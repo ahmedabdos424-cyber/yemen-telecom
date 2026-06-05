@@ -44,7 +44,7 @@ const BottomNav = lazy(() => import('./components/BottomNav'));
 
 import { AnimatePresence, motion } from 'motion/react';
 import { LogOut, Check, Copy, X } from 'lucide-react';
-import { api, setToken } from './api/client';
+import { api, setToken, fetchCsrfToken } from './api/client';
 
 export default function App() {
   // Global Authentication States & Session Management
@@ -94,6 +94,7 @@ export default function App() {
             setUsername('');
             setTokenWrapper(null);
           }
+          fetchCsrfToken();
         })
         .catch(() => {
           // Token expired or invalid — clear auth state silently
@@ -256,6 +257,7 @@ export default function App() {
         const savedTab = localStorage.getItem('tele_role_tab') || 'home';
         setRoleTab(savedTab);
       }
+      fetchCsrfToken();
       return;
     } catch {
       // Backend unavailable - fall back to localStorage auth

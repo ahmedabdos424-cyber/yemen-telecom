@@ -1,6 +1,9 @@
-const API_BASE = '/api';
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? '/api'
+  : 'https://yemen-telecom-api.onrender.com/api';
 
 let authToken: string | null = localStorage.getItem('auth_token');
+let csrfToken: string | null = null;
 
 export function setToken(token: string | null) {
   authToken = token;
@@ -11,6 +14,18 @@ export function setToken(token: string | null) {
   }
 }
 
+export async function fetchCsrfToken(): Promise<void> {
+  try {
+    const res = await fetch(`${API_BASE}/csrf-token`, { credentials: 'include' });
+    if (res.ok) {
+      const data = await res.json();
+      csrfToken = data.token;
+    }
+  } catch {
+    csrfToken = null;
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -18,6 +33,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   };
   if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`;
+  }
+  if (csrfToken && !path.startsWith('/auth/') && path !== '/csrf-token') {
+    headers['X-CSRF-Token'] = csrfToken;
   }
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
   if (!res.ok) {
@@ -33,6 +51,9 @@ async function uploadFile(file: File | Blob, fieldName = 'image'): Promise<{ url
   const headers: Record<string, string> = {};
   if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`;
+  }
+  if (csrfToken) {
+    headers['X-CSRF-Token'] = csrfToken;
   }
   const res = await fetch(`${API_BASE}/upload/image`, { method: 'POST', headers, body: form });
   if (!res.ok) {
