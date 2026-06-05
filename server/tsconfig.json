@@ -15,5 +15,5 @@
     "sourceMap": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "src/init-db.ts", "src/seed.ts"]
+  "exclude": ["node_modules", "dist", "src/init-db.ts", "src/seed.ts", "src/firebase-admin.ts"]
 }
