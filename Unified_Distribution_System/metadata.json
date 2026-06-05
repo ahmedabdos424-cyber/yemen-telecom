@@ -1,0 +1,6 @@
+{
+  "name": "نظام التوزيع الموحد",
+  "description": "منصة تتبع وتوزيع الشرائح الذكية - لوحة تحكم للوكلاء والبائعين لتفعيل الشرائح وإدارة المخزون والعمليات الميدانية.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

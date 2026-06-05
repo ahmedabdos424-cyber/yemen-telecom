@@ -1,0 +1,53 @@
+import { Router, Request, Response } from 'express';
+import { query } from '../db';
+
+const router = Router();
+
+router.get('/', async (_req: Request, res: Response) => {
+  try {
+    const result = await query('SELECT * FROM operations ORDER BY id DESC');
+    res.json(result.rows.map((r: any) => ({
+      id: r.op_id,
+      type: r.type,
+      target: r.target,
+      operator: r.operator,
+      date: r.date,
+      time: r.time,
+      status: r.status,
+    })));
+  } catch (err) {
+    console.error('Error fetching operations:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/', async (req: Request, res: Response) => {
+  const { type, target, operator, status } = req.body;
+  if (!type || !target) {
+    return res.status(400).json({ error: 'Type and target are required' });
+  }
+  try {
+    const opId = `op_${Date.now()}`;
+    const now = new Date();
+    const date = now.toISOString().split('T')[0].replace(/-/g, '/');
+    const time = 'الآن';
+    const result = await query(
+      `INSERT INTO operations (op_id, type, target, operator, date, time, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [opId, type, target, operator || '', date, time, status || 'success']
+    );
+    res.status(201).json({
+      id: result.rows[0].op_id,
+      type: result.rows[0].type,
+      target: result.rows[0].target,
+      operator: result.rows[0].operator,
+      date: result.rows[0].date,
+      time: result.rows[0].time,
+      status: result.rows[0].status,
+    });
+  } catch (err) {
+    console.error('Error creating operation:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+export default router;

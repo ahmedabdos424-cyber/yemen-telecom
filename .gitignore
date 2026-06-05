@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.vite/
+*.log
+.env
+.DS_Store
+*.apk
+*.zip
+*.png
+firebase-service-account.json
+.domdump.txt

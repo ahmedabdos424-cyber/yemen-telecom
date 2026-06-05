@@ -1,0 +1,6 @@
+{
+  "name": "إدارة شرائح Telecom",
+  "description": "نظام لإدارة وتوزيع الشرائح ومراقبة الهويات المتكررة ومتابعة الوكلاء والمبيعات وإعدادات الأمان والتقارير.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
