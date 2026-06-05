@@ -19,7 +19,7 @@ export const pool = new Pool({
   ssl: process.env.DB_HOST !== 'localhost' ? { rejectUnauthorized: false } : false,
   connectionTimeoutMillis: 10000,
   family: 4,
-});
+} as any);
 
 pool.on('error', (err) => {
   console.error('Unexpected error on idle client', err);
