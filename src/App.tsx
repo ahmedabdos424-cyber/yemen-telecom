@@ -1027,18 +1027,22 @@ export default function App() {
       {/* Seller Credentials Modal */}
       <AnimatePresence>
         {sellerCredentials && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-          >
+          <>
             <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              className="w-full max-w-sm bg-slate-900 border border-slate-700 rounded-3xl p-6 shadow-2xl text-right"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+              onClick={() => setSellerCredentials(null)}
+            />
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              className="fixed bottom-0 left-0 right-0 z-50 sm:relative sm:max-w-sm sm:mx-auto sm:my-auto sm:rounded-3xl card-enhanced rounded-t-3xl p-5 pb-8 max-h-[90dvh] overflow-y-auto"
             >
+              <div className="bottom-sheet-drag sm:hidden mx-auto mb-2" />
               <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-700">
                 <h3 className="text-base font-bold text-emerald-400 flex items-center gap-2">
                   <Check size={18} />
@@ -1046,7 +1050,8 @@ export default function App() {
                 </h3>
                 <button
                   onClick={() => setSellerCredentials(null)}
-                  className="p-1 text-slate-500 hover:text-slate-100 rounded-full transition-colors cursor-pointer"
+                  className="touch-target flex items-center justify-center p-2 text-slate-500 hover:text-slate-100 rounded-xl transition-colors cursor-pointer"
+                  aria-label="إغلاق"
                 >
                   <X size={18} />
                 </button>
@@ -1056,26 +1061,28 @@ export default function App() {
               </p>
               <div className="space-y-3 mb-5">
                 <div className="bg-slate-950 rounded-xl p-3 border border-slate-800">
-                  <label className="text-[10px] text-slate-500 block mb-1">اسم المستخدم</label>
+                  <span className="input-label">اسم المستخدم</span>
                   <div className="flex items-center justify-between gap-2">
-                    <code className="text-sm font-mono text-slate-100 bg-slate-900 px-3 py-1.5 rounded-lg flex-1 text-left" dir="ltr">{sellerCredentials.username}</code>
+                    <code className="text-sm font-mono text-slate-100 bg-slate-900 px-3 py-1.5 rounded-lg flex-1 text-left dir-ltr" dir="ltr">{sellerCredentials.username}</code>
                     <button
                       onClick={() => { navigator.clipboard.writeText(sellerCredentials.username); }}
-                      className="btn-icon bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-100"
+                      className="copy-btn"
                       title="نسخ اسم المستخدم"
+                      aria-label="نسخ اسم المستخدم"
                     >
                       <Copy size={14} />
                     </button>
                   </div>
                 </div>
                 <div className="bg-slate-950 rounded-xl p-3 border border-slate-800">
-                  <label className="text-[10px] text-slate-500 block mb-1">كلمة المرور</label>
+                  <span className="input-label">كلمة المرور</span>
                   <div className="flex items-center justify-between gap-2">
-                    <code className="text-sm font-mono text-amber-400 bg-slate-900 px-3 py-1.5 rounded-lg flex-1 text-left" dir="ltr">{sellerCredentials.password}</code>
+                    <code className="text-sm font-mono text-amber-400 bg-slate-900 px-3 py-1.5 rounded-lg flex-1 text-left dir-ltr" dir="ltr">{sellerCredentials.password}</code>
                     <button
                       onClick={() => { navigator.clipboard.writeText(sellerCredentials.password); }}
-                      className="btn-icon bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-100"
+                      className="copy-btn"
                       title="نسخ كلمة المرور"
+                      aria-label="نسخ كلمة المرور"
                     >
                       <Copy size={14} />
                     </button>
@@ -1084,67 +1091,65 @@ export default function App() {
               </div>
               <button
                 onClick={() => setSellerCredentials(null)}
-                className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm transition-all cursor-pointer"
+                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm transition-all active:scale-[0.98] cursor-pointer min-h-[48px]"
               >
                 إغلاق
               </button>
             </motion.div>
-          </motion.div>
+          </>
         )}
       </AnimatePresence>
 
       {/* Logout Confirmation Dialog */}
       <AnimatePresence>
         {showLogoutModal && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <>
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowLogoutModal(false)}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
             />
             <motion.div
-              initial={{ scale: 0.95, y: 100 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 100 }}
-              className="relative w-full sm:max-w-sm bg-slate-900 sm:border border-slate-800 sm:rounded-3xl rounded-t-3xl p-5 sm:p-6 shadow-2xl overflow-hidden text-slate-200 z-10 text-right safe-bottom"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              className="fixed bottom-0 left-0 right-0 z-50 sm:relative sm:max-w-sm sm:mx-auto sm:my-auto sm:rounded-3xl card-enhanced rounded-t-3xl p-5 pb-8"
             >
-              {/* Header */}
-              <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-800/60">
-                <h3 className="text-sm font-bold text-slate-100">تسجيل الخروج</h3>
+              <div className="bottom-sheet-drag sm:hidden mx-auto mb-2" />
+              <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-700">
+                <h3 className="text-sm font-bold">تسجيل الخروج</h3>
                 <button
                   onClick={() => setShowLogoutModal(false)}
-                  className="p-1.5 text-slate-500 hover:text-slate-100 rounded-full transition-colors cursor-pointer touch-target"
+                  className="touch-target flex items-center justify-center p-2 text-slate-500 hover:text-slate-100 rounded-xl transition-colors cursor-pointer"
+                  aria-label="إغلاق"
                 >
-                  <span className="material-symbols-outlined text-sm">close</span>
+                  <span className="material-symbols-outlined text-lg">close</span>
                 </button>
               </div>
-
-              {/* Description */}
               <div className="mb-6">
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
                   هل أنت متأكد أنك تريد تسجيل الخروج من حسابك؟
                 </p>
               </div>
-
-              {/* Buttons */}
               <div className="flex gap-3">
                 <button
                   onClick={handleConfirmLogout}
-                  className="flex-1 py-3.5 bg-[#b90e1a] hover:bg-red-750 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all cursor-pointer text-center min-h-[44px]"
+                  className="flex-1 py-3.5 bg-ym hover:bg-red-700 active:scale-[0.98] text-white font-bold text-xs sm:text-sm rounded-xl transition-all cursor-pointer text-center min-h-[48px]"
                 >
                   تسجيل الخروج
                 </button>
                 <button
                   onClick={() => setShowLogoutModal(false)}
-                  className="flex-1 py-3.5 bg-slate-800 hover:bg-slate-750 text-slate-300 font-medium text-[#c0c6d1] rounded-xl border border-slate-700 transition-all cursor-pointer text-center min-h-[44px]"
+                  className="flex-1 py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 transition-all active:scale-[0.98] cursor-pointer text-center min-h-[48px]"
                 >
                   إلغاء
                 </button>
               </div>
             </motion.div>
-          </div>
+          </>
         )}
       </AnimatePresence>
       </>

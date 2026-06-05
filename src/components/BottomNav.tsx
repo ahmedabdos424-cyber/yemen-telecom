@@ -1,4 +1,5 @@
 ﻿import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { ViewType } from '../types';
 import AdminMoreDrawer from './AdminMoreDrawer';
 
@@ -32,22 +33,30 @@ export default function BottomNav({ currentView, setView, unresolvedAlertsCount,
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-300/90 shadow-[0_-8px_30px_rgb(0,0,0,0.08)] z-50 transition-all duration-200 nav-safe-bottom">
-        <div className="max-w-7xl mx-auto h-14 md:h-16 px-2 md:px-8 flex justify-between items-center" dir="rtl">
+      <nav className="bottom-nav transition-all duration-200">
+        <div className="max-w-7xl mx-auto h-14 md:h-16 px-1 md:px-4 flex justify-around items-center" dir="rtl">
           {primaryNavItems.map((item) => {
             const isSelected = currentView === item.id ||
               (item.id === 'agents' && currentView === 'add-agent') ||
               (item.id === 'more' && isMoreOpen);
             return (
               <button key={item.id} onClick={() => handleNavClick(item.id)}
-                className={`flex flex-col items-center justify-center flex-1 h-full py-1 relative cursor-pointer active:scale-95 transition-all select-none group focus:outline-none focus:ring-2 focus:ring-secondary/35 rounded-xl min-w-0 ${isSelected ? 'text-red-600' : 'text-slate-400 hover:text-slate-600'}`}>
-                {isSelected && <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 md:w-10 h-0.5 bg-red-600 rounded-b-md"></span>}
-                <div className={`w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all duration-150 ${isSelected ? 'bg-red-600/10 text-red-600' : 'text-slate-400'}`}>
-                  <span className={`material-symbols-outlined text-xl md:text-2xl transition-transform ${isSelected ? 'font-bold' : ''}`}>{item.icon}</span>
+                className={`bottom-nav-btn flex-col px-1 min-w-0 ${isSelected ? 'active' : ''}`}
+                aria-label={item.label}
+                aria-current={isSelected ? 'page' : undefined}>
+                {isSelected && (
+                  <motion.span layoutId="bottomNavIndicator"
+                    className="absolute top-0 left-1/2 -translate-x-1/2 w-10 h-[3px] bg-ym rounded-b-md" />
+                )}
+                <div className={`bottom-nav-icon ${isSelected ? 'bg-ym/10' : ''}`}>
+                  <span className={`material-symbols-outlined text-2xl transition-transform duration-200 ${isSelected ? 'scale-110 font-bold' : ''}`}>{item.icon}</span>
                 </div>
-                <span className={`text-[9px] md:text-[10px] mt-0.5 font-medium tracking-tight transition-colors truncate w-full text-center ${isSelected ? 'text-slate-950 font-bold' : 'text-slate-400'}`}>{item.label}</span>
+                <span className="bottom-nav-label">{item.label}</span>
                 {item.id === 'reports' && unresolvedAlertsCount > 0 && (
-                  <span className="absolute top-0.5 right-1/2 translate-x-3 md:translate-x-4 bg-red-600 text-white font-mono text-[7px] md:text-[8px] font-bold w-3.5 h-3.5 md:w-4 md:h-4 rounded-full flex items-center justify-center border border-white">!</span>
+                  <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }}
+                    className="absolute top-0.5 right-1/2 translate-x-3 translate-y-0.5 bg-red-600 text-white font-mono text-[8px] font-bold w-[18px] h-[18px] rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                    {unresolvedAlertsCount > 9 ? '9+' : unresolvedAlertsCount}
+                  </motion.span>
                 )}
               </button>
             );

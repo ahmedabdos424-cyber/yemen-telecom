@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { ViewType } from '../types';
 
 interface AdminMoreDrawerProps {
@@ -66,158 +67,186 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
 
   return (
     <>
-      <div
-        className="fixed inset-0 bg-gray-950/60 backdrop-blur-xs z-[100] flex justify-center items-end md:items-center p-0 md:p-4 animate-in fade-in duration-150"
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]"
         onClick={() => setIsMoreOpen(false)}
+      />
+      <motion.div
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+        className="bottom-sheet z-[101] md:!relative md:!rounded-2xl md:max-w-lg lg:max-w-2xl md:mx-auto md:my-auto md:max-h-[85vh]"
+        onClick={(e) => e.stopPropagation()}
       >
-        <div
-          className="bg-white w-full md:max-w-lg lg:max-w-2xl rounded-t-3xl md:rounded-2xl shadow-2xl border md:border-slate-200 max-h-[90vh] md:max-h-[90vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom md:slide-in-from-bottom-0 duration-200"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="px-4 md:px-6 py-3 md:py-4 bg-slate-950 border-b border-slate-800 flex justify-between items-center text-white shrink-0">
-            <div className="flex items-center gap-2 md:gap-2.5">
-              <span className="material-symbols-outlined text-secondary text-xl md:text-2xl">apps</span>
-              <div>
-                <h3 className="font-bold text-xs md:text-sm font-sans tracking-wide">الخيارات الإدارية لتطبيقات النظام</h3>
-                <p className="text-[9px] md:text-[10px] text-slate-400 font-medium">الولوج إلى أدوات ومستلزمات وعافية الاتصالات الفرعية</p>
-              </div>
+        <div className="bottom-sheet-drag md:hidden" />
+        <div className="bottom-sheet-header">
+          <div className="flex items-center gap-2.5">
+            <span className="material-symbols-outlined text-ym text-xl">apps</span>
+            <div>
+              <h3 className="font-bold text-sm">الخيارات الإدارية</h3>
+              <p className="text-[10px] text-slate-500">أدوات ومستلزمات النظام</p>
             </div>
-            <button onClick={() => setIsMoreOpen(false)}
-              className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors cursor-pointer touch-target">
-              <span className="material-symbols-outlined text-sm font-bold">close</span>
-            </button>
           </div>
+          <button onClick={() => setIsMoreOpen(false)}
+            className="touch-target flex items-center justify-center p-2 hover:bg-slate-800/50 rounded-xl text-slate-400 hover:text-white transition-colors cursor-pointer">
+            <span className="material-symbols-outlined text-lg">close</span>
+          </button>
+        </div>
 
-          <div className="flex-1 overflow-y-auto px-4 md:px-6 py-3 md:py-4 space-y-4 md:space-y-5 bg-slate-950/70 text-right dir-rtl">
-            <div className="space-y-2">
-              <h4 className="text-[10px] text-slate-400 bg-slate-300/50 px-2.5 py-1 rounded-md font-bold inline-block select-none">👥 العمليات والوكلاء ومراقبة البيع</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <button onClick={() => { setActiveSubScreen('user-management'); }}
-                  className="w-full text-right p-3 bg-white border border-slate-300/50 hover:bg-sky-50 rounded-xl transition-all cursor-pointer flex items-center justify-between group">
-                  <div className="flex items-center gap-2.5">
-                    <span className="material-symbols-outlined text-slate-400 group-hover:text-sky-600 text-lg">person_search</span>
-                    <span className="text-xs font-bold text-slate-700 group-hover:text-slate-900">إدارة مستخدمي النظام</span>
-                  </div>
-                  <span className="material-symbols-outlined text-gray-300 text-sm group-hover:translate-x-[-2px] transition-transform">arrow_back</span>
-                </button>
-                <button onClick={() => { setView('sellers'); setIsMoreOpen(false); }}
-                  className="w-full text-right p-3 bg-white border border-slate-300/50 hover:bg-sky-50 rounded-xl transition-all cursor-pointer flex items-center justify-between group">
-                  <div className="flex items-center gap-2.5">
-                    <span className="material-symbols-outlined text-slate-400 group-hover:text-sky-600 text-lg">storefront</span>
-                    <span className="text-xs font-bold text-slate-700 group-hover:text-slate-900">إدارة البائعين ونقاط البيع</span>
-                  </div>
-                  <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold ml-1">نشط</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <h4 className="text-[10px] text-slate-400 bg-slate-300/50 px-2.5 py-1 rounded-md font-bold inline-block select-none">🛡️ المراقبة والتدقيق الأمني وتكامل الهويات</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <button onClick={() => { setView('duplicate-identities'); setIsMoreOpen(false); }}
-                  className="w-full text-right p-3 bg-white border border-slate-300/50 hover:bg-sky-50 rounded-xl transition-all cursor-pointer flex items-center justify-between group">
-                  <div className="flex items-center gap-2.5">
-                    <span className="material-symbols-outlined text-slate-400 group-hover:text-red-600 text-lg">policy</span>
-                    <span className="text-xs font-bold text-slate-700 group-hover:text-slate-900">المراقبة ومكافحة التسييل</span>
-                  </div>
-                  <span className="text-[9px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-bold ml-1">أمني</span>
-                </button>
-                <button onClick={() => { setActiveSubScreen('audit-logs'); }}
-                  className="w-full text-right p-3 bg-white border border-slate-300/50 hover:bg-sky-50 rounded-xl transition-all cursor-pointer flex items-center justify-between group">
-                  <div className="flex items-center gap-2.5">
-                    <span className="material-symbols-outlined text-slate-400 group-hover:text-sky-600 text-lg">list_alt</span>
-                    <span className="text-xs font-bold text-slate-700 group-hover:text-slate-900">سجلات التدقيق الأمني (Audit)</span>
-                  </div>
-                  <span className="material-symbols-outlined text-gray-300 text-sm group-hover:translate-x-[-2px] transition-transform">arrow_back</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <h4 className="text-[10px] text-slate-400 bg-slate-300/50 px-2.5 py-1 rounded-md font-bold inline-block select-none">🌐 الشبكات والبنية التحتية والمخازن</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <button onClick={() => { setActiveSubScreen('operator-management'); }}
-                  className="w-full text-right p-3 bg-white border border-slate-300/50 hover:bg-sky-50 rounded-xl transition-all cursor-pointer flex items-center justify-between group">
-                  <div className="flex items-center gap-2.5"><span className="material-symbols-outlined text-slate-400 group-hover:text-sky-600 text-lg">cell_tower</span><span className="text-xs font-bold text-slate-700 group-hover:text-slate-900">إدارة مشغلي الاتصالات</span></div>
-                  <span className="material-symbols-outlined text-gray-300 text-sm">arrow_back</span>
-                </button>
-                <button onClick={() => { setActiveSubScreen('storage-management'); }}
-                  className="w-full text-right p-3 bg-white border border-slate-300/50 hover:bg-sky-50 rounded-xl transition-all cursor-pointer flex items-center justify-between group">
-                  <div className="flex items-center gap-2.5"><span className="material-symbols-outlined text-slate-400 group-hover:text-sky-600 text-lg">warehouse</span><span className="text-xs font-bold text-slate-700 group-hover:text-slate-900">إدارة المستودعات والتخزين</span></div>
-                  <span className="material-symbols-outlined text-gray-300 text-sm">arrow_back</span>
-                </button>
-                <button onClick={() => { setActiveSubScreen('system-health'); }}
-                  className="w-full text-right p-3 bg-white border border-slate-300/50 hover:bg-sky-50 rounded-xl transition-all cursor-pointer flex items-center justify-between group">
-                  <div className="flex items-center gap-2.5"><span className="material-symbols-outlined text-slate-400 group-hover:text-green-500 text-lg">dns</span><span className="text-xs font-bold text-slate-700 group-hover:text-slate-900">صحة وحالة الخوادم</span></div>
-                  <div className="flex items-center gap-1.5 font-mono text-[9px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full"><span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>100%</div>
-                </button>
-                <button onClick={() => { setActiveSubScreen('backup-restore'); }}
-                  className="w-full text-right p-3 bg-white border border-slate-300/50 hover:bg-sky-50 rounded-xl transition-all cursor-pointer flex items-center justify-between group">
-                  <div className="flex items-center gap-2.5"><span className="material-symbols-outlined text-slate-400 group-hover:text-sky-600 text-lg">backup</span><span className="text-xs font-bold text-slate-700 group-hover:text-slate-900">النسخ الاحتياطي والاستعادة</span></div>
-                  <span className="material-symbols-outlined text-gray-300 text-sm">arrow_back</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <h4 className="text-[10px] text-slate-400 bg-slate-300/50 px-2.5 py-1 rounded-md font-bold inline-block select-none">🛡️ صلاحيات الموظفين والربط البرمجي</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <button onClick={() => { setActiveSubScreen('permissions-roles'); }}
-                  className="w-full text-right p-3 bg-white border border-slate-300/50 hover:bg-sky-50 rounded-xl transition-all cursor-pointer flex items-center justify-between group">
-                  <div className="flex items-center gap-2.5"><span className="material-symbols-outlined text-slate-400 group-hover:text-sky-600 text-lg">badge</span><span className="text-xs font-bold text-slate-700 group-hover:text-slate-900">الصلاحيات وأدوار الموظفين</span></div>
-                  <span className="material-symbols-outlined text-gray-300 text-sm">arrow_back</span>
-                </button>
-                <button onClick={() => { setActiveSubScreen('integrations'); }}
-                  className="w-full text-right p-3 bg-white border border-slate-300/50 hover:bg-sky-50 rounded-xl transition-all cursor-pointer flex items-center justify-between group">
-                  <div className="flex items-center gap-2.5"><span className="material-symbols-outlined text-slate-400 group-hover:text-sky-600 text-lg">api</span><span className="text-xs font-bold text-slate-700 group-hover:text-slate-900">التكامل الخارجي ويبهوك (API)</span></div>
-                  <span className="material-symbols-outlined text-gray-300 text-sm">arrow_back</span>
-                </button>
-                <button onClick={() => { setView('reports'); setIsMoreOpen(false); }}
-                  className="w-full text-right p-3 bg-white border border-slate-300/50 hover:bg-sky-50 rounded-xl transition-all cursor-pointer flex items-center justify-between group sm:col-span-2">
-                  <div className="flex items-center gap-2.5"><span className="material-symbols-outlined text-slate-400 group-hover:text-sky-600 text-lg">query_stats</span><span className="text-xs font-bold text-slate-700 group-hover:text-slate-900">تقارير وتحليلات متقدمة</span></div>
-                  <span className="text-[9px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold">تقرير</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <h4 className="text-[10px] text-slate-400 bg-slate-300/50 px-2.5 py-1 rounded-md font-bold inline-block select-none">ℹ️ المساعدة ومعلومات الخدمة والدعم</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <button onClick={() => { setActiveSubScreen('support-center'); }}
-                  className="w-full text-right p-3 bg-white border border-slate-300/50 hover:bg-sky-50 rounded-xl transition-all cursor-pointer flex flex-col justify-center items-center text-center gap-1 group">
-                  <span className="material-symbols-outlined text-slate-400 group-hover:text-sky-600 text-2xl">contact_support</span>
-                  <span className="text-[10px] font-extrabold text-slate-700">مركز الدعم</span>
-                </button>
-                <button onClick={() => { setActiveSubScreen('help-guide'); }}
-                  className="w-full text-right p-3 bg-white border border-slate-300/50 hover:bg-sky-50 rounded-xl transition-all cursor-pointer flex flex-col justify-center items-center text-center gap-1 group">
-                  <span className="material-symbols-outlined text-slate-400 group-hover:text-sky-600 text-2xl">help_outline</span>
-                  <span className="text-[10px] font-extrabold text-slate-700">دليل الاستخدام</span>
-                </button>
-                <button onClick={() => { setActiveSubScreen('about-system'); }}
-                  className="w-full text-right p-3 bg-white border border-slate-300/50 hover:bg-sky-50 rounded-xl transition-all cursor-pointer flex flex-col justify-center items-center text-center gap-1 group">
-                  <span className="material-symbols-outlined text-slate-400 group-hover:text-sky-600 text-2xl">info</span>
-                  <span className="text-[10px] font-extrabold text-slate-700">حول النظام</span>
-                </button>
-              </div>
+        <div className="bottom-sheet-body space-y-4">
+          <div className="space-y-2">
+            <h4 className="text-[10px] text-slate-500 bg-slate-800/50 px-2.5 py-1 rounded-md font-bold inline-block select-none">👥 العمليات والوكلاء ومراقبة البيع</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button onClick={() => { setActiveSubScreen('user-management'); }}
+                className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
+                <div className="flex items-center gap-2.5">
+                  <span className="material-symbols-outlined text-slate-400 group-hover:text-ym text-lg">person_search</span>
+                  <span className="text-xs font-bold text-slate-200">إدارة مستخدمي النظام</span>
+                </div>
+                <span className="material-symbols-outlined text-slate-600 text-sm group-hover:-translate-x-0.5 transition-transform">arrow_back</span>
+              </button>
+              <button onClick={() => { setView('sellers'); setIsMoreOpen(false); }}
+                className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
+                <div className="flex items-center gap-2.5">
+                  <span className="material-symbols-outlined text-slate-400 group-hover:text-ym text-lg">storefront</span>
+                  <span className="text-xs font-bold text-slate-200">إدارة البائعين ونقاط البيع</span>
+                </div>
+                <span className="text-[9px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full font-bold">نشط</span>
+              </button>
             </div>
           </div>
 
-          <div className="px-4 md:px-6 py-3 md:py-4 bg-slate-200 border-t border-slate-300 flex justify-center shrink-0">
-            <button onClick={() => setShowLogOutDialog(true)}
-              className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-3 px-5 rounded-xl font-bold text-xs transition-all shadow-md hover:shadow-red-500/10 active:scale-[0.98] cursor-pointer min-h-[44px]">
-              <span className="material-symbols-outlined text-sm font-bold">logout</span>
-              تسجيل الخروج الآمن من النظام
-            </button>
+          <div className="space-y-2">
+            <h4 className="text-[10px] text-slate-500 bg-slate-800/50 px-2.5 py-1 rounded-md font-bold inline-block select-none">🛡️ المراقبة والتدقيق الأمني</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button onClick={() => { setView('duplicate-identities'); setIsMoreOpen(false); }}
+                className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
+                <div className="flex items-center gap-2.5">
+                  <span className="material-symbols-outlined text-slate-400 group-hover:text-red-500 text-lg">policy</span>
+                  <span className="text-xs font-bold text-slate-200">المراقبة ومكافحة التسييل</span>
+                </div>
+                <span className="text-[9px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full font-bold">أمني</span>
+              </button>
+              <button onClick={() => { setActiveSubScreen('audit-logs'); }}
+                className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
+                <div className="flex items-center gap-2.5">
+                  <span className="material-symbols-outlined text-slate-400 group-hover:text-sf text-lg">list_alt</span>
+                  <span className="text-xs font-bold text-slate-200">سجلات التدقيق الأمني</span>
+                </div>
+                <span className="material-symbols-outlined text-slate-600 text-sm group-hover:-translate-x-0.5 transition-transform">arrow_back</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <h4 className="text-[10px] text-slate-500 bg-slate-800/50 px-2.5 py-1 rounded-md font-bold inline-block select-none">🌐 الشبكات والبنية التحتية</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button onClick={() => { setActiveSubScreen('operator-management'); }}
+                className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
+                <div className="flex items-center gap-2.5"><span className="material-symbols-outlined text-slate-400 group-hover:text-sf text-lg">cell_tower</span><span className="text-xs font-bold text-slate-200">إدارة مشغلي الاتصالات</span></div>
+                <span className="material-symbols-outlined text-slate-600 text-sm">arrow_back</span>
+              </button>
+              <button onClick={() => { setActiveSubScreen('storage-management'); }}
+                className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
+                <div className="flex items-center gap-2.5"><span className="material-symbols-outlined text-slate-400 group-hover:text-you text-lg">warehouse</span><span className="text-xs font-bold text-slate-200">إدارة المستودعات</span></div>
+                <span className="material-symbols-outlined text-slate-600 text-sm">arrow_back</span>
+              </button>
+              <button onClick={() => { setActiveSubScreen('system-health'); }}
+                className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
+                <div className="flex items-center gap-2.5"><span className="material-symbols-outlined text-slate-400 group-hover:text-green-500 text-lg">dns</span><span className="text-xs font-bold text-slate-200">صحة الخوادم</span></div>
+                <div className="flex items-center gap-1.5 font-mono text-[9px] font-bold text-green-400 bg-green-500/20 px-2 py-0.5 rounded-full"><span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>100%</div>
+              </button>
+              <button onClick={() => { setActiveSubScreen('backup-restore'); }}
+                className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
+                <div className="flex items-center gap-2.5"><span className="material-symbols-outlined text-slate-400 group-hover:text-sf text-lg">backup</span><span className="text-xs font-bold text-slate-200">النسخ الاحتياطي</span></div>
+                <span className="material-symbols-outlined text-slate-600 text-sm">arrow_back</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <h4 className="text-[10px] text-slate-500 bg-slate-800/50 px-2.5 py-1 rounded-md font-bold inline-block select-none">🛡️ صلاحيات الموظفين والربط البرمجي</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button onClick={() => { setActiveSubScreen('permissions-roles'); }}
+                className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
+                <div className="flex items-center gap-2.5"><span className="material-symbols-outlined text-slate-400 group-hover:text-ym text-lg">badge</span><span className="text-xs font-bold text-slate-200">الصلاحيات والأدوار</span></div>
+                <span className="material-symbols-outlined text-slate-600 text-sm">arrow_back</span>
+              </button>
+              <button onClick={() => { setActiveSubScreen('integrations'); }}
+                className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
+                <div className="flex items-center gap-2.5"><span className="material-symbols-outlined text-slate-400 group-hover:text-you text-lg">api</span><span className="text-xs font-bold text-slate-200">التكامل الخارجي API</span></div>
+                <span className="material-symbols-outlined text-slate-600 text-sm">arrow_back</span>
+              </button>
+              <button onClick={() => { setView('reports'); setIsMoreOpen(false); }}
+                className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer sm:col-span-2">
+                <div className="flex items-center gap-2.5"><span className="material-symbols-outlined text-slate-400 group-hover:text-ym text-lg">query_stats</span><span className="text-xs font-bold text-slate-200">تقارير وتحليلات متقدمة</span></div>
+                <span className="text-[9px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full font-bold">تقرير</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <h4 className="text-[10px] text-slate-500 bg-slate-800/50 px-2.5 py-1 rounded-md font-bold inline-block select-none">ℹ️ المساعدة والدعم</h4>
+            <div className="grid grid-cols-3 gap-2">
+              <button onClick={() => { setActiveSubScreen('support-center'); }}
+                className="p-3 card-enhanced hover:border-slate-600 flex flex-col items-center text-center gap-1 cursor-pointer">
+                <span className="material-symbols-outlined text-slate-400 group-hover:text-ym text-2xl">contact_support</span>
+                <span className="text-[10px] font-bold text-slate-300">مركز الدعم</span>
+              </button>
+              <button onClick={() => { setActiveSubScreen('help-guide'); }}
+                className="p-3 card-enhanced hover:border-slate-600 flex flex-col items-center text-center gap-1 cursor-pointer">
+                <span className="material-symbols-outlined text-slate-400 group-hover:text-sf text-2xl">help_outline</span>
+                <span className="text-[10px] font-bold text-slate-300">دليل الاستخدام</span>
+              </button>
+              <button onClick={() => { setActiveSubScreen('about-system'); }}
+                className="p-3 card-enhanced hover:border-slate-600 flex flex-col items-center text-center gap-1 cursor-pointer">
+                <span className="material-symbols-outlined text-slate-400 group-hover:text-you text-2xl">info</span>
+                <span className="text-[10px] font-bold text-slate-300">حول النظام</span>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
 
-      {activeSubScreen !== null && (
-        <div className="fixed inset-0 bg-gray-950/75 backdrop-blur-md z-[110] flex items-end md:items-center justify-center p-0 md:p-4 overflow-y-auto">
-          <div className="bg-white w-full md:max-w-2xl rounded-t-3xl md:rounded-2xl shadow-2xl border-0 md:border border-slate-300 overflow-hidden flex flex-col max-h-[90vh] md:max-h-[85vh] text-right dir-rtl animate-in slide-in-from-bottom md:zoom-in-95 duration-200 safe-bottom">
-            <div className="px-4 md:px-6 py-3 md:py-4 bg-slate-950 border-b border-slate-800 flex justify-between items-center text-white shrink-0">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-secondary text-lg md:text-xl">
+        <div className="bottom-sheet-header border-t border-slate-800 mt-auto">
+          <button onClick={() => setShowLogOutDialog(true)}
+            className="w-full flex items-center justify-center gap-2 bg-ym hover:bg-red-700 active:scale-[0.98] text-white py-3.5 px-5 rounded-xl font-bold text-xs transition-all cursor-pointer min-h-[48px]">
+            <span className="material-symbols-outlined text-base">logout</span>
+            تسجيل الخروج الآمن من النظام
+          </button>
+        </div>
+      </motion.div>
+
+      <AnimatePresence>
+        {activeSubScreen !== null && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[110]"
+            onClick={() => setActiveSubScreen(null)}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {activeSubScreen !== null && (
+          <motion.div
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+            className="bottom-sheet z-[111] md:!relative md:!rounded-2xl md:max-w-2xl md:mx-auto md:my-auto md:max-h-[85vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bottom-sheet-drag md:hidden" />
+            <div className="bottom-sheet-header">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="material-symbols-outlined text-ym text-lg shrink-0">
                   {activeSubScreen === 'user-management' && 'person_search'}
                   {activeSubScreen === 'audit-logs' && 'policy'}
                   {activeSubScreen === 'operator-management' && 'cell_tower'}
@@ -230,27 +259,27 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
                   {activeSubScreen === 'help-guide' && 'help_outline'}
                   {activeSubScreen === 'about-system' && 'info'}
                 </span>
-                <span className="font-bold text-[11px] md:text-xs truncate max-w-[200px] md:max-w-none">
-                  {activeSubScreen === 'user-management' && 'إدارة مستخدمي ومسؤولي النظام'}
-                  {activeSubScreen === 'audit-logs' && 'سجلات الرقابة والتدقيق الأمني المباشر'}
-                  {activeSubScreen === 'operator-management' && 'إدارة شبكات ومزودي خدمات الاتصالات'}
-                  {activeSubScreen === 'storage-management' && 'إدارة مستودعات مخازن الشرائح'}
-                  {activeSubScreen === 'system-health' && 'صحة البنية التحتية للخوادم'}
-                  {activeSubScreen === 'backup-restore' && 'النسخ الاحتياطي والأرشفة الجنائية'}
-                  {activeSubScreen === 'permissions-roles' && 'مصفوفة الأدوار والصلاحيات الوظيفية'}
-                  {activeSubScreen === 'integrations' && 'تكامل بوابات الدفع والربط الخارجي API'}
-                  {activeSubScreen === 'support-center' && 'مركز اتصال الدعم الفني والمراسلة'}
-                  {activeSubScreen === 'help-guide' && 'الدليل الإرشادي والتعليمات التوضيحية'}
-                  {activeSubScreen === 'about-system' && 'حول نظام إدارة تسييل وتوزيع الشرائح'}
+                <span className="font-bold text-xs truncate">
+                  {activeSubScreen === 'user-management' && 'إدارة مستخدمي النظام'}
+                  {activeSubScreen === 'audit-logs' && 'سجلات التدقيق الأمني'}
+                  {activeSubScreen === 'operator-management' && 'إدارة مشغلي الاتصالات'}
+                  {activeSubScreen === 'storage-management' && 'إدارة المستودعات'}
+                  {activeSubScreen === 'system-health' && 'صحة الخوادم'}
+                  {activeSubScreen === 'backup-restore' && 'النسخ الاحتياطي'}
+                  {activeSubScreen === 'permissions-roles' && 'الصلاحيات والأدوار'}
+                  {activeSubScreen === 'integrations' && 'التكامل الخارجي API'}
+                  {activeSubScreen === 'support-center' && 'مركز الدعم الفني'}
+                  {activeSubScreen === 'help-guide' && 'دليل الاستخدام'}
+                  {activeSubScreen === 'about-system' && 'حول النظام'}
                 </span>
               </div>
               <button onClick={() => setActiveSubScreen(null)}
-                className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white cursor-pointer touch-target">
-                <span className="material-symbols-outlined text-sm font-bold">close</span>
+                className="touch-target flex items-center justify-center p-2 hover:bg-slate-800/50 rounded-xl text-slate-400 hover:text-white transition-colors cursor-pointer">
+                <span className="material-symbols-outlined text-lg">close</span>
               </button>
             </div>
 
-            <div className="p-4 md:p-6 overflow-y-auto space-y-3 md:space-y-4 text-slate-800 select-text">
+            <div className="bottom-sheet-body space-y-3 select-text">
               {activeSubScreen === 'user-management' && (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
@@ -489,37 +518,38 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
               )}
             </div>
 
-            <div className="px-6 py-4 bg-slate-950 border-t border-slate-200 flex justify-end shrink-0">
+            <div className="bottom-sheet-header border-t border-slate-800 mt-auto">
               <button onClick={() => setActiveSubScreen(null)}
-                className="bg-slate-950 hover:bg-slate-900 text-white font-bold text-xs px-5 py-2 rounded-xl cursor-pointer">حسناً، فهمت ذلك</button>
+                className="w-full py-3.5 bg-ym hover:bg-red-700 text-white font-bold text-xs rounded-xl transition-all cursor-pointer min-h-[48px]">حسناً، فهمت ذلك</button>
             </div>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {showLogOutDialog && (
-        <div className="fixed inset-0 bg-gray-950/75 backdrop-blur-md z-[120] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 text-right dir-rtl space-y-4 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center gap-2.5 text-red-600">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[120] flex items-center justify-center p-4">
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="card-enhanced max-w-sm w-full p-6 space-y-4">
+            <div className="flex items-center gap-2.5 text-red-500">
               <span className="material-symbols-outlined text-2xl font-bold">warning</span>
               <h4 className="font-extrabold text-sm">تأكيد تسجيل الخروج</h4>
             </div>
-            <p className="text-xs text-slate-600 leading-normal">هل أنت متأكد من رغبتك في تسجيل الخروج من النظام حالياً؟</p>
+            <p className="text-xs text-slate-400 leading-normal">هل أنت متأكد من رغبتك في تسجيل الخروج من النظام حالياً؟</p>
             <div className="flex gap-2.5 pt-2">
               <button onClick={() => { setShowLogOutDialog(false); setIsMoreOpen(false); if (onLogout) onLogout(); }}
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-2.5 rounded-xl transition-all cursor-pointer">نعم، تسجيل الخروج</button>
+                className="flex-1 bg-ym hover:bg-red-700 active:scale-[0.98] text-white font-bold text-xs py-3 rounded-xl transition-all cursor-pointer min-h-[48px]">نعم، تسجيل الخروج</button>
               <button onClick={() => setShowLogOutDialog(false)}
-                className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-750 font-bold text-xs py-2.5 rounded-xl transition-all cursor-pointer">تراجع</button>
+                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs py-3 rounded-xl transition-all cursor-pointer min-h-[48px]">تراجع</button>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
 
       {logoutMessageVisible && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[130] bg-slate-950 text-white shadow-2xl border border-slate-800 rounded-xl px-5 py-3 flex items-center gap-2.5 text-xs font-bold animate-in fade-in slide-in-from-top duration-200">
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
+          className="fixed top-6 left-1/2 -translate-x-1/2 z-[130] card border border-green-500/30 px-5 py-3 flex items-center gap-2.5 text-xs font-bold shadow-xl">
           <span className="material-symbols-outlined text-green-500 font-bold">check_circle</span>
           <span>تم تسجيل الخروج من جلسة الإدارة الآمنة.</span>
-        </div>
+        </motion.div>
       )}
     </>
   );
