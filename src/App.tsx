@@ -309,27 +309,29 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
 
+  const refreshData = () => Promise.all([
+    api.getSims().then(setAdminSims).catch(() => {}),
+    api.getAgents().then(setAdminAgents).catch(() => {}),
+    api.getSellers().then((data) => { setAdminSellers(data); setTeleSellers(data); }).catch(() => {}),
+    api.getAlerts().then(setAdminAlerts).catch(() => {}),
+    api.getSettings().then(setAdminSettings).catch(() => {}),
+    api.getTransactions().then(setAdminTransactions).catch(() => {}),
+    api.getInventories().then(setTeleInventories).catch(() => {}),
+    api.getOperations().then(setTeleOperations).catch(() => {}),
+    api.getStats().then(setAdminStats).catch(() => {}),
+  ]);
+
   useEffect(() => {
     if (!role) return;
     setLoading(true);
     setApiError(null);
-    Promise.all([
-      api.getSims().then(setAdminSims).catch(() => {}),
-      api.getAgents().then(setAdminAgents).catch(() => {}),
-      api.getSellers().then(setAdminSellers).catch(() => {}),
-      api.getAlerts().then(setAdminAlerts).catch(() => {}),
-      api.getSettings().then(setAdminSettings).catch(() => {}),
-      api.getSellers().then(setTeleSellers).catch(() => {}),
-      api.getInventories().then(setTeleInventories).catch(() => {}),
-      api.getOperations().then(setTeleOperations).catch(() => {}),
-      api.getStats().then(setAdminStats).catch(() => {}),
-    ])
-    .then(() => setLoading(false))
-    .catch((err) => {
-      console.error('API fetch error:', err);
-      setApiError('تعذر الاتصال بالخادم. يتم استخدام البيانات المحلية.');
-      setLoading(false);
-    });
+    refreshData()
+      .then(() => setLoading(false))
+      .catch((err) => {
+        console.error('API fetch error:', err);
+        setApiError('تعذر الاتصال بالخادم. يتم استخدام البيانات المحلية.');
+        setLoading(false);
+      });
   }, [role]);
 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -540,6 +542,7 @@ export default function App() {
         operator: op,
         status: 'success',
       });
+      refreshData();
     } catch (err) {
       console.error('Failed to log operation via API:', err);
     }
@@ -598,6 +601,7 @@ export default function App() {
       if (target) {
         await api.updateSim(target.id, { status: 'sold' });
       }
+      refreshData();
     } catch (err) {
       console.error('Failed to update SIM via API:', err);
     }
