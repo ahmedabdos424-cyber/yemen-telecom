@@ -186,9 +186,9 @@ CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires ON token_blacklist(expire
 -- SEED DATA
 
 INSERT INTO users (username, password_hash, display_name, role, status) VALUES
-  ('admin', '$2b$10$8K1p/a0dL1LXMIgoEDFrwOfMQkfAjkMBcGmIxqZpEEBFTFqO2q3mS', 'أحمد محمد', 'manager', 'active'),
-  ('agent', '$2b$10$8K1p/a0dL1LXMIgoEDFrwOfMQkfAjkMBcGmIxqZpEEBFTFqO2q3mS', 'الوكيل أحمد محمد', 'agent', 'active'),
-  ('seller', '$2b$10$8K1p/a0dL1LXMIgoEDFrwOfMQkfAjkMBcGmIxqZpEEBFTFqO2q3mS', 'البائع عبدالرحمن العتيبي', 'seller', 'active')
+  ('admin', '$2a$10$LS1.tsnmbo8M8Uz8MEKuHOUWcRtEIq468TV05kTcMSYHzVGP4Ou02', 'أحمد محمد', 'manager', 'active'),
+  ('agent', '$2a$10$LS1.tsnmbo8M8Uz8MEKuHOUWcRtEIq468TV05kTcMSYHzVGP4Ou02', 'الوكيل أحمد محمد', 'agent', 'active'),
+  ('seller', '$2a$10$LS1.tsnmbo8M8Uz8MEKuHOUWcRtEIq468TV05kTcMSYHzVGP4Ou02', 'البائع عبدالرحمن العتيبي', 'seller', 'active')
 ON CONFLICT (username) DO NOTHING;
 
 INSERT INTO sims (phone, iccid, provider, status, owner, date_added, package_type) VALUES
