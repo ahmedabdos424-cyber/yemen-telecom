@@ -22,6 +22,9 @@ dotenv.config({ path: '.env' });
 const app = express();
 const PORT = parseInt(process.env.API_PORT || '4000');
 
+// Trust proxy for rate limiter behind Render's reverse proxy
+app.set('trust proxy', 1);
+
 // CSRF token generation endpoint
 const CSRF_SECRET = process.env.CSRF_SECRET || crypto.randomBytes(32).toString('hex');
 app.get('/api/csrf-token', (req, res) => {

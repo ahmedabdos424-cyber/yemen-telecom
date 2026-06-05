@@ -18,6 +18,7 @@ export const pool = new Pool({
   database: process.env.DB_NAME || 'yemen_telecom',
   ssl: process.env.DB_HOST !== 'localhost' ? { rejectUnauthorized: false } : false,
   connectionTimeoutMillis: 10000,
+  family: 4,
 });
 
 pool.on('error', (err) => {
