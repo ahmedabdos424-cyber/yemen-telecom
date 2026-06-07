@@ -106,6 +106,8 @@ router.post('/logout', async (req: Request, res: Response) => {
   }
 });
 
+console.log('[AUTH] AUTH ROUTES LOADED — /login /refresh /logout /me');
+
 router.get('/me', async (req: Request, res: Response) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) {

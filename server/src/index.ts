@@ -118,11 +118,54 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', environment: process.env.NODE_ENV, timestamp: new Date().toISOString(), uptime: process.uptime() });
 });
 
-// Apply JWT auth to all /api routes except auth
-app.use(/^\/api\/(?!auth).*/, authenticateToken);
+// Apply JWT auth to all /api routes except auth and debug routes
+app.use(/^\/api\/(?!auth|routes).*/, authenticateToken);
+
+// Extract a mount path from an Express layer's regexp
+// Pattern: ^\/path\/?(?=\/|$) or ^\/path\/?$
+function extractMountPath(regexp: RegExp): string {
+  let src = regexp.source;
+  src = src.replace(/^\^/, '');                          // remove leading ^
+  src = src.replace(/\\\/\?\(\?=\\\/\|\$\)$/, '');       // remove \/?(?=\/|$)
+  src = src.replace(/\\\/\?$/, '');                      // remove possible \/?$
+  src = src.replace(/\\\//g, '/');                       // convert \/ to /
+  return src;
+}
+
+// Helper to extract registered routes
+function listRoutes(): { method: string; path: string }[] {
+  const routes: { method: string; path: string }[] = [];
+  const stack = (app as any)._router?.stack || [];
+  for (const layer of stack) {
+    if (layer.route) {
+      const methods = Object.keys(layer.route.methods).join(',').toUpperCase();
+      routes.push({ method: methods, path: layer.route.path });
+    } else if (layer.name === 'router' && layer.handle?.stack) {
+      const mountPath = extractMountPath(layer.regexp);
+      for (const sub of layer.handle.stack) {
+        if (sub.route) {
+          const methods = Object.keys(sub.route.methods).join(',').toUpperCase();
+          const subPath = sub.route.path === '/' ? '' : sub.route.path;
+          routes.push({ method: methods, path: mountPath + subPath });
+        } else if (sub.name === 'router' && sub.handle?.stack) {
+          const subMountPath = extractMountPath(sub.regexp);
+          for (const inner of sub.handle.stack) {
+            if (inner.route) {
+              const methods = Object.keys(inner.route.methods).join(',').toUpperCase();
+              routes.push({ method: methods, path: mountPath + subMountPath + inner.route.path });
+            }
+          }
+        }
+      }
+    }
+  }
+  return routes;
+}
 
 // Routes
+console.log('[REGISTER] REGISTERING AUTH ROUTES');
 app.use('/api/auth', authRoutes);
+console.log('[REGISTER] AUTH ROUTES REGISTERED');
 app.use('/api/sims', simsRoutes);
 app.use('/api/agents', agentsRoutes);
 app.use('/api/sellers', sellersRoutes);
@@ -135,6 +178,8 @@ app.use('/api/users', usersRoutes);
 app.use('/api/customers', customersRoutes);
 app.use('/api/distributions', distributionsRoutes);
 app.use('/api/reports', reportsRoutes);
+
+
 
 // In-memory cache for stats
 let statsCache: { data: any; timestamp: number } | null = null;
@@ -180,6 +225,11 @@ app.get('/api/stats', requireRole('manager'), async (_req, res) => {
   }
 });
 
+// Debug route listing endpoint (no auth — shows all registered routes)
+app.get('/api/routes', (_req, res) => {
+  res.json({ routes: listRoutes() });
+});
+
 // 404 handler for unknown API routes
 app.use('/api/*', (_req, res) => {
   res.status(404).json({ error: 'API endpoint not found' });
@@ -192,5 +242,9 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on http://0.0.0.0:${PORT}`);
+  console.log(`[INIT] Server running on http://0.0.0.0:${PORT}`);
+  console.log(`[INIT] Routes (${listRoutes().length} total):`);
+  for (const r of listRoutes()) {
+    console.log(`  ${r.method.padEnd(6)} ${r.path}`);
+  }
 });
