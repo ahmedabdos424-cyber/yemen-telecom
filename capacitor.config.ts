@@ -7,7 +7,7 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'https',
     cleartext: true,
-    allowNavigation: ['10.0.0.*', 'localhost:4000', 'localhost:3000', 'yemen-telecom-api.onrender.com', 'yemen-telecom-1699.web.app'],
+    allowNavigation: ['yemen-telecom-api.onrender.com', 'yemen-telecom-1699.web.app'],
   },
   plugins: {
     FirebaseAuthentication: {

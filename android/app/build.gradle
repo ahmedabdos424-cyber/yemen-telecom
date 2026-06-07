@@ -1,14 +1,12 @@
 apply plugin: 'com.android.application'
 
-if (!System.getenv('KEYSTORE_PASSWORD') ||
-    !System.getenv('KEYSTORE_ALIAS') ||
-    !System.getenv('KEY_PASSWORD')) {
-    throw new GradleException("Missing Android signing environment variables")
-}
-
 android {
     namespace = "com.yemen.telecom"
     compileSdk = rootProject.ext.compileSdkVersion
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
     defaultConfig {
         applicationId "com.yemen.telecom"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -17,8 +15,6 @@ android {
         versionName "1.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
-             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
-             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
@@ -31,10 +27,19 @@ android {
         }
     }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
+            if (System.getenv('KEYSTORE_PASSWORD') &&
+                System.getenv('KEYSTORE_ALIAS') &&
+                System.getenv('KEY_PASSWORD')) {
+                signingConfig signingConfigs.release
+            } else {
+                signingConfig signingConfigs.debug
+            }
         }
     }
 }
@@ -44,6 +49,7 @@ repositories {
         dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
     }
 }
+
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
