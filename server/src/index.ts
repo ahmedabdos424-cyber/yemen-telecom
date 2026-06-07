@@ -64,9 +64,14 @@ app.use(helmet({
   },
 }));
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,http://10.0.0.185:3000,https://yemen-telecom-1699.web.app').split(',');
+const isCapacitorOrigin = (origin: string) =>
+  origin === 'https://localhost' ||
+  origin === 'capacitor://localhost' ||
+  origin.startsWith('https://localhost:') ||
+  origin.startsWith('http://localhost:') && origin !== 'http://localhost:3000'; // 3000 handled above
 app.use(cors({
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.includes(origin) || (origin && isCapacitorOrigin(origin))) {
       callback(null, true);
     } else {
       console.warn(`CORS blocked origin: ${origin}`);
@@ -75,7 +80,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-CSRF-Hash', 'X-Refresh-Token'],
 }));
 app.use(compression());
 app.use(express.json({ limit: '1mb' }));
