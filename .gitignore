@@ -9,3 +9,53 @@ dist/
 *.png
 firebase-service-account.json
 .domdump.txt
+android/app/release.keystore
+*.keystore
+*.jks
+keystore.properties
+# Audit reports
+*_REPORT.md
+*_PLAN.md
+*_CHECKLIST.md
+
+# Validation documents
+PRODUCTION_*.md
+PRE_*.md
+POST_*.md
+FINAL_*.md
+SECURITY_*.md
+REMEDIATION_*.md
+INFRASTRUCTURE_*.md
+MOBILE_*.md
+PLAY_STORE_*.md
+UI_UX_*.md
+PERFORMANCE_*.md
+
+# Test files
+server/api_test_results.txt
+server/server.err
+
+# Firebase cache
+.firebase/*.cache
+
+# Reports
+*_REPORT.md
+*_PLAN.md
+*_CHECKLIST.md
+
+# Validation docs
+PRODUCTION_*.md
+PRE_*.md
+POST_*.md
+FINAL_*.md
+SECURITY_*.md
+INFRASTRUCTURE_*.md
+MOBILE_*.md
+PLAY_STORE_*.md
+PERFORMANCE_*.md
+
+# Test outputs
+server/api_test_results.txt
+
+# Firebase cache
+.firebase/*.cache

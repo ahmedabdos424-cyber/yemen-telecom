@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { query } from '../db';
 import { requireRole } from '../middleware/auth';
+import { getPagination } from '../helpers';
 
 const router = Router();
 
@@ -70,9 +71,15 @@ router.put('/settings', requireRole('manager'), async (req: Request, res: Respon
   }
 });
 
-router.get('/transactions', requireRole('manager'), async (_req: Request, res: Response) => {
+router.get('/transactions', requireRole('manager'), async (req: Request, res: Response) => {
   try {
-    const result = await query('SELECT * FROM transactions ORDER BY id');
+    const { page, limit, offset } = getPagination(req);
+    const paginate = req.query.page || req.query.limit;
+    const queryText = paginate
+      ? 'SELECT * FROM transactions ORDER BY id LIMIT $1 OFFSET $2'
+      : 'SELECT * FROM transactions ORDER BY id';
+    const params = paginate ? [limit, offset] : [];
+    const result = await query(queryText, params);
     res.json(result.rows.map((r: any) => ({
       id: r.id,
       clientName: r.client_name,
@@ -87,27 +94,62 @@ router.get('/transactions', requireRole('manager'), async (_req: Request, res: R
   }
 });
 
-router.get('/duplicate-identities', requireRole('manager'), async (_req: Request, res: Response) => {
+router.get('/duplicate-identities', requireRole('manager'), async (req: Request, res: Response) => {
   try {
-    const result = await query('SELECT * FROM duplicate_identities ORDER BY duplicates_count DESC');
-    res.json(result.rows.map((r: any) => ({
-      idNo: r.id_no,
-      name: r.name,
-      simsCount: r.sims_count,
-      duplicatesCount: r.duplicates_count,
-      risk: r.risk,
-      region: r.region,
-      avatarInitials: r.avatar_initials,
-    })));
+    const { page, limit, offset } = getPagination(req);
+    const paginate = req.query.page || req.query.limit;
+    const queryText = paginate
+      ? `SELECT id_number AS id_no, name,
+              COUNT(*) OVER (PARTITION BY id_number) AS duplicates_count,
+              SUM(COALESCE(sims_count, 0)) OVER (PARTITION BY id_number) AS sims_count,
+              region
+       FROM sellers
+       WHERE id_number != ''
+       ORDER BY duplicates_count DESC LIMIT $1 OFFSET $2`
+      : `SELECT id_number AS id_no, name,
+              COUNT(*) OVER (PARTITION BY id_number) AS duplicates_count,
+              SUM(COALESCE(sims_count, 0)) OVER (PARTITION BY id_number) AS sims_count,
+              region
+       FROM sellers
+       WHERE id_number != ''
+       ORDER BY duplicates_count DESC`;
+    const params = paginate ? [limit, offset] : [];
+    const result = await query(queryText, params);
+    const seen = new Set<string>();
+    const deduped = result.rows.filter((r: any) => {
+      if (seen.has(r.id_no)) return false;
+      seen.add(r.id_no);
+      return true;
+    });
+    res.json(deduped.map((r: any) => {
+      const count = r.duplicates_count;
+      const risk = count >= 5 ? 'مرتفع جداً' : count >= 3 ? 'مرتفع' : 'متوسط';
+      const initials = r.name ? r.name.split(' ').slice(0, 2).map((s: string) => s[0]).join(' ') : '';
+      return {
+        idNo: r.id_no,
+        name: r.name,
+        simsCount: parseInt(r.sims_count) || 0,
+        duplicatesCount: parseInt(r.duplicates_count) || 0,
+        risk,
+        region: r.region || '',
+        avatarInitials: initials,
+      };
+    }));
   } catch (err) {
     console.error('Error fetching duplicate identities:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-router.get('/audit-logs', requireRole('manager'), async (_req: Request, res: Response) => {
+router.get('/audit-logs', requireRole('manager'), async (req: Request, res: Response) => {
   try {
-    const result = await query('SELECT * FROM audit_logs ORDER BY id');
+    const { page, limit, offset } = getPagination(req);
+    const paginate = req.query.page || req.query.limit;
+    const queryText = paginate
+      ? 'SELECT * FROM audit_logs ORDER BY id LIMIT $1 OFFSET $2'
+      : 'SELECT * FROM audit_logs ORDER BY id';
+    const params = paginate ? [limit, offset] : [];
+    const result = await query(queryText, params);
     res.json(result.rows.map((r: any) => ({
       id: r.log_id,
       type: r.type,

@@ -314,7 +314,7 @@ export default function AgentsView({ agents, setView, onUpdateAgent }: AgentsVie
           </div>
           <div class="header-left">
             <div class="logo-placeholder">YEMEN TELECOM</div>
-            <p>تاريخ النظام الرئيسي: 01/06/2026</p>
+            <p>تاريخ النظام الرئيسي: ${new Date().toLocaleDateString('en-GB')}</p>
             <p>مرجع السند: TELE/AGENTS-2026-${Math.floor(1000 + Math.random() * 9000)}</p>
           </div>
         </div>
@@ -717,8 +717,8 @@ export default function AgentsView({ agents, setView, onUpdateAgent }: AgentsVie
                   </div>
                   <div className="text-left space-y-1">
                     <div className="text-xs font-bold text-red-600 font-mono">YEMEN TELECOM</div>
-                    <p className="text-[8px] text-gray-400">تاريخ النظام: 01/06/2026</p>
-                    <p className="text-[8px] text-gray-400 font-mono">المرجع: TELE/PREVIEW-2026-F</p>
+                    <p className="text-[8px] text-gray-400">تاريخ النظام: ${new Date().toLocaleDateString('en-GB')}</p>
+                    <p className="text-[8px] text-gray-400 font-mono">المرجع: TELE/PREVIEW-${new Date().getFullYear()}-F</p>
                   </div>
                 </div>
 
@@ -732,7 +732,7 @@ export default function AgentsView({ agents, setView, onUpdateAgent }: AgentsVie
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-gray-50 p-4 border border-gray-200 rounded-lg mb-6 text-[11px]">
                   <div className="flex justify-between border-b border-dashed border-gray-200 pb-1.5 md:border-none md:pb-0">
                     <span className="font-bold text-gray-550">تاريخ الاستخراج:</span>
-                    <span className="font-semibold">01/06/2026</span>
+                    <span className="font-semibold">{new Date().toLocaleDateString('en-GB')}</span>
                   </div>
                   <div className="flex justify-between border-b border-dashed border-gray-200 pb-1.5 md:border-none md:pb-0">
                     <span className="font-bold text-gray-550">المستخدم المستخرِج:</span>

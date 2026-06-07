@@ -3,8 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { Seller, SIM } from '../types';
+import { Check } from 'lucide-react';
 
 interface SellersViewProps {
   sellers: Seller[];
@@ -19,12 +20,65 @@ export default function SellersView({ sellers, sims, onUpdateSeller, onAddBalanc
   const [showAddBalanceModal, setShowAddBalanceModal] = useState(false);
   const [balanceAmount, setBalanceAmount] = useState<number>(5000);
 
+  // Camera capture with preview for invoice photo
+  const [showCam, setShowCam] = useState(false);
+  const [camPreview, setCamPreview] = useState<string | null>(null);
+  const [camStream, setCamStream] = useState<MediaStream | null>(null);
+  const camVideoRef = useRef<HTMLVideoElement>(null);
+  const camCanvasRef = useRef<HTMLCanvasElement>(null);
+  const camFileRef = useRef<HTMLInputElement>(null);
+
+  const openInvoiceCam = useCallback(async () => {
+    setShowCam(true);
+    setCamPreview(null);
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      setCamStream(s);
+      if (camVideoRef.current) {
+        camVideoRef.current.srcObject = s;
+        camVideoRef.current.play();
+      }
+    } catch {
+      camFileRef.current?.click();
+      setShowCam(false);
+    }
+  }, []);
+
+  const captureInvoiceFrame = useCallback(() => {
+    if (camVideoRef.current && camCanvasRef.current) {
+      const v = camVideoRef.current;
+      const c = camCanvasRef.current;
+      c.width = v.videoWidth;
+      c.height = v.videoHeight;
+      c.getContext('2d')?.drawImage(v, 0, 0);
+      setCamPreview(c.toDataURL('image/jpeg', 0.8));
+    }
+    if (camStream) {
+      camStream.getTracks().forEach(t => t.stop());
+      setCamStream(null);
+    }
+  }, [camStream]);
+
+  const confirmInvoiceCapture = useCallback(() => {
+    setCamPreview(null);
+    setShowCam(false);
+  }, []);
+
+  const closeInvoiceCam = useCallback(() => {
+    if (camStream) {
+      camStream.getTracks().forEach(t => t.stop());
+      setCamStream(null);
+    }
+    setCamPreview(null);
+    setShowCam(false);
+  }, [camStream]);
+
   const selectedSeller = sellers.find((s) => s.id === selectedSellerId) || sellers[0];
 
   // Specific SIM items assigned to the selected seller (Ahmed has some specific keys in the mock data, or we filter sims currently owned by him)
-  const sellerSIMs = sims.filter(
+  const sellerSIMs = useMemo(() => sims.filter(
     (sim) => sim.owner.includes(selectedSeller.name) || (selectedSeller.id === 'SLR-99021' && sim.id !== '1' && sim.id !== '2' && sim.id !== '3')
-  );
+  ), [sims, selectedSeller]);
 
   const toggleSellerStatus = (id: string, currentStatus: 'active' | 'inactive' | 'suspended' | 'low_stock') => {
     const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
@@ -208,7 +262,7 @@ export default function SellersView({ sellers, sims, onUpdateSeller, onAddBalanc
               </thead>
               <tbody className="divide-y divide-gray-100 font-mono">
                 {sellerSIMs.map((sim) => (
-                  <tr key={sim.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={sim.id} className="hover:bg-gray-50 transition-colors content-visibility-auto">
                     <td data-label="رقم الهاتف" className="px-3 md:px-6 py-3 md:py-4 font-bold text-gray-900 text-[11px]">{sim.phone}</td>
                     <td data-label="الرقم التسلسلي (ICCID)" className="px-3 md:px-6 py-3 md:py-4 text-gray-500 text-[11px] hidden md:table-cell">{sim.iccid}</td>
                     <td data-label="نوع الباقة" className="px-3 md:px-6 py-3 md:py-4 font-sans font-semibold text-gray-800 text-[11px] hidden sm:table-cell">{sim.packageType}</td>
@@ -270,7 +324,7 @@ export default function SellersView({ sellers, sims, onUpdateSeller, onAddBalanc
                     placeholder="مثال: 10000"
                     className="input-field with-icon-left"
                   />
-                  <button type="button" className="input-camera-btn" title="تصوير الفاتورة">
+                  <button type="button" onClick={openInvoiceCam} className="input-camera-btn" title="تصوير الفاتورة">
                     <span className="material-symbols-outlined text-sm">photo_camera</span>
                   </button>
                 </div>
@@ -291,6 +345,79 @@ export default function SellersView({ sellers, sims, onUpdateSeller, onAddBalanc
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden camera elements */}
+      <video ref={camVideoRef} autoPlay playsInline className="hidden" />
+      <canvas ref={camCanvasRef} className="hidden" />
+      <input ref={camFileRef} type="file" accept="image/*" capture="environment" onChange={(e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          const r = new FileReader();
+          r.onload = (ev) => setCamPreview(ev.target?.result as string);
+          r.readAsDataURL(file);
+        }
+      }} className="hidden" />
+
+      {/* Camera live viewfinder */}
+      {showCam && !camPreview && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="relative w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
+            <div className="relative aspect-[4/3] bg-black flex items-center justify-center">
+              <video ref={camVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
+              <div className="absolute inset-0 border-[3px] border-dashed border-red-400/40 m-8 rounded-2xl pointer-events-none" />
+            </div>
+            <div className="flex gap-3 p-4 bg-gray-50">
+              <button
+                type="button"
+                onClick={captureInvoiceFrame}
+                className="btn btn-sm flex-1 bg-red-600 hover:bg-red-500 text-white flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-sm">photo_camera</span>
+                التقاط الصورة
+              </button>
+              <button
+                type="button"
+                onClick={closeInvoiceCam}
+                className="btn btn-sm flex-1 bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Camera preview confirm/retake */}
+      {showCam && camPreview && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="relative w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
+            <div className="relative aspect-[4/3] bg-black flex items-center justify-center">
+              <img src={camPreview} alt="المعاينة" className="w-full h-full object-contain" />
+              <div className="absolute top-3 right-3 bg-emerald-500/20 border border-emerald-400/30 text-emerald-600 text-[10px] px-2.5 py-1 rounded-full font-bold">
+                معاينة
+              </div>
+            </div>
+            <div className="flex gap-3 p-4 bg-gray-50">
+              <button
+                type="button"
+                onClick={confirmInvoiceCapture}
+                className="btn btn-sm flex-1 bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2"
+              >
+                <Check size={16} />
+                موافق
+              </button>
+              <button
+                type="button"
+                onClick={() => { setCamPreview(null); openInvoiceCam(); }}
+                className="btn btn-sm flex-1 bg-white border border-gray-200 text-gray-600 hover:bg-gray-100 flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-sm">refresh</span>
+                إعادة
+              </button>
+            </div>
           </div>
         </div>
       )}

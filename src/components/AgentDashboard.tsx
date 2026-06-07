@@ -91,36 +91,8 @@ export default function AgentDashboard({
   const handleRefreshInventory = async (operator: Operator) => {
     setRefreshingOperator(operator);
     try {
-      const apiEndpoint = 
-        operator === 'yemen_mobile' || operator === 'Yemen Mobile'
-          ? 'https://api.yemenmobile.com.ye/v3/agent/inventory'
-          : operator === 'you' || operator === 'YOU'
-          ? 'https://api.you-telecom.ye/b2b/inventory/sync'
-          : 'https://api.sabafon.com.ye/v2/partner/stock';
-
-      console.log(`fetching operator inventory from external API: ${apiEndpoint}`);
-      await new Promise(resolve => setTimeout(resolve, 400));
-      
       const currentInv = inventories.find(i => i.operator === operator);
       if (!currentInv) return;
-
-      const stockIncrement = Math.floor(150 + Math.random() * 200); 
-      const updatedAvailable = currentInv.available + stockIncrement;
-      const updatedRemaining = Math.max(0, currentInv.remaining + Math.floor(Math.random() * 40));
-
-      const updatedInventories = inventories.map(i => {
-        if (i.operator === operator) {
-          return {
-            ...i,
-            available: updatedAvailable,
-            remaining: updatedRemaining,
-            periodDays: Math.min(30, i.periodDays + 1)
-          };
-        }
-        return i;
-      });
-
-      onUpdateInventories(updatedInventories);
 
       const operatorName = 
         operator === 'yemen_mobile' || operator === 'Yemen Mobile' 
@@ -129,14 +101,16 @@ export default function AgentDashboard({
           ? 'YOU' 
           : 'سبأفون';
 
-      alert(`تم التحديث بنجاح!
-نوع الاستعلام: مزامنة المخزون الفوري البين-بيني (Interoperability API)
-رابط الخادم: ${apiEndpoint}
-المشغل: ${operatorName}
-النتيجة: تم إضافة ${stockIncrement} شريحة ذكية جديدة متوفرة لقائمة الحصص المقررة.`);
-
-    } catch (error) {
-      alert('فشلت عملية تحديث المخزون نتيجة خطأ في الاتصال بالبوابة الخارجية للمشغل. يرجى المحاولة لاحقاً.');
+      const updatedInventories = inventories.map(i => {
+        if (i.operator === operator) {
+          return { ...i, periodDays: Math.min(30, i.periodDays + 1) };
+        }
+        return i;
+      });
+      onUpdateInventories(updatedInventories);
+      alert(`تم تحديث بيانات المخزون لـ ${operatorName}.`);
+    } catch {
+      alert('فشلت عملية تحديث المخزون. يرجى المحاولة لاحقاً.');
     } finally {
       setRefreshingOperator(null);
     }
@@ -659,7 +633,7 @@ export default function AgentDashboard({
               <div className="flex flex-col items-center mb-6">
                 <div className="w-24 h-24 rounded-full border-4 border-slate-850 shadow-md overflow-hidden bg-slate-950 mb-3 flex items-center justify-center">
                   {selectedSeller.avatar ? (
-                    <img src={selectedSeller.avatar} alt={selectedSeller.name} className="w-full h-full object-cover" />
+                    <img loading="lazy" src={selectedSeller.avatar} alt={selectedSeller.name} className="w-full h-full object-cover" />
                   ) : (
                     <span className="material-symbols-outlined text-4xl text-slate-600">store</span>
                   )}

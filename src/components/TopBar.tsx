@@ -11,13 +11,17 @@ interface TopBarProps {
   setView: (view: ViewType) => void;
   onMenuToggle: () => void;
   unresolvedAlertsCount: number;
+  displayName?: string;
+  role?: string;
 }
 
 export default function TopBar({
   currentView,
   setView,
   onMenuToggle,
-  unresolvedAlertsCount
+  unresolvedAlertsCount,
+  displayName,
+  role
 }: TopBarProps) {
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -147,15 +151,11 @@ export default function TopBar({
         {/* Admin profile user header */}
         <div className="flex items-center gap-2">
           <div className="text-right hidden sm:block">
-            <p className="text-[11px] md:text-xs font-bold text-gray-900">أحمد محمد</p>
-            <p className="text-[9px] md:text-[10px] text-gray-500">مسؤول النظام الأعلى</p>
+            <p className="text-[11px] md:text-xs font-bold text-gray-900">{displayName || 'أحمد محمد'}</p>
+            <p className="text-[9px] md:text-[10px] text-gray-500">{role === 'manager' ? 'مسؤول النظام الأعلى' : role === 'agent' ? 'وكيل معتمد' : role === 'seller' ? 'بائع تجزئة' : 'مستخدم'}</p>
           </div>
-          <div className="w-7 h-7 md:w-10 md:h-10 rounded-full bg-primary-container text-white flex items-center justify-center font-bold text-sm border border-gray-200 shadow-sm relative overflow-hidden">
-            <img 
-              alt="ملف المستخدم المسؤول" 
-              className="w-full h-full object-cover" 
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuCskPTg0PPt134f9p13mCzkurWQRaKjB9oG-ODRUL4yGslUGe3gc49dgWXjadKNc1GhkThpYh_UR2ce30F9FPF0BANll_oXB7ibrsezX6gFA2mKnWZrNzjAkY4Rs_7VSgASqoMJRtnHsAvdKh7xbpzvqwKVoxQXnk61yDBkwzrzyHlH0at8UxveZxpdpx4iw8h3PD9RbA_cqCknn4G82OG5pzF6X--okNJDoBUvo4wU8UyqVtxhc_XGOCHM6ExxQYvEPgdhW_qKmPM"
-            />
+          <div className="w-7 h-7 md:w-10 md:h-10 rounded-full bg-primary-container text-white flex items-center justify-center font-bold text-sm border border-gray-200 shadow-sm">
+            {(displayName || 'أحمد محمد').charAt(0)}
           </div>
         </div>
       </div>

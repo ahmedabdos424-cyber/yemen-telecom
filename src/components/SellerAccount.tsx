@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, type ChangeEvent, type FormEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Seller } from '../types';
 import ThemeToggle from './shared/ThemeToggle';
@@ -20,7 +20,6 @@ export default function SellerAccount({
   sellerData, darkMode, setDarkMode,
   onPasswordChanged, onConfirmLogout, onLogout
 }: SellerAccountProps) {
-  const [editModalOpen, setEditModalOpen] = useState(false);
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
@@ -34,7 +33,7 @@ export default function SellerAccount({
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSellerPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSellerPhotoChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
@@ -61,7 +60,7 @@ export default function SellerAccount({
     }
   };
 
-  const handlePasswordChangeSubmit = (e: React.FormEvent) => {
+  const handlePasswordChangeSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!idNumberEntry) return alert('الرجاء إدخال رقم الهوية الخاصة بك للتحقق');
     if (!newPassword || !confirmPassword) return alert('الرجاء تعبئة حقول كلمة المرور الجديدة');
@@ -89,7 +88,7 @@ export default function SellerAccount({
         <div className="relative z-10">
           <div className="w-24 h-24 rounded-full border-4 border-slate-800 mx-auto mb-4 overflow-hidden shadow-xl shadow-black/30">
             {sellerPhoto ? (
-              <img src={sellerPhoto} alt={sellerData.name} className="w-full h-full object-cover" />
+              <img loading="lazy" src={sellerPhoto} alt={sellerData.name} className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full bg-slate-800 flex items-center justify-center">
                 <User size={32} className="text-slate-500" />
@@ -157,57 +156,39 @@ export default function SellerAccount({
           <TrendingUp size={14} className="text-red-500" />
           <h3 className="text-xs font-bold text-slate-100">الإحصائيات الشخصية</h3>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center">
+        <div className="flex gap-3 overflow-x-auto pb-4 snap-x scrollbar-hide">
+          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center min-w-[140px] flex-shrink-0 snap-center">
             <Smartphone size={16} className="text-red-500 mx-auto mb-2" />
             <p className="stat-card-value text-slate-100">{sellerData.simsCount}</p>
             <p className="text-[10px] text-slate-400 mt-1">إجمالي الشرائح</p>
           </div>
-          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center">
+          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center min-w-[140px] flex-shrink-0 snap-center">
             <TrendingUp size={16} className="text-amber-500 mx-auto mb-2" />
             <p className="stat-card-value text-slate-100">{sellerData.totalSales?.toLocaleString() || sellerData.sales30Days}</p>
             <p className="text-[10px] text-slate-400 mt-1">إجمالي المبيعات</p>
           </div>
-          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center">
+          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center min-w-[140px] flex-shrink-0 snap-center">
             <Layers size={16} className="text-blue-500 mx-auto mb-2" />
             <p className="stat-card-value text-slate-100">{sellerData.currentStock || 0}</p>
             <p className="text-[10px] text-slate-400 mt-1">المخزون الحالي</p>
           </div>
-          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center">
+          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center min-w-[140px] flex-shrink-0 snap-center">
             <Award size={16} className="text-emerald-500 mx-auto mb-2" />
             <p className="stat-card-value text-slate-100">{sellerData.efficiency || 0}%</p>
             <p className="text-[10px] text-slate-400 mt-1">نسبة الكفاءة</p>
           </div>
-          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center">
+          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center min-w-[140px] flex-shrink-0 snap-center">
             <TrendingUp size={16} className="text-purple-500 mx-auto mb-2" />
             <p className="stat-card-value text-slate-100">%{sellerData.salesGrowth || 0}</p>
             <p className="text-[10px] text-slate-400 mt-1">نمو المبيعات</p>
           </div>
-          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center">
+          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center min-w-[140px] flex-shrink-0 snap-center">
             <Activity size={16} className="text-cyan-500 mx-auto mb-2" />
             <p className="stat-card-value text-slate-100">%{sellerData.activityRate || 0}</p>
             <p className="text-[10px] text-slate-400 mt-1">معدل النشاط</p>
           </div>
         </div>
       </div>
-
-      {/* Edit Data Button */}
-      <button
-        type="button"
-        onClick={() => setEditModalOpen(true)}
-        className="w-full flex items-center justify-between p-4 bg-slate-900 border border-slate-800 rounded-2xl hover:bg-slate-800/40 transition-all group"
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-red-600/10 border border-red-500/20 flex items-center justify-center text-red-500 group-hover:scale-105 transition-transform">
-            <User size={18} />
-          </div>
-          <div className="text-right">
-            <p className="text-sm font-bold text-slate-100">تعديل البيانات</p>
-            <p className="text-[10px] text-slate-500 mt-0.5">تحديث الصورة الشخصية والبيانات المسموحة</p>
-          </div>
-        </div>
-        <ChevronLeft size={16} className="text-slate-500 group-hover:text-slate-100 transition-colors" />
-      </button>
 
       {/* Change Password Button */}
       <button
@@ -284,75 +265,6 @@ export default function SellerAccount({
         <ChevronLeft size={16} className="text-slate-500 group-hover:text-slate-100 transition-colors" />
       </button>
 
-      {/* Edit Data Modal */}
-      <AnimatePresence>
-        {editModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setEditModalOpen(false)}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ scale: 0.95, y: 15 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 15 }}
-              className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl z-10 text-slate-200"
-              dir="rtl"
-            >
-              <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-red-600/10 border border-red-500/20 flex items-center justify-center text-red-500">
-                    <User size={16} />
-                  </div>
-                  <h3 className="text-sm font-bold text-slate-100">تعديل البيانات</h3>
-                </div>
-                <button
-                  onClick={() => setEditModalOpen(false)}
-                  className="p-1.5 text-slate-500 hover:text-slate-100 hover:bg-slate-800/40 rounded-full transition-colors cursor-pointer"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <div className="space-y-5">
-                <div className="flex flex-col items-center">
-                  <div className="w-20 h-20 rounded-full border-4 border-slate-800 overflow-hidden mb-3">
-                    {sellerPhoto ? (
-                      <img src={sellerPhoto} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-slate-800 flex items-center justify-center">
-                        <User size={30} className="text-slate-500" />
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-xs text-slate-400">يمكنك تغيير الصورة الشخصية فقط</span>
-                </div>
-
-                <div className="flex gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => { setEditModalOpen(false); setPhotoModalOpen(true); }}
-                    className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer"
-                  >
-                    تغيير الصورة
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditModalOpen(false)}
-                    className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs rounded-xl transition-all cursor-pointer"
-                  >
-                    إلغاء
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
       {/* Photo Modal */}
       <AnimatePresence>
         {photoModalOpen && (
@@ -387,7 +299,7 @@ export default function SellerAccount({
               <div className="flex flex-col items-center space-y-4">
                 <div className="w-28 h-28 rounded-full border-4 border-slate-800 overflow-hidden shadow-lg">
                   {sellerPhoto ? (
-                    <img src={sellerPhoto} alt="" className="w-full h-full object-cover" />
+                    <img loading="lazy" src={sellerPhoto} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full bg-slate-800 flex items-center justify-center">
                       <Image size={40} className="text-slate-500" />

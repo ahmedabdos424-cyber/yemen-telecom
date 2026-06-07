@@ -12,6 +12,18 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
 };
 
+const missingVars = Object.entries(firebaseConfig)
+  .filter(([, v]) => !v)
+  .map(([k]) => k);
+
+if (missingVars.length > 0) {
+  if (import.meta.env.DEV) {
+    console.warn(`[firebase] Missing env vars: ${missingVars.join(', ')}. Set VITE_FIREBASE_* in .env`);
+  } else {
+    console.error('Firebase configuration missing');
+  }
+}
+
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const storage = getStorage(app);

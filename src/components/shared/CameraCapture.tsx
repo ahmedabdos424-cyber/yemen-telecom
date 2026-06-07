@@ -9,6 +9,7 @@ interface CameraCaptureProps {
 export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptureProps) {
   const [scanning, setScanning] = useState(false);
   const [showViewfinder, setShowViewfinder] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -26,6 +27,7 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
   const startCamera = useCallback(async () => {
     setScanning(true);
     setShowViewfinder(true);
+    setPreviewImage(null);
     try {
       const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       streamRef.current = s;
@@ -48,10 +50,27 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
       canvas.height = video.videoHeight;
       canvas.getContext('2d')?.drawImage(video, 0, 0);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-      onCapture(dataUrl);
+      setPreviewImage(dataUrl);
     }
-    stopCamera();
-  }, [onCapture, stopCamera]);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+  }, []);
+
+  const confirmCapture = useCallback(() => {
+    if (previewImage) {
+      onCapture(previewImage);
+    }
+    setPreviewImage(null);
+    setShowViewfinder(false);
+    setScanning(false);
+  }, [previewImage, onCapture]);
+
+  const retakeCapture = useCallback(() => {
+    setPreviewImage(null);
+    startCamera();
+  }, [startCamera]);
 
   const handleFileFallback = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -59,13 +78,13 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
       const reader = new FileReader();
       reader.onload = (ev) => {
         if (ev.target?.result) {
-          onCapture(ev.target.result as string);
+          setPreviewImage(ev.target.result as string);
         }
       };
       reader.readAsDataURL(file);
     }
     setScanning(false);
-  }, [onCapture]);
+  }, []);
 
   return (
     <>
@@ -83,8 +102,8 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
         {scanning ? <RefreshCw className="animate-spin" size={iconSize} /> : <Camera size={iconSize} />}
       </button>
 
-      {/* Camera viewfinder overlay */}
-      {showViewfinder && (
+      {/* Camera viewfinder with live preview */}
+      {showViewfinder && !previewImage && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
            <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
              <div className="relative aspect-[4/3] bg-black flex items-center justify-center">
@@ -111,6 +130,38 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
           </div>
         </div>
       )}
+
+      {/* Preview with confirm/retake */}
+      {showViewfinder && previewImage && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
+            <div className="relative aspect-[4/3] bg-black flex items-center justify-center">
+              <img src={previewImage} alt="المعاينة" className="w-full h-full object-contain" />
+              <div className="absolute top-3 right-3 bg-emerald-500/20 border border-emerald-400/30 text-emerald-400 text-[10px] px-2.5 py-1 rounded-full font-bold">
+                معاينة
+              </div>
+            </div>
+            <div className="flex gap-3 p-4 bg-slate-950">
+              <button
+                type="button"
+                onClick={confirmCapture}
+                className="btn btn-sm flex-1 bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2"
+              >
+                <Check size={16} />
+                موافق
+              </button>
+              <button
+                type="button"
+                onClick={retakeCapture}
+                className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center gap-2"
+              >
+                <RefreshCw size={16} />
+                إعادة
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -122,6 +173,7 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
 }) {
   const [showViewfinder, setShowViewfinder] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -139,6 +191,7 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
   const startCamera = useCallback(async () => {
     setScanning(true);
     setShowViewfinder(true);
+    setPreviewImage(null);
     try {
       const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       streamRef.current = s;
@@ -160,22 +213,39 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       canvas.getContext('2d')?.drawImage(video, 0, 0);
-      onCapture(canvas.toDataURL('image/jpeg', 0.8));
+      setPreviewImage(canvas.toDataURL('image/jpeg', 0.8));
     }
-    stopCamera();
-  }, [onCapture, stopCamera]);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+  }, []);
+
+  const confirmCapture = useCallback(() => {
+    if (previewImage) {
+      onCapture(previewImage);
+    }
+    setPreviewImage(null);
+    setShowViewfinder(false);
+    setScanning(false);
+  }, [previewImage, onCapture]);
+
+  const retakeCapture = useCallback(() => {
+    setPreviewImage(null);
+    startCamera();
+  }, [startCamera]);
 
   const handleFileFallback = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = (ev) => {
-        if (ev.target?.result) onCapture(ev.target.result as string);
+        if (ev.target?.result) setPreviewImage(ev.target.result as string);
       };
       reader.readAsDataURL(file);
     }
     setScanning(false);
-  }, [onCapture]);
+  }, []);
 
   return (
     <>
@@ -223,8 +293,8 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
         </div>
       )}
 
-      {/* Viewfinder overlay */}
-      {showViewfinder && (
+      {/* Live camera viewfinder */}
+      {showViewfinder && !previewImage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
             <div className="relative aspect-[4/3] bg-black flex items-center justify-center">
@@ -238,6 +308,30 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
                </button>
                <button onClick={stopCamera} className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300">
                 إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Preview with confirm/retake */}
+      {showViewfinder && previewImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
+            <div className="relative aspect-[4/3] bg-black flex items-center justify-center">
+              <img src={previewImage} alt="المعاينة" className="w-full h-full object-contain" />
+              <div className="absolute top-3 right-3 bg-emerald-500/20 border border-emerald-400/30 text-emerald-400 text-[10px] px-2.5 py-1 rounded-full font-bold">
+                معاينة
+              </div>
+            </div>
+            <div className="flex gap-3 p-4 bg-slate-950">
+              <button onClick={confirmCapture} className="btn btn-sm flex-1 bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2">
+                <Check size={16} />
+                موافق
+              </button>
+              <button onClick={retakeCapture} className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center gap-2">
+                <RefreshCw size={16} />
+                إعادة
               </button>
             </div>
           </div>

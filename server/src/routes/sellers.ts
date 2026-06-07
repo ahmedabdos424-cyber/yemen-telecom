@@ -1,7 +1,9 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { query } from '../db';
 import { requireRole, AuthRequest } from '../middleware/auth';
+import { getPagination } from '../helpers';
 
 const router = Router();
 
@@ -32,39 +34,72 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
+  const { page, limit, offset } = getPagination(req);
   try {
+    const paginate = req.query.page || req.query.limit;
     let result;
     if (req.user.role === 'manager') {
-      result = await query(
-        `SELECT s.*, a.name as agent_name 
-         FROM sellers s 
-         LEFT JOIN agents a ON s.agent_id = a.id 
-         ORDER BY s.id DESC`
-      );
+      if (paginate) {
+        result = await query(
+          `SELECT s.*, a.name as agent_name 
+           FROM sellers s 
+           LEFT JOIN agents a ON s.agent_id = a.id 
+           ORDER BY s.id DESC LIMIT $1 OFFSET $2`,
+          [limit, offset]
+        );
+      } else {
+        result = await query(
+          `SELECT s.*, a.name as agent_name 
+           FROM sellers s 
+           LEFT JOIN agents a ON s.agent_id = a.id 
+           ORDER BY s.id DESC`
+        );
+      }
     } else if (req.user.role === 'agent') {
       const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
       if (agentRes.rows.length === 0) {
         return res.json([]);
       }
       const agentId = agentRes.rows[0].id;
-      result = await query(
-        `SELECT s.*, a.name as agent_name 
-         FROM sellers s 
-         LEFT JOIN agents a ON s.agent_id = a.id 
-         WHERE s.agent_id = $1 
-         ORDER BY s.id DESC`,
-        [agentId]
-      );
+      if (paginate) {
+        result = await query(
+          `SELECT s.*, a.name as agent_name 
+           FROM sellers s 
+           LEFT JOIN agents a ON s.agent_id = a.id 
+           WHERE s.agent_id = $1 
+           ORDER BY s.id DESC LIMIT $2 OFFSET $3`,
+          [agentId, limit, offset]
+        );
+      } else {
+        result = await query(
+          `SELECT s.*, a.name as agent_name 
+           FROM sellers s 
+           LEFT JOIN agents a ON s.agent_id = a.id 
+           WHERE s.agent_id = $1 
+           ORDER BY s.id DESC`,
+          [agentId]
+        );
+      }
     } else {
-      // seller role
-      result = await query(
-        `SELECT s.*, a.name as agent_name 
-         FROM sellers s 
-         LEFT JOIN agents a ON s.agent_id = a.id 
-         WHERE s.user_id = $1 
-         ORDER BY s.id DESC`,
-        [req.user.id]
-      );
+      if (paginate) {
+        result = await query(
+          `SELECT s.*, a.name as agent_name 
+           FROM sellers s 
+           LEFT JOIN agents a ON s.agent_id = a.id 
+           WHERE s.user_id = $1 
+           ORDER BY s.id DESC LIMIT $2 OFFSET $3`,
+          [req.user.id, limit, offset]
+        );
+      } else {
+        result = await query(
+          `SELECT s.*, a.name as agent_name 
+           FROM sellers s 
+           LEFT JOIN agents a ON s.agent_id = a.id 
+           WHERE s.user_id = $1 
+           ORDER BY s.id DESC`,
+          [req.user.id]
+        );
+      }
     }
     res.json(result.rows.map(mapSeller));
   } catch (err) {
@@ -97,7 +132,7 @@ router.post('/', requireRole('manager', 'agent'), async (req: Request, res: Resp
       return res.status(409).json({ error: 'Username is already taken by another account' });
     }
 
-    const sellerPassword = password || '123456';
+    const sellerPassword = password || crypto.randomBytes(4).toString('hex');
     const passwordHash = await bcrypt.hash(sellerPassword, 10);
 
     const userResult = await query(
@@ -144,6 +179,92 @@ router.post('/', requireRole('manager', 'agent'), async (req: Request, res: Resp
     });
   } catch (err) {
     console.error('Error creating seller:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.put('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const existing = await query('SELECT * FROM sellers WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Seller not found' });
+    }
+    const cur = existing.rows[0];
+    const name = req.body.name ?? cur.name;
+    const store_name = req.body.store_name ?? req.body.storeName ?? cur.store_name;
+    const id_number = req.body.id_number ?? req.body.idNumber ?? cur.id_number;
+    const phone = req.body.phone ?? cur.phone;
+    const region = req.body.region ?? cur.region;
+    const region_code = req.body.region_code ?? req.body.regionCode ?? cur.region_code;
+    const status = req.body.status ?? cur.status;
+    const result = await query(
+      `UPDATE sellers SET name=$1, store_name=$2, id_number=$3, phone=$4, region=$5, region_code=$6, status=$7 WHERE id=$8 RETURNING *`,
+      [name, store_name, id_number, phone, region, region_code, status, id]
+    );
+    const updated = await query(
+      `SELECT s.*, a.name as agent_name FROM sellers s LEFT JOIN agents a ON s.agent_id = a.id WHERE s.id = $1`,
+      [id]
+    );
+    res.json(mapSeller(updated.rows[0]));
+  } catch (err) {
+    console.error('Error updating seller:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.put('/:id/balance', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  const { amount } = req.body;
+  if (amount === undefined || typeof amount !== 'number') {
+    return res.status(400).json({ error: 'Numeric amount is required' });
+  }
+  try {
+    const existing = await query('SELECT * FROM sellers WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Seller not found' });
+    }
+    const cur = existing.rows[0];
+    const newSales = (cur.sales_30_days || 0) + amount;
+    const result = await query(
+      `UPDATE sellers SET sales_30_days=$1, total_sales=COALESCE(total_sales,0)+$2 WHERE id=$3 RETURNING *`,
+      [newSales, amount, id]
+    );
+    const updated = await query(
+      `SELECT s.*, a.name as agent_name FROM sellers s LEFT JOIN agents a ON s.agent_id = a.id WHERE s.id = $1`,
+      [id]
+    );
+    res.json(mapSeller(updated.rows[0]));
+  } catch (err) {
+    console.error('Error updating seller balance:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/:id/reset-password', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const sellerRes = await query('SELECT * FROM sellers WHERE id = $1', [id]);
+    if (sellerRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Seller not found' });
+    }
+    const seller = sellerRes.rows[0];
+    if (!seller.user_id) {
+      return res.status(400).json({ error: 'Seller has no linked user account' });
+    }
+    const newPassword = crypto.randomBytes(4).toString('hex');
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, seller.user_id]);
+    const userRes = await query('SELECT username FROM users WHERE id = $1', [seller.user_id]);
+    res.json({
+      message: `Password reset successfully for ${seller.name}`,
+      credentials: {
+        username: userRes.rows[0].username,
+        password: newPassword,
+      },
+    });
+  } catch (err) {
+    console.error('Error resetting seller password:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -1,10 +1,21 @@
 import { Router, Request, Response } from 'express';
 import { query } from '../db';
+import { requireRole } from '../middleware/auth';
+import { getPagination, paginatedQuery } from '../helpers';
 
 const router = Router();
 
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', requireRole('manager', 'agent'), async (req: Request, res: Response) => {
   try {
+    const { page, limit, offset } = getPagination(req);
+    if (req.query.page || req.query.limit) {
+      const result = await paginatedQuery<any>(
+        'SELECT * FROM sims ORDER BY id DESC',
+        'SELECT COUNT(*) FROM sims',
+        [], page, limit, offset
+      );
+      return res.json(result);
+    }
     const result = await query('SELECT * FROM sims ORDER BY id DESC');
     res.json(result.rows);
   } catch (err) {
@@ -13,7 +24,7 @@ router.get('/', async (_req: Request, res: Response) => {
   }
 });
 
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', requireRole('manager'), async (req: Request, res: Response) => {
   const { phone, iccid, provider, status, owner, package_type } = req.body;
   if (!iccid) {
     return res.status(400).json({ error: 'ICCID is required' });
@@ -35,7 +46,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', requireRole('manager'), async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
     const existing = await query('SELECT * FROM sims WHERE id = $1', [id]);
@@ -60,7 +71,7 @@ router.put('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', requireRole('manager'), async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
     await query('DELETE FROM sims WHERE id = $1', [id]);

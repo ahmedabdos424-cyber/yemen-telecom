@@ -3,8 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { SIM } from '../types';
+import { Upload } from 'lucide-react';
+import CameraCapture from './shared/CameraCapture';
+import { StatsCardSkeleton } from './shared/Skeleton';
 
 interface SIMsViewProps {
   sims: SIM[];
@@ -29,13 +32,20 @@ export default function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
   const [formPackage, setFormPackage] = useState('باقة مزايا الشهرية');
   const [formOwner, setFormOwner] = useState('المركز الرئيسي');
 
+  // CSV import state
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvPreview, setCsvPreview] = useState<Partial<SIM>[]>([]);
+  const [csvImporting, setCsvImporting] = useState(false);
+  const csvFileRef = useRef<HTMLInputElement>(null);
+
+
+
   // Dynamically extract unique values for advanced filtering
   const uniqueOwners = Array.from(new Set(sims.map((s) => s.owner).filter(Boolean))).sort();
   const uniquePackages = Array.from(new Set(sims.map((s) => s.packageType).filter(Boolean))).sort();
 
   // Filter & Search computation with multi-filter query support
-  const filteredSIMs = sims.filter((sim) => {
-    // 1. Multi-word search across key fields (phone, iccid, owner, packageType)
+  const filteredSIMs = useMemo(() => sims.filter((sim) => {
     const searchTokens = searchTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
     const matchesSearch = searchTokens.length === 0 || searchTokens.every(token => 
       sim.phone?.toLowerCase().includes(token) || 
@@ -44,14 +54,13 @@ export default function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
       sim.packageType.toLowerCase().includes(token)
     );
 
-    // 2. Select dropdown filters
     const matchesProvider = selectedProvider === 'all' || sim.provider === selectedProvider;
     const matchesStatus = selectedStatus === 'all' || sim.status === selectedStatus;
     const matchesOwner = selectedOwner === 'all' || sim.owner === selectedOwner;
     const matchesPackage = selectedPackage === 'all' || sim.packageType === selectedPackage;
 
     return matchesSearch && matchesProvider && matchesStatus && matchesOwner && matchesPackage;
-  });
+  }), [sims, searchTerm, selectedProvider, selectedStatus, selectedOwner, selectedPackage]);
 
   // Text highlighting utility
   const highlightMatches = (text: string, search: string) => {
@@ -85,12 +94,12 @@ export default function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
     );
   };
 
-  const stats = {
+  const stats = useMemo(() => ({
     total: sims.length,
     available: sims.filter((s) => s.status === 'available').length,
     reserved: sims.filter((s) => s.status === 'reserved').length,
     inactive: sims.filter((s) => s.status === 'inactive').length
-  };
+  }), [sims]);
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,28 +119,52 @@ export default function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
     setShowAddModal(false);
   };
 
+  const handleCSVFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCsvFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      const lines = text.split('\n').filter(line => line.trim());
+      const records: Partial<SIM>[] = [];
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim());
+        if (values.length < 2) continue;
+        const record: Record<string, string> = {};
+        headers.forEach((h, idx) => { record[h] = values[idx] || ''; });
+        records.push({
+          phone: record['phone'] || record['رقم الهاتف'] || '',
+          iccid: record['iccid'] || record['الرقم التسلسلي'] || '',
+          provider: (record['provider'] || record['الشبكة'] || 'Yemen Mobile') as any,
+          packageType: record['package'] || record['package_type'] || record['الباقة'] || 'باقة مزايا الشهرية',
+          owner: record['owner'] || record['المالك'] || 'المركز الرئيسي',
+          status: 'available',
+          dateAdded: new Date().toLocaleDateString('ar-YE'),
+        });
+      }
+      setCsvPreview(records);
+    };
+    reader.readAsText(file);
+  };
+
   const handleImportCSV = (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate importing some SIM records from CSV list
-    onAddSIM({
-      phone: '771404090',
-      iccid: '8996704455662288001',
-      provider: 'Yemen Mobile',
-      packageType: 'باقة البيانات 10GB',
-      owner: 'المركز الرئيسي',
-      status: 'available',
-      dateAdded: new Date().toLocaleDateString('ar-YE')
+    if (csvPreview.length === 0) return;
+    setCsvImporting(true);
+    let imported = 0;
+    csvPreview.forEach(sim => {
+      if (sim.phone && sim.iccid) {
+        onAddSIM(sim);
+        imported++;
+      }
     });
-    onAddSIM({
-      phone: '711559988',
-      iccid: '8996704455662288002',
-      provider: 'Sabafon',
-      packageType: 'باقة هلا الفضية',
-      owner: 'وكالة النجم',
-      status: 'available',
-      dateAdded: new Date().toLocaleDateString('ar-YE')
-    });
+    setCsvImporting(false);
+    setCsvFile(null);
+    setCsvPreview([]);
     setShowImportModal(false);
+    alert(`تم استيراد ${imported} شريحة بنجاح من ملف CSV.`);
   };
 
   return (
@@ -163,6 +196,14 @@ export default function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
       </div>
 
       {/* Summary counters grid */}
+      {sims.length === 0 ? (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+          <StatsCardSkeleton />
+          <StatsCardSkeleton />
+          <StatsCardSkeleton />
+          <StatsCardSkeleton />
+        </div>
+      ) : (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <div className="stat-card stat-card-ym">
           <div className="flex justify-between items-start mb-2">
@@ -200,6 +241,7 @@ export default function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
           <h4 className="stat-card-value font-mono">{stats.inactive}</h4>
         </div>
       </div>
+      )}
 
       {/* Advanced search and dropdown filters row */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3 shadow-sm">
@@ -349,11 +391,31 @@ export default function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
           <span className="text-[11px] text-gray-500 font-mono">إظهار {filteredSIMs.length} من {sims.length}</span>
         </div>
 
+        {sims.length === 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1,2,3,4,5,6].map(i => (
+              <div key={i} className="bg-white border border-gray-200 rounded-xl p-4 space-y-3 content-visibility-auto contain-strict">
+                <div className="flex items-center gap-3">
+                  <div className="bg-slate-800 animate-pulse rounded-full w-8 h-8" />
+                  <div className="space-y-2 flex-1">
+                    <div className="bg-slate-800 animate-pulse rounded h-3 w-3/4" />
+                    <div className="bg-slate-800 animate-pulse rounded h-2 w-1/2" />
+                  </div>
+                </div>
+                <div className="bg-slate-800 animate-pulse rounded h-3 w-full" />
+                <div className="flex justify-between">
+                  <div className="bg-slate-800 animate-pulse rounded h-8 w-8" />
+                  <div className="bg-slate-800 animate-pulse rounded h-8 w-8" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredSIMs.map((sim) => (
             <div
               key={sim.id}
-              className="bg-white border border-gray-200 shadow-sm p-4 rounded-xl flex flex-col justify-between hover:shadow-md transition-shadow active:scale-[0.99]"
+              className="bg-white border border-gray-200 shadow-sm p-4 rounded-xl flex flex-col justify-between hover:shadow-md transition-shadow active:scale-[0.99] content-visibility-auto contain-strict"
             >
               <div className="flex justify-between items-start mb-3">
                 <div className="flex items-center gap-2.5">
@@ -406,12 +468,13 @@ export default function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
             </div>
           ))}
 
-          {filteredSIMs.length === 0 && (
+          {filteredSIMs.length === 0 && sims.length > 0 && (
             <div className="col-span-full py-8 text-center text-gray-500 font-body-sm bg-white rounded-xl border border-gray-200">
               لا توجد شرائح مطابقة لبحثك المخصّص حالياً.
             </div>
           )}
         </div>
+      )}
       </div>
 
       {/* Manual Insert Dialog Modal */}
@@ -440,9 +503,7 @@ export default function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
                     placeholder="مثال: 777112233"
                     className="w-full pr-10 pl-10 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all font-mono"
                   />
-                  <button type="button" className="input-camera-btn" title="تصوير الرقم">
-                    <span className="material-symbols-outlined text-sm">photo_camera</span>
-                  </button>
+                  <CameraCapture onCapture={() => {}} />
                 </div>
               </div>
               <div>
@@ -457,9 +518,7 @@ export default function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
                     placeholder="89967000..."
                     className="w-full pr-10 pl-10 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all font-mono"
                   />
-                  <button type="button" className="input-camera-btn" title="تصوير ICCID">
-                    <span className="material-symbols-outlined text-sm">photo_camera</span>
-                  </button>
+                  <CameraCapture onCapture={() => {}} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -484,9 +543,7 @@ export default function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
                       onChange={(e) => setFormPackage(e.target.value)}
                       className="w-full pl-10 px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all"
                     />
-                    <button type="button" className="input-camera-btn" title="تصوير الباقة">
-                      <span className="material-symbols-outlined text-sm">photo_camera</span>
-                    </button>
+                    <CameraCapture onCapture={() => {}} />
                   </div>
                 </div>
               </div>
@@ -499,9 +556,7 @@ export default function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
                     onChange={(e) => setFormOwner(e.target.value)}
                     className="w-full pl-10 px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all"
                   />
-                  <button type="button" className="input-camera-btn" title="تصوير المالك">
-                    <span className="material-symbols-outlined text-sm">photo_camera</span>
-                  </button>
+                  <CameraCapture onCapture={() => {}} />
                 </div>
               </div>
               <div className="flex gap-2 justify-end pt-4 border-t border-gray-100">
@@ -538,24 +593,38 @@ export default function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
               </h3>
             </div>
             <form onSubmit={handleImportCSV} className="p-6 space-y-5">
-              <div className="border-2 border-dashed border-gray-250 rounded-2xl p-6.5 text-center space-y-2.5 bg-gray-50/50 hover:bg-gray-50 hover:border-secondary/50 transition-colors duration-200 group cursor-pointer">
-                <span className="material-symbols-outlined text-gray-400 text-3xl group-hover:scale-105 group-hover:text-secondary transition-all">upload_file</span>
-                <p className="text-xs text-gray-650 font-bold">اسحب ملف CSV أو قم بالتصفح</p>
-                <p className="text-[11px] text-gray-400">يدعم السجلات المنفصلة بفاصلة حتى 50,000 شريحة بالدفعة</p>
+              <input ref={csvFileRef} type="file" accept=".csv" onChange={handleCSVFileChange} className="hidden" />
+              <div
+                onClick={() => csvFileRef.current?.click()}
+                className="border-2 border-dashed border-gray-250 rounded-2xl p-6.5 text-center space-y-2.5 bg-gray-50/50 hover:bg-gray-50 hover:border-secondary/50 transition-colors duration-200 group cursor-pointer"
+              >
+                <Upload size={32} className="mx-auto text-gray-400 group-hover:scale-105 group-hover:text-secondary transition-all" />
+                <p className="text-xs text-gray-650 font-bold">{csvFile ? csvFile.name : 'اسحب ملف CSV أو قم بالتصفح'}</p>
+                <p className="text-[11px] text-gray-400">الأعمدة المدعومة: phone, iccid, provider, package, owner</p>
               </div>
+              {csvPreview.length > 0 && (
+                <div className="bg-gray-50 rounded-xl p-3 max-h-32 overflow-y-auto">
+                  <p className="text-[11px] text-gray-600 font-bold mb-1">تم التعرف على {csvPreview.length} سجل:</p>
+                  {csvPreview.slice(0, 5).map((sim, i) => (
+                    <p key={i} className="text-[10px] text-gray-500 font-mono">{sim.phone} | {sim.iccid}</p>
+                  ))}
+                  {csvPreview.length > 5 && <p className="text-[10px] text-gray-400">...و{csvPreview.length - 5} سجل آخر</p>}
+                </div>
+              )}
               <div className="flex gap-2 justify-end pt-3 border-t border-gray-100">
                 <button
                   type="button"
-                  onClick={() => setShowImportModal(false)}
+                  onClick={() => { setShowImportModal(false); setCsvFile(null); setCsvPreview([]); }}
                   className="px-4 py-2 border border-gray-200 text-gray-700 bg-white hover:bg-gray-55/70 rounded-xl text-xs font-bold transition-all hover:border-gray-300 cursor-pointer"
                 >
                   إلغاء التوريد
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:brightness-110 shadow-md active:scale-[0.98] transition-all cursor-pointer"
+                  disabled={csvPreview.length === 0 || csvImporting}
+                  className="px-5 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:brightness-110 shadow-md active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50"
                 >
-                  بدء فحص واستيراد الملف
+                  {csvImporting ? 'جارٍ الاستيراد...' : `بدء استيراد ${csvPreview.length} شريحة`}
                 </button>
               </div>
             </form>

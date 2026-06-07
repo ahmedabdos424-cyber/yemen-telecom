@@ -3,8 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { SystemAlert, SystemSettings } from '../types';
+import { CardSkeleton } from './shared/Skeleton';
 
 interface AlertsViewProps {
   alerts: SystemAlert[];
@@ -23,10 +24,10 @@ export default function AlertsView({
   const [isVerifyingSecurity, setIsVerifyingSecurity] = useState(false);
   const [reorderLoaders, setReorderLoaders] = useState<Record<string, boolean>>({});
 
-  const filteredAlerts = alerts.filter((alert) => {
+  const filteredAlerts = useMemo(() => alerts.filter((alert) => {
     if (priorityFilter === 'all') return true;
     return alert.priority === priorityFilter;
-  });
+  }), [alerts, priorityFilter]);
 
   const handleReorder = (alertId: string) => {
     setReorderLoaders((prev) => ({ ...prev, [alertId]: true }));
@@ -91,7 +92,13 @@ export default function AlertsView({
             التنبيهات الفورية النشطة
           </h3>
 
-          {filteredAlerts.length === 0 ? (
+          {alerts.length === 0 ? (
+            <div className="space-y-3">
+              <CardSkeleton />
+              <CardSkeleton />
+              <CardSkeleton />
+            </div>
+          ) : filteredAlerts.length === 0 ? (
             <div className="p-10 bg-white border border-gray-200 rounded-xl text-center text-gray-500 text-xs">
               <span className="material-symbols-outlined text-green-500 text-3xl block mb-2">check_circle</span>
               <p className="font-bold">جميع الأنظمة مستقرة</p>
@@ -101,7 +108,7 @@ export default function AlertsView({
             filteredAlerts.map((alert) => (
               <div
                 key={alert.id}
-                className={`card flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-all hover:shadow-md ${
+                className={`card flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-all hover:shadow-md content-visibility-auto contain-strict ${
                   alert.priority === 'high'
                     ? 'border-r-red-650'
                     : alert.priority === 'medium'

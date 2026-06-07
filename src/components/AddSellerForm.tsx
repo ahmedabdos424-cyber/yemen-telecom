@@ -21,6 +21,7 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
   const [region, setRegion] = useState('');
   const [cameraState, setCameraState] = useState<'idle' | 'scanning' | 'success'>('idle');
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [idPreview, setIdPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successInfo, setSuccessInfo] = useState('');
 
@@ -34,6 +35,7 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
     setCameraState('scanning');
     setShowCamera(true);
     setCapturedImage(null);
+    setIdPreview(null);
     try {
       const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       setStream(s);
@@ -42,7 +44,6 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
         videoRef.current.play();
       }
     } catch {
-      // Fallback to file upload if camera not available
       fileInputRef.current?.click();
       setShowCamera(false);
       setCameraState('idle');
@@ -56,12 +57,29 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       canvas.getContext('2d')?.drawImage(video, 0, 0);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-      setCapturedImage(dataUrl);
+      setIdPreview(canvas.toDataURL('image/jpeg', 0.8));
       setIdNumber('');
+    }
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+      setStream(null);
+    }
+  };
+
+  const confirmIdCapture = () => {
+    if (idPreview) {
+      setCapturedImage(idPreview);
       setCameraState('success');
     }
-    stopCamera();
+    setIdPreview(null);
+    setShowCamera(false);
+    setTimeout(() => setCameraState('idle'), 400);
+  };
+
+  const retakeIdCapture = () => {
+    setIdPreview(null);
+    setShowCamera(false);
+    setTimeout(() => startCamera(), 300);
   };
 
   const stopCamera = () => {
@@ -69,6 +87,7 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
       stream.getTracks().forEach(t => t.stop());
       setStream(null);
     }
+    setIdPreview(null);
     setShowCamera(false);
     setTimeout(() => setCameraState('idle'), 400);
   };
@@ -78,10 +97,8 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
     if (file) {
       const reader = new FileReader();
       reader.onload = (ev) => {
-        setCapturedImage(ev.target?.result as string);
+        setIdPreview(ev.target?.result as string);
         setIdNumber('');
-        setCameraState('success');
-        setTimeout(() => setCameraState('idle'), 400);
       };
       reader.readAsDataURL(file);
     }
@@ -251,12 +268,12 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="أدخل كلمة مرور قوية للبائع"
-                className="input-field pl-10 bg-slate-950 border-slate-850 text-sm text-right placeholder:text-slate-700"
+                className="input-field pr-10 bg-slate-950 border-slate-850 text-sm text-right placeholder:text-slate-700"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute left-3 top-3.5 text-slate-500 hover:text-slate-100 touch-target flex items-center justify-center"
+                className="absolute right-3 top-3.5 text-slate-500 hover:text-slate-100 touch-target flex items-center justify-center"
                 id="toggle-password-visibility-btn"
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -329,7 +346,7 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
 
           {/* Camera viewfinder modal */}
           <AnimatePresence>
-            {showCamera && (
+            {showCamera && !idPreview && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -370,6 +387,50 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
                       className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition-all cursor-pointer"
                     >
                       إلغاء
+                    </button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* ID preview confirm/retake */}
+          <AnimatePresence>
+            {idPreview && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+              >
+                <motion.div
+                  initial={{ scale: 0.95 }}
+                  animate={{ scale: 1 }}
+                  exit={{ scale: 0.95 }}
+                  className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl"
+                >
+                  <div className="relative aspect-[4/3] bg-black flex items-center justify-center">
+                    <img src={idPreview} alt="معاينة الهوية" className="w-full h-full object-contain" />
+                    <div className="absolute top-3 right-3 bg-emerald-500/20 border border-emerald-400/30 text-emerald-400 text-[10px] px-2.5 py-1 rounded-full font-bold">
+                      معاينة
+                    </div>
+                  </div>
+                  <div className="flex gap-3 p-4 bg-slate-950">
+                    <button
+                      type="button"
+                      onClick={confirmIdCapture}
+                      className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <Check size={16} />
+                      موافق
+                    </button>
+                    <button
+                      type="button"
+                      onClick={retakeIdCapture}
+                      className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <RefreshCw size={16} />
+                      إعادة
                     </button>
                   </div>
                 </motion.div>

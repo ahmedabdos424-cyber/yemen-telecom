@@ -204,21 +204,22 @@ export default function DashboardView({
               </span>
             </div>
             <div className="p-4 space-y-3 flex-1 overflow-y-auto max-h-72">
-              <div className="card border-r-4 border-red-500 flex gap-3 items-start">
-                <span className="material-symbols-outlined text-red-600 text-xl">warning</span>
-                <div className="flex-1">
-                  <h4 className="font-bold text-xs text-red-950 leading-tight">مخزون منخفض - تعز</h4>
-                  <p className="text-[11px] text-red-800 mt-1">المتبقي 480 قطعة فقط في الفرع الرئيسي.</p>
+              {alerts.length === 0 && (
+                <div className="text-center py-8 text-gray-400 text-xs">
+                  لا توجد تنبيهات نشطة حالياً
                 </div>
-              </div>
-              
-              <div className="card border-r-4 border-orange-500 flex gap-3 items-start">
-                <span className="material-symbols-outlined text-orange-600 text-xl">content_copy</span>
-                <div className="flex-1">
-                  <h4 className="font-bold text-xs text-orange-950 leading-tight">اشتباه هويات مكررة</h4>
-                  <p className="text-[11px] text-orange-800 mt-1">15 عملية تفعيل مشبوهة خلال الـ 24 ساعة الماضية.</p>
+              )}
+              {alerts.map((alert) => (
+                <div key={alert.id} className={`card border-r-4 ${alert.priority === 'high' ? 'border-red-500' : alert.priority === 'medium' ? 'border-orange-500' : 'border-blue-500'} flex gap-3 items-start`}>
+                  <span className={`material-symbols-outlined ${alert.priority === 'high' ? 'text-red-600' : alert.priority === 'medium' ? 'text-orange-600' : 'text-blue-600'} text-xl`}>
+                    {alert.priority === 'high' ? 'warning' : alert.priority === 'medium' ? 'content_copy' : 'info'}
+                  </span>
+                  <div className="flex-1">
+                    <h4 className="font-bold text-xs leading-tight">{alert.title}</h4>
+                    <p className="text-[11px] mt-1">{alert.description}</p>
+                  </div>
                 </div>
-              </div>
+              ))}
             </div>
             <div className="p-4 pt-0 border-t border-gray-100 bg-gray-50/50">
               <button 

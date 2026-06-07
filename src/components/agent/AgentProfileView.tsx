@@ -31,7 +31,6 @@ export default function AgentProfileView({
   darkMode,
   setDarkMode
 }: AgentProfileViewProps) {
-  const [editModalOpen, setEditModalOpen] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
@@ -144,7 +143,7 @@ export default function AgentProfileView({
         <div className="relative z-10">
           <div className="w-24 h-24 rounded-full border-4 border-slate-800 mx-auto mb-4 overflow-hidden shadow-xl shadow-black/30">
             {agentPhoto ? (
-              <img src={agentPhoto} alt={username} className="w-full h-full object-cover" />
+              <img loading="lazy" src={agentPhoto} alt={username} className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full bg-slate-800 flex items-center justify-center">
                 <User size={32} className="text-slate-500" />
@@ -208,52 +207,34 @@ export default function AgentProfileView({
            <TrendingUp size={14} className="text-op-ym" />
           <h3 className="text-xs font-bold text-slate-100">الإحصائيات الشخصية</h3>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center">
+        <div className="flex gap-3 overflow-x-auto pb-4 snap-x scrollbar-hide">
+          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center min-w-[140px] flex-shrink-0 snap-center">
             <Users size={16} className="text-op-ym mx-auto mb-2" />
             <p className="text-2xl font-bold text-slate-100">{sellersCount}</p>
             <p className="text-[10px] text-slate-400 mt-1">البائعين التابعين</p>
           </div>
-          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center">
+          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center min-w-[140px] flex-shrink-0 snap-center">
             <Layers size={16} className="text-amber-500 mx-auto mb-2" />
             <p className="text-2xl font-bold text-slate-100">{totalSimsReceived}</p>
             <p className="text-[10px] text-slate-400 mt-1">إجمالي الشرائح</p>
           </div>
-          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center">
+          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center min-w-[140px] flex-shrink-0 snap-center">
             <Package size={16} className="text-blue-500 mx-auto mb-2" />
             <p className="text-2xl font-bold text-slate-100">{totalRemaining}</p>
             <p className="text-[10px] text-slate-400 mt-1">المتبقي بالمخزون</p>
           </div>
-          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center">
+          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center min-w-[140px] flex-shrink-0 snap-center">
             <TrendingUp size={16} className="text-emerald-500 mx-auto mb-2" />
             <p className="text-2xl font-bold text-slate-100">{totalSales.toLocaleString()}</p>
             <p className="text-[10px] text-slate-400 mt-1">إجمالي المبيعات</p>
           </div>
-          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center">
+          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center min-w-[140px] flex-shrink-0 snap-center">
             <Target size={16} className="text-purple-500 mx-auto mb-2" />
             <p className="text-2xl font-bold text-slate-100">{totalClients}</p>
             <p className="text-[10px] text-slate-400 mt-1">عدد العملاء</p>
           </div>
         </div>
       </div>
-
-      {/* Edit Data Button */}
-      <button
-        type="button"
-        onClick={() => setEditModalOpen(true)}
-        className="card w-full flex items-center justify-between p-4 hover:bg-slate-800/40 group"
-       >
-         <div className="flex items-center gap-3">
-           <div className="btn-icon rounded-xl bg-op-ym-light border-op-ym/20 flex items-center justify-center text-op-ym group-hover:scale-105 transition-transform">
-             <User size={18} />
-           </div>
-           <div className="text-right">
-             <p className="text-sm font-bold text-slate-100">تعديل البيانات</p>
-             <p className="text-[10px] text-slate-500 mt-0.5">تحديث الصورة الشخصية والبيانات المسموحة</p>
-           </div>
-         </div>
-         <ChevronLeft size={16} className="text-slate-500 group-hover:text-slate-100 transition-colors" />
-       </button>
 
        {/* Change Password Button */}
        <button
@@ -346,76 +327,7 @@ export default function AgentProfileView({
            </div>
          </div>
          <ChevronLeft size={16} className="text-slate-500 group-hover:text-slate-100 transition-colors" />
-       </button>
-
-      {/* Edit Data Modal */}
-      <AnimatePresence>
-        {editModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setEditModalOpen(false)}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ scale: 0.95, y: 15 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 15 }}
-              className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl z-10 text-slate-200"
-              dir="rtl"
-            >
-              <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
-                <div className="flex items-center gap-2">
-                  <div className="btn-icon rounded-lg bg-op-ym-light border-op-ym/20 flex items-center justify-center text-op-ym">
-                     <User size={16} />
-                   </div>
-                  <h3 className="text-sm font-bold text-slate-100">تعديل البيانات</h3>
-                </div>
-                <button
-                  onClick={() => setEditModalOpen(false)}
-                  className="p-1.5 text-slate-500 hover:text-slate-100 hover:bg-slate-800/40 rounded-full transition-colors cursor-pointer"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <div className="space-y-5">
-                <div className="flex flex-col items-center">
-                  <div className="w-20 h-20 rounded-full border-4 border-slate-800 overflow-hidden mb-3">
-                    {agentPhoto ? (
-                      <img src={agentPhoto} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-slate-800 flex items-center justify-center">
-                        <User size={30} className="text-slate-500" />
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-xs text-slate-400">يمكنك تغيير الصورة الشخصية فقط</span>
-                </div>
-
-                <div className="flex gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => { setEditModalOpen(false); setPhotoModalOpen(true); }}
-                    className="btn btn-sm flex-1 bg-op-ym hover:bg-op-ym/90 text-white"
-                   >
-                     تغيير الصورة
-                   </button>
-                   <button
-                     type="button"
-                     onClick={() => setEditModalOpen(false)}
-                     className="btn btn-sm btn-ghost flex-1 text-slate-300"
-                  >
-                    إلغاء
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+        </button>
 
       {/* Change Password Modal */}
       <AnimatePresence>
@@ -570,7 +482,7 @@ export default function AgentProfileView({
               <div className="flex flex-col items-center space-y-4">
                 <div className="w-28 h-28 rounded-full border-4 border-slate-800 overflow-hidden shadow-lg">
                   {agentPhoto ? (
-                    <img src={agentPhoto} alt="" className="w-full h-full object-cover" />
+                    <img loading="lazy" src={agentPhoto} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full bg-slate-800 flex items-center justify-center">
                       <Image size={40} className="text-slate-500" />

@@ -14,12 +14,23 @@ async function seed() {
     let schema = fs.readFileSync(schemaPath, 'utf-8');
 
     const hash = await bcrypt.hash('123456', 10);
+    // Replace the placeholder hash with the one generated at runtime
     schema = schema.replace(
-      /\$2b\$10\$8K1p\/a0dL1LXMIgoEDFrwOfMQkfAjkMBcGmIxqZpEEBFTFqO2q3mS/g,
+      /\$2a\$10\$LS1\.tsnmbo8M8Uz8MEKuHOUWcRtEIq468TV05kTcMSYHzVGP4Ou02/g,
       hash
     );
 
     await client.query(schema);
+
+    // Update all seed users to have the same default password
+    const users = ['manager', 'agent', 'seller'];
+    for (const username of users) {
+      const userResult = await client.query('SELECT id FROM users WHERE username = $1', [username]);
+      if (userResult.rows.length > 0) {
+        await client.query('UPDATE users SET password_hash = $1 WHERE username = $2', [hash, username]);
+      }
+    }
+
     console.log('Database seeded successfully!');
   } catch (err) {
     console.error('Error seeding database:', err);

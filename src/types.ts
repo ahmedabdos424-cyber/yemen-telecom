@@ -5,31 +5,49 @@
 
 export type Role = 'manager' | 'agent' | 'seller';
 
-export type Operator = 'yemen_mobile' | 'sabafon' | 'you' | 'Yemen Mobile' | 'Sabafon' | 'YOU';
+export type SimStatus = 'available' | 'sold' | 'reserved' | 'inactive' | 'suspended';
+export type SimProvider = 'Yemen Mobile' | 'Sabafon' | 'YOU';
+export type Operator = 'yemen_mobile' | 'sabafon' | 'you' | SimProvider;
 
-export interface SIM {
-  id: string;
-  phone: string;
-  iccid: string;
-  provider: 'Yemen Mobile' | 'Sabafon' | 'YOU';
-  status: 'available' | 'sold' | 'reserved' | 'inactive' | 'suspended';
-  owner: string;
-  dateAdded: string;
-  packageType: string;
-}
-
-// Extracted zip uses 'Sim' (different case)
-export interface Sim {
+export interface ISim {
   id: string;
   iccid: string;
-  operator: 'yemen_mobile' | 'sabafon' | 'you' | 'Yemen Mobile' | 'Sabafon' | 'YOU';
-  category: string;
-  status: 'available' | 'sold' | 'reserved' | 'inactive' | 'suspended';
+  provider: SimProvider;
+  /** Alias for provider — auto-set by helper */
+  operator?: Operator;
+  status: SimStatus;
   dateAdded: string;
   phone?: string;
   owner?: string;
   packageType?: string;
+  category?: string;
+  contract_image?: string;
+  customer_name?: string;
+  customer_id?: string;
+  assigned_to?: number | null;
 }
+
+export function setSimOperator(sim: ISim): ISim {
+  return { ...sim, operator: toOperator(sim.provider) };
+}
+
+export function simProvider(o: Operator): SimProvider {
+  if (o === 'yemen_mobile') return 'Yemen Mobile';
+  if (o === 'sabafon') return 'Sabafon';
+  if (o === 'you') return 'YOU';
+  return o;
+}
+
+export function toOperator(p: SimProvider): Operator {
+  if (p === 'Yemen Mobile') return 'yemen_mobile';
+  if (p === 'Sabafon') return 'sabafon';
+  if (p === 'YOU') return 'you';
+  return p;
+}
+
+// Legacy aliases
+export type SIM = ISim;
+export type Sim = ISim;
 
 export interface Agent {
   id: string;

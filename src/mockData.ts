@@ -88,62 +88,13 @@ export const INITIAL_SELLERS: Seller[] = [
 ];
 
 export const INITIAL_SIMS: Sim[] = [
-  {
-    id: 'sim1',
-    iccid: '8996600123456789012',
-    operator: 'yemen_mobile',
-    category: 'Prepaid Gold',
-    status: 'available',
-    dateAdded: '2023/10/12'
-  },
-  {
-    id: 'sim2',
-    iccid: '8996600123456789045',
-    operator: 'you',
-    category: 'Postpaid Basic',
-    status: 'sold',
-    dateAdded: '2023/10/12'
-  },
-  {
-    id: 'sim3',
-    iccid: '8996600123456789088',
-    operator: 'sabafon',
-    category: 'Data Only',
-    status: 'reserved',
-    dateAdded: '2023/10/14'
-  },
-  {
-    id: 'sim4',
-    iccid: '8996600123456789256',
-    operator: 'yemen_mobile',
-    category: 'Prepaid Gold',
-    status: 'inactive',
-    dateAdded: '2023/10/15'
-  },
-  {
-    id: 'sim5',
-    iccid: '8996600123456789301',
-    operator: 'you',
-    category: 'Prepaid Premium',
-    status: 'available',
-    dateAdded: '2023/10/18'
-  },
-  {
-    id: 'sim6',
-    iccid: '8996600123456789355',
-    operator: 'sabafon',
-    category: 'Prepaid Gold',
-    status: 'available',
-    dateAdded: '2023/10/19'
-  },
-  {
-    id: 'sim7',
-    iccid: '8996620548123985714',
-    operator: 'yemen_mobile',
-    category: 'Postpaid Premium',
-    status: 'available',
-    dateAdded: '2023/10/20'
-  }
+  { id: 'sim1', iccid: '8996600123456789012', provider: 'Yemen Mobile', operator: 'yemen_mobile', category: 'Prepaid Gold', status: 'available', dateAdded: '2023/10/12' },
+  { id: 'sim2', iccid: '8996600123456789045', provider: 'YOU', operator: 'you', category: 'Postpaid Basic', status: 'sold', dateAdded: '2023/10/12' },
+  { id: 'sim3', iccid: '8996600123456789088', provider: 'Sabafon', operator: 'sabafon', category: 'Data Only', status: 'reserved', dateAdded: '2023/10/14' },
+  { id: 'sim4', iccid: '8996600123456789256', provider: 'Yemen Mobile', operator: 'yemen_mobile', category: 'Prepaid Gold', status: 'inactive', dateAdded: '2023/10/15' },
+  { id: 'sim5', iccid: '8996600123456789301', provider: 'YOU', operator: 'you', category: 'Prepaid Premium', status: 'available', dateAdded: '2023/10/18' },
+  { id: 'sim6', iccid: '8996600123456789355', provider: 'Sabafon', operator: 'sabafon', category: 'Prepaid Gold', status: 'available', dateAdded: '2023/10/19' },
+  { id: 'sim7', iccid: '8996620548123985714', provider: 'Yemen Mobile', operator: 'yemen_mobile', category: 'Postpaid Premium', status: 'available', dateAdded: '2023/10/20' },
 ];
 
 export const INITIAL_OPERATIONS: Operation[] = [

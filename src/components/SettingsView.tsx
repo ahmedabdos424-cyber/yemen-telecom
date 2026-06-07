@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { SystemSettings } from '../types';
 import { AUDIT_LOGS } from '../data';
 import ConfirmModal from './shared/ConfirmModal';
+import { captureError } from '../lib/monitor.ts';
 
 interface SettingsViewProps {
   settings: SystemSettings;
@@ -32,7 +33,7 @@ export default function SettingsView({ settings, onUpdateSettings }: SettingsVie
       downloadAnchor.click();
       downloadAnchor.remove();
     } catch (error) {
-      console.error(error);
+      captureError(error, 'downloadAuditReport');
       alert('حدث خطأ أثناء توليد التقرير الأمني.');
     }
   };

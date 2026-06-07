@@ -7,15 +7,14 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { query } from '../db';
 import { hashToken, isTokenBlacklisted } from '../middleware/auth';
+import { validate, loginSchema, refreshTokenSchema } from '../validation';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(64).toString('hex');
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV !== 'production' ? crypto.randomBytes(64).toString('hex') : '');
+const REFRESH_SECRET = process.env.REFRESH_SECRET || (process.env.NODE_ENV !== 'production' ? crypto.randomBytes(64).toString('hex') : '');
 
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', validate(loginSchema), async (req: Request, res: Response) => {
   const { username, password } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password are required' });
-  }
   try {
     const result = await query('SELECT * FROM users WHERE username = $1', [username]);
     if (result.rows.length === 0) {
@@ -27,9 +26,12 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
     await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
-    const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
+    const payload = { id: user.id, username: user.username, role: user.role };
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
+    const refreshToken = jwt.sign(payload, REFRESH_SECRET, { expiresIn: '7d' });
     res.json({
       token,
+      refreshToken,
       user: {
         id: user.id,
         username: user.username,
@@ -40,8 +42,29 @@ router.post('/login', async (req: Request, res: Response) => {
       },
     });
   } catch (err) {
-    console.error('Login error:', err);
+    console.error('[LOGIN ERROR]:', err);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/refresh', validate(refreshTokenSchema), async (req: Request, res: Response) => {
+  const { refreshToken } = req.body;
+  try {
+    const blacklisted = await isTokenBlacklisted(refreshToken);
+    if (blacklisted) {
+      return res.status(401).json({ error: 'Refresh token has been revoked' });
+    }
+    const decoded = jwt.verify(refreshToken, REFRESH_SECRET) as any;
+    const payload = { id: decoded.id, username: decoded.username, role: decoded.role };
+    const newToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
+    const newRefreshToken = jwt.sign(payload, REFRESH_SECRET, { expiresIn: '7d' });
+    res.json({ token: newToken, refreshToken: newRefreshToken });
+  } catch (err: any) {
+    if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Invalid or expired refresh token' });
+    }
+    console.error('Refresh token error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -60,9 +83,26 @@ router.post('/logout', async (req: Request, res: Response) => {
         [hashToken(token), expiresAt]
       );
     }
+    const refreshTokenHeader = req.headers['x-refresh-token'] as string;
+    if (refreshTokenHeader) {
+      try {
+        const rtDecoded = jwt.verify(refreshTokenHeader, REFRESH_SECRET) as any;
+        if (rtDecoded.exp) {
+          const rtExpiresAt = new Date(rtDecoded.exp * 1000).toISOString();
+          await query(
+            'INSERT INTO token_blacklist (token_hash, expires_at) VALUES ($1, $2) ON CONFLICT (token_hash) DO NOTHING',
+            [hashToken(refreshTokenHeader), rtExpiresAt]
+          );
+        }
+      } catch { /* refresh token already expired — ignore */ }
+    }
     res.json({ message: 'Logged out successfully' });
-  } catch {
-    return res.status(401).json({ error: 'Invalid token' });
+  } catch (err: any) {
+    if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    console.error('Logout error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -92,8 +132,12 @@ router.get('/me', async (req: Request, res: Response) => {
       region: u.region,
       lastLogin: u.last_login,
     });
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid token' });
+  } catch (err: any) {
+    if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    console.error('Auth me error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 

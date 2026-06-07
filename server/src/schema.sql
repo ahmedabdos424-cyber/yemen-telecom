@@ -99,13 +99,19 @@ CREATE TABLE IF NOT EXISTS operations (
   status VARCHAR(20) NOT NULL DEFAULT 'success' CHECK (status IN ('success', 'failed', 'pending')),
   customer_name VARCHAR(200),
   customer_id VARCHAR(50),
-  contract_image VARCHAR(500)
+  contract_image VARCHAR(500),
+  created_at TIMESTAMP DEFAULT NOW()
 );
 
 -- Upgrade existing operations table if needed
 ALTER TABLE operations ADD COLUMN IF NOT EXISTS customer_name VARCHAR(200);
 ALTER TABLE operations ADD COLUMN IF NOT EXISTS customer_id VARCHAR(50);
 ALTER TABLE operations ADD COLUMN IF NOT EXISTS contract_image VARCHAR(500);
+ALTER TABLE operations ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
+
+-- Ensure sims and alerts have created_at for tracking
+ALTER TABLE sims ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
+ALTER TABLE alerts ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
 
 CREATE TABLE IF NOT EXISTS inventories (
   id SERIAL PRIMARY KEY,
@@ -163,6 +169,42 @@ CREATE TABLE IF NOT EXISTS duplicate_identities (
   avatar_initials VARCHAR(10) DEFAULT ''
 );
 
+CREATE TABLE IF NOT EXISTS customers (
+  id SERIAL PRIMARY KEY,
+  full_name VARCHAR(200) NOT NULL,
+  id_number VARCHAR(50) NOT NULL,
+  phone VARCHAR(50) DEFAULT '',
+  region VARCHAR(200) DEFAULT '',
+  sims_count INTEGER DEFAULT 1,
+  first_activation TIMESTAMP DEFAULT NOW(),
+  last_activation TIMESTAMP DEFAULT NOW(),
+  created_at TIMESTAMP DEFAULT NOW(),
+  activated_by INTEGER REFERENCES sellers(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS distribution_requests (
+  id SERIAL PRIMARY KEY,
+  request_id VARCHAR(100) UNIQUE NOT NULL,
+  agent_id INTEGER REFERENCES agents(id) ON DELETE SET NULL,
+  seller_id INTEGER REFERENCES sellers(id) ON DELETE SET NULL,
+  operator VARCHAR(50) NOT NULL,
+  count INTEGER NOT NULL,
+  status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'fulfilled')),
+  created_at TIMESTAMP DEFAULT NOW(),
+  approved_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  approved_at TIMESTAMP,
+  notes TEXT DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_customers_id_number ON customers(id_number);
+CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
+CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(full_name);
+CREATE INDEX IF NOT EXISTS idx_distribution_status ON distribution_requests(status);
+CREATE INDEX IF NOT EXISTS idx_distribution_agent ON distribution_requests(agent_id);
+
+-- Remove the static duplicate_identities seed data since we now query dynamically
+DELETE FROM duplicate_identities WHERE id > 0;
+
 -- Performance Indexes
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
@@ -183,10 +225,18 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_type ON audit_logs(type);
 CREATE INDEX IF NOT EXISTS idx_duplicate_identities_region ON duplicate_identities(region);
 CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires ON token_blacklist(expires_at);
 
+-- Periodic cleanup function for expired blacklisted tokens
+CREATE OR REPLACE FUNCTION cleanup_expired_tokens()
+RETURNS void AS $$
+BEGIN
+  DELETE FROM token_blacklist WHERE expires_at < NOW();
+END;
+$$ LANGUAGE plpgsql;
+
 -- SEED DATA
 
 INSERT INTO users (username, password_hash, display_name, role, status) VALUES
-  ('admin', '$2a$10$LS1.tsnmbo8M8Uz8MEKuHOUWcRtEIq468TV05kTcMSYHzVGP4Ou02', 'أحمد محمد', 'manager', 'active'),
+  ('manager', '$2a$10$LS1.tsnmbo8M8Uz8MEKuHOUWcRtEIq468TV05kTcMSYHzVGP4Ou02', 'أحمد محمد', 'manager', 'active'),
   ('agent', '$2a$10$LS1.tsnmbo8M8Uz8MEKuHOUWcRtEIq468TV05kTcMSYHzVGP4Ou02', 'الوكيل أحمد محمد', 'agent', 'active'),
   ('seller', '$2a$10$LS1.tsnmbo8M8Uz8MEKuHOUWcRtEIq468TV05kTcMSYHzVGP4Ou02', 'البائع عبدالرحمن العتيبي', 'seller', 'active')
 ON CONFLICT (username) DO NOTHING;

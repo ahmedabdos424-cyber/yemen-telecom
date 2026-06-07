@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Seller, Operation, Sim } from '../types';
+import { api } from '../api/client';
 import SellerHome from './SellerHome';
 import SellerAccount from './SellerAccount';
 import SellerSimsView from './SellerSimsView';
@@ -87,7 +88,7 @@ export default function SellerDashboard({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isChangingPass, setIsChangingPass] = useState(false);
 
-  const handlePasswordChangeSubmit = (e: React.FormEvent) => {
+  const handlePasswordChangeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!idNumberEntry) return alert('الرجاء إدخال رقم الهوية الخاصة بك للتحقق');
     if (!newPassword || !confirmPassword) return alert('الرجاء تعبئة حقول كلمة المرور الجديدة');
@@ -95,17 +96,19 @@ export default function SellerDashboard({
     if (idNumberEntry !== sellerData.idNumber) return alert('رقم الهوية المدخل غير مطابق لهويتك المسجلة بالنظام');
 
     setIsChangingPass(true);
-    setTimeout(() => {
-      setIsChangingPass(false);
+    try {
+      await api.updatePassword('', newPassword);
       onPasswordChanged(newPassword);
-      
       setIdNumberEntry('');
       setNewPassword('');
       setConfirmPassword('');
       setPasswordOpen(false);
-      
       alert('تم تحديث كلمة المرور الخاصة بك بنجاح!');
-    }, 500);
+    } catch (err: any) {
+      alert(err.message || 'فشل تحديث كلمة المرور. تحقق من اتصال الخادم.');
+    } finally {
+      setIsChangingPass(false);
+    }
   };
 
   const handleSellerConfirmLogout = () => {

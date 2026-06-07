@@ -1,12 +1,23 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { query } from '../db';
 import { requireRole } from '../middleware/auth';
+import { getPagination, paginatedQuery } from '../helpers';
 
 const router = Router();
 
-router.get('/', requireRole('manager', 'agent'), async (_req: Request, res: Response) => {
+router.get('/', requireRole('manager', 'agent'), async (req: Request, res: Response) => {
   try {
+    const { page, limit, offset } = getPagination(req);
+    if (req.query.page || req.query.limit) {
+      const result = await paginatedQuery<any>(
+        'SELECT * FROM agents ORDER BY id',
+        'SELECT COUNT(*) FROM agents',
+        [], page, limit, offset
+      );
+      return res.json(result);
+    }
     const result = await query('SELECT * FROM agents ORDER BY id');
     res.json(result.rows);
   } catch (err) {
@@ -30,7 +41,7 @@ router.post('/', requireRole('manager'), async (req: Request, res: Response) => 
       return res.status(409).json({ error: 'Username is already registered by another account' });
     }
 
-    const agentPassword = password || '123456';
+    const agentPassword = password || crypto.randomBytes(4).toString('hex');
     const passwordHash = await bcrypt.hash(agentPassword, 10);
 
     const userResult = await query(

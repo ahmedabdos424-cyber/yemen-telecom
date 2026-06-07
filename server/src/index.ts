@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
@@ -16,8 +17,21 @@ import alertsRoutes from './routes/alerts';
 import adminRoutes from './routes/admin';
 import uploadRoutes from './routes/upload';
 import usersRoutes from './routes/users';
+import customersRoutes from './routes/customers';
+import distributionsRoutes from './routes/distributions';
+import reportsRoutes from './routes/reports';
 
 dotenv.config({ path: '.env' });
+
+// Production environment validation
+if (process.env.NODE_ENV === 'production') {
+  const required = ['JWT_SECRET', 'REFRESH_SECRET', 'CSRF_SECRET'];
+  const missing = required.filter(k => !process.env[k]);
+  if (missing.length > 0) {
+    console.error(`Missing required environment variables: ${missing.join(', ')}`);
+    process.exit(1);
+  }
+}
 
 const app = express();
 const PORT = parseInt(process.env.API_PORT || '4000');
@@ -26,7 +40,7 @@ const PORT = parseInt(process.env.API_PORT || '4000');
 app.set('trust proxy', 1);
 
 // CSRF token generation endpoint
-const CSRF_SECRET = process.env.CSRF_SECRET || crypto.randomBytes(32).toString('hex');
+const CSRF_SECRET = process.env.CSRF_SECRET || (process.env.NODE_ENV !== 'production' ? crypto.randomBytes(32).toString('hex') : '');
 app.get('/api/csrf-token', (req, res) => {
   const token = crypto.randomBytes(32).toString('hex');
   const hash = crypto.createHmac('sha256', CSRF_SECRET).update(token).digest('hex');
@@ -36,7 +50,18 @@ app.get('/api/csrf-token', (req, res) => {
 // Security middleware
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "blob:"],
+      connectSrc: ["'self'"],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+    },
+  },
 }));
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,http://10.0.0.185:3000,https://yemen-telecom-1699.web.app').split(',');
 app.use(cors({
@@ -52,6 +77,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
 }));
+app.use(compression());
 app.use(express.json({ limit: '1mb' }));
 app.use('/uploads', express.static('uploads'));
 
@@ -59,8 +85,13 @@ app.use('/uploads', express.static('uploads'));
 app.use('/api', (req, res, next) => {
   if (['POST', 'PUT', 'DELETE'].includes(req.method) && !req.path.startsWith('/auth/') && !req.path.startsWith('/csrf-token')) {
     const csrfHeader = req.headers['x-csrf-token'] as string;
-    if (!csrfHeader) {
-      return res.status(403).json({ error: 'CSRF token required' });
+    const csrfHash = req.headers['x-csrf-hash'] as string;
+    if (!csrfHeader || !csrfHash) {
+      return res.status(403).json({ error: 'CSRF token and hash required' });
+    }
+    const expectedHash = crypto.createHmac('sha256', CSRF_SECRET).update(csrfHeader).digest('hex');
+    if (csrfHash !== expectedHash) {
+      return res.status(403).json({ error: 'Invalid CSRF token' });
     }
   }
   next();
@@ -82,6 +113,11 @@ const apiLimiter = rateLimit({
 });
 app.use('/api', apiLimiter);
 
+// Health check endpoint (public — no auth required)
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok', environment: process.env.NODE_ENV, timestamp: new Date().toISOString(), uptime: process.uptime() });
+});
+
 // Apply JWT auth to all /api routes except auth
 app.use(/^\/api\/(?!auth).*/, authenticateToken);
 
@@ -96,37 +132,48 @@ app.use('/api/alerts', alertsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/customers', customersRoutes);
+app.use('/api/distributions', distributionsRoutes);
+app.use('/api/reports', reportsRoutes);
 
-// Stats endpoint
-app.get('/api/stats', async (_req, res) => {
+// In-memory cache for stats
+let statsCache: { data: any; timestamp: number } | null = null;
+const STATS_CACHE_TTL = 300_000; // 5 minutes
+
+// Stats endpoint (manager only)
+app.get('/api/stats', requireRole('manager'), async (_req, res) => {
+  if (statsCache && Date.now() - statsCache.timestamp < STATS_CACHE_TTL) {
+    return res.json(statsCache.data);
+  }
   try {
-    const [
-      totalSims, soldSims, activeSellersRes, availableStock,
-      totalAgents, totalSellers, activeSims, weeklySales, growth
-    ] = await Promise.all([
-      query('SELECT COUNT(*) FROM sims'),
-      query("SELECT COUNT(*) FROM sims WHERE status='sold'"),
-      query("SELECT COUNT(*) FROM sellers WHERE status='active'"),
-      query("SELECT COUNT(*) FROM sims WHERE status='available'"),
-      query("SELECT COUNT(*) FROM agents"),
-      query("SELECT COUNT(*) FROM sellers"),
-      query("SELECT COUNT(*) FROM sims WHERE status IN ('available','sold','reserved')"),
-      query("SELECT COALESCE(SUM(sales_30_days) / 4, 0) FROM sellers"),
-      query("SELECT COALESCE((SUM(sales_30_days) - SUM(total_sales)) * 100.0 / NULLIF(SUM(total_sales), 0), 0) FROM sellers"),
-    ]);
+    const result = await query(`
+      SELECT
+        (SELECT COUNT(*) FROM sims) AS total_sims,
+        (SELECT COUNT(*) FROM sims WHERE status='sold') AS sold_sims,
+        (SELECT COUNT(*) FROM sellers WHERE status='active') AS active_sellers,
+        (SELECT COUNT(*) FROM sims WHERE status='available') AS available_stock,
+        (SELECT COUNT(*) FROM agents) AS total_agents,
+        (SELECT COUNT(*) FROM sellers) AS total_sellers,
+        (SELECT COUNT(*) FROM sims WHERE status IN ('available','sold','reserved')) AS active_sims,
+        (SELECT COALESCE(SUM(sales_30_days) / 4, 0) FROM sellers) AS sales_weekly,
+        (SELECT COALESCE((SUM(sales_30_days) - SUM(total_sales)) * 100.0 / NULLIF(SUM(total_sales), 0), 0) FROM sellers) AS sales_growth
+    `);
 
-    res.json({
-      sales_weekly: Math.round(parseFloat(weeklySales.rows[0].coalesce)),
-      sales_growth: Math.round(parseFloat(growth.rows[0].coalesce) * 10) / 10,
-      active_sellers: parseInt(activeSellersRes.rows[0].count),
-      available_stock: parseInt(availableStock.rows[0].count),
-      total_sims: parseInt(totalSims.rows[0].count),
-      sold_sims: parseInt(soldSims.rows[0].count),
-      remaining_sims: parseInt(totalSims.rows[0].count) - parseInt(soldSims.rows[0].count),
-      active_sims: parseInt(activeSims.rows[0].count),
-      total_agents: parseInt(totalAgents.rows[0].count),
-      total_sellers: parseInt(totalSellers.rows[0].count),
-    });
+    const s = result.rows[0];
+    const data = {
+      sales_weekly: Math.round(parseFloat(s.sales_weekly)),
+      sales_growth: Math.round(parseFloat(s.sales_growth) * 10) / 10,
+      active_sellers: parseInt(s.active_sellers),
+      available_stock: parseInt(s.available_stock),
+      total_sims: parseInt(s.total_sims),
+      sold_sims: parseInt(s.sold_sims),
+      remaining_sims: parseInt(s.total_sims) - parseInt(s.sold_sims),
+      active_sims: parseInt(s.active_sims),
+      total_agents: parseInt(s.total_agents),
+      total_sellers: parseInt(s.total_sellers),
+    };
+    statsCache = { data, timestamp: Date.now() };
+    res.json(data);
   } catch (err) {
     console.error('Error fetching stats:', err);
     res.status(500).json({ error: 'Internal server error' });

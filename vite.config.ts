@@ -10,6 +10,18 @@ export default defineConfig({
       '@': path.resolve(__dirname, '.'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-motion': ['motion'],
+          'vendor-lucide': ['lucide-react'],
+          'vendor-d3': ['d3'],
+          'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/storage'],
+        },
+      },
+    },
+  },
   server: {
     port: 3000,
     host: '0.0.0.0',

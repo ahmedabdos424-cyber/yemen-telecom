@@ -1,11 +1,21 @@
 import { Router, Request, Response } from 'express';
 import { query } from '../db';
+import { requireRole } from '../middleware/auth';
+import { getPagination } from '../helpers';
 
 const router = Router();
 
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', requireRole('manager', 'agent'), async (req: Request, res: Response) => {
   try {
-    const result = await query('SELECT * FROM operations ORDER BY id DESC');
+    const { page, limit, offset } = getPagination(req);
+    const paginate = req.query.page || req.query.limit;
+    let sql = 'SELECT * FROM operations ORDER BY id DESC';
+    const params: any[] = [];
+    if (paginate) {
+      sql += ' LIMIT $1 OFFSET $2';
+      params.push(limit, offset);
+    }
+    const result = await query(sql, params);
     res.json(result.rows.map((r: any) => ({
       id: r.op_id,
       type: r.type,
@@ -21,7 +31,7 @@ router.get('/', async (_req: Request, res: Response) => {
   }
 });
 
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', requireRole('manager', 'agent'), async (req: Request, res: Response) => {
   const { type, target, operator, status } = req.body;
   if (!type || !target) {
     return res.status(400).json({ error: 'Type and target are required' });

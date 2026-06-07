@@ -1,6 +1,7 @@
 import React from 'react';
 import { Role } from '../types';
-import { Home, PlusCircle, UserPlus, Users, Cpu, UserCheck, Settings, LogOut } from 'lucide-react';
+import { Home, PlusCircle, UserPlus, Users, Cpu, UserCheck, LogOut } from 'lucide-react';
+import MobileBottomNav from './shared/MobileBottomNav';
 
 interface NavBarProps {
   role: Role;
@@ -11,7 +12,6 @@ interface NavBarProps {
 }
 
 export default function NavBar({ role, activeTab, setActiveTab, username, onLogout }: NavBarProps) {
-  // Define links depending on the logged-in role
   const isAgent = role === 'agent';
 
   const menuItems = isAgent
@@ -30,12 +30,26 @@ export default function NavBar({ role, activeTab, setActiveTab, username, onLogo
         { id: 'account', label: 'بيانات الحساب', icon: UserCheck },
       ];
 
+  const bottomNavItems = isAgent
+    ? [
+        { id: 'home', label: 'الرئيسية', icon: 'home' },
+        { id: 'activate', label: 'تفعيل شريحة', icon: 'add_circle' },
+        { id: 'add_seller', label: 'إضافة بائع', icon: 'person_add' },
+        { id: 'sellers', label: 'البائعين', icon: 'group' },
+        { id: 'my_sims', label: 'شرائحي', icon: 'sim_card' },
+        { id: 'account', label: 'بيانات الحساب', icon: 'verified_user' },
+      ]
+    : [
+        { id: 'home', label: 'الرئيسية', icon: 'home' },
+        { id: 'activate', label: 'تفعيل شريحة', icon: 'add_circle' },
+        { id: 'my_sims', label: 'شرائحي', icon: 'sim_card' },
+        { id: 'account', label: 'بيانات الحساب', icon: 'verified_user' },
+      ];
+
   return (
     <>
-      {/* 1. Desktop Persistent Sidebar (On the RIGHT inside RTL layout) */}
       <aside className="hidden lg:flex flex-col fixed right-0 top-0 h-screen bg-slate-900 border-l border-slate-800 w-70 text-slate-100 z-40 p-5 pt-20 justify-between">
         <div className="space-y-6">
-          {/* Brand Panel */}
           <div className="flex items-center gap-3 px-3 py-4 bg-slate-950/60 rounded-2xl border border-slate-800/80 shadow-md shadow-black/20">
             <div className="w-11 h-11 rounded-xl bg-red-600/10 border border-red-500/20 flex items-center justify-center text-red-500">
               <span className="material-symbols-outlined text-[24px]">leak_add</span>
@@ -46,10 +60,9 @@ export default function NavBar({ role, activeTab, setActiveTab, username, onLogo
             </div>
           </div>
 
-          {/* Logged in User Profile Info */}
           <div className="flex flex-col items-center px-4 py-5 bg-slate-950/30 rounded-2xl border border-slate-800/20 text-center shadow-md shadow-black/20">
             <div className="w-14 h-14 rounded-full border-2 border-red-600 p-0.5 mb-3 overflow-hidden shadow-lg shadow-red-950/10">
-              <img 
+              <img loading="lazy"
                 alt={username}
                 src={
                   isAgent
@@ -64,7 +77,6 @@ export default function NavBar({ role, activeTab, setActiveTab, username, onLogo
             <span className="text-[9px] font-mono font-bold bg-[#141d2e] border border-blue-900/30 text-blue-400 px-2 py-0.5 rounded-full mt-2">ID: 99283</span>
           </div>
 
-          {/* Navigation Links */}
           <nav className="space-y-1 bg-slate-950/20 rounded-2xl p-2 border border-slate-800/20">
             {menuItems.map((item) => {
               const Icon = item.icon;
@@ -87,7 +99,6 @@ export default function NavBar({ role, activeTab, setActiveTab, username, onLogo
           </nav>
         </div>
 
-        {/* Footer Sidebar Control */}
         <div>
           <button
             onClick={onLogout}
@@ -99,30 +110,11 @@ export default function NavBar({ role, activeTab, setActiveTab, username, onLogo
         </div>
       </aside>
 
-      {/* 2. Mobile Bottom Navigation Bar - with safe area support */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 shadow-[0_-4px_16px_rgba(0,0,0,0.15)] flex justify-between items-center px-1 pb-[env(safe-area-inset-bottom)] nav-safe-bottom" dir="rtl">
-        {menuItems.map((item) => {
-          const Icon = item.icon;
-          const isSelected = activeTab === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={`flex flex-col items-center justify-center flex-1 py-1.5 px-1 transition-all cursor-pointer min-w-0 touch-target ${
-                isSelected 
-                  ? 'text-red-500 font-semibold' 
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <div className={`p-1.5 rounded-full transition-all ${isSelected ? 'bg-red-500/10' : ''}`}>
-                <Icon size={20} />
-              </div>
-              <span className="text-[9px] mt-0.5 truncate w-full text-center leading-tight">{item.label}</span>
-              {isSelected && <span className="w-1 h-1 rounded-full bg-red-500 mt-0.5" />}
-            </button>
-          );
-        })}
-      </nav>
+      <MobileBottomNav
+        items={bottomNavItems}
+        activeId={activeTab}
+        onChange={setActiveTab}
+      />
     </>
   );
 }

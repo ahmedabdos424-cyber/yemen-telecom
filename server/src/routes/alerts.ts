@@ -1,11 +1,21 @@
 import { Router, Request, Response } from 'express';
 import { query } from '../db';
+import { requireRole } from '../middleware/auth';
+import { getPagination } from '../helpers';
 
 const router = Router();
 
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', requireRole('manager'), async (req: Request, res: Response) => {
   try {
-    const result = await query('SELECT * FROM alerts ORDER BY id DESC');
+    const { page, limit, offset } = getPagination(req);
+    const paginate = req.query.page || req.query.limit;
+    let sql = 'SELECT * FROM alerts ORDER BY id DESC';
+    const params: any[] = [];
+    if (paginate) {
+      sql += ' LIMIT $1 OFFSET $2';
+      params.push(limit, offset);
+    }
+    const result = await query(sql, params);
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching alerts:', err);
@@ -13,7 +23,7 @@ router.get('/', async (_req: Request, res: Response) => {
   }
 });
 
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', requireRole('manager'), async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
     await query('DELETE FROM alerts WHERE id = $1', [id]);

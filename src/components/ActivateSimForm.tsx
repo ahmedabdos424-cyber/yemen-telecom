@@ -150,18 +150,24 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
         {/* Yemen Mobile */}
         <div 
           onClick={() => setOperator('yemen_mobile')}
-          className={`relative flex flex-col items-center gap-2 p-4 bg-slate-950 border-2 rounded-2xl cursor-pointer transition-all ${
+          className={`relative flex flex-col items-center gap-2 p-4 border-2 rounded-2xl cursor-pointer transition-all duration-200 active:scale-[0.97] ${
             operator === 'yemen_mobile' 
-              ? 'border-op-ym bg-op-ym-light' 
-              : 'border-slate-800 hover:border-op-ym/40'
+              ? 'bg-op-ym border-op-ym shadow-lg shadow-op-ym/30 scale-[1.02]' 
+              : 'bg-slate-950 border-slate-800 hover:border-op-ym/60 hover:bg-op-ym-light/50'
            }`}
          >
-           <div className="w-12 h-12 rounded-full bg-op-ym flex items-center justify-center text-white shadow-xl shadow-op-ym/20">
+           <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 ${
+             operator === 'yemen_mobile' 
+               ? 'bg-white/20 text-white' 
+               : 'bg-op-ym text-white shadow-lg shadow-op-ym/20'
+           }`}>
              <span className="material-symbols-outlined text-3xl">signal_cellular_alt</span>
            </div>
-           <span className="text-xs font-bold text-slate-100">يمن موبايل</span>
+           <span className={`text-xs font-bold transition-colors duration-200 ${
+             operator === 'yemen_mobile' ? 'text-white' : 'text-slate-100'
+           }`}>يمن موبايل</span>
            {operator === 'yemen_mobile' && (
-             <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-op-ym text-white rounded-full flex items-center justify-center text-[10px] border border-slate-900 shadow">
+             <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white text-op-ym rounded-full flex items-center justify-center text-[10px] border-2 border-op-ym shadow">
                <Check size={10} strokeWidth={3} />
              </span>
           )}
@@ -170,18 +176,24 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
         {/* Sabafon */}
         <div 
           onClick={() => setOperator('sabafon')}
-          className={`relative flex flex-col items-center gap-2 p-4 bg-slate-950 border-2 rounded-2xl cursor-pointer transition-all ${
+          className={`relative flex flex-col items-center gap-2 p-4 border-2 rounded-2xl cursor-pointer transition-all duration-200 active:scale-[0.97] ${
             operator === 'sabafon' 
-              ? 'border-op-sf bg-op-sf-light' 
-              : 'border-slate-800 hover:border-op-sf/40'
+              ? 'bg-op-sf border-op-sf shadow-lg shadow-op-sf/30 scale-[1.02]' 
+              : 'bg-slate-950 border-slate-800 hover:border-op-sf/60 hover:bg-op-sf-light/50'
            }`}
          >
-           <div className="w-12 h-12 rounded-full bg-op-sf flex items-center justify-center text-white shadow-xl shadow-op-sf/20">
+           <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 ${
+             operator === 'sabafon' 
+               ? 'bg-white/20 text-white' 
+               : 'bg-op-sf text-white shadow-lg shadow-op-sf/20'
+           }`}>
              <span className="material-symbols-outlined text-3xl">rss_feed</span>
            </div>
-           <span className="text-xs font-bold text-slate-100">سبأفون</span>
+           <span className={`text-xs font-bold transition-colors duration-200 ${
+             operator === 'sabafon' ? 'text-white' : 'text-slate-100'
+           }`}>سبأفون</span>
            {operator === 'sabafon' && (
-             <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-op-sf text-white rounded-full flex items-center justify-center text-[10px] border border-slate-900 shadow">
+             <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white text-op-sf rounded-full flex items-center justify-center text-[10px] border-2 border-op-sf shadow">
                <Check size={10} strokeWidth={3} />
              </span>
           )}
@@ -190,18 +202,24 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
         {/* YOU */}
         <div 
           onClick={() => setOperator('you')}
-          className={`relative flex flex-col items-center gap-2 p-4 bg-slate-950 border-2 rounded-2xl cursor-pointer transition-all ${
+          className={`relative flex flex-col items-center gap-2 p-4 border-2 rounded-2xl cursor-pointer transition-all duration-200 active:scale-[0.97] ${
             operator === 'you' 
-              ? 'border-op-you bg-op-you-light' 
-              : 'border-slate-800 hover:border-op-you/40'
+              ? 'bg-op-you border-op-you shadow-lg shadow-op-you/30 scale-[1.02]' 
+              : 'bg-slate-950 border-slate-800 hover:border-op-you/60 hover:bg-op-you-light/50'
            }`}
          >
-           <div className="w-12 h-12 rounded-full bg-op-you flex items-center justify-center text-[#1A1A1A] shadow-xl shadow-op-you/20">
+           <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 ${
+             operator === 'you' 
+               ? 'bg-black/10 text-[#1A1A1A]' 
+               : 'bg-op-you text-[#1A1A1A] shadow-lg shadow-op-you/20'
+           }`}>
              <span className="material-symbols-outlined text-3xl font-bold">sensors</span>
            </div>
-           <span className="text-xs font-bold text-slate-100 font-sans">YOU</span>
+           <span className={`text-xs font-bold transition-colors duration-200 ${
+             operator === 'you' ? 'text-[#1A1A1A]' : 'text-slate-100'
+           }`}>YOU</span>
            {operator === 'you' && (
-             <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-op-you text-[#1A1A1A] rounded-full flex items-center justify-center text-[10px] border border-slate-900 shadow">
+             <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-[#1A1A1A] text-op-you rounded-full flex items-center justify-center text-[10px] border-2 border-op-you shadow">
                <Check size={10} strokeWidth={3} />
              </span>
           )}
@@ -280,11 +298,11 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
                   dir="ltr"
                   style={{ textAlign: 'left' }}
                 />
-                <CameraCapture onCapture={(data) => setIccidCaptured(data)} />
+                <CameraCapture onCapture={(data) => { setIccidCaptured(data); setIccid('captured_from_camera'); }} />
               </div>
               {iccidCaptured && (
                 <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1 mt-1">
-                  <Check size={12} /> تم التقاط الصورة
+                  <Check size={12} /> تم التقاط صورة الشريحة
                 </span>
               )}
             </div>
