@@ -126,7 +126,7 @@ export default function SellerSimManagementView({ sims, onUpdateSims }: SellerSi
           <Cpu className="text-red-500" size={18} />
           <span>شاشة شرائحي</span>
         </h2>
-        <p className="text-xs text-slate-400 font-light mt-1">إدارة وتتبع جميع الشرائح المتوفرة والمخصصة في حسابك بالتفصيل.</p>
+
       </div>
 
       {/* 1. Horizontal Scrollable Company Statistics Cards */}

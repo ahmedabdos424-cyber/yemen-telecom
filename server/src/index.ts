@@ -41,11 +41,6 @@ app.set('trust proxy', 1);
 
 // CSRF token generation endpoint
 const CSRF_SECRET = process.env.CSRF_SECRET || (process.env.NODE_ENV !== 'production' ? crypto.randomBytes(32).toString('hex') : '');
-app.get('/api/csrf-token', (req, res) => {
-  const token = crypto.randomBytes(32).toString('hex');
-  const hash = crypto.createHmac('sha256', CSRF_SECRET).update(token).digest('hex');
-  res.json({ token, hash });
-});
 
 // Security middleware
 app.use(helmet({
@@ -85,6 +80,13 @@ app.use(cors({
 app.use(compression());
 app.use(express.json({ limit: '1mb' }));
 app.use('/uploads', express.static('uploads'));
+
+// CSRF token generation endpoint (must be after CORS middleware)
+app.get('/api/csrf-token', (req, res) => {
+  const token = crypto.randomBytes(32).toString('hex');
+  const hash = crypto.createHmac('sha256', CSRF_SECRET).update(token).digest('hex');
+  res.json({ token, hash });
+});
 
 // CSRF validation middleware for state-changing requests
 app.use('/api', (req, res, next) => {

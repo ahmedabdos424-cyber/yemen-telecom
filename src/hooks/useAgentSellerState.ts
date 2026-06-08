@@ -32,7 +32,6 @@ export function useAgentSellerState(role: string | null, username: string) {
   };
 
   const handleAddSellerForAgent = async (data: Omit<Seller, 'id' | 'creationDate' | 'lastLogin'>) => {
-    let sellerId: string;
     let credUsername = (data.username || data.phone || `seller_${Date.now()}`).trim().toLowerCase();
     const credPassword = data.password || Math.random().toString(36).substring(2, 8);
     const sellerName = data.name;
@@ -41,19 +40,16 @@ export function useAgentSellerState(role: string | null, username: string) {
       const result = await api.createSeller({ ...data, agent_name: username });
       const created = result.seller || result;
       setSellers(prev => [created, ...prev]);
-      sellerId = created.id;
       if (result.credentials) {
         credUsername = result.credentials.username;
       }
+      setSellerCredentials({ username: credUsername, password: credPassword, sellerName });
+      handleSetRoleTab('sellers');
     } catch (err) {
       captureError(err, 'handleAddSellerForAgent');
-      sellerId = String(Math.floor(10000 + Math.random() * 90000));
-      const now = new Date().toISOString().split('T')[0].replace(/-/g, '/');
-      setSellers(prev => [{ ...data, id: sellerId, creationDate: now, lastLogin: 'لم يسجل دخول بعد' } as Seller, ...prev]);
+      const message = err instanceof Error ? err.message : 'حدث خطأ غير متوقع';
+      alert(`فشل إنشاء البائع: ${message}\n\nيرجى التحقق من اتصال الخادم والمحاولة مرة أخرى.`);
     }
-
-    setSellerCredentials({ username: credUsername, password: credPassword, sellerName });
-    handleSetRoleTab('sellers');
   };
 
   const handleTransferSimsForAgent = async (op: Operator, count: number, startSerial: string, endSerial: string, recipientName: string) => {

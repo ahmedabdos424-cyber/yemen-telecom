@@ -53,7 +53,7 @@ export default function AlertsView({
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="font-headline-lg text-lg md:text-xl font-bold text-gray-900">سجل التنبيهات والأمان العقدية</h2>
-          <p className="text-xs text-gray-500 mt-1">مراقبة فورية لأداء النظام، ثغرات الأمان، وحالات مخزون الشرائح بالفروع</p>
+
         </div>
         <div className="flex gap-1.5 bg-gray-100 rounded-lg p-1">
           <button

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   User, CheckCircle, AlertTriangle, TrendingUp, Search, X, Edit, History,
-  Smartphone, DollarSign, Lock, MoreVertical
+  Smartphone, DollarSign, Lock, MoreVertical, Check, Cpu, Trash2, UserX, Eye
 } from 'lucide-react';
 import { Seller } from '../../types';
+import ConfirmModal from '../shared/ConfirmModal';
 
 interface SellerListViewProps {
   sellers: Seller[];
@@ -29,9 +31,15 @@ export default function SellerListView({
   onLockToggle
 }: SellerListViewProps) {
   const [sellerSearchQuery, setSellerSearchQuery] = useState('');
-  const [sellerRegionFilter, setSellerRegionFilter] = useState('all');
   const [sellerStatusFilter, setSellerStatusFilter] = useState('all');
   const [sellerLockedState, setSellerLockedState] = useState<Record<string, boolean>>({});
+  const [allocModalSeller, setAllocModalSeller] = useState<Seller | null>(null);
+  const [allocFrom, setAllocFrom] = useState('');
+  const [allocTo, setAllocTo] = useState('');
+  const [allocOp, setAllocOp] = useState<'yemen_mobile' | 'sabafon' | 'you'>('yemen_mobile');
+  const [menuSeller, setMenuSeller] = useState<Seller | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Seller | null>(null);
+  const [confirmDisable, setConfirmDisable] = useState<Seller | null>(null);
 
   // Compute stats for sellers
   const totalCount = sellers.length;
@@ -47,10 +55,9 @@ export default function SellerListView({
       (seller.phone && seller.phone.toLowerCase().includes(q)) ||
       (seller.storeName && seller.storeName.toLowerCase().includes(q));
 
-    const matchesRegion = sellerRegionFilter === 'all' || seller.region === sellerRegionFilter;
     const matchesStatus = sellerStatusFilter === 'all' || seller.status === sellerStatusFilter;
 
-    return matchesSearch && matchesRegion && matchesStatus;
+    return matchesSearch && matchesStatus;
   });
 
   const handleResetPasswordClick = (seller: Seller) => {
@@ -78,10 +85,10 @@ export default function SellerListView({
   return (
     <div className="space-y-6 text-right">
       
-      {/* Stat Cards: Total Sellers, Active, Low Stock, Daily Sales */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Stat Cards: Horizontal scroll on mobile, grid on desktop */}
+      <div className="flex gap-4 overflow-x-auto pb-2 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:overflow-visible sm:pb-0 snap-x snap-mandatory scroll-smooth" dir="ltr">
         
-        <div className="stat-card flex justify-between items-center">
+        <div className="stat-card flex justify-between items-center min-w-[220px] sm:min-w-0 snap-start">
           <div className="space-y-1">
             <span className="text-[10px] text-slate-500 font-bold block">إجمالي البائعين</span>
             <h3 className="stat-card-value text-slate-100">{totalCount} <span className="text-xs text-slate-400 font-normal">بائع</span></h3>
@@ -92,7 +99,7 @@ export default function SellerListView({
           </div>
         </div>
 
-        <div className="stat-card flex justify-between items-center">
+        <div className="stat-card flex justify-between items-center min-w-[220px] sm:min-w-0 snap-start">
           <div className="space-y-1">
             <span className="text-[10px] text-slate-500 font-bold block">البائعين النشطين</span>
             <h3 className="stat-card-value text-emerald-400">{activeCount} <span className="text-xs text-slate-400 font-normal">متصل</span></h3>
@@ -103,7 +110,7 @@ export default function SellerListView({
           </div>
         </div>
 
-        <div className="stat-card flex justify-between items-center">
+        <div className="stat-card flex justify-between items-center min-w-[220px] sm:min-w-0 snap-start">
           <div className="space-y-1">
             <span className="text-[10px] text-slate-500 font-bold block">مخزون منخفض حرج</span>
             <h3 className="stat-card-value text-amber-500">{lowStockCount} <span className="text-xs text-slate-400 font-normal">حساب</span></h3>
@@ -114,7 +121,7 @@ export default function SellerListView({
           </div>
         </div>
 
-        <div className="stat-card flex justify-between items-center">
+        <div className="stat-card flex justify-between items-center min-w-[220px] sm:min-w-0 snap-start">
           <div className="space-y-1">
             <span className="text-[10px] text-slate-500 font-bold block">مبيعات اليوم والتوزيع</span>
             <h3 className="stat-card-value text-red-500">{dailyAllocations} <span className="text-xs text-slate-400 font-normal">عملية</span></h3>
@@ -147,18 +154,6 @@ export default function SellerListView({
         </div>
 
         <div className="flex flex-wrap gap-2 w-full lg:w-auto">
-          <select
-            value={sellerRegionFilter}
-            onChange={(e) => setSellerRegionFilter(e.target.value)}
-            className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-[11px] text-slate-200 outline-none"
-          >
-            <option value="all">كل المحافظات والمناطق</option>
-            <option value="الرياض">الرياض / العليا</option>
-            <option value="مكة المكرمة">مكة المكرمة</option>
-            <option value="المدينة المنورة">المدينة المنورة</option>
-            <option value="المنطقة الشرقية">المنطقة الشرقية</option>
-          </select>
-
           <select
             value={sellerStatusFilter}
             onChange={(e) => setSellerStatusFilter(e.target.value)}
@@ -330,6 +325,13 @@ export default function SellerListView({
                         <h4 className="font-bold text-slate-100 text-sm truncate">{seller.name}</h4>
                         <p className="text-[10px] text-slate-500 truncate">{seller.storeName || 'متجر بيع بالتجزئة'}</p>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => setMenuSeller(menuSeller?.id === seller.id ? null : seller)}
+                        className="btn-icon rounded-lg bg-slate-800/40 hover:bg-slate-700/60 text-slate-400 hover:text-slate-100 flex-shrink-0"
+                      >
+                        <MoreVertical size={16} />
+                      </button>
                       <span className={`badge ${statusColor} flex-shrink-0`}>{statusText}</span>
                     </div>
 
@@ -343,7 +345,9 @@ export default function SellerListView({
 
                     {/* Action buttons */}
                     <div className="flex gap-2 pt-2 border-t border-slate-800/50">
-                      <button onClick={() => { if (onManageSims) onManageSims(seller); }} className="flex-1 btn btn-sm btn-ghost text-red-400 hover:text-red-300 text-[10px] h-9">إدارة الشرائح</button>
+                      <button onClick={() => { setAllocModalSeller(seller); }} className="flex-1 btn btn-sm btn-ghost text-red-400 hover:text-red-300 text-[10px] h-9 flex items-center justify-center gap-1">
+                        <Cpu size={18} /> <span>تخصيص</span>
+                      </button>
                       <button onClick={() => { if (onViewPayments) onViewPayments(seller); }} className="flex-1 btn btn-sm btn-ghost text-[10px] h-9">المدفوعات</button>
                       <button onClick={() => {
                         const lockState = !isLocked;
@@ -362,6 +366,234 @@ export default function SellerListView({
         </div>
       )}
 
+      {/* Three-Dots Seller Menu */}
+      <AnimatePresence>
+        {menuSeller && (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMenuSeller(null)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="relative w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-right text-slate-200"
+            >
+              <div className="flex justify-between items-center pb-4 border-b border-slate-800 mb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-100">بيانات البائع</h3>
+                </div>
+                <button onClick={() => setMenuSeller(null)} className="p-1 text-slate-500 hover:text-slate-100 hover:bg-slate-800 rounded-full transition-colors cursor-pointer">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="space-y-3 mb-4 p-4 bg-slate-950/40 rounded-2xl border border-slate-800/40">
+                <div className="flex justify-between text-xs"><span className="text-slate-400">اسم البائع</span><span className="font-bold text-slate-100">{menuSeller.name}</span></div>
+                <div className="flex justify-between text-xs"><span className="text-slate-400">رقم الهوية</span><span className="font-bold text-slate-100 font-mono">{menuSeller.idNumber || '---'}</span></div>
+                <div className="flex justify-between text-xs"><span className="text-slate-400">رقم الهاتف</span><span className="font-bold text-slate-100 font-mono" dir="ltr">{menuSeller.phone}</span></div>
+                <div className="flex justify-between text-xs"><span className="text-slate-400">الموقع</span><span className="font-bold text-slate-100">{menuSeller.region}</span></div>
+                <div className="flex justify-between text-xs"><span className="text-slate-400">عدد الشرائح</span><span className="font-bold text-red-400">{menuSeller.simsCount} SIM</span></div>
+                <div className="flex justify-between text-xs"><span className="text-slate-400">الحالة</span><span className={`font-bold ${menuSeller.status === 'active' ? 'text-emerald-400' : 'text-amber-400'}`}>{menuSeller.status === 'active' ? 'نشط' : menuSeller.status === 'low_stock' ? 'مخزون منخفض' : 'غير نشط'}</span></div>
+              </div>
+
+              <div className="space-y-2">
+                <button
+                  onClick={() => { if (onEditSeller) onEditSeller(menuSeller); setMenuSeller(null); }}
+                  className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Edit size={14} /> تعديل بيانات البائع
+                </button>
+                <button
+                  onClick={() => { setConfirmDelete(menuSeller); setMenuSeller(null); }}
+                  className="w-full py-3 bg-red-950/30 hover:bg-red-950/50 text-red-400 font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 border border-red-900/30"
+                >
+                  <Trash2 size={14} /> حذف بائع
+                </button>
+                <button
+                  onClick={() => { setConfirmDisable(menuSeller); setMenuSeller(null); }}
+                  className="w-full py-3 bg-amber-950/30 hover:bg-amber-950/50 text-amber-400 font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 border border-amber-900/30"
+                >
+                  <UserX size={14} /> تعطيل حساب
+                </button>
+                <button
+                  onClick={() => { if (onResetSellerPassword) onResetSellerPassword(menuSeller.id); setMenuSeller(null); }}
+                  className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Lock size={14} /> إعادة تعيين كلمة المرور
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation */}
+      <ConfirmModal
+        open={!!confirmDelete}
+        onConfirm={() => {
+          if (confirmDelete && onUpdateSellerStatus) {
+            onUpdateSellerStatus(confirmDelete.id, 'inactive');
+          }
+          setConfirmDelete(null);
+        }}
+        onCancel={() => setConfirmDelete(null)}
+        title="حذف البائع"
+        message={`هل أنت متأكد من حذف البائع "${confirmDelete?.name}"? لا يمكن التراجع عن هذا الإجراء.`}
+        confirmLabel="حذف"
+        cancelLabel="إلغاء"
+        variant="danger"
+      />
+
+      {/* Disable Confirmation */}
+      <ConfirmModal
+        open={!!confirmDisable}
+        onConfirm={() => {
+          if (confirmDisable && onUpdateSellerStatus) {
+            onUpdateSellerStatus(confirmDisable.id, 'inactive');
+          }
+          setConfirmDisable(null);
+        }}
+        onCancel={() => setConfirmDisable(null)}
+        title="تعطيل الحساب"
+        message={`هل أنت متأكد من تعطيل حساب "${confirmDisable?.name}"? يمكن إعادة التفعيل لاحقاً.`}
+        confirmLabel="تعطيل"
+        cancelLabel="إلغاء"
+        variant="warning"
+      />
+
+      {/* SIM Allocation Popup */}
+      <AnimatePresence>
+        {allocModalSeller && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setAllocModalSeller(null)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="relative w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-right text-slate-200"
+            >
+              <div className="flex justify-between items-center pb-4 border-b border-slate-800 mb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-100">تخصيص شرائح</h3>
+                  <p className="text-[10px] text-slate-400 mt-0.5">للبائع: {allocModalSeller.name}</p>
+                </div>
+                <button onClick={() => setAllocModalSeller(null)} className="p-1 text-slate-500 hover:text-slate-100 hover:bg-slate-800 rounded-full transition-colors cursor-pointer">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-400">شركة الاتصالات</label>
+                  <select
+                    value={allocOp}
+                    onChange={(e) => setAllocOp(e.target.value as any)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs outline-none focus:border-red-600 transition-colors text-slate-200"
+                  >
+                    <option value="yemen_mobile">يمن موبايل</option>
+                    <option value="sabafon">سبأفون</option>
+                    <option value="you">YOU</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-400">رقم الشريحة من</label>
+                  <input
+                    type="text"
+                    value={allocFrom}
+                    onChange={(e) => setAllocFrom(e.target.value.replace(/\D/g, ''))}
+                    placeholder="89961..."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs outline-none focus:border-red-600 transition-colors text-slate-200 font-sans"
+                    dir="ltr"
+                    style={{ textAlign: 'center' }}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-400">رقم الشريحة إلى</label>
+                  <input
+                    type="text"
+                    value={allocTo}
+                    onChange={(e) => setAllocTo(e.target.value.replace(/\D/g, ''))}
+                    placeholder="89967..."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs outline-none focus:border-red-600 transition-colors text-slate-200 font-sans"
+                    dir="ltr"
+                    style={{ textAlign: 'center' }}
+                  />
+                </div>
+
+                {/* Auto-calculated count — read-only */}
+                <div className="bg-slate-950/40 border border-slate-800 rounded-xl p-4 text-right">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-400">المستلم:</span>
+                    <span className="font-bold text-slate-100">{allocModalSeller.name}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs mt-2 pt-2 border-t border-slate-800/40">
+                    <span className="text-slate-400">العدد:</span>
+                    <span className="font-bold text-emerald-400 text-sm">
+                      {allocFrom && allocTo
+                        ? `${parseInt(allocTo) - parseInt(allocFrom) + 1} شريحة`
+                        : '0 شريحة'}
+                    </span>
+                  </div>
+                  {allocFrom && allocTo && (
+                    <div className="text-[9px] text-slate-500 mt-1 text-left font-mono" dir="ltr">
+                      {allocFrom} - {allocTo}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const from = parseInt(allocFrom);
+                      const to = parseInt(allocTo);
+                      if (!allocFrom || !allocTo || isNaN(from) || isNaN(to)) {
+                        alert('الرجاء إدخال نطاق أرقام صحيح');
+                        return;
+                      }
+                      if (to < from) {
+                        alert('رقم (إلى) يجب أن يكون أكبر من أو يساوي رقم (من)');
+                        return;
+                      }
+                      const count = to - from + 1;
+                      alert(`تم تخصيص ${count} شريحة من ${allocOp === 'yemen_mobile' ? 'يمن موبايل' : allocOp === 'sabafon' ? 'سبأفون' : 'YOU'} للبائع ${allocModalSeller.name}`);
+                      setAllocModalSeller(null);
+                      setAllocFrom('');
+                      setAllocTo('');
+                    }}
+                    className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer"
+                  >
+                    <span className="flex items-center justify-center gap-2">
+                      <Check size={14} />
+                      تأكيد التخصيص
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setAllocModalSeller(null); setAllocFrom(''); setAllocTo(''); }}
+                    className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

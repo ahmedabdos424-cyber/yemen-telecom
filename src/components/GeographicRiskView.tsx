@@ -319,7 +319,7 @@ export default function GeographicRiskView() {
         .attr('y2', d => (d.target as any).y);
 
       node
-        .attr('transform', d => `translate(${d.x},${d.y})`);
+        .attr('transform', d => `translate(${(d as any).x},${(d as any).y})`);
     });
 
     // Drag simulation triggers

@@ -8,7 +8,6 @@ import {
   Image, Settings
 } from 'lucide-react';
 import AgentSettingsModal from './AgentSettingsModal';
-import ThemeToggle from '../shared/ThemeToggle';
 
 interface AgentProfileViewProps {
   username: string;
@@ -140,8 +139,27 @@ export default function AgentProfileView({
       {/* Page Header */}
       <div className="card text-center relative overflow-hidden">
         <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-r from-red-950/20 to-transparent" />
+        {/* Header Actions: Dark Mode + Settings */}
+        <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setDarkMode(!darkMode)}
+            className="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/50 flex items-center justify-center text-slate-400 hover:text-amber-400 transition-all"
+          >
+            <span className="material-symbols-outlined text-lg">
+              {darkMode ? 'light_mode' : 'dark_mode'}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            className="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/50 flex items-center justify-center text-slate-400 hover:text-slate-100 transition-all"
+          >
+            <Settings size={18} />
+          </button>
+        </div>
         <div className="relative z-10">
-          <div className="w-24 h-24 rounded-full border-4 border-slate-800 mx-auto mb-4 overflow-hidden shadow-xl shadow-black/30">
+          <div className="w-24 h-24 rounded-full border-4 border-slate-800 mx-auto mb-4 overflow-hidden shadow-xl shadow-black/30 relative">
             {agentPhoto ? (
               <img loading="lazy" src={agentPhoto} alt={username} className="w-full h-full object-cover" />
             ) : (
@@ -149,6 +167,13 @@ export default function AgentProfileView({
                 <User size={32} className="text-slate-500" />
               </div>
             )}
+            <button
+              type="button"
+              onClick={() => setPhotoModalOpen(true)}
+              className="absolute -top-1 -right-1 w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-500 border-2 border-slate-900 flex items-center justify-center text-white shadow-lg transition-all cursor-pointer z-10"
+            >
+              <Camera size={14} />
+            </button>
           </div>
           <h2 className="text-xl font-bold text-slate-100">{username}</h2>
           <p className="text-xs text-op-ym font-bold mt-1">وكيل معتمد</p>
@@ -253,63 +278,6 @@ export default function AgentProfileView({
         </div>
         <ChevronLeft size={16} className="text-slate-500 group-hover:text-slate-100 transition-colors" />
       </button>
-
-      {/* Photo Section Button */}
-      <button
-        type="button"
-        onClick={() => setPhotoModalOpen(true)}
-        className="card w-full flex items-center justify-between p-4 hover:bg-slate-800/40 transition-all group"
-       >
-         <div className="flex items-center gap-3">
-           <div className="btn-icon rounded-xl bg-op-sf-light border-op-sf/20 flex items-center justify-center text-op-sf group-hover:scale-105 transition-transform">
-             <Camera size={18} />
-           </div>
-           <div className="text-right">
-             <p className="text-sm font-bold text-slate-100">الصورة الشخصية</p>
-             <p className="text-[10px] text-slate-500 mt-0.5">تغيير أو حذف الصورة الشخصية للحساب</p>
-           </div>
-         </div>
-         <ChevronLeft size={16} className="text-slate-500 group-hover:text-slate-100 transition-colors" />
-       </button>
-
-      {/* Theme Toggle */}
-      <ThemeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
-
-      {/* Settings Button */}
-      <button
-        type="button"
-        onClick={() => setSettingsOpen(true)}
-        className="card w-full flex items-center justify-between p-4 hover:bg-slate-800/40 transition-all group"
-       >
-         <div className="flex items-center gap-3">
-           <div className="btn-icon rounded-xl bg-slate-700/30 border-slate-700/40 flex items-center justify-center text-slate-400 group-hover:scale-105 transition-transform">
-             <Settings size={18} />
-           </div>
-           <div className="text-right">
-             <p className="text-sm font-bold text-slate-100">إعدادات الحساب</p>
-             <p className="text-[10px] text-slate-500 mt-0.5">المظهر، الإشعارات، ومعلومات الحساب</p>
-           </div>
-         </div>
-         <ChevronLeft size={16} className="text-slate-500 group-hover:text-slate-100 transition-colors" />
-       </button>
-
-       {/* View Activity Button */}
-      <button
-        type="button"
-        onClick={() => alert('جاري تحميل سجل النشاطات...')}
-        className="card w-full flex items-center justify-between p-4 hover:bg-slate-800/40 transition-all group"
-       >
-         <div className="flex items-center gap-3">
-           <div className="btn-icon rounded-xl bg-emerald-600/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 group-hover:scale-105 transition-transform">
-             <Clock size={18} />
-           </div>
-           <div className="text-right">
-             <p className="text-sm font-bold text-slate-100">عرض النشاط</p>
-             <p className="text-[10px] text-slate-500 mt-0.5">سجل العمليات والنشاطات السابقة</p>
-           </div>
-         </div>
-         <ChevronLeft size={16} className="text-slate-500 group-hover:text-slate-100 transition-colors" />
-       </button>
 
       {/* Logout Button */}
       <button

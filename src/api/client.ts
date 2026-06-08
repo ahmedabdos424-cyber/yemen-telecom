@@ -1,8 +1,10 @@
 import { captureTiming } from '../lib/monitor.ts';
 
-const isCapacitor = (window as any).Capacitor?.isNative;
-const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const API_BASE = isCapacitor || !isLocal
+const isCapacitor = !!(window as any).Capacitor?.isNative;
+const hostname = window.location.hostname;
+const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
+const isDevProxy = isLocal && window.location.port !== '';
+const API_BASE = isCapacitor || (isLocal && !isDevProxy) || !isLocal
   ? 'https://yemen-telecom-api.onrender.com/api'
   : '/api';
 
@@ -89,6 +91,31 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers['X-Refresh-Token'] = refreshToken;
   }
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  if (res.status === 403 && !path.startsWith('/auth/') && path !== '/csrf-token') {
+    const errBody = await res.json().catch(() => ({}));
+    if (errBody.error && (errBody.error.includes('CSRF'))) {
+      await fetchCsrfToken();
+      if (csrfToken && csrfHash) {
+        headers['X-CSRF-Token'] = csrfToken;
+        headers['X-CSRF-Hash'] = csrfHash;
+        const retryRes = await fetch(`${API_BASE}${path}`, { ...options, headers });
+        if (retryRes.ok) {
+          const dur = performance.now() - start;
+          captureTiming(`${options.method || 'GET'} ${path} (csrf-retry)`, dur);
+          return retryRes.json();
+        }
+        if (!retryRes.ok) {
+          const err2 = await retryRes.json().catch(() => ({ error: retryRes.statusText }));
+          const dur = performance.now() - start;
+          captureTiming(`${options.method || 'GET'} ${path} (csrf-retry)`, dur);
+          throw new Error(err2.error || `HTTP ${retryRes.status}`);
+        }
+      }
+      const dur = performance.now() - start;
+      captureTiming(`${options.method || 'GET'} ${path}`, dur);
+      throw new Error(errBody.error || `HTTP ${res.status}`);
+    }
+  }
   if (res.status === 401 && refreshToken && !path.startsWith('/auth/')) {
     const newToken = await refreshAccessToken();
     if (newToken) {
@@ -97,11 +124,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       if (!retryRes.ok) {
         const err = await retryRes.json().catch(() => ({ error: retryRes.statusText }));
         const dur = performance.now() - start;
-        captureTiming(`${options.method || 'GET'} ${path} (retry)`, dur);
+        captureTiming(`${options.method || 'GET'} ${path} (token-retry)`, dur);
         throw new Error(err.error || `HTTP ${retryRes.status}`);
       }
       const dur = performance.now() - start;
-      captureTiming(`${options.method || 'GET'} ${path} (retry)`, dur);
+      captureTiming(`${options.method || 'GET'} ${path} (token-retry)`, dur);
       return retryRes.json();
     }
   }

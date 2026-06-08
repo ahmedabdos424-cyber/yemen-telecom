@@ -110,7 +110,7 @@ export default function SellerSimsView({ sims, onUpdateSims }: SellerSimsViewPro
           <Cpu className="text-red-500" size={18} />
           <span>شاشة شرائحي</span>
         </h2>
-        <p className="text-xs text-slate-400 font-light mt-1">إدارة وتتبع جميع الشرائح المتوفرة والمخصصة في حسابك بالتفصيل.</p>
+
       </div>
 
       <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-none" dir="rtl">

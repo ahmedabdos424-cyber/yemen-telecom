@@ -173,7 +173,7 @@ export default function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="font-headline-lg text-lg md:text-xl font-bold text-gray-900">إدارة ومخزن شرائح الاتصال</h2>
-          <p className="text-xs text-gray-500 mt-1">تتبع، فرز، ومراقبة مخزون الشرائح النشطة والجاهزة للتوزيع</p>
+
         </div>
         <div className="flex items-center gap-2.5 w-full md:w-auto">
           {/* CSV Import */}

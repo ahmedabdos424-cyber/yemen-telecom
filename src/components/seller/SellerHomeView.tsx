@@ -22,7 +22,7 @@ export default function SellerHomeView({ operations, setActiveTab }: SellerHomeV
             <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse"></span>
             بوابة العمليات والمبيعات الموحدة
           </h2>
-          <p className="text-xs text-slate-400 leading-relaxed font-light mt-0.5">متابعة فورية لكميات الشرائح، الحصص التشغيلية، وعمليات التفعيل النشطة.</p>
+
         </div>
         <span className="text-[10px] font-mono text-slate-500 bg-slate-950/60 border border-slate-850 px-2.5 py-1 rounded-xl" dir="ltr">2026-06-02</span>
       </div>

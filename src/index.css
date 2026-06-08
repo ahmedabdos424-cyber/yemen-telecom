@@ -572,7 +572,7 @@ body {
 /* Camera icon inside input */
 .input-camera-btn {
   position: absolute;
-  left: 0.625rem;
+  inset-inline-start: 0.625rem;
   top: 50%;
   transform: translateY(-50%);
   width: 36px;

@@ -427,7 +427,7 @@ export default function AgentsView({ agents, setView, onUpdateAgent }: AgentsVie
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="font-headline-lg text-lg md:text-xl font-bold text-gray-900">إدارة شبكة الوكلاء المعتمدين</h2>
-          <p className="text-xs text-gray-500 mt-1">تتبع الفروع الرئيسية، مبيعاتهم اليومية وحالة مخزون الشرائح لديهم</p>
+
         </div>
         <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
           <button

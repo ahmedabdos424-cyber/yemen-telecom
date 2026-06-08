@@ -17,7 +17,7 @@ export default defineConfig({
           'vendor-motion': ['motion'],
           'vendor-lucide': ['lucide-react'],
           'vendor-d3': ['d3'],
-          'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/storage'],
+
         },
       },
     },

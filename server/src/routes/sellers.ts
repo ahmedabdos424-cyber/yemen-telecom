@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { query } from '../db';
+import { query, transaction } from '../db';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination } from '../helpers';
 
@@ -123,25 +123,9 @@ router.post('/', requireRole('manager', 'agent'), async (req: Request, res: Resp
     const regionCodeVal = region_code ?? req.body.regionCode ?? '';
 
     // Create user account for the seller
-    let userId: number | null = null;
     const sellerUsername = (username || phone || `seller_${Date.now()}`).trim().toLowerCase();
-
-    // Prevent takeover/downgrade of existing accounts
-    const userExists = await query('SELECT id FROM users WHERE username = $1', [sellerUsername]);
-    if (userExists.rows.length > 0) {
-      return res.status(409).json({ error: 'Username is already taken by another account' });
-    }
-
     const sellerPassword = password || crypto.randomBytes(4).toString('hex');
     const passwordHash = await bcrypt.hash(sellerPassword, 10);
-
-    const userResult = await query(
-      `INSERT INTO users (username, password_hash, display_name, role, status, phone, region)
-       VALUES ($1, $2, $3, 'seller', 'active', $4, $5)
-       RETURNING id`,
-      [sellerUsername, passwordHash, name, phone || '', region || '']
-    );
-    userId = userResult.rows[0].id;
 
     // Look up agent_id if agent_name provided
     let agentId: number | null = null;
@@ -152,32 +136,52 @@ router.post('/', requireRole('manager', 'agent'), async (req: Request, res: Resp
       }
     }
 
-    // Create seller record
     const sid = req.body.seller_id || req.body.sellerId || `SLR-${String(Math.floor(10000 + Math.random() * 90000))}`;
     const now = new Date().toISOString().split('T')[0].replace(/-/g, '/');
-    const result = await query(
-      `INSERT INTO sellers (seller_id, user_id, agent_id, name, store_name, id_number, phone, region, region_code, status, creation_date, last_login)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
-      [sid, userId, agentId, name, storeNameVal, idNumberVal, phone || '', region || '', regionCodeVal, status || 'active', now, 'لم يسجل دخول بعد']
-    );
 
-    // Fetch newly created seller with agent_name JOIN
-    const finalResult = await query(
-      `SELECT s.*, a.name as agent_name 
-       FROM sellers s 
-       LEFT JOIN agents a ON s.agent_id = a.id 
-       WHERE s.id = $1`,
-      [result.rows[0].id]
-    );
+    // Execute all DB writes inside a transaction
+    const { seller: createdSeller } = await transaction(async (client) => {
+      const userExists = await client.query('SELECT id FROM users WHERE username = $1', [sellerUsername]);
+      if (userExists.rows.length > 0) {
+        throw Object.assign(new Error('Username is already taken by another account'), { statusCode: 409 });
+      }
+
+      const userResult = await client.query(
+        `INSERT INTO users (username, password_hash, display_name, role, status, phone, region)
+         VALUES ($1, $2, $3, 'seller', 'active', $4, $5)
+         RETURNING id`,
+        [sellerUsername, passwordHash, name, phone || '', region || '']
+      );
+      const userId = userResult.rows[0].id;
+
+      const sellerResult = await client.query(
+        `INSERT INTO sellers (seller_id, user_id, agent_id, name, store_name, id_number, phone, region, region_code, status, creation_date, last_login)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+        [sid, userId, agentId, name, storeNameVal, idNumberVal, phone || '', region || '', regionCodeVal, status || 'active', now, 'لم يسجل دخول بعد']
+      );
+
+      const finalResult = await client.query(
+        `SELECT s.*, a.name as agent_name 
+         FROM sellers s 
+         LEFT JOIN agents a ON s.agent_id = a.id 
+         WHERE s.id = $1`,
+        [sellerResult.rows[0].id]
+      );
+
+      return { seller: mapSeller(finalResult.rows[0]) };
+    });
 
     res.status(201).json({
-      seller: mapSeller(finalResult.rows[0]),
+      seller: createdSeller,
       credentials: {
         username: sellerUsername,
         password: sellerPassword
       }
     });
-  } catch (err) {
+  } catch (err: any) {
+    if (err.statusCode === 409) {
+      return res.status(409).json({ error: err.message });
+    }
     console.error('Error creating seller:', err);
     res.status(500).json({ error: 'Internal server error' });
   }

@@ -43,7 +43,7 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
       <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
         <div>
           <h2 className="font-headline-lg text-lg font-bold text-gray-905">تسجيل وكيل أو فرع توزيع معتمد</h2>
-          <p className="text-xs text-gray-500 mt-1">تجهيز ملف العقدة وتوثيق الرقم القومي مع تخصيص مخزون SIM الافتتاحي</p>
+
         </div>
         <button
           onClick={() => setView('agents')}

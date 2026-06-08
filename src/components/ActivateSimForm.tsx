@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Operator } from '../types';
 import { Check, Camera, RefreshCw, Save, X, Phone, User, Shield, CreditCard, Layers } from 'lucide-react';
 import CameraCapture, { DocumentCapture } from './shared/CameraCapture';
+import { useOcr } from '../hooks/useOcr';
 
 interface ActivateSimFormProps {
   onSimActivated: (simData: {
@@ -26,6 +27,15 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
   const [iccidCaptured, setIccidCaptured] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const { recognize, progress: ocrProgress } = useOcr();
+
+  const handleNameCapture = useCallback(async (imageData: string) => {
+    const name = await recognize(imageData);
+    if (name) {
+      setFullName(name);
+    }
+    setNameCaptured(imageData);
+  }, [recognize]);
 
   // Define brand colors dynamically
   const getBrandDetails = (op: Operator) => {
@@ -124,9 +134,6 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
       {/* Form Header Title */}
       <div className="mb-6">
         <h2 className="text-xl font-bold text-slate-100 tracking-tight">تفعيل شريحة جديدة</h2>
-        <p className="text-slate-400 text-xs mt-1 leading-relaxed">
-          اختر شبكة المشغل المطلوب وأدخل البيانات المترتبة لتسجيل العميل وتفعيل الشريحة فوراً بالبث
-        </p>
       </div>
 
       <AnimatePresence>
@@ -144,6 +151,8 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
           </motion.div>
         )}
       </AnimatePresence>
+
+
 
       {/* Operator Carrier Grid */}
       <div className="grid grid-cols-3 gap-4 w-full mb-8">
@@ -242,7 +251,7 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
             
             {/* Full Name */}
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5Pr">
+              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                 <User size={14} className="text-slate-500" />
                 الاسم الكامل للعميل
               </label>
@@ -252,14 +261,34 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="أدخل الاسم الثلاثي واللقب"
-                  className={`input-field pl-13 bg-slate-900 border-slate-800 text-sm focus:outline-none focus:ring-1 ${brand.ringClass}`}
+                  className={`input-field pl-14 bg-slate-900 border-slate-800 text-sm focus:outline-none focus:ring-1 ${brand.ringClass}`}
                 />
-                <CameraCapture onCapture={(data) => setNameCaptured(data)} />
+                <CameraCapture onCapture={handleNameCapture} />
               </div>
-              {nameCaptured && (
-                <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1 mt-1">
-                  <Check size={12} /> تم التقاط الصورة
-                </span>
+              <AnimatePresence>
+                {nameCaptured && (
+                  <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                    className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1 mt-1">
+                    <Check size={12} /> تم التقاط صورة الهوية
+                  </motion.span>
+                )}
+              </AnimatePresence>
+
+              {ocrProgress.visible && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                  <div className="w-full max-w-xs bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-center">
+                    <RefreshCw size={32} className="mx-auto text-amber-400 mb-4 animate-spin" />
+                    <p className="text-xs text-slate-200 mb-3 font-semibold">{ocrProgress.stage}</p>
+                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${ocrProgress.progress}%` }}
+                        className="h-full bg-gradient-to-l from-emerald-500 to-emerald-400 rounded-full"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-2">{Math.round(ocrProgress.progress)}%</p>
+                  </div>
+                </div>
               )}
             </div>
 
@@ -294,11 +323,11 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
                   onChange={(e) => setIccid(e.target.value)}
                   placeholder="89xxxxxxxxxxxxxxxx"
                   inputMode="numeric"
-                  className={`input-field pl-13 bg-slate-900 border-slate-800 text-sm focus:outline-none focus:ring-1 ${brand.ringClass} font-sans`}
+                  className={`input-field pl-20 bg-slate-900 border-slate-800 text-sm focus:outline-none focus:ring-1 ${brand.ringClass} font-sans`}
                   dir="ltr"
-                  style={{ textAlign: 'left' }}
+                  style={{ textAlign: 'right' }}
                 />
-                <CameraCapture onCapture={(data) => { setIccidCaptured(data); setIccid('captured_from_camera'); }} />
+                <CameraCapture onCapture={(data) => { setIccidCaptured(data); }} />
               </div>
               {iccidCaptured && (
                 <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1 mt-1">
@@ -341,32 +370,51 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
         </div>
 
         {/* Action Buttons Footer block */}
-        <div className="flex flex-col-reverse md:flex-row items-center justify-end gap-3 pt-4 border-t border-slate-800 mt-6 md:mt-8">
-          <button
-            type="button"
-            onClick={handleClear}
-            className="btn btn-ghost w-full md:w-auto text-slate-400 text-xs hover:bg-slate-800 hover:text-slate-100"
-          >
-            مسح البيانات
-          </button>
-          
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className={`btn w-full md:w-auto text-xs shadow-md ${brand.bgClass} ${brand.glowColor} flex items-center justify-center gap-2`}
-          >
-            {isSubmitting ? (
-              <>
-                <RefreshCw className="animate-spin text-white" size={14} />
-                <span>جاري إرسال إشارات التفعيل والربط...</span>
-              </>
-            ) : (
-              <>
-                <Save size={14} />
-                <span>حفظ البيانات وتفعيل الشريحة</span>
-              </>
-            )}
-          </button>
+        <div className="flex flex-col gap-3 pt-4 border-t border-slate-800 mt-6 md:mt-8">
+          {/* Submission Progress Bar — hidden until submit */}
+          {isSubmitting && (
+            <div className="mb-1">
+              <div className="flex justify-between items-center mb-1.5">
+                <span className="text-[10px] text-slate-500 font-medium">جاري التفعيل...</span>
+                <span className="text-[10px] font-bold text-emerald-400">جاري</span>
+              </div>
+              <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: '100%' }}
+                  transition={{ duration: 0.5, ease: 'easeInOut' }}
+                  className="h-full bg-gradient-to-l from-emerald-500 to-emerald-400 rounded-full"
+                />
+              </div>
+            </div>
+          )}
+          <div className="flex flex-col-reverse md:flex-row items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={handleClear}
+              className="btn btn-ghost w-full md:w-auto text-slate-400 text-xs hover:bg-slate-800 hover:text-slate-100"
+            >
+              مسح البيانات
+            </button>
+            
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className={`btn w-full md:w-auto text-xs shadow-md ${brand.bgClass} ${brand.glowColor} flex items-center justify-center gap-2`}
+            >
+              {isSubmitting ? (
+                <>
+                  <RefreshCw className="animate-spin text-white" size={14} />
+                  <span>جاري إرسال إشارات التفعيل والربط...</span>
+                </>
+              ) : (
+                <>
+                  <Save size={14} />
+                  <span>حفظ البيانات وتفعيل الشريحة</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </form>
 

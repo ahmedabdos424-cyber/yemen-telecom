@@ -1,8 +1,9 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Seller } from '../types';
-import { Check, Camera, RefreshCw, Lock, MapPin, Phone, CreditCard, ShoppingBag, User, X, Eye, EyeOff } from 'lucide-react';
+import { Check, Camera, RefreshCw, Lock, MapPin, Phone, CreditCard, ShoppingBag, User, X, Eye, EyeOff, Copy, CircleCheck } from 'lucide-react';
 import CameraCapture from './shared/CameraCapture';
+import { useOcr } from '../hooks/useOcr';
 
 interface AddSellerFormProps {
   onSellerAdded: (newSeller: Omit<Seller, 'id' | 'creationDate' | 'lastLogin'>) => void;
@@ -19,95 +20,20 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
   const [idNumber, setIdNumber] = useState('');
   const [phone, setPhone] = useState('');
   const [region, setRegion] = useState('');
-  const [cameraState, setCameraState] = useState<'idle' | 'scanning' | 'success'>('idle');
-  const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const [idPreview, setIdPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successInfo, setSuccessInfo] = useState('');
+  const [showCredentials, setShowCredentials] = useState(false);
+  const [credentialsData, setCredentialsData] = useState<{ username: string; password: string } | null>(null);
+  const [progressStage, setProgressStage] = useState<'idle' | 25 | 50 | 75 | 100>('idle');
+  const { recognize, progress: ocrProgress } = useOcr();
 
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [showCamera, setShowCamera] = useState(false);
-  const [stream, setStream] = useState<MediaStream | null>(null);
-
-  const startCamera = useCallback(async () => {
-    setCameraState('scanning');
-    setShowCamera(true);
-    setCapturedImage(null);
-    setIdPreview(null);
-    try {
-      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      setStream(s);
-      if (videoRef.current) {
-        videoRef.current.srcObject = s;
-        videoRef.current.play();
-      }
-    } catch {
-      fileInputRef.current?.click();
-      setShowCamera(false);
-      setCameraState('idle');
+  const handleNameCapture = useCallback(async (imageData: string) => {
+    const name = await recognize(imageData);
+    if (name) {
+      setFullName(name);
     }
-  }, []);
-
-  const captureFrame = () => {
-    if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext('2d')?.drawImage(video, 0, 0);
-      setIdPreview(canvas.toDataURL('image/jpeg', 0.8));
-      setIdNumber('');
-    }
-    if (stream) {
-      stream.getTracks().forEach(t => t.stop());
-      setStream(null);
-    }
-  };
-
-  const confirmIdCapture = () => {
-    if (idPreview) {
-      setCapturedImage(idPreview);
-      setCameraState('success');
-    }
-    setIdPreview(null);
-    setShowCamera(false);
-    setTimeout(() => setCameraState('idle'), 400);
-  };
-
-  const retakeIdCapture = () => {
-    setIdPreview(null);
-    setShowCamera(false);
-    setTimeout(() => startCamera(), 300);
-  };
-
-  const stopCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach(t => t.stop());
-      setStream(null);
-    }
-    setIdPreview(null);
-    setShowCamera(false);
-    setTimeout(() => setCameraState('idle'), 400);
-  };
-
-  const handleFileCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        setIdPreview(ev.target?.result as string);
-        setIdNumber('');
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const removeCapturedImage = () => {
-    setCapturedImage(null);
-    setIdNumber('');
-  };
+    setNameCaptured(imageData);
+  }, [recognize]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,7 +68,18 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
     }
 
     setIsSubmitting(true);
+    setProgressStage(25);
+
     setTimeout(() => {
+      setProgressStage(50);
+    }, 400);
+
+    setTimeout(() => {
+      setProgressStage(75);
+    }, 800);
+
+    setTimeout(() => {
+      setProgressStage(100);
       setIsSubmitting(false);
       onSellerAdded({
         name: fullName,
@@ -165,6 +102,8 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
         activityRate: 0
       });
 
+      setShowCredentials(true);
+      setCredentialsData({ username, password });
       setSuccessInfo(`تم إنشاء حساب البائع "${fullName}" بنجاح.`);
       
       setFullName('');
@@ -175,16 +114,16 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
       setIdNumber('');
       setPhone('');
       setRegion('');
-      setCapturedImage(null);
 
       setTimeout(() => {
         setSuccessInfo('');
+        setProgressStage('idle');
       }, 4000);
-    }, 500);
+    }, 1200);
   };
 
   return (
-    <div className="card w-full max-w-2xl mx-auto p-6 text-slate-100 font-sans" id="add-seller-form-container">
+    <div dir="rtl" className="card w-full max-w-2xl mx-auto p-6 text-slate-100 font-sans" id="add-seller-form-container">
       
       {/* Header */}
       <div className="border-b border-slate-800 pb-5 mb-6" id="add-seller-header">
@@ -192,27 +131,7 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
           <span className="material-symbols-outlined text-red-500">person_add</span>
           بيانات حساب البائع الجديد
         </h2>
-        <p className="text-slate-400 text-xs mt-1 leading-relaxed">
-          يرجى إدخال معلومات المتجر والحساب بدقة عالية لضمان صحة التدقيق الأمني لشبكات التوزيع
-        </p>
       </div>
-
-      <AnimatePresence>
-        {successInfo && (
-          <motion.div 
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="mb-6 p-4 bg-emerald-950/40 border border-emerald-800/40 rounded-2xl flex items-start gap-3"
-            id="success-notification"
-          >
-            <Check className="text-emerald-400 shrink-0 mt-0.5" size={18} />
-            <div className="text-xs text-emerald-300 leading-relaxed">
-              <span className="font-bold">تم بنجاح!</span> {successInfo}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <form onSubmit={handleSubmit} className="space-y-6" id="add-seller-form-element">
         {/* Name Field */}
@@ -230,12 +149,32 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
               placeholder="أدخل اسم البائع الكامل ثلاثياً"
               className="input-field pl-12 bg-slate-950 border-slate-850 text-sm text-right placeholder:text-slate-700"
             />
-            <CameraCapture onCapture={(data) => setNameCaptured(data)} />
+            <CameraCapture onCapture={handleNameCapture} />
           </div>
-          {nameCaptured && (
-            <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
-              <Check size={12} /> تم التقاط الصورة
-            </span>
+          <AnimatePresence>
+            {nameCaptured && (
+              <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                <Check size={12} /> تم التقاط صورة الهوية
+              </motion.span>
+            )}
+          </AnimatePresence>
+
+          {ocrProgress.visible && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+              <div className="w-full max-w-xs bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-center">
+                <RefreshCw size={32} className="mx-auto text-amber-400 mb-4 animate-spin" />
+                <p className="text-xs text-slate-200 mb-3 font-semibold">{ocrProgress.stage}</p>
+                <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${ocrProgress.progress}%` }}
+                    className="h-full bg-gradient-to-l from-emerald-500 to-emerald-400 rounded-full"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-500 mt-2">{Math.round(ocrProgress.progress)}%</p>
+              </div>
+            </div>
           )}
         </div>
 
@@ -268,7 +207,7 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="أدخل كلمة مرور قوية للبائع"
-                className="input-field pr-10 bg-slate-950 border-slate-850 text-sm text-right placeholder:text-slate-700"
+                className="input-field pl-10 bg-slate-950 border-slate-850 text-sm text-right placeholder:text-slate-700"
               />
               <button
                 type="button"
@@ -298,185 +237,24 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
           />
         </div>
 
-        {/* ID Number with inline camera capture */}
-        <div className="flex flex-col gap-3 card" id="idnumber-field-group">
-          <div className="flex justify-between items-center pr-1">
-            <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5" htmlFor="id_number">
-              <CreditCard size={14} className="text-slate-500" />
-              رقم الهوية الوطنية / الإقامة للبائع
-            </label>
-            <span className="text-[10px] text-slate-500">نظام التدقيق العاجل للشرائح YM</span>
-          </div>
-
-          <div className="relative">
-            <input
-              type="text"
-              id="id_number"
-              value={idNumber}
-              onChange={(e) => setIdNumber(e.target.value)}
-              placeholder="أدخل رقم الهوية المكون من 10 خانات"
-              inputMode="numeric"
-              className="input-field pl-12 bg-slate-950 border-slate-850 text-sm text-right placeholder:text-slate-700 font-sans"
-            />
-            <button
-              type="button"
-              onClick={startCamera}
-              disabled={cameraState === 'scanning'}
-              className="input-camera-btn bg-slate-800 hover:bg-red-600 text-slate-300 hover:text-slate-100"
-              id="scan-id-camera-trigger"
-              title="التقاط صورة الهوية"
-            >
-              {cameraState === 'scanning' ? (
-                <RefreshCw className="animate-spin" size={16} />
-              ) : (
-                <Camera size={16} />
-              )}
-            </button>
-          </div>
-
-          {/* Hidden file input fallback */}
+        {/* ID Number - Simplified text input (camera removed) */}
+        <div className="flex flex-col gap-2" id="idnumber-field-group">
+          <label className="text-xs font-semibold text-slate-300 pr-1 flex items-center gap-1.5" htmlFor="id_number">
+            <CreditCard size={14} className="text-slate-500" />
+            رقم الهوية الوطنية / الإقامة للبائع
+          </label>
           <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handleFileCapture}
-            className="hidden"
+            type="text"
+            id="id_number"
+            value={idNumber}
+            onChange={(e) => setIdNumber(e.target.value)}
+            placeholder="أدخل رقم الهوية المكون من 10 خانات"
+            inputMode="numeric"
+            className="input-field bg-slate-950 border-slate-850 text-sm text-right placeholder:text-slate-700 font-sans"
           />
-
-          {/* Camera viewfinder modal */}
-          <AnimatePresence>
-            {showCamera && !idPreview && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-                id="camera-modal"
-              >
-                <motion.div
-                  initial={{ scale: 0.95 }}
-                  animate={{ scale: 1 }}
-                  exit={{ scale: 0.95 }}
-                  className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl"
-                >
-                  <div className="relative aspect-[4/3] bg-black flex items-center justify-center">
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      playsInline
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 border-[3px] border-dashed border-red-400/40 m-8 rounded-2xl pointer-events-none" />
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-red-400/20">
-                      <CreditCard size={64} />
-                    </div>
-                  </div>
-                  <div className="flex gap-3 p-4 bg-slate-950">
-                    <button
-                      type="button"
-                      onClick={captureFrame}
-                      className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      <Camera size={16} />
-                      التقاط الصورة
-                    </button>
-                    <button
-                      type="button"
-                      onClick={stopCamera}
-                      className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition-all cursor-pointer"
-                    >
-                      إلغاء
-                    </button>
-                  </div>
-                </motion.div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* ID preview confirm/retake */}
-          <AnimatePresence>
-            {idPreview && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-              >
-                <motion.div
-                  initial={{ scale: 0.95 }}
-                  animate={{ scale: 1 }}
-                  exit={{ scale: 0.95 }}
-                  className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl"
-                >
-                  <div className="relative aspect-[4/3] bg-black flex items-center justify-center">
-                    <img src={idPreview} alt="معاينة الهوية" className="w-full h-full object-contain" />
-                    <div className="absolute top-3 right-3 bg-emerald-500/20 border border-emerald-400/30 text-emerald-400 text-[10px] px-2.5 py-1 rounded-full font-bold">
-                      معاينة
-                    </div>
-                  </div>
-                  <div className="flex gap-3 p-4 bg-slate-950">
-                    <button
-                      type="button"
-                      onClick={confirmIdCapture}
-                      className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      <Check size={16} />
-                      موافق
-                    </button>
-                    <button
-                      type="button"
-                      onClick={retakeIdCapture}
-                      className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      <RefreshCw size={16} />
-                      إعادة
-                    </button>
-                  </div>
-                </motion.div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Captured image preview */}
-          <AnimatePresence>
-            {capturedImage && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.96 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="p-3 bg-slate-900 border border-slate-800 rounded-xl flex gap-4 items-center mt-1"
-                id="id-preview-container"
-              >
-                <div className="relative w-24 h-16 bg-slate-950 border border-slate-800 rounded-lg overflow-hidden shrink-0 flex items-center justify-center shadow">
-                  <img src={capturedImage} alt="ID Document Preview" className="w-full h-full object-cover" />
-                  <div className="absolute top-1 right-1 bg-emerald-500 text-white rounded-full p-0.5 shadow">
-                    <Check size={8} />
-                  </div>
-                </div>
-                <div className="flex-1 text-right">
-                  <h4 className="text-[11px] font-bold text-emerald-400 flex items-center gap-1 justify-start">
-                    <Check size={14} />
-                    تم التقاط صورة بطاقة الهوية / الإقامة بنجاح
-                  </h4>
-                  <p className="text-[10px] text-slate-400 mt-1">الرقم المستخلص بعد المطابقة: {idNumber}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={removeCapturedImage}
-                  className="text-slate-500 hover:text-slate-100 p-1 rounded-md"
-                  id="remove-captured-image-btn"
-                >
-                  <X size={14} />
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Hidden canvas for frame capture */}
-          <canvas ref={canvasRef} className="hidden" />
         </div>
 
-        {/* Phone Number - REMOVED +966 COUNTRY KEY CONTAINER */}
+        {/* Phone Number */}
         <div className="flex flex-col gap-2" id="phone-field-group">
           <label className="text-xs font-semibold text-slate-300 pr-1 flex items-center gap-1.5" htmlFor="phone">
             <Phone size={14} className="text-slate-500" />
@@ -508,11 +286,43 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
           />
         </div>
 
+        {/* Submission Progress Bar — hidden until submit */}
+        {isSubmitting && (
+          <div className="mb-2">
+            <div className="flex justify-between items-center mb-1.5">
+              <span className="text-[10px] text-slate-500 font-medium">
+                {progressStage === 25 ? 'تجهيز الطلب...' :
+                 progressStage === 50 ? 'إنشاء حساب المستخدم...' :
+                 progressStage === 75 ? 'إنشاء ملف البائع...' :
+                 'اكتمل بنجاح'}
+              </span>
+              <span className="text-[10px] font-bold text-emerald-400">{progressStage}%</span>
+            </div>
+            <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${progressStage}%` }}
+                className="h-full bg-gradient-to-l from-emerald-500 to-emerald-400 rounded-full"
+              />
+            </div>
+            {progressStage !== 100 && (
+              <div className="mt-2 flex items-center gap-2">
+                <RefreshCw size={10} className="animate-spin text-emerald-400" />
+                <span className="text-[9px] text-emerald-500">
+                  {progressStage === 25 ? 'جاري تجهيز البيانات...' :
+                   progressStage === 50 ? 'جاري إنشاء حساب المستخدم...' :
+                   'جاري ربط ملف البائع...'}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Form Submit Button */}
         <button
           type="submit"
           disabled={isSubmitting}
-          className="btn btn-primary w-full flex items-center justify-center gap-2 text-sm mt-8"
+          className="btn btn-primary w-full flex items-center justify-center gap-2 text-sm"
           id="add-seller-submit-btn"
         >
           {isSubmitting ? (
@@ -528,6 +338,79 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
           )}
         </button>
       </form>
+
+      {/* Credentials Success Dialog */}
+      <AnimatePresence>
+        {showCredentials && credentialsData && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="relative w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-right"
+            >
+              <div className="flex items-center gap-3 mb-4 pb-3 border-b border-slate-800">
+                <div className="w-10 h-10 rounded-xl bg-emerald-600/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                  <CircleCheck size={20} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-100">تم إنشاء الحساب بنجاح</h3>
+                  <p className="text-[10px] text-slate-400">يرجى حفظ بيانات الاعتماد أدناه</p>
+                </div>
+              </div>
+
+              <div className="space-y-3 mb-6">
+                <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[11px] text-slate-400">اسم المستخدم</span>
+                    <span className="text-xs font-bold text-slate-100 font-mono" dir="ltr">{credentialsData.username}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-slate-800/40">
+                    <span className="text-[11px] text-slate-400">كلمة المرور</span>
+                    <span className="text-xs font-bold text-amber-400 font-mono" dir="ltr">{credentialsData.password}</span>
+                  </div>
+                </div>
+                <p className="text-[9px] text-amber-500/80 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs">info</span>
+                  يرجى تسليم بيانات الدخول هذه للبائع الجديد وحفظها بشكل آمن
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(
+                        `اسم المستخدم: ${credentialsData.username}\nكلمة المرور: ${credentialsData.password}`
+                      );
+                      alert('تم نسخ بيانات الدخول بنجاح');
+                    } catch {
+                      alert('تعذر النسخ - الرجاء نسخ البيانات يدوياً');
+                    }
+                  }}
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Copy size={14} />
+                  نسخ البيانات
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowCredentials(false); setProgressStage('idle'); }}
+                  className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                >
+                  إغلاق
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

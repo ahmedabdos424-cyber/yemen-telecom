@@ -171,7 +171,7 @@ export default function AgentDashboard({
   };
 
   return (
-    <div className="space-y-8 font-sans pb-16 safe-bottom">
+    <div dir="rtl" className="space-y-8 font-sans pb-16 safe-bottom">
       
       {/* 1. Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-6">
@@ -183,13 +183,7 @@ export default function AgentDashboard({
               ? 'إدارة الحسابات ورقابة البائعين' 
               : 'إدارة مبيعات الوكيل'}
           </h1>
-          <p className="text-slate-400 text-xs mt-1 leading-relaxed">
-            {role === 'manager' 
-              ? 'صلاحية الرقابة الشاملة والتدقيق لمخزون الوكلاء ومراجعة كفاءة بائعي التجزئة وإصدار التوجيهات' 
-              : activeTab === 'sellers' 
-              ? 'إدارة نقاط البيع التابعة لك بمرونة، تحديث الصلاحيات، وإعادة تعيين كلمة المرور فوراً' 
-              : 'متابعة البائعين التابعين لنطاقك الإقليمي، وإجراء عمليات تحويل الشرائح ونطاقات السيريال'}
-          </p>
+
         </div>
         <div className="flex items-center gap-3">
           {activeTab === 'sellers' && (
@@ -523,7 +517,7 @@ export default function AgentDashboard({
                 </div>
 
                 {/* Step 4: Summary container */}
-                <div className="bg-[#0f141f] border border-slate-800 rounded-xl p-4 text-right">
+                <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 text-right">
                   <h4 className="text-[10px] font-bold text-red-500 mb-2 pb-1 border-b border-slate-800">ملخص العملية</h4>
                   <div className="space-y-2 text-[11px] font-light">
                     <div className="flex justify-between items-center text-slate-400">

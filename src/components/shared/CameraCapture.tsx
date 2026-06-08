@@ -1,44 +1,92 @@
-import React, { useRef, useCallback, useState } from 'react';
-import { Camera, RefreshCw, X, Check } from 'lucide-react';
+import React, { useRef, useCallback, useState, useEffect } from 'react';
+import { Camera, RefreshCw, X, Check, Settings } from 'lucide-react';
 
 interface CameraCaptureProps {
   onCapture: (imageData: string) => void;
   iconSize?: number;
 }
 
+function openAppSettings() {
+  const intentUrl = 'intent:#Intent;action=android.settings.APPLICATION_DETAILS_SETTINGS;S:package=com.yemen.telecom;end';
+  const fallbackUrl = 'app-settings://';
+  try { window.location.href = intentUrl; } catch {
+    try { window.open(fallbackUrl, '_blank'); } catch {
+      /* cannot open settings */
+    }
+  }
+}
+
+function disposeCanvas(c: HTMLCanvasElement | null) {
+  if (!c) return;
+  c.width = 0;
+  c.height = 0;
+  const ctx = c.getContext('2d');
+  if (ctx) ctx.clearRect(0, 0, 0, 0);
+}
+
 export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptureProps) {
   const [scanning, setScanning] = useState(false);
   const [showViewfinder, setShowViewfinder] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [permissionDenied, setPermissionDenied] = useState(false);
+  const [permanentDenial, setPermanentDenial] = useState(false);
+  const streamStartTimeRef = useRef(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const denialCountRef = useRef(0);
+
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
+      disposeCanvas(canvasRef.current);
+    };
+  }, []);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     }
+    disposeCanvas(canvasRef.current);
     setShowViewfinder(false);
     setScanning(false);
   }, []);
 
   const startCamera = useCallback(async () => {
+    setPermissionDenied(false);
+    setPermanentDenial(false);
     setScanning(true);
     setShowViewfinder(true);
     setPreviewImage(null);
     try {
       const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       streamRef.current = s;
+      denialCountRef.current = 0;
       if (videoRef.current) {
         videoRef.current.srcObject = s;
         videoRef.current.play();
       }
-    } catch {
-      fileInputRef.current?.click();
+    } catch (err) {
       setShowViewfinder(false);
       setScanning(false);
+      const isPermissionError = err instanceof DOMException && (
+        err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError'
+      );
+      if (isPermissionError) {
+        denialCountRef.current += 1;
+        if (denialCountRef.current >= 2) {
+          setPermanentDenial(true);
+        } else {
+          setPermissionDenied(true);
+        }
+      } else {
+        fileInputRef.current?.click();
+      }
     }
   }, []);
 
@@ -46,10 +94,11 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      canvas.width = Math.min(video.videoWidth, 1920);
+      canvas.height = Math.min(video.videoHeight, 1920);
       canvas.getContext('2d')?.drawImage(video, 0, 0);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      disposeCanvas(canvas);
       setPreviewImage(dataUrl);
     }
     if (streamRef.current) {
@@ -60,9 +109,9 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
 
   const confirmCapture = useCallback(() => {
     if (previewImage) {
+      setPreviewImage(null);
       onCapture(previewImage);
     }
-    setPreviewImage(null);
     setShowViewfinder(false);
     setScanning(false);
   }, [previewImage, onCapture]);
@@ -91,7 +140,6 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
       <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileFallback} className="hidden" />
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* Camera trigger button */}
       <button
         type="button"
         onClick={startCamera}
@@ -102,36 +150,34 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
         {scanning ? <RefreshCw className="animate-spin" size={iconSize} /> : <Camera size={iconSize} />}
       </button>
 
-      {/* Camera viewfinder with live preview */}
       {showViewfinder && !previewImage && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
            <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
-             <div className="relative aspect-[4/3] bg-black flex items-center justify-center">
-               <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
-               <div className="absolute inset-0 border-[3px] border-dashed border-red-400/40 m-8 rounded-2xl pointer-events-none" />
-             </div>
-             <div className="flex gap-3 p-4 bg-slate-950">
-              <button
-                 type="button"
-                 onClick={captureFrame}
-                 className="btn btn-sm flex-1 bg-red-600 hover:bg-red-500 text-white flex items-center justify-center gap-2"
-               >
-                 <Camera size={16} />
-                 التقاط الصورة
-               </button>
+              <div className="relative aspect-[4/3] bg-black flex items-center justify-center">
+                <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                <div className="absolute inset-0 border-[3px] border-dashed border-red-400/40 m-8 rounded-2xl pointer-events-none" />
+              </div>
+              <div className="flex gap-3 p-4 bg-slate-950">
                <button
-                 type="button"
-                 onClick={stopCamera}
-                 className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300"
-               >
-                 إلغاء
-               </button>
-            </div>
-          </div>
-        </div>
+                  type="button"
+                  onClick={captureFrame}
+                  className="btn btn-sm flex-1 bg-red-600 hover:bg-red-500 text-white flex items-center justify-center gap-2"
+                >
+                  <Camera size={16} />
+                  التقاط الصورة
+                </button>
+                <button
+                  type="button"
+                  onClick={stopCamera}
+                  className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300"
+                >
+                  إلغاء
+                </button>
+             </div>
+           </div>
+         </div>
       )}
 
-      {/* Preview with confirm/retake */}
       {showViewfinder && previewImage && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
@@ -162,6 +208,64 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
           </div>
         </div>
       )}
+
+      {permissionDenied && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-center">
+            <Camera size={40} className="mx-auto text-red-400 mb-4" />
+            <p className="text-sm text-slate-200 mb-6 leading-relaxed">
+              يجب السماح بالوصول إلى الكاميرا لاستخدام قراءة الهوية
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setPermissionDenied(false)}
+                className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300"
+              >
+                إغلاق
+              </button>
+              <button
+                type="button"
+                onClick={() => { setPermissionDenied(false); startCamera(); }}
+                className="btn btn-sm flex-1 bg-red-600 hover:bg-red-500 text-white"
+              >
+                إعادة المحاولة
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {permanentDenial && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-center">
+            <Settings size={40} className="mx-auto text-amber-400 mb-4" />
+            <p className="text-sm text-slate-200 mb-2 leading-relaxed">
+              تم رفض الوصول إلى الكاميرا بشكل دائم
+            </p>
+            <p className="text-xs text-slate-400 mb-6 leading-relaxed">
+              يرجى فتح إعدادات التطبيق والسماح بالوصول إلى الكاميرا
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setPermanentDenial(false)}
+                className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300"
+              >
+                إغلاق
+              </button>
+              <button
+                type="button"
+                onClick={() => { setPermanentDenial(false); openAppSettings(); }}
+                className="btn btn-sm flex-1 bg-amber-600 hover:bg-amber-500 text-white flex items-center justify-center gap-2"
+              >
+                <Settings size={14} />
+                فتح الإعدادات
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -174,35 +278,77 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
   const [showViewfinder, setShowViewfinder] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [permissionDenied, setPermissionDenied] = useState(false);
+  const [permanentDenial, setPermanentDenial] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const denialCountRef = useRef(0);
+
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
+      disposeCanvas(canvasRef.current);
+    };
+  }, []);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     }
+    disposeCanvas(canvasRef.current);
     setShowViewfinder(false);
     setScanning(false);
   }, []);
 
   const startCamera = useCallback(async () => {
+    setPermissionDenied(false);
+    setPermanentDenial(false);
     setScanning(true);
     setShowViewfinder(true);
     setPreviewImage(null);
     try {
-      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      const resolution = Math.min(screen.width, screen.height, 1280);
+      const s = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: resolution }, height: { ideal: resolution } },
+      });
       streamRef.current = s;
+      denialCountRef.current = 0;
       if (videoRef.current) {
         videoRef.current.srcObject = s;
         videoRef.current.play();
       }
     } catch {
-      fileInputRef.current?.click();
-      setShowViewfinder(false);
-      setScanning(false);
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        streamRef.current = s;
+        denialCountRef.current = 0;
+        if (videoRef.current) {
+          videoRef.current.srcObject = s;
+          videoRef.current.play();
+        }
+      } catch (err) {
+        setShowViewfinder(false);
+        setScanning(false);
+        const isPermissionError = err instanceof DOMException && (
+          err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError'
+        );
+        if (isPermissionError) {
+          denialCountRef.current += 1;
+          if (denialCountRef.current >= 2) {
+            setPermanentDenial(true);
+          } else {
+            setPermissionDenied(true);
+          }
+        } else {
+          fileInputRef.current?.click();
+        }
+      }
     }
   }, []);
 
@@ -210,10 +356,12 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      canvas.width = Math.min(video.videoWidth, 1920);
+      canvas.height = Math.min(video.videoHeight, 1920);
       canvas.getContext('2d')?.drawImage(video, 0, 0);
-      setPreviewImage(canvas.toDataURL('image/jpeg', 0.8));
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      disposeCanvas(canvas);
+      setPreviewImage(dataUrl);
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
@@ -223,9 +371,9 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
 
   const confirmCapture = useCallback(() => {
     if (previewImage) {
+      setPreviewImage(null);
       onCapture(previewImage);
     }
-    setPreviewImage(null);
     setShowViewfinder(false);
     setScanning(false);
   }, [previewImage, onCapture]);
@@ -293,7 +441,6 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
         </div>
       )}
 
-      {/* Live camera viewfinder */}
       {showViewfinder && !previewImage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
@@ -314,7 +461,6 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
         </div>
       )}
 
-      {/* Preview with confirm/retake */}
       {showViewfinder && previewImage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
@@ -332,6 +478,64 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
               <button onClick={retakeCapture} className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center gap-2">
                 <RefreshCw size={16} />
                 إعادة
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {permissionDenied && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-center">
+            <Camera size={40} className="mx-auto text-red-400 mb-4" />
+            <p className="text-sm text-slate-200 mb-6 leading-relaxed">
+              يجب السماح بالوصول إلى الكاميرا لاستخدام قراءة الهوية
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setPermissionDenied(false)}
+                className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300"
+              >
+                إغلاق
+              </button>
+              <button
+                type="button"
+                onClick={() => { setPermissionDenied(false); startCamera(); }}
+                className="btn btn-sm flex-1 bg-red-600 hover:bg-red-500 text-white"
+              >
+                إعادة المحاولة
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {permanentDenial && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-center">
+            <Settings size={40} className="mx-auto text-amber-400 mb-4" />
+            <p className="text-sm text-slate-200 mb-2 leading-relaxed">
+              تم رفض الوصول إلى الكاميرا بشكل دائم
+            </p>
+            <p className="text-xs text-slate-400 mb-6 leading-relaxed">
+              يرجى فتح إعدادات التطبيق والسماح بالوصول إلى الكاميرا
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setPermanentDenial(false)}
+                className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300"
+              >
+                إغلاق
+              </button>
+              <button
+                type="button"
+                onClick={() => { setPermanentDenial(false); openAppSettings(); }}
+                className="btn btn-sm flex-1 bg-amber-600 hover:bg-amber-500 text-white flex items-center justify-center gap-2"
+              >
+                <Settings size={14} />
+                فتح الإعدادات
               </button>
             </div>
           </div>

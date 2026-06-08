@@ -59,7 +59,7 @@ export default function SimManagementView({
           <Cpu className="text-red-500" size={18} />
           <span>إدارة مخزون الشرائح العام للوكيل</span>
         </h2>
-        <p className="text-xs text-slate-400 font-light mt-1">المستودع المركزي لشرائح الاتصال والخطوط الفعالة وتتبع التوزيع في المحافظات.</p>
+
       </div>
 
       {/* 1. Horizontal Scrollable Company Statistics Cards */}

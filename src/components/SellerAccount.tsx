@@ -1,10 +1,9 @@
 import { useState, useRef, type ChangeEvent, type FormEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Seller } from '../types';
-import ThemeToggle from './shared/ThemeToggle';
 import {
   User, MapPin, TrendingUp, Smartphone, Layers, Award, Activity, Lock, Camera,
-  LogOut, ChevronLeft, X, Image, Clock
+  LogOut, ChevronLeft, X, Image, Clock, Settings
 } from 'lucide-react';
 
 interface SellerAccountProps {
@@ -85,8 +84,20 @@ export default function SellerAccount({
       {/* Page Header */}
       <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 text-center relative overflow-hidden">
         <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-r from-red-950/20 to-transparent" />
+        {/* Header Actions: Dark Mode */}
+        <div className="absolute top-4 right-4 z-20">
+          <button
+            type="button"
+            onClick={() => setDarkMode(!darkMode)}
+            className="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/50 flex items-center justify-center text-slate-400 hover:text-amber-400 transition-all"
+          >
+            <span className="material-symbols-outlined text-lg">
+              {darkMode ? 'light_mode' : 'dark_mode'}
+            </span>
+          </button>
+        </div>
         <div className="relative z-10">
-          <div className="w-24 h-24 rounded-full border-4 border-slate-800 mx-auto mb-4 overflow-hidden shadow-xl shadow-black/30">
+          <div className="w-24 h-24 rounded-full border-4 border-slate-800 mx-auto mb-4 overflow-hidden shadow-xl shadow-black/30 relative">
             {sellerPhoto ? (
               <img loading="lazy" src={sellerPhoto} alt={sellerData.name} className="w-full h-full object-cover" />
             ) : (
@@ -94,6 +105,13 @@ export default function SellerAccount({
                 <User size={32} className="text-slate-500" />
               </div>
             )}
+            <button
+              type="button"
+              onClick={() => setPhotoModalOpen(true)}
+              className="absolute -top-1 -right-1 w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-500 border-2 border-slate-900 flex items-center justify-center text-white shadow-lg transition-all cursor-pointer z-10"
+            >
+              <Camera size={14} />
+            </button>
           </div>
           <h2 className="text-xl font-bold text-slate-100">{sellerData.name}</h2>
           <p className="text-xs text-red-400 font-bold mt-1">بائع معتمد</p>
@@ -208,44 +226,7 @@ export default function SellerAccount({
         <ChevronLeft size={16} className="text-slate-500 group-hover:text-slate-100 transition-colors" />
       </button>
 
-      {/* Photo Section Button */}
-      <button
-        type="button"
-        onClick={() => setPhotoModalOpen(true)}
-        className="w-full flex items-center justify-between p-4 bg-slate-900 border border-slate-800 rounded-2xl hover:bg-slate-800/40 transition-all group"
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-600/10 border border-blue-500/20 flex items-center justify-center text-blue-500 group-hover:scale-105 transition-transform">
-            <Camera size={18} />
-          </div>
-          <div className="text-right">
-            <p className="text-sm font-bold text-slate-100">الصورة الشخصية</p>
-            <p className="text-[10px] text-slate-500 mt-0.5">تغيير أو حذف الصورة الشخصية للحساب</p>
-          </div>
-        </div>
-        <ChevronLeft size={16} className="text-slate-500 group-hover:text-slate-100 transition-colors" />
-      </button>
 
-      {/* Theme Toggle */}
-      <ThemeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
-
-      {/* View Activity Button */}
-      <button
-        type="button"
-        onClick={() => alert('جاري تحميل سجل النشاطات...')}
-        className="w-full flex items-center justify-between p-4 bg-slate-900 border border-slate-800 rounded-2xl hover:bg-slate-800/40 transition-all group"
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-600/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 group-hover:scale-105 transition-transform">
-            <Clock size={18} />
-          </div>
-          <div className="text-right">
-            <p className="text-sm font-bold text-slate-100">عرض النشاط</p>
-            <p className="text-[10px] text-slate-500 mt-0.5">سجل العمليات والنشاطات السابقة</p>
-          </div>
-        </div>
-        <ChevronLeft size={16} className="text-slate-500 group-hover:text-slate-100 transition-colors" />
-      </button>
 
       {/* Logout Button */}
       <button
