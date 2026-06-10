@@ -11,13 +11,15 @@ export default defineConfig({
     },
   },
   build: {
+    sourcemap: 'hidden',
     rollupOptions: {
+      external: ['@capacitor/preferences'],
       output: {
         manualChunks: {
           'vendor-motion': ['motion'],
           'vendor-lucide': ['lucide-react'],
           'vendor-d3': ['d3'],
-
+          'vendor-tesseract': ['tesseract.js'],
         },
       },
     },

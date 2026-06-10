@@ -12,7 +12,7 @@ interface AgentsViewProps {
   onUpdateAgent: (id: string, updated: Partial<Agent>) => void;
 }
 
-export default function AgentsView({ agents, setView, onUpdateAgent }: AgentsViewProps) {
+function AgentsView({ agents, setView, onUpdateAgent }: AgentsViewProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [regionFilter, setRegionFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -849,3 +849,5 @@ export default function AgentsView({ agents, setView, onUpdateAgent }: AgentsVie
     </div>
   );
 }
+
+export default React.memo(AgentsView);

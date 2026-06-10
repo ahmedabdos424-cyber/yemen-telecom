@@ -27,8 +27,8 @@ router.post('/login', validate(loginSchema), async (req: Request, res: Response)
     }
     await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
     const payload = { id: user.id, username: user.username, role: user.role };
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
-    const refreshToken = jwt.sign(payload, REFRESH_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '24h', issuer: 'yemen-telecom', algorithm: 'HS256' });
+    const refreshToken = jwt.sign(payload, REFRESH_SECRET, { expiresIn: '7d', issuer: 'yemen-telecom', algorithm: 'HS256' });
     res.json({
       token,
       refreshToken,
@@ -54,10 +54,10 @@ router.post('/refresh', validate(refreshTokenSchema), async (req: Request, res: 
     if (blacklisted) {
       return res.status(401).json({ error: 'Refresh token has been revoked' });
     }
-    const decoded = jwt.verify(refreshToken, REFRESH_SECRET) as any;
+    const decoded = jwt.verify(refreshToken, REFRESH_SECRET, { issuer: 'yemen-telecom', algorithms: ['HS256'] }) as any;
     const payload = { id: decoded.id, username: decoded.username, role: decoded.role };
-    const newToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
-    const newRefreshToken = jwt.sign(payload, REFRESH_SECRET, { expiresIn: '7d' });
+    const newToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '24h', issuer: 'yemen-telecom', algorithm: 'HS256' });
+    const newRefreshToken = jwt.sign(payload, REFRESH_SECRET, { expiresIn: '7d', issuer: 'yemen-telecom', algorithm: 'HS256' });
     res.json({ token: newToken, refreshToken: newRefreshToken });
   } catch (err: any) {
     if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
@@ -75,7 +75,7 @@ router.post('/logout', async (req: Request, res: Response) => {
   }
   try {
     const token = auth.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = jwt.verify(token, JWT_SECRET, { issuer: 'yemen-telecom', algorithms: ['HS256'] }) as any;
     if (decoded.exp) {
       const expiresAt = new Date(decoded.exp * 1000).toISOString();
       await query(
@@ -115,7 +115,7 @@ router.get('/me', async (req: Request, res: Response) => {
   }
   try {
     const token = auth.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = jwt.verify(token, JWT_SECRET, { issuer: 'yemen-telecom', algorithms: ['HS256'] }) as any;
     const blacklisted = await isTokenBlacklisted(token);
     if (blacklisted) {
       return res.status(401).json({ error: 'Token has been revoked' });

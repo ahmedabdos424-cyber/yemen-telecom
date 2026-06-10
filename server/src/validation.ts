@@ -13,9 +13,22 @@ export function validate(schema: z.ZodSchema, source: 'body' | 'query' | 'params
   };
 }
 
+// Helper to strip HTML/script tags from strings (XSS prevention)
+function stripHtml(v: string): string {
+  return v.replace(/<[^>]*>/g, '').replace(/[<>]/g, '');
+}
+
+function s(min = 1, max = 200) {
+  return z.string().min(min).max(max).transform(v => stripHtml(v));
+}
+
+function so(max = 200) {
+  return z.string().max(max).optional().transform(v => v ? stripHtml(v) : v);
+}
+
 // Auth
 export const loginSchema = z.object({
-  username: z.string().min(1, 'Username is required').max(100),
+  username: s(1, 100),
   password: z.string().min(1, 'Password is required').max(200),
 });
 
@@ -30,9 +43,9 @@ export const updatePasswordSchema = z.object({
 });
 
 export const updateProfileSchema = z.object({
-  displayName: z.string().max(200).optional(),
+  displayName: so(200),
   phone: z.string().max(50).optional(),
-  region: z.string().max(200).optional(),
+  region: so(200),
   avatar: z.string().max(500).optional(),
 });
 
@@ -42,8 +55,8 @@ export const createSimSchema = z.object({
   phone: z.string().max(50).optional().default(''),
   provider: z.enum(['Yemen Mobile', 'Sabafon', 'YOU']).optional().default('Yemen Mobile'),
   status: z.enum(['available', 'sold', 'reserved', 'inactive', 'suspended']).optional().default('available'),
-  owner: z.string().max(200).optional().default('المركز الرئيسي'),
-  package_type: z.string().max(100).optional().default('باقة مزايا الشهرية'),
+  owner: so(200).default('المركز الرئيسي'),
+  package_type: so(100).default('باقة مزايا الشهرية'),
 });
 
 export const updateSimSchema = z.object({
@@ -51,14 +64,14 @@ export const updateSimSchema = z.object({
   iccid: z.string().max(50).optional(),
   provider: z.enum(['Yemen Mobile', 'Sabafon', 'YOU']).optional(),
   status: z.enum(['available', 'sold', 'reserved', 'inactive', 'suspended']).optional(),
-  owner: z.string().max(200).optional(),
-  package_type: z.string().max(100).optional(),
+  owner: so(200),
+  package_type: so(100),
 });
 
 // Agents
 export const createAgentSchema = z.object({
-  name: z.string().min(1, 'Agent name is required').max(200),
-  region: z.string().max(200).optional().default(''),
+  name: s(1, 200),
+  region: so(200).default(''),
   phone: z.string().max(50).optional().default(''),
   sellers_count: z.number().int().min(0).optional().default(0),
   sims_count: z.number().int().min(0).optional().default(0),
@@ -68,8 +81,8 @@ export const createAgentSchema = z.object({
 });
 
 export const updateAgentSchema = z.object({
-  name: z.string().max(200).optional(),
-  region: z.string().max(200).optional(),
+  name: so(200),
+  region: so(200),
   phone: z.string().max(50).optional(),
   sellers_count: z.number().int().min(0).optional(),
   sims_count: z.number().int().min(0).optional(),
@@ -78,31 +91,31 @@ export const updateAgentSchema = z.object({
 
 // Sellers
 export const createSellerSchema = z.object({
-  name: z.string().min(1, 'Seller name is required').max(200),
-  store_name: z.string().max(200).optional().default(''),
-  storeName: z.string().max(200).optional(),
+  name: s(1, 200),
+  store_name: so(200).default(''),
+  storeName: so(200),
   id_number: z.string().max(50).optional().default(''),
   idNumber: z.string().max(50).optional(),
   phone: z.string().max(50).optional().default(''),
-  region: z.string().max(200).optional().default(''),
+  region: so(200).default(''),
   region_code: z.string().max(50).optional().default(''),
   regionCode: z.string().max(50).optional(),
   status: z.enum(['active', 'inactive', 'suspended', 'low_stock']).optional().default('active'),
   username: z.string().max(100).optional(),
   password: z.string().max(200).optional(),
-  agent_name: z.string().max(200).optional(),
+  agent_name: so(200),
   seller_id: z.string().max(50).optional(),
   sellerId: z.string().max(50).optional(),
 });
 
 export const updateSellerSchema = z.object({
-  name: z.string().max(200).optional(),
-  store_name: z.string().max(200).optional(),
-  storeName: z.string().max(200).optional(),
+  name: so(200),
+  store_name: so(200),
+  storeName: so(200),
   id_number: z.string().max(50).optional(),
   idNumber: z.string().max(50).optional(),
   phone: z.string().max(50).optional(),
-  region: z.string().max(200).optional(),
+  region: so(200),
   region_code: z.string().max(50).optional(),
   regionCode: z.string().max(50).optional(),
   status: z.enum(['active', 'inactive', 'suspended', 'low_stock']).optional(),
@@ -115,7 +128,7 @@ export const updateSellerBalanceSchema = z.object({
 // Operations
 export const createOperationSchema = z.object({
   type: z.enum(['activate', 'recharge']).refine(v => v, 'Operation type is required'),
-  target: z.string().min(1, 'Target is required').max(100),
+  target: s(1, 100),
   operator: z.string().max(50).optional().default(''),
   status: z.enum(['success', 'failed', 'pending']).optional().default('success'),
 });
@@ -151,12 +164,12 @@ export const updateSettingsSchema = z.object({
 
 // Customers
 export const createCustomerSchema = z.object({
-  full_name: z.string().min(1, 'Customer name is required').max(200),
-  fullName: z.string().min(1).max(200).optional(),
+  full_name: s(1, 200),
+  fullName: s(1, 200).optional(),
   id_number: z.string().min(1, 'ID number is required').max(50),
   idNumber: z.string().min(1).max(50).optional(),
   phone: z.string().max(50).optional().default(''),
-  region: z.string().max(200).optional().default(''),
+  region: so(200).default(''),
   sims_count: z.number().int().min(0).optional().default(1),
   activated_by: z.number().int().optional(),
 });
@@ -165,13 +178,13 @@ export const createCustomerSchema = z.object({
 export const createDistributionSchema = z.object({
   seller_id: z.number().int().optional(),
   sellerId: z.number().int().optional(),
-  seller_name: z.string().max(200).optional(),
+  seller_name: so(200),
   operator: z.string().min(1).max(50),
   count: z.number().int().min(1, 'Count must be at least 1').max(10000),
-  notes: z.string().optional().default(''),
+  notes: so(200).default(''),
 });
 
 export const approveDistributionSchema = z.object({
   status: z.enum(['approved', 'rejected']),
-  notes: z.string().optional(),
+  notes: so(200),
 });

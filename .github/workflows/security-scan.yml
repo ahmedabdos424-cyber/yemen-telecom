@@ -1,0 +1,43 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'  # Every Monday at 6 AM
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: npm audit
+        run: npm audit --audit-level=high || true
+        continue-on-error: true
+
+      - name: Check for secrets in code
+        run: |
+          echo "Checking for potential secrets in tracked files..."
+          ! grep -r "-----BEGIN" --include="*.{key,pem,crt}" . 2>/dev/null && echo "No private keys found" || echo "WARNING: Private keys found!"
+          ! grep -rn "DB_PASSWORD\|JWT_SECRET\|REFRESH_SECRET\|CSRF_SECRET" --include="*.{ts,tsx,js,jsx,json}" . 2>/dev/null | grep -v "process.env\|import.meta.env\|\.env\|node_modules\|\.example" && echo "No hardcoded secrets found" || echo "WARNING: Possible hardcoded secrets!"
+
+      - name: Check .gitignore coverage
+        run: |
+          for pattern in ".env" ".env.local" "*.keystore" "*.jks"; do
+            if grep -q "^$pattern$" .gitignore 2>/dev/null; then
+              echo "✅ $pattern is in .gitignore"
+            else
+              echo "⚠️  $pattern is NOT in .gitignore"
+            fi
+          done

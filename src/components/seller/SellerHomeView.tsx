@@ -1,3 +1,10 @@
+/**
+ * ARCHIVED COMPONENT
+ * Previously used for seller home view.
+ * Active version: src/components/SellerHome.tsx
+ * Keep for backward compatibility reference.
+ */
+
 import React from 'react';
 import { PlusCircle, Smartphone, TrendingUp, Cpu, Award } from 'lucide-react';
 import { Seller, Operation } from '../../types';

@@ -1,7 +1,16 @@
+/**
+ * Firebase initialization module.
+ * Currently not imported by any active component.
+ * Reserved for future Firebase Authentication / Storage integration.
+ *
+ * Firestore imports are commented out to reduce bundle size.
+ * Uncomment when Firestore functionality is needed.
+ */
+
 import { initializeApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { getStorage, connectStorageEmulator } from 'firebase/storage';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+// import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
@@ -27,15 +36,14 @@ if (missingVars.length > 0) {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
-export const db = getFirestore(app);
+// export const db = getFirestore(app);
 
-// Connect to emulators in development
 if (import.meta.env.DEV) {
   const useEmulator = import.meta.env.VITE_FIREBASE_EMULATOR === 'true';
   if (useEmulator) {
     connectAuthEmulator(auth, 'http://localhost:9099');
     connectStorageEmulator(storage, 'localhost', 9199);
-    connectFirestoreEmulator(db, 'localhost', 8080);
+    // connectFirestoreEmulator(db, 'localhost', 8080);
   }
 }
 

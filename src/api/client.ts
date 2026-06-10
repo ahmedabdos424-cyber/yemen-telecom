@@ -1,3 +1,4 @@
+import { tokenStorage } from '../services/tokenStorage.ts';
 import { captureTiming } from '../lib/monitor.ts';
 
 const isCapacitor = !!(window as any).Capacitor?.isNative;
@@ -8,8 +9,8 @@ const API_BASE = isCapacitor || (isLocal && !isDevProxy) || !isLocal
   ? 'https://yemen-telecom-api.onrender.com/api'
   : '/api';
 
-let authToken: string | null = localStorage.getItem('auth_token');
-let refreshToken: string | null = localStorage.getItem('refresh_token');
+let authToken: string | null = tokenStorage.getAuthTokenSync();
+let refreshToken: string | null = tokenStorage.getRefreshTokenSync();
 let csrfToken: string | null = null;
 let csrfHash: string | null = null;
 let isRefreshing = false;
@@ -18,18 +19,18 @@ let pendingRequests: Array<(token: string) => void> = [];
 export function setToken(token: string | null) {
   authToken = token;
   if (token) {
-    localStorage.setItem('auth_token', token);
+    tokenStorage.setAuthToken(token);
   } else {
-    localStorage.removeItem('auth_token');
+    tokenStorage.removeAuthToken();
   }
 }
 
 export function setRefreshToken(token: string | null) {
   refreshToken = token;
   if (token) {
-    localStorage.setItem('refresh_token', token);
+    tokenStorage.setRefreshToken(token);
   } else {
-    localStorage.removeItem('refresh_token');
+    tokenStorage.removeRefreshToken();
   }
 }
 
@@ -83,11 +84,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`;
   }
-  if (csrfToken && csrfHash && !path.startsWith('/auth/') && path !== '/csrf-token') {
+  const isLogout = path === '/auth/logout';
+  if (csrfToken && csrfHash && ((!path.startsWith('/auth/') && path !== '/csrf-token') || isLogout)) {
     headers['X-CSRF-Token'] = csrfToken;
     headers['X-CSRF-Hash'] = csrfHash;
   }
-  if (refreshToken && path === '/auth/logout') {
+  if (refreshToken && isLogout) {
     headers['X-Refresh-Token'] = refreshToken;
   }
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers });

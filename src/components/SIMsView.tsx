@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useCallback } from 'react';
 import { SIM } from '../types';
 import { Upload } from 'lucide-react';
 import CameraCapture from './shared/CameraCapture';
@@ -14,7 +14,7 @@ interface SIMsViewProps {
   onAddSIM: (sim: Partial<SIM>) => void;
 }
 
-export default function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
+function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProvider, setSelectedProvider] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
@@ -41,8 +41,8 @@ export default function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
 
 
   // Dynamically extract unique values for advanced filtering
-  const uniqueOwners = Array.from(new Set(sims.map((s) => s.owner).filter(Boolean))).sort();
-  const uniquePackages = Array.from(new Set(sims.map((s) => s.packageType).filter(Boolean))).sort();
+  const uniqueOwners = useMemo(() => Array.from(new Set(sims.map((s) => s.owner).filter(Boolean))).sort(), [sims]);
+  const uniquePackages = useMemo(() => Array.from(new Set(sims.map((s) => s.packageType).filter(Boolean))).sort(), [sims]);
 
   // Filter & Search computation with multi-filter query support
   const filteredSIMs = useMemo(() => sims.filter((sim) => {
@@ -63,7 +63,7 @@ export default function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
   }), [sims, searchTerm, selectedProvider, selectedStatus, selectedOwner, selectedPackage]);
 
   // Text highlighting utility
-  const highlightMatches = (text: string, search: string) => {
+  const highlightMatches = useCallback((text: string, search: string) => {
     if (!text) return '';
     if (!search.trim()) return <span>{text}</span>;
 
@@ -92,7 +92,7 @@ export default function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
         })}
       </span>
     );
-  };
+  }, []);
 
   const stats = useMemo(() => ({
     total: sims.length,
@@ -101,7 +101,7 @@ export default function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
     inactive: sims.filter((s) => s.status === 'inactive').length
   }), [sims]);
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (!formPhone || !formIccid) return;
     onAddSIM({
@@ -117,9 +117,9 @@ export default function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
     setFormPhone('');
     setFormIccid('');
     setShowAddModal(false);
-  };
+  }, [formPhone, formIccid, formProvider, formPackage, formOwner, onAddSIM]);
 
-  const handleCSVFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCSVFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setCsvFile(file);
@@ -147,9 +147,9 @@ export default function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
       setCsvPreview(records);
     };
     reader.readAsText(file);
-  };
+  }, []);
 
-  const handleImportCSV = (e: React.FormEvent) => {
+  const handleImportCSV = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (csvPreview.length === 0) return;
     setCsvImporting(true);
@@ -165,7 +165,7 @@ export default function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
     setCsvPreview([]);
     setShowImportModal(false);
     alert(`تم استيراد ${imported} شريحة بنجاح من ملف CSV.`);
-  };
+  }, [csvPreview, onAddSIM]);
 
   return (
     <div className="space-y-6">
@@ -634,3 +634,5 @@ export default function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
     </div>
   );
 }
+
+export default React.memo(SIMsView);

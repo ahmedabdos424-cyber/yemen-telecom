@@ -7,6 +7,14 @@ export interface OcrProgressState {
   stage: string;
 }
 
+export interface OcrResult {
+  text: string;
+  error?: string;
+}
+
+const OCR_TIMEOUT_MS = 30_000;
+const MAX_RETRIES = 2;
+
 const stages: Record<string, { label: string; range: [number, number] }> = {
   'loading tesseract core':        { label: 'تحميل محرك OCR',     range: [0, 15] },
   'loading language traineddata':   { label: 'تحميل اللغة العربية',   range: [15, 25] },
@@ -24,7 +32,33 @@ function stageProgress(status: string, rawProgress: number): number {
   return min + (max - min) * Math.min(rawProgress, 1);
 }
 
-function cleanOcrText(raw: string): string[] {
+function otsuThreshold(pixels: Uint8ClampedArray): number {
+  let sum = 0;
+  for (let i = 0; i < pixels.length; i += 4) {
+    sum += 0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2];
+  }
+  const mean = sum / (pixels.length / 4);
+  let bestThresh = 128, bestVar = 0;
+  for (let t = 1; t < 255; t++) {
+    let w1 = 0, w2 = 0, s1 = 0, s2 = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      const g = 0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2];
+      if (g <= t) { w1++; s1 += g; }
+      else { w2++; s2 += g; }
+    }
+    if (w1 === 0 || w2 === 0) continue;
+    const m1 = s1 / w1, m2 = s2 / w2;
+    const betweenVar = w1 * w2 * (m1 - m2) * (m1 - m2);
+    if (betweenVar > bestVar) { bestVar = betweenVar; bestThresh = t; }
+  }
+  return bestThresh;
+}
+
+function cleanOcrText(raw: string, confidence?: number): string[] {
+  const CONFIDENCE_THRESHOLD = 60;
+  if (confidence !== undefined && confidence < CONFIDENCE_THRESHOLD) {
+    return [];
+  }
   return raw
     .split('\n')
     .map(l => l.trim())
@@ -34,6 +68,10 @@ function cleanOcrText(raw: string): string[] {
     .map(l => l.replace(/\s+/g, ' ').trim())
     .filter(l => l.length >= 3)
     .filter(l => /[\u0600-\u06FF]/.test(l))
+    .filter(l => {
+      const arabicWords = l.split(/\s+/).filter(w => /[\u0600-\u06FF]/.test(w));
+      return arabicWords.length >= 1 && arabicWords.some(w => w.length >= 2);
+    })
     .sort((a, b) => b.length - a.length);
 }
 
@@ -45,16 +83,18 @@ function extractValidName(lines: string[]): string | null {
   return lines.length > 0 ? lines[0] : null;
 }
 
+export { cleanOcrText, extractValidName, otsuThreshold, stageProgress };
+
 function detectBlur(dataUrl: string): Promise<number> {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
       const c = document.createElement('canvas');
-      c.width = img.width;
-      c.height = img.height;
+      c.width = Math.min(img.width, 800);
+      c.height = Math.min(img.height, 800);
       const ctx = c.getContext('2d');
       if (!ctx) { resolve(0); return; }
-      ctx.drawImage(img, 0, 0);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
       const d = ctx.getImageData(0, 0, c.width, c.height);
       const pixels = d.data;
       let sum = 0, count = 0;
@@ -80,11 +120,11 @@ function detectLowLight(dataUrl: string): Promise<number> {
     const img = new Image();
     img.onload = () => {
       const c = document.createElement('canvas');
-      c.width = img.width;
-      c.height = img.height;
+      c.width = Math.min(img.width, 800);
+      c.height = Math.min(img.height, 800);
       const ctx = c.getContext('2d');
       if (!ctx) { resolve(128); return; }
-      ctx.drawImage(img, 0, 0);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
       const d = ctx.getImageData(0, 0, c.width, c.height);
       const pixels = d.data;
       let sum = 0, count = 0;
@@ -102,7 +142,7 @@ function detectLowLight(dataUrl: string): Promise<number> {
 let singletonWorker: Awaited<ReturnType<typeof createWorker>> | null = null;
 let singletonInitPromise: Promise<void> | null = null;
 
-async function getWorker(logger?: (m: { status: string; progress: number }) => void): Promise<Awaited<ReturnType<typeof createWorker>>> {
+async function getWorker(logger?: (m: { status: string; progress: number }) => void) {
   if (singletonWorker) return singletonWorker;
   if (singletonInitPromise) {
     await singletonInitPromise;
@@ -124,6 +164,25 @@ async function getWorker(logger?: (m: { status: string; progress: number }) => v
     throw e;
   }
   return singletonWorker!;
+}
+
+function terminateWorker() {
+  if (singletonWorker) {
+    try {
+      singletonWorker.terminate();
+    } catch { }
+    singletonWorker = null;
+    singletonInitPromise = null;
+  }
+}
+
+async function recognizeWithTimeout(worker: Awaited<ReturnType<typeof createWorker>>, image: string, timeoutMs: number) {
+  return Promise.race([
+    worker.recognize(image),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('OCR_TIMEOUT')), timeoutMs)
+    ),
+  ]);
 }
 
 let totalOcrCalls = 0;
@@ -182,13 +241,14 @@ export function useOcr() {
         ctx.drawImage(img, 0, 0, width, height);
         const d = ctx.getImageData(0, 0, width, height);
         const pixels = d.data;
+        const thresh = otsuThreshold(pixels);
         for (let i = 0; i < pixels.length; i += 4) {
           const gray = 0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2];
-          const adj = Math.min(255, Math.max(0, Math.round((gray - 128) * 1.4 + 128)));
-          pixels[i] = pixels[i + 1] = pixels[i + 2] = adj;
+          const binary = gray >= thresh ? 255 : 0;
+          pixels[i] = pixels[i + 1] = pixels[i + 2] = binary;
         }
         ctx.putImageData(d, 0, 0);
-        resolve(c.toDataURL('image/jpeg', 0.7));
+        resolve(c.toDataURL('image/jpeg', 0.8));
         c.width = 0;
         c.height = 0;
       };
@@ -200,7 +260,33 @@ export function useOcr() {
     await initWorker();
 
     const worker = await getWorker(loggerRef.current);
-    const { data: { text } } = await worker.recognize(preprocessed);
+
+    let text = '';
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const { data } = await recognizeWithTimeout(worker, preprocessed, OCR_TIMEOUT_MS);
+        text = data.text;
+        const ocrConfidence = data.confidence;
+        if (text.trim() === '' || (ocrConfidence !== undefined && ocrConfidence < 40 && attempt < MAX_RETRIES)) {
+          lastError = new Error('LOW_CONFIDENCE');
+          continue;
+        }
+        lastError = null;
+        break;
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        if (lastError.message === 'OCR_TIMEOUT' && attempt < MAX_RETRIES) {
+          setProgress(prev => ({ ...prev, progress: stageProgress('recognizing text', 0), stage: `محاولة ${attempt + 2}/${MAX_RETRIES + 1}` }));
+          continue;
+        }
+        if (attempt >= MAX_RETRIES) {
+          setProgress({ visible: false, progress: 0, stage: '' });
+          totalOcrTime += performance.now() - startTime;
+          return '';
+        }
+      }
+    }
 
     setProgress(prev => ({ ...prev, progress: stageProgress('analyzing name', 0.5), stage: stages['analyzing name'].label }));
 
@@ -231,3 +317,5 @@ export function useOcr() {
 export function getOcrStats() {
   return { totalOcrCalls, totalOcrTime, avgTime: totalOcrCalls > 0 ? totalOcrTime / totalOcrCalls : 0 };
 }
+
+export { terminateWorker };

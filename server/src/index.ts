@@ -90,7 +90,7 @@ app.get('/api/csrf-token', (req, res) => {
 
 // CSRF validation middleware for state-changing requests
 app.use('/api', (req, res, next) => {
-  if (['POST', 'PUT', 'DELETE'].includes(req.method) && !req.path.startsWith('/auth/') && !req.path.startsWith('/csrf-token')) {
+  if (['POST', 'PUT', 'DELETE'].includes(req.method) && !req.path.startsWith('/auth/login') && !req.path.startsWith('/auth/refresh') && !req.path.startsWith('/csrf-token')) {
     const csrfHeader = req.headers['x-csrf-token'] as string;
     const csrfHash = req.headers['x-csrf-hash'] as string;
     if (!csrfHeader || !csrfHash) {
@@ -112,6 +112,21 @@ const authLimiter = rateLimit({
 });
 app.use('/api/auth/login', authLimiter);
 
+// Rate limiting on token refresh endpoint
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: 'Too many refresh attempts, please try again later' },
+});
+app.use('/api/auth/refresh', refreshLimiter);
+
+// Stricter rate limiter for write endpoints (mutations)
+const writeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: { error: 'Too many write requests, please slow down' },
+});
+
 // General rate limiter for all API routes
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -125,8 +140,16 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', environment: process.env.NODE_ENV, timestamp: new Date().toISOString(), uptime: process.uptime() });
 });
 
-// Apply JWT auth to all /api routes except auth and debug routes
-app.use(/^\/api\/(?!auth|routes).*/, authenticateToken);
+// Apply write rate limiter to all POST/PUT/DELETE routes
+app.use('/api', (req, res, next) => {
+  if (['POST', 'PUT', 'DELETE'].includes(req.method) && !req.path.startsWith('/auth/')) {
+    return writeLimiter(req, res, next);
+  }
+  next();
+});
+
+// Apply JWT auth to all /api routes except auth (routes debug is dev-only)
+app.use(/^\/api\/(?!auth).*/, authenticateToken);
 
 // Extract a mount path from an Express layer's regexp
 // Pattern: ^\/path\/?(?=\/|$) or ^\/path\/?$
@@ -232,10 +255,12 @@ app.get('/api/stats', requireRole('manager'), async (_req, res) => {
   }
 });
 
-// Debug route listing endpoint (no auth — shows all registered routes)
-app.get('/api/routes', (_req, res) => {
-  res.json({ routes: listRoutes() });
-});
+// Debug route listing endpoint (disabled in production)
+if (process.env.NODE_ENV !== 'production') {
+  app.get('/api/routes', (_req, res) => {
+    res.json({ routes: listRoutes() });
+  });
+}
 
 // 404 handler for unknown API routes
 app.use('/api/*', (_req, res) => {

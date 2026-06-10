@@ -1,3 +1,12 @@
+/**
+ * ARCHIVED SERVICE
+ * Reserved for future Firebase integration.
+ * Not currently imported by any component.
+ *
+ * To activate: uncomment imports in App.tsx or components
+ * and set VITE_FIREBASE_* environment variables.
+ */
+
 import { auth, storage } from '../firebase';
 import {
   signInWithEmailAndPassword,
@@ -7,7 +16,6 @@ import {
 } from 'firebase/auth';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
-// Firebase Authentication Service
 export const firebaseAuth = {
   login: (email: string, password: string) =>
     signInWithEmailAndPassword(auth, email, password),
@@ -20,7 +28,6 @@ export const firebaseAuth = {
   getCurrentUser: () => auth.currentUser,
 };
 
-// Firebase Storage Service
 export const firebaseStorage = {
   uploadFile: async (file: File, path: string = 'uploads') => {
     const fileRef = ref(storage, `${path}/${Date.now()}-${file.name}`);

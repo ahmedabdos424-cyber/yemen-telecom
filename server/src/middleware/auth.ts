@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config({ path: '.env' });
 
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
+import jwt, { VerifyOptions } from 'jsonwebtoken';
 import crypto from 'crypto';
 import { query } from '../db';
 
@@ -38,7 +38,10 @@ export async function authenticateToken(req: AuthRequest, res: Response, next: N
   }
   const token = auth.split(' ')[1];
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = jwt.verify(token, JWT_SECRET, {
+      issuer: 'yemen-telecom',
+      algorithms: ['HS256'],
+    }) as any;
     const blacklisted = await isTokenBlacklisted(token);
     if (blacklisted) {
       return res.status(401).json({ error: 'Token has been revoked' });

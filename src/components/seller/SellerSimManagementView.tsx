@@ -1,3 +1,10 @@
+/**
+ * ARCHIVED COMPONENT
+ * Previously used for seller SIM management.
+ * Active version: src/components/SellerSimsView.tsx
+ * Keep for backward compatibility reference.
+ */
+
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sim, Operator } from '../../types';

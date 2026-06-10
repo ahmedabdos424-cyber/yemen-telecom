@@ -10,10 +10,7 @@ const config: CapacitorConfig = {
     allowNavigation: ['yemen-telecom-api.onrender.com', 'yemen-telecom-1699.web.app'],
   },
   plugins: {
-    FirebaseAuthentication: {
-      skipNativeAuth: false,
-      providers: ['phone', 'google.com', 'password'],
-    },
+    CapacitorPreferences: {},
   },
 };
 

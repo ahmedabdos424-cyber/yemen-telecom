@@ -14,7 +14,7 @@ interface SellersViewProps {
   onAddBalance: (sellerId: string, amount: number) => void;
 }
 
-export default function SellersView({ sellers, sims, onUpdateSeller, onAddBalance }: SellersViewProps) {
+function SellersView({ sellers, sims, onUpdateSeller, onAddBalance }: SellersViewProps) {
   const [selectedSellerId, setSelectedSellerId] = useState<string>('SLR-99021');
   const [activeTab, setActiveTab] = useState<'inventory' | 'customers' | 'transactions'>('inventory');
   const [showAddBalanceModal, setShowAddBalanceModal] = useState(false);
@@ -80,17 +80,17 @@ export default function SellersView({ sellers, sims, onUpdateSeller, onAddBalanc
     (sim) => sim.owner.includes(selectedSeller.name) || (selectedSeller.id === 'SLR-99021' && sim.id !== '1' && sim.id !== '2' && sim.id !== '3')
   ), [sims, selectedSeller]);
 
-  const toggleSellerStatus = (id: string, currentStatus: 'active' | 'inactive' | 'suspended' | 'low_stock') => {
+  const toggleSellerStatus = useCallback((id: string, currentStatus: 'active' | 'inactive' | 'suspended' | 'low_stock') => {
     const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
     onUpdateSeller(id, { status: newStatus });
-  };
+  }, [onUpdateSeller]);
 
-  const submitAddBalance = (e: React.FormEvent) => {
+  const submitAddBalance = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     onAddBalance(selectedSeller.id, balanceAmount);
     setShowAddBalanceModal(false);
     alert(`تم إضافة رصيد مبيعات بقيمة ${balanceAmount} ر.ي للبائع ${selectedSeller.name} بنجاح!`);
-  };
+  }, [onAddBalance, selectedSeller.id, selectedSeller.name, balanceAmount]);
 
   return (
     <div className="space-y-6">
@@ -424,3 +424,5 @@ export default function SellersView({ sellers, sims, onUpdateSeller, onAddBalanc
     </div>
   );
 }
+
+export default React.memo(SellersView);

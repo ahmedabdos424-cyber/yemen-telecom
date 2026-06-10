@@ -1,0 +1,27 @@
+name: TypeCheck
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**/*.ts'
+      - 'src/**/*.tsx'
+      - 'server/src/**/*.ts'
+      - 'tsconfig.json'
+  pull_request:
+    branches: [main]
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - run: npm ci
+      - run: npx tsc --noEmit
+        name: TypeScript Check (Frontend)
+      - run: cd server && npx tsc --noEmit
+        name: TypeScript Check (Server)
