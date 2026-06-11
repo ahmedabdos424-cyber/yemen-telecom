@@ -42,6 +42,7 @@
     "vite": "^6.2.3"
   },
   "devDependencies": {
+    "@capacitor/preferences": "^8.0.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/bcrypt": "^6.0.0",
