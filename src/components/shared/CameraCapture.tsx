@@ -152,7 +152,7 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
 
       {showViewfinder && !previewImage && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-           <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
+           <div className="relative w-full max-w-lg md:max-w-xl bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
               <div className="relative aspect-[4/3] bg-black flex items-center justify-center">
                 <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
                 <div className="absolute inset-0 border-[3px] border-dashed border-red-400/40 m-8 rounded-2xl pointer-events-none" />
@@ -180,7 +180,7 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
 
       {showViewfinder && previewImage && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
+          <div className="relative w-full max-w-lg md:max-w-xl bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
             <div className="relative aspect-[4/3] bg-black flex items-center justify-center">
               <img src={previewImage} alt="المعاينة" className="w-full h-full object-contain" />
               <div className="absolute top-3 right-3 bg-emerald-500/20 border border-emerald-400/30 text-emerald-400 text-[10px] px-2.5 py-1 rounded-full font-bold">
@@ -211,7 +211,7 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
 
       {permissionDenied && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-center">
+          <div className="w-full max-w-sm md:max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-center">
             <Camera size={40} className="mx-auto text-red-400 mb-4" />
             <p className="text-sm text-slate-200 mb-6 leading-relaxed">
               يجب السماح بالوصول إلى الكاميرا لاستخدام قراءة الهوية
@@ -238,7 +238,7 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
 
       {permanentDenial && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-center">
+          <div className="w-full max-w-sm md:max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-center">
             <Settings size={40} className="mx-auto text-amber-400 mb-4" />
             <p className="text-sm text-slate-200 mb-2 leading-relaxed">
               تم رفض الوصول إلى الكاميرا بشكل دائم
@@ -486,7 +486,7 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
 
       {permissionDenied && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-center">
+          <div className="w-full max-w-sm md:max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-center">
             <Camera size={40} className="mx-auto text-red-400 mb-4" />
             <p className="text-sm text-slate-200 mb-6 leading-relaxed">
               يجب السماح بالوصول إلى الكاميرا لاستخدام قراءة الهوية
@@ -513,7 +513,7 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
 
       {permanentDenial && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-center">
+          <div className="w-full max-w-sm md:max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-center">
             <Settings size={40} className="mx-auto text-amber-400 mb-4" />
             <p className="text-sm text-slate-200 mb-2 leading-relaxed">
               تم رفض الوصول إلى الكاميرا بشكل دائم

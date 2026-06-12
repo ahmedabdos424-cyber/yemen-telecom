@@ -1,6 +1,6 @@
 import React from 'react';
 import { Role } from '../types';
-import { Home, PlusCircle, UserPlus, Users, Cpu, UserCheck, LogOut } from 'lucide-react';
+import { Home, PlusCircle, UserPlus, Users, Cpu, UserCircle, LogOut } from 'lucide-react';
 import MobileBottomNav from './shared/MobileBottomNav';
 
 interface NavBarProps {
@@ -21,13 +21,13 @@ export default function NavBar({ role, activeTab, setActiveTab, username, onLogo
         { id: 'add_seller', label: 'إضافة بائع', icon: UserPlus },
         { id: 'sellers', label: 'البائعين', icon: Users },
         { id: 'my_sims', label: 'شرائحي', icon: Cpu },
-        { id: 'account', label: 'بيانات الحساب', icon: UserCheck },
+        { id: 'account', label: 'بيانات الحساب', icon: UserCircle },
       ]
     : [
         { id: 'home', label: 'الرئيسية', icon: Home },
         { id: 'activate', label: 'تفعيل شريحة', icon: PlusCircle },
         { id: 'my_sims', label: 'شرائحي', icon: Cpu },
-        { id: 'account', label: 'بيانات الحساب', icon: UserCheck },
+        { id: 'account', label: 'بيانات الحساب', icon: UserCircle },
       ];
 
   const bottomNavItems = isAgent
@@ -37,13 +37,13 @@ export default function NavBar({ role, activeTab, setActiveTab, username, onLogo
         { id: 'add_seller', label: 'إضافة بائع', icon: 'person_add' },
         { id: 'sellers', label: 'البائعين', icon: 'group' },
         { id: 'my_sims', label: 'شرائحي', icon: 'sim_card' },
-        { id: 'account', label: 'بيانات الحساب', icon: 'verified_user' },
+        { id: 'account', label: 'بيانات الحساب', icon: 'account_circle' },
       ]
     : [
         { id: 'home', label: 'الرئيسية', icon: 'home' },
         { id: 'activate', label: 'تفعيل شريحة', icon: 'add_circle' },
         { id: 'my_sims', label: 'شرائحي', icon: 'sim_card' },
-        { id: 'account', label: 'بيانات الحساب', icon: 'verified_user' },
+        { id: 'account', label: 'بيانات الحساب', icon: 'account_circle' },
       ];
 
   return (

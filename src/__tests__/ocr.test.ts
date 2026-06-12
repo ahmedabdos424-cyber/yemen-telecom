@@ -56,18 +56,32 @@ function otsuThreshold(pixels: Uint8ClampedArray): number {
 
 function stageProgress(status: string, rawProgress: number): number {
   const stages: Record<string, { label: string; range: [number, number] }> = {
-    'loading tesseract core':        { label: 'تحميل محرك OCR',     range: [0, 15] },
-    'loading language traineddata':   { label: 'تحميل اللغة العربية',   range: [15, 25] },
-    'initializing api':              { label: 'تهيئة المحرك',       range: [25, 30] },
-    'preprocessing':                 { label: 'معالجة الصورة',       range: [30, 40] },
-    'recognizing text':              { label: 'استخراج النص',        range: [40, 85] },
-    'analyzing name':                { label: 'تحليل الاسم',         range: [85, 100] },
-    'complete':                      { label: 'اكتمل',               range: [100, 100] },
+    'loading tesseract core':        { label: 'فتح الكاميرا',     range: [0, 10] },
+    'loading language traineddata':   { label: 'فتح الكاميرا',     range: [10, 20] },
+    'initializing api':              { label: 'معالجة الصورة',    range: [20, 30] },
+    'preprocessing':                 { label: 'معالجة الصورة',    range: [30, 50] },
+    'recognizing text':              { label: 'تشغيل OCR',        range: [50, 80] },
+    'analyzing name':                { label: 'استخراج الاسم',    range: [80, 100] },
+    'complete':                      { label: 'اكتمل',            range: [100, 100] },
   };
   const s = stages[status];
   if (!s) return 0;
   const [min, max] = s.range;
   return min + (max - min) * Math.min(rawProgress, 1);
+}
+
+function extractArabicPersonName(lines: string[]): string | null {
+  const REJECTED_PATTERNS = [
+    /رقم\s+الهوية|الهوية\s+الوطنية|الإقامة|الجنسية|العنوان|تاريخ\s+الميلاد|الجنس|النوع|المهنة|جهة\s+الإصدار/,
+  ];
+  const candidates = lines
+    .filter(line => !REJECTED_PATTERNS.some(p => p.test(line)))
+    .filter(line => {
+      const words = line.split(/\s+/).filter(w => /[\u0600-\u06FF]/.test(w));
+      return words.length >= 2 && words.length <= 6;
+    })
+    .sort((a, b) => b.length - a.length);
+  return candidates.length > 0 ? candidates[0] : (lines.length > 0 ? lines[0] : null);
 }
 
 describe('OCR — Stage Progress Calculation', () => {
@@ -78,15 +92,15 @@ describe('OCR — Stage Progress Calculation', () => {
   it('should calculate progress within range', () => {
     const progress = stageProgress('loading tesseract core', 0.5);
     expect(progress).toBeGreaterThanOrEqual(0);
-    expect(progress).toBeLessThanOrEqual(15);
+    expect(progress).toBeLessThanOrEqual(10);
   });
 
   it('should return min when progress is 0', () => {
-    expect(stageProgress('loading language traineddata', 0)).toBe(15);
+    expect(stageProgress('loading language traineddata', 0)).toBe(10);
   });
 
   it('should return max when progress is 1', () => {
-    expect(stageProgress('loading language traineddata', 1)).toBe(25);
+    expect(stageProgress('loading language traineddata', 1)).toBe(20);
   });
 
   it('should handle complete stage', () => {
@@ -320,5 +334,67 @@ describe('OCR — Preprocessing Pipeline', () => {
     const lines = cleanOcrText(raw);
     expect(lines.some(l => l.includes('محمد'))).toBe(true);
     expect(lines.every(l => !l.includes('('))).toBe(true);
+  });
+});
+
+describe('OCR — Arabic Person Name Extraction', () => {
+  it('should extract clean Arabic name', () => {
+    const lines = ['أحمد', 'محمد أحمد علي'];
+    expect(extractArabicPersonName(lines)).toBe('محمد أحمد علي');
+  });
+
+  it('should reject lines with ID patterns', () => {
+    const lines = ['رقم الهوية 12345', 'محمد أحمد عمر'];
+    expect(extractArabicPersonName(lines)).toBe('محمد أحمد عمر');
+  });
+
+  it('should reject lines with nationality patterns', () => {
+    const lines = ['الجنسية يمني', 'عبدالله محمد'];
+    expect(extractArabicPersonName(lines)).toBe('عبدالله محمد');
+  });
+
+  it('should reject lines with address patterns', () => {
+    const lines = ['العنوان صنعاء', 'علي حسن صالح'];
+    expect(extractArabicPersonName(lines)).toBe('علي حسن صالح');
+  });
+
+  it('should reject lines with date of birth patterns', () => {
+    const lines = ['تاريخ الميلاد 1990', 'محمد أحمد علي صالح'];
+    expect(extractArabicPersonName(lines)).toBe('محمد أحمد علي صالح');
+  });
+
+  it('should reject lines with gender patterns', () => {
+    const lines = ['الجنس ذكر', 'فاطمة أحمد'];
+    expect(extractArabicPersonName(lines)).toBe('فاطمة أحمد');
+  });
+
+  it('should reject single-word lines', () => {
+    const lines = ['محمد', 'أحمد علي'];
+    expect(extractArabicPersonName(lines)).toBe('أحمد علي');
+  });
+
+  it('should reject lines with more than 6 Arabic words', () => {
+    const lines = ['محمد أحمد علي عمر حسن خالد سعيد', 'أحمد علي'];
+    expect(extractArabicPersonName(lines)).toBe('أحمد علي');
+  });
+
+  it('should prefer longer valid names', () => {
+    const lines = ['أحمد', 'محمد أحمد علي عمر'];
+    expect(extractArabicPersonName(lines)).toBe('محمد أحمد علي عمر');
+  });
+
+  it('should return null for empty array', () => {
+    expect(extractArabicPersonName([])).toBeNull();
+  });
+
+  it('should handle mixed content with rejected patterns', () => {
+    const lines = ['رقم الهوية: 1234567890', 'الجنسية: يمني', 'محمد أحمد علي صالح'];
+    expect(extractArabicPersonName(lines)).toBe('محمد أحمد علي صالح');
+  });
+
+  it('should handle lines with only rejected content', () => {
+    const lines = ['رقم الهوية 12345', 'تاريخ الميلاد 1990'];
+    const result = extractArabicPersonName(lines);
+    expect(result).not.toBeNull();
   });
 });

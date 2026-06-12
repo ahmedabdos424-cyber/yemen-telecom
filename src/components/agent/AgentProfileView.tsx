@@ -312,7 +312,7 @@ export default function AgentProfileView({
               initial={{ scale: 0.95, y: 15 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 15 }}
-              className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl z-10 text-slate-200"
+              className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl z-10 text-slate-200 max-h-[90vh] overflow-y-auto"
               dir="rtl"
             >
               <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
@@ -431,7 +431,7 @@ export default function AgentProfileView({
               initial={{ scale: 0.95, y: 15 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 15 }}
-              className="relative w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl z-10 text-slate-200"
+              className="relative w-full max-w-sm md:max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl z-10 text-slate-200 max-h-[90vh] overflow-y-auto"
               dir="rtl"
             >
               <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
@@ -534,7 +534,7 @@ export default function AgentProfileView({
               initial={{ scale: 0.95, y: 15 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 15 }}
-              className="relative w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl z-10 text-slate-200"
+              className="relative w-full max-w-sm md:max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl z-10 text-slate-200 max-h-[90vh] overflow-y-auto"
               dir="rtl"
             >
               <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-800/60">

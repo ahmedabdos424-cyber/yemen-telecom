@@ -146,7 +146,7 @@ export default function SellerSimManagementView({ sims, onUpdateSims }: SellerSi
             <button
               key={op.key}
               onClick={() => setSimOperatorFilter(simOperatorFilter === op.key ? 'all' : op.key)}
-              className={`flex-shrink-0 w-64 bg-slate-900 border ${
+              className={`flex-shrink-0 w-56 sm:w-64 bg-slate-900 border ${
                 simOperatorFilter === op.key ? 'border-red-500 shadow-md shadow-red-950/10' : 'border-slate-800'
               } rounded-2xl p-4 text-right transition-all hover:border-slate-700`}
             >
@@ -448,7 +448,7 @@ export default function SellerSimManagementView({ sims, onUpdateSims }: SellerSi
         {detailSim && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 font-sans">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setDetailSim(null)} />
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="relative bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl w-full max-w-sm text-right text-slate-300">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="relative bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl w-full max-w-sm md:max-w-md text-right text-slate-300 max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center pb-4 border-b border-slate-800 mb-4">
                 <h3 className="font-extrabold text-sm text-white">تفاصيل الشريحة الكاملة</h3>
                 <button onClick={() => setDetailSim(null)} className="p-1 hover:bg-slate-850 text-slate-400 hover:text-white rounded-full transition-colors"><X size={15} /></button>
@@ -488,7 +488,7 @@ export default function SellerSimManagementView({ sims, onUpdateSims }: SellerSi
         {editSim && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 font-sans">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditSim(null)} />
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="relative bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl w-full max-w-sm text-right text-slate-300">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="relative bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl w-full max-w-sm md:max-w-md text-right text-slate-300 max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center pb-4 border-b border-slate-800 mb-4">
                 <h3 className="font-extrabold text-sm text-white">تعديل معلومات الشريحة</h3>
                 <button onClick={() => setEditSim(null)} className="p-1 hover:bg-slate-850 text-slate-400 hover:text-white rounded-full transition-colors"><X size={15} /></button>
@@ -527,7 +527,7 @@ export default function SellerSimManagementView({ sims, onUpdateSims }: SellerSi
         {transferSim && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 font-sans">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setTransferSim(null)} />
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="relative bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl w-full max-w-sm text-right text-slate-200">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="relative bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl w-full max-w-sm md:max-w-md text-right text-slate-200 max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center pb-4 border-b border-slate-800 mb-4">
                 <h3 className="font-extrabold text-sm text-white">نقل ملكية الشريحة</h3>
                 <button onClick={() => setTransferSim(null)} className="p-1 hover:bg-slate-850 text-slate-400 hover:text-white rounded-full transition-colors"><X size={15} /></button>

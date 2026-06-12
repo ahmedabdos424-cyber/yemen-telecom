@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sim, Operator } from '../types';
 import ConfirmModal from './shared/ConfirmModal';
+import EmptyState from './shared/EmptyState';
 import {
   Smartphone, Search, X, Eye, Edit, ArrowRightLeft, BookMarked, RefreshCw, Check, Printer, Trash2,
   MoreVertical, Cpu
@@ -121,7 +122,7 @@ export default function SellerSimsView({ sims, onUpdateSims }: SellerSimsViewPro
             <button
               key={op.key}
               onClick={() => setSimOperatorFilter(simOperatorFilter === op.key ? 'all' : op.key)}
-              className={`flex-shrink-0 w-64 bg-slate-900 border ${simOperatorFilter === op.key ? 'border-red-500 shadow-md shadow-red-950/10' : 'border-slate-800'} rounded-2xl p-4 text-right transition-all hover:border-slate-700`}
+              className={`flex-shrink-0 w-56 sm:w-64 bg-slate-900 border ${simOperatorFilter === op.key ? 'border-red-500 shadow-md shadow-red-950/10' : 'border-slate-800'} rounded-2xl p-4 text-right transition-all hover:border-slate-700`}
             >
               <div className="flex justify-between items-start mb-3">
                 <div className={`w-9 h-9 rounded-xl ${op.iconColor} border flex items-center justify-center font-bold text-xs`}>{op.logo}</div>
@@ -175,11 +176,7 @@ export default function SellerSimsView({ sims, onUpdateSims }: SellerSimsViewPro
       </div>
 
       {filtered.length === 0 ? (
-        <div className="text-center bg-slate-900 border border-slate-800 rounded-3xl p-10 space-y-2">
-          <Smartphone className="mx-auto text-slate-600 animate-pulse" size={32} />
-          <h4 className="text-xs font-bold text-slate-100">لم يتم العثور على أي شرائح مطابقة</h4>
-          <p className="text-[10px] text-slate-400 font-light max-w-xs mx-auto">جرب تغيير نطاق البحث أو تصفية حالة التصفح للوصول إلى النتائج المطلوبة.</p>
-        </div>
+        <EmptyState icon={<Smartphone size={36} className="text-slate-600" />} title="لم يتم العثور على أي شرائح مطابقة" description="جرب تغيير نطاق البحث أو تصفية حالة التصفح للوصول إلى النتائج المطلوبة." />
       ) : (
         <div className="space-y-4">
           <div className="hidden md:block bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-sm">
@@ -264,9 +261,25 @@ export default function SellerSimsView({ sims, onUpdateSims }: SellerSimsViewPro
                   </div>
                   <div className="flex gap-2 justify-end border-t border-slate-800/60 pt-3">
                     <button onClick={() => setDetailSim(sim)} className="btn btn-sm btn-ghost">التفاصيل</button>
-                    <button onClick={() => { setEditSim(sim); setEditIccid(sim.iccid); setEditPhone(sim.phone || ''); setEditCategory(sim.category || ''); setEditOperator(sim.operator); }} className="btn btn-sm btn-ghost">تعديل</button>
-                    <button onClick={() => handleStatusChange(sim.id, 'sold')} className="btn btn-sm btn-ghost text-blue-400 hover:text-blue-300">تسييل</button>
-                    <button onClick={() => handleDeleteSim(sim.id)} className="btn btn-sm btn-ghost text-red-500 hover:text-red-400">حذف</button>
+                    <div className="relative">
+                      <button onClick={() => setActiveMenuSimId(activeMenuSimId === sim.id ? null : sim.id)}
+                        className="btn-icon hover:bg-slate-950 text-slate-400 hover:text-slate-100 cursor-pointer"><MoreVertical size={16} /></button>
+                      {activeMenuSimId === sim.id && (
+                        <>
+                          <div className="fixed inset-0 z-20" onClick={() => setActiveMenuSimId(null)} />
+                          <div className="absolute left-0 bottom-8 w-44 bg-slate-950 border border-slate-800 rounded-2xl p-1.5 shadow-2xl z-30 text-right space-y-0.5 animate-scale-down">
+                            <button onClick={() => handleStatusChange(sim.id, 'sold')} className="w-full text-right px-3 py-2 text-[10px] text-blue-400 hover:bg-slate-900 rounded-lg flex items-center gap-2"><Check size={12} /><span>بيع الشريحة</span></button>
+                            {sim.status === 'available' ? (
+                              <button onClick={() => handleStatusChange(sim.id, 'reserved')} className="w-full text-right px-3 py-2 text-[10px] text-amber-400 hover:bg-slate-900 rounded-lg flex items-center gap-2"><BookMarked size={12} /><span>حجز الشريحة</span></button>
+                            ) : (
+                              <button onClick={() => handleStatusChange(sim.id, 'available')} className="w-full text-right px-3 py-2 text-[10px] text-emerald-400 hover:bg-slate-900 rounded-lg flex items-center gap-2"><RefreshCw size={12} /><span>إلغاء الحجز</span></button>
+                            )}
+                            <button onClick={() => { setTransferSim(sim); setActiveMenuSimId(null); }} className="w-full text-right px-3 py-2 text-[10px] text-slate-300 hover:bg-slate-900 hover:text-slate-100 rounded-lg flex items-center gap-2"><ArrowRightLeft size={12} /><span>نقل الشريحة</span></button>
+                            <button onClick={() => { alert(`جاري طباعة بيانات الشريحة...\nICCID: ${sim.iccid}\nالحالة: ${sim.status}`); setActiveMenuSimId(null); }} className="w-full text-right px-3 py-2 text-[10px] text-slate-300 hover:bg-slate-900 hover:text-slate-100 rounded-lg flex items-center gap-2"><Printer size={12} /><span>طباعة</span></button>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -292,7 +305,7 @@ export default function SellerSimsView({ sims, onUpdateSims }: SellerSimsViewPro
         {detailSim && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 font-sans">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setDetailSim(null)} />
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="relative bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl w-full max-w-sm text-right text-slate-300">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="relative bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl w-full max-w-sm md:max-w-md text-right text-slate-300 max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center pb-4 border-b border-slate-800 mb-4">
                 <h3 className="font-extrabold text-sm text-slate-100">تفاصيل الشريحة الكاملة</h3>
                 <button onClick={() => setDetailSim(null)} className="p-1 hover:bg-slate-850 text-slate-400 hover:text-slate-100 rounded-full transition-colors"><X size={15} /></button>
@@ -313,7 +326,7 @@ export default function SellerSimsView({ sims, onUpdateSims }: SellerSimsViewPro
         {editSim && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 font-sans">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditSim(null)} />
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="relative bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl w-full max-w-sm text-right text-slate-300">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="relative bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl w-full max-w-sm md:max-w-md text-right text-slate-300 max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center pb-4 border-b border-slate-800 mb-4">
                 <h3 className="font-extrabold text-sm text-slate-100">تعديل معلومات الشريحة</h3>
                 <button onClick={() => setEditSim(null)} className="p-1 hover:bg-slate-850 text-slate-400 hover:text-slate-100 rounded-full transition-colors"><X size={15} /></button>
@@ -351,7 +364,7 @@ export default function SellerSimsView({ sims, onUpdateSims }: SellerSimsViewPro
         {transferSim && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 font-sans">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setTransferSim(null)} />
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="relative bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl w-full max-w-sm text-right text-slate-200">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="relative bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl w-full max-w-sm md:max-w-md text-right text-slate-200 max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center pb-4 border-b border-slate-800 mb-4">
                 <h3 className="font-extrabold text-sm text-slate-100">نقل ملكية الشريحة</h3>
                 <button onClick={() => setTransferSim(null)} className="p-1 hover:bg-slate-850 text-slate-400 hover:text-slate-100 rounded-full transition-colors"><X size={15} /></button>

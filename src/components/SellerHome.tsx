@@ -14,14 +14,10 @@ export default function SellerHome({ operations, onNavigate }: SellerHomeProps) 
 
       {/* Welcome Panel */}
       <div className="flex justify-between items-center text-right border-b border-slate-800 pb-4">
-        <div>
-          <h2 className="text-lg font-bold text-slate-100 tracking-tight flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse"></span>
-            بوابة العمليات والمبيعات الموحدة
-          </h2>
-
-        </div>
-        <span className="text-[10px] font-mono text-slate-500 bg-slate-950/60 border border-slate-850 px-2.5 py-1 rounded-xl" dir="ltr">2026-06-02</span>
+        <h2 className="text-lg font-bold text-slate-100 tracking-tight flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse"></span>
+          بوابة العمليات والمبيعات الموحدة
+        </h2>
       </div>
 
       {/* Quick Action Button */}
@@ -36,10 +32,10 @@ export default function SellerHome({ operations, onNavigate }: SellerHomeProps) 
       </div>
 
       {/* Quick Metrics Counters */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="snap-dashboard">
 
         {/* Metric A */}
-        <div className="stat-card flex flex-col justify-between h-32 hover:shadow-md transition-shadow">
+        <div className="stat-card flex flex-col justify-between hover:shadow-md transition-shadow min-h-[130px]">
           <div className="flex justify-between items-start">
             <span className="btn-icon bg-blue-500/10 rounded-xl text-[#0151d5]">
               <Smartphone size={16} />
@@ -55,7 +51,7 @@ export default function SellerHome({ operations, onNavigate }: SellerHomeProps) 
         </div>
 
         {/* Metric B */}
-        <div className="stat-card flex flex-col justify-between h-32 hover:shadow-md transition-shadow">
+        <div className="stat-card flex flex-col justify-between hover:shadow-md transition-shadow min-h-[130px]">
           <div className="flex justify-between items-start">
             <span className="btn-icon bg-purple-500/10 rounded-xl text-purple-400">
               <Cpu size={16} />
@@ -69,7 +65,7 @@ export default function SellerHome({ operations, onNavigate }: SellerHomeProps) 
         </div>
 
         {/* Metric C */}
-        <div className="stat-card flex flex-col justify-between h-32 col-span-2 lg:col-span-1 hover:shadow-md transition-shadow">
+        <div className="stat-card flex flex-col justify-between hover:shadow-md transition-shadow min-h-[130px]">
           <div className="flex justify-between items-start">
             <span className="p-2 bg-red-500/10 rounded-xl text-red-500 animate-pulse">
               <Award size={16} />
@@ -97,7 +93,7 @@ export default function SellerHome({ operations, onNavigate }: SellerHomeProps) 
         </div>
 
         <div className="table-wrap">
-          <table className="text-xs">
+          <table className="text-xs table-cards-mobile">
             <thead>
               <tr className="bg-slate-950/40 border-b border-slate-800 text-slate-400">
                 <th className="p-4 font-bold text-slate-400">نوع العملية ومقدم الخدمة</th>
@@ -109,7 +105,7 @@ export default function SellerHome({ operations, onNavigate }: SellerHomeProps) 
             <tbody className="divide-y divide-slate-800/30">
               {operations.map((op) => (
                 <tr key={op.id} className="hover:bg-slate-950/10 transition-colors">
-                  <td className="p-4">
+                  <td data-label="العملية" className="p-4">
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
                         op.status === 'success'
@@ -120,8 +116,8 @@ export default function SellerHome({ operations, onNavigate }: SellerHomeProps) 
                           {op.type === 'activate' ? 'person_add' : 'payments'}
                         </span>
                       </div>
-                      <div>
-                        <p className="font-bold text-xs text-slate-200">
+                      <div className="min-w-0">
+                        <p className="font-bold text-xs text-slate-200 truncate">
                           {op.type === 'activate' ? 'تفعيل شريحة' : 'شحن رصيد'}
                         </p>
                         <p className="text-[9px] text-slate-500 mt-0.5">
@@ -130,13 +126,13 @@ export default function SellerHome({ operations, onNavigate }: SellerHomeProps) 
                       </div>
                     </div>
                   </td>
-                  <td className="p-4 font-mono text-slate-300 font-semibold select-all">
+                  <td data-label="المرجع" className="p-4 font-mono text-slate-300 font-semibold select-all truncate max-w-[120px]">
                     {op.target}
                   </td>
-                  <td className="p-4 text-slate-400">
+                  <td data-label="التوقيت" className="p-4 text-slate-400">
                     {op.time}
                   </td>
-                  <td className="p-4 text-center">
+                  <td data-label="الحالة" className="p-4 text-center">
                     <span className={`badge ${
                       op.status === 'success'
                         ? 'badge-success'

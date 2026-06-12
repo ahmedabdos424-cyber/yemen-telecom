@@ -26,6 +26,8 @@ export default function MobileBottomNav({ items, activeId, onChange, badgeCount,
                 isSelected ? 'text-red-500 font-semibold' : 'text-slate-400 hover:text-slate-200'
               }`}
               aria-label={item.label}
+              role="tab"
+              aria-selected={isSelected}
               aria-current={isSelected ? 'page' : undefined}>
               {isSelected && (
                 <motion.span layoutId="bottomNavIndicator"

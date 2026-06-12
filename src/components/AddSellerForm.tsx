@@ -212,7 +212,7 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-3.5 text-slate-500 hover:text-slate-100 touch-target flex items-center justify-center"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-100 touch-target flex items-center justify-center"
                 id="toggle-password-visibility-btn"
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -352,7 +352,7 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
               initial={{ scale: 0.95, y: 15 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 15 }}
-              className="relative w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-right"
+              className="relative w-full max-w-sm md:max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-right max-h-[90vh] overflow-y-auto"
             >
               <div className="flex items-center gap-3 mb-4 pb-3 border-b border-slate-800">
                 <div className="w-10 h-10 rounded-xl bg-emerald-600/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">

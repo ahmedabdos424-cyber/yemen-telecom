@@ -16,13 +16,13 @@ const OCR_TIMEOUT_MS = 30_000;
 const MAX_RETRIES = 2;
 
 const stages: Record<string, { label: string; range: [number, number] }> = {
-  'loading tesseract core':        { label: 'تحميل محرك OCR',     range: [0, 15] },
-  'loading language traineddata':   { label: 'تحميل اللغة العربية',   range: [15, 25] },
-  'initializing api':              { label: 'تهيئة المحرك',       range: [25, 30] },
-  'preprocessing':                 { label: 'معالجة الصورة',       range: [30, 40] },
-  'recognizing text':              { label: 'استخراج النص',        range: [40, 85] },
-  'analyzing name':                { label: 'تحليل الاسم',         range: [85, 100] },
-  'complete':                      { label: 'اكتمل',               range: [100, 100] },
+  'loading tesseract core':        { label: 'فتح الكاميرا',     range: [0, 10] },
+  'loading language traineddata':   { label: 'فتح الكاميرا',     range: [10, 20] },
+  'initializing api':              { label: 'معالجة الصورة',    range: [20, 30] },
+  'preprocessing':                 { label: 'معالجة الصورة',    range: [30, 50] },
+  'recognizing text':              { label: 'تشغيل OCR',        range: [50, 80] },
+  'analyzing name':                { label: 'استخراج الاسم',    range: [80, 100] },
+  'complete':                      { label: 'اكتمل',            range: [100, 100] },
 };
 
 function stageProgress(status: string, rawProgress: number): number {
@@ -83,7 +83,23 @@ function extractValidName(lines: string[]): string | null {
   return lines.length > 0 ? lines[0] : null;
 }
 
-export { cleanOcrText, extractValidName, otsuThreshold, stageProgress };
+const REJECTED_PATTERNS = [
+  /رقم\s+الهوية|الهوية\s+الوطنية|الإقامة|الجنسية|العنوان|تاريخ\s+الميلاد|الجنس|النوع|المهنة|جهة\s+الإصدار/,
+];
+
+function extractArabicPersonName(lines: string[]): string | null {
+  const candidates = lines
+    .filter(line => !REJECTED_PATTERNS.some(p => p.test(line)))
+    .filter(line => {
+      const words = line.split(/\s+/).filter(w => /[\u0600-\u06FF]/.test(w));
+      return words.length >= 2 && words.length <= 6;
+    })
+    .sort((a, b) => b.length - a.length);
+
+  return candidates.length > 0 ? candidates[0] : extractValidName(lines);
+}
+
+export { cleanOcrText, extractValidName, extractArabicPersonName, otsuThreshold, stageProgress };
 
 function detectBlur(dataUrl: string): Promise<number> {
   return new Promise((resolve) => {
@@ -222,7 +238,7 @@ export function useOcr() {
       return 'DARK';
     }
 
-    const maxDim = 1000;
+    const maxDim = 1200;
     const preprocessed = await new Promise<string>((resolve) => {
       const img = new Image();
       img.onload = () => {
@@ -291,7 +307,7 @@ export function useOcr() {
     setProgress(prev => ({ ...prev, progress: stageProgress('analyzing name', 0.5), stage: stages['analyzing name'].label }));
 
     const lines = cleanOcrText(text);
-    const name = extractValidName(lines);
+    const name = extractArabicPersonName(lines);
 
     if (!name || name.length < 3 || /^\d+$/.test(name) || !/[\u0600-\u06FF]/.test(name)) {
       setProgress({ visible: false, progress: 0, stage: '' });

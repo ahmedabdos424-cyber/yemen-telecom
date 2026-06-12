@@ -16,6 +16,8 @@ interface AgentDashboardProps {
   onTransferSims: (operator: Operator, count: number, startSerial: string, endSerial: string, recipientName: string) => void;
   onUpdateSellerStatus: (sellerId: string, status: 'active' | 'inactive') => void;
   onResetSellerPassword: (sellerId: string) => void;
+  onEditSeller: (seller: Seller) => void;
+  onDeleteSeller: (sellerId: string) => Promise<void>;
   onUpdateInventories: (inventories: OperatorInventory[]) => void;
   username: string;
   onLogout: () => void;
@@ -37,6 +39,8 @@ export default function AgentDashboard({
   onTransferSims,
   onUpdateSellerStatus,
   onResetSellerPassword,
+  onEditSeller,
+  onDeleteSeller,
   onUpdateInventories,
   username,
   onLogout,
@@ -203,6 +207,8 @@ export default function AgentDashboard({
           sellers={sellers}
           onUpdateSellerStatus={onUpdateSellerStatus}
           onResetSellerPassword={onResetSellerPassword}
+          onEditSeller={onEditSeller}
+          onDeleteSeller={onDeleteSeller}
         />
       ) : activeTab === 'my_sims' ? (
         <SimManagementView
@@ -260,7 +266,7 @@ export default function AgentDashboard({
 
           {/* 3. Summary Cards for Operator Stock & Sellers Statistics */}
           <h3 className="text-sm font-bold text-slate-300 pb-1 pt-4">مؤشرات الحصص وإحصائيات نقاط البيع</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
+          <div className="snap-dashboard">
             {inventories.map((inv) => {
               const isYm = inv.operator === 'yemen_mobile' || inv.operator === 'Yemen Mobile';
               const isYou = inv.operator === 'you' || inv.operator === 'YOU';
@@ -360,7 +366,7 @@ export default function AgentDashboard({
           <h3 className="text-sm font-bold text-slate-300 pb-1 pt-4 font-sans">آخر العمليات</h3>
           <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-sm">
             <div className="table-wrap">
-              <table className="text-xs">
+              <table className="text-xs table-cards-mobile">
                 <thead>
                   <tr className="bg-slate-950/60 border-b border-slate-800 text-slate-400">
                     <th className="p-4 font-bold text-slate-400">التاريخ</th>
@@ -381,13 +387,13 @@ export default function AgentDashboard({
                     { id: '6', date: '2026/05/25', sellerName: 'خالد عمر', operator: 'you', simsCount: 10, opType: 'تحويل رصيد سيريال', status: 'failed' },
                   ].map((op) => (
                     <tr key={op.id} className="hover:bg-slate-950/30 transition-colors">
-                      <td className="p-4 text-slate-400 font-medium">
+                      <td data-label="التاريخ" className="p-4 text-slate-400 font-medium">
                         {op.date}
                       </td>
-                      <td className="p-4 font-bold text-slate-100">
+                      <td data-label="اسم البائع" className="p-4 font-bold text-slate-100">
                         {op.sellerName}
                       </td>
-                      <td className="p-4">
+                      <td data-label="المشغل" className="p-4">
                         <span className={`badge ${
                           op.operator === 'yemen_mobile' 
                             ? 'badge-active' 
@@ -398,13 +404,13 @@ export default function AgentDashboard({
                           {op.operator === 'yemen_mobile' ? 'يمن موبايل' : op.operator === 'you' ? 'YOU' : 'سبأفون'}
                         </span>
                       </td>
-                      <td className="p-4 font-semibold text-slate-300 font-sans">
+                      <td data-label="عدد الشرائح" className="p-4 font-semibold text-slate-300 font-sans">
                         {op.simsCount} شرائح
                       </td>
-                      <td className="p-4 text-slate-300 font-medium">
+                      <td data-label="نوع العملية" className="p-4 text-slate-300 font-medium">
                         {op.opType}
                       </td>
-                      <td className="p-4 text-center">
+                      <td data-label="الحالة" className="p-4 text-center">
                         <span className={`badge ${
                           op.status === 'success'
                             ? 'badge-success'

@@ -79,7 +79,12 @@ export default function App() {
 
     return (
       <div className="min-h-dvh bg-theme-background font-sans antialiased text-slate-100 pb-[calc(4rem+env(safe-area-inset-bottom))]">
-        {!isOnline && <OfflineBanner />}
+        {!isOnline && (
+          <div className="fixed top-0 left-0 right-0 z-[60] bg-red-600 text-white text-center py-1.5 text-[11px] font-bold shadow-lg flex items-center justify-center gap-2" role="alert" aria-live="assertive">
+            <span className="material-symbols-outlined text-xs">wifi_off</span>
+            لا يوجد اتصال بالإنترنت
+          </div>
+        )}
         <TopBar currentView={mgr.currentView} setView={mgr.setView} onMenuToggle={() => {}} unresolvedAlertsCount={mgr.alerts.length} displayName={username} role={role} />
         <div className="flex pt-[calc(4rem+env(safe-area-inset-top))] min-h-dvh">
           <main className="flex-1 px-3 sm:px-4 md:px-8 py-4 md:py-8 lg:pt-10">
@@ -141,6 +146,8 @@ export default function App() {
         onTransferSims: agt.handleTransferSimsForAgent,
         onUpdateSellerStatus: agt.handleUpdateSellerStatusForAgent,
         onResetSellerPassword: agt.handleResetSellerPasswordForAgent,
+        onEditSeller: agt.handleEditSellerForAgent,
+        onDeleteSeller: agt.handleDeleteSellerForAgent,
         onUpdateInventories: agt.handleUpdateInventories,
         username, onLogout: () => {}, onConfirmLogout: handleLogout,
         darkMode, setDarkMode,
@@ -176,7 +183,12 @@ export default function App() {
 
   return (
     <div className="min-h-screen transition-colors duration-300 font-sans bg-slate-950 text-slate-100">
-      {!isOnline && <OfflineBanner />}
+      {!isOnline && (
+        <div className="fixed top-0 left-0 right-0 z-[60] bg-red-600 text-white text-center py-1.5 text-[11px] font-bold shadow-lg flex items-center justify-center gap-2" role="alert" aria-live="assertive">
+          <span className="material-symbols-outlined text-xs">wifi_off</span>
+          لا يوجد اتصال بالإنترنت
+        </div>
+      )}
       {isLoading && !role ? <LoadingScreen /> : (
       <>
         <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:32px_32px] opacity-15 pointer-events-none" />
@@ -202,10 +214,10 @@ export default function App() {
                 className="fixed bottom-0 left-0 right-0 z-50 sm:relative sm:max-w-sm sm:mx-auto sm:my-auto sm:rounded-3xl card-enhanced rounded-t-3xl p-5 pb-8 max-h-[90dvh] overflow-y-auto">
                 <div className="bottom-sheet-drag sm:hidden mx-auto mb-2" />
                 <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-700">
-                  <h3 className="text-base font-bold text-emerald-400 flex items-center gap-2"><Check size={18} /> تم إنشاء البائع بنجاح</h3>
+                  <h3 className="text-base font-bold text-emerald-400 flex items-center gap-2"><Check size={18} /> {agt.sellerCredentials.mode === 'reset' ? 'تم إعادة تعيين كلمة المرور' : 'تم إنشاء البائع بنجاح'}</h3>
                   <button onClick={() => agt.setSellerCredentials(null)} className="touch-target flex items-center justify-center p-2 text-slate-500 hover:text-slate-100 rounded-xl transition-colors cursor-pointer"><X size={18} /></button>
                 </div>
-                <p className="text-xs text-slate-400 mb-4">تم إنشاء حساب البائع <strong className="text-slate-100">{agt.sellerCredentials.sellerName}</strong> بنجاح. بيانات تسجيل الدخول:</p>
+                <p className="text-xs text-slate-400 mb-4">{agt.sellerCredentials.mode === 'reset' ? 'تم إعادة تعيين كلمة المرور للبائع' : 'تم إنشاء حساب البائع'} <strong className="text-slate-100">{agt.sellerCredentials.sellerName}</strong>. بيانات تسجيل الدخول:</p>
                 <div className="space-y-3 mb-5">
                   <div className="bg-slate-950 rounded-xl p-3 border border-slate-800">
                     <span className="input-label">اسم المستخدم</span>
@@ -242,11 +254,4 @@ export default function App() {
   );
 }
 
-function OfflineBanner() {
-  return (
-    <div className="fixed top-0 left-0 right-0 z-[60] bg-red-600 text-white text-center py-1.5 text-[11px] font-bold shadow-lg">
-      <span className="material-symbols-outlined text-xs align-middle ml-1">wifi_off</span>
-      لا يوجد اتصال بالإنترنت — البيانات المعروضة قد تكون غير محدثة
-    </div>
-  );
-}
+

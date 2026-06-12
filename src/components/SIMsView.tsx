@@ -3,11 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { SIM } from '../types';
 import { Upload } from 'lucide-react';
 import CameraCapture from './shared/CameraCapture';
 import { StatsCardSkeleton } from './shared/Skeleton';
+import { useDebounce } from '../hooks/useDebounce';
 
 interface SIMsViewProps {
   sims: SIM[];
@@ -16,6 +17,7 @@ interface SIMsViewProps {
 
 function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 300);
   const [selectedProvider, setSelectedProvider] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedOwner, setSelectedOwner] = useState<string>('all');
@@ -46,7 +48,7 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
 
   // Filter & Search computation with multi-filter query support
   const filteredSIMs = useMemo(() => sims.filter((sim) => {
-    const searchTokens = searchTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const searchTokens = debouncedSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
     const matchesSearch = searchTokens.length === 0 || searchTokens.every(token => 
       sim.phone?.toLowerCase().includes(token) || 
       sim.iccid.toLowerCase().includes(token) || 
@@ -60,7 +62,7 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
     const matchesPackage = selectedPackage === 'all' || sim.packageType === selectedPackage;
 
     return matchesSearch && matchesProvider && matchesStatus && matchesOwner && matchesPackage;
-  }), [sims, searchTerm, selectedProvider, selectedStatus, selectedOwner, selectedPackage]);
+  }), [sims, debouncedSearch, selectedProvider, selectedStatus, selectedOwner, selectedPackage]);
 
   // Text highlighting utility
   const highlightMatches = useCallback((text: string, search: string) => {
@@ -418,15 +420,15 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
               className="bg-white border border-gray-200 shadow-sm p-4 rounded-xl flex flex-col justify-between hover:shadow-md transition-shadow active:scale-[0.99] content-visibility-auto contain-strict"
             >
               <div className="flex justify-between items-start mb-3">
-                <div className="flex items-center gap-2.5">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-[11px] text-white ${
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-[11px] text-white shrink-0 ${
                     sim.provider === 'Yemen Mobile' ? 'bg-op-ym' : sim.provider === 'Sabafon' ? 'bg-op-sf' : 'bg-op-you'
                   }`}>
                     {sim.provider === 'Yemen Mobile' ? 'YM' : sim.provider === 'Sabafon' ? 'SF' : 'YOU'}
                   </div>
-                  <div>
-                    <p className="text-xs font-bold text-gray-900 font-mono">{highlightMatches(sim.phone, searchTerm)}</p>
-                    <p className="text-[11px] text-gray-500 font-mono mt-0.5">{highlightMatches(sim.iccid, searchTerm)}</p>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-gray-900 font-mono truncate">{highlightMatches(sim.phone, searchTerm)}</p>
+                    <p className="text-[11px] text-gray-500 font-mono mt-0.5 truncate">{highlightMatches(sim.iccid, searchTerm)}</p>
                   </div>
                 </div>
                   <div className="flex items-center gap-1.5">
@@ -480,7 +482,7 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
       {/* Manual Insert Dialog Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-gray-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden text-right leading-relaxed animate-in fade-in zoom-in-95 duration-200 border border-gray-100/80">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md lg:max-w-lg overflow-hidden text-right leading-relaxed animate-in fade-in zoom-in-95 duration-200 border border-gray-100/80">
             <div className="px-6 py-4.5 bg-gray-50 border-b border-gray-150 flex justify-between items-center">
               <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-gray-150/70 rounded-full text-gray-400 hover:text-gray-700 transition-colors cursor-pointer">
                 <span className="material-symbols-outlined text-lg">close</span>
@@ -501,7 +503,7 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
                     value={formPhone}
                     onChange={(e) => setFormPhone(e.target.value)}
                     placeholder="مثال: 777112233"
-                    className="w-full pr-10 pl-10 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all font-mono"
+                    className="w-full pr-10 pl-12 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all font-mono"
                   />
                   <CameraCapture onCapture={() => {}} />
                 </div>
@@ -516,7 +518,7 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
                     value={formIccid}
                     onChange={(e) => setFormIccid(e.target.value)}
                     placeholder="89967000..."
-                    className="w-full pr-10 pl-10 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all font-mono"
+                    className="w-full pr-10 pl-12 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all font-mono"
                   />
                   <CameraCapture onCapture={() => {}} />
                 </div>
@@ -541,7 +543,7 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
                       type="text"
                       value={formPackage}
                       onChange={(e) => setFormPackage(e.target.value)}
-                      className="w-full pl-10 px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all"
+                      className="w-full pl-12 px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all"
                     />
                     <CameraCapture onCapture={() => {}} />
                   </div>
@@ -554,7 +556,7 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
                     type="text"
                     value={formOwner}
                     onChange={(e) => setFormOwner(e.target.value)}
-                    className="w-full pl-10 px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all"
+                    className="w-full pl-12 px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all"
                   />
                   <CameraCapture onCapture={() => {}} />
                 </div>
@@ -582,7 +584,7 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
       {/* CSV Import Modal */}
       {showImportModal && (
         <div className="fixed inset-0 bg-gray-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden text-right leading-relaxed animate-in fade-in zoom-in-95 duration-200 border border-gray-100/80">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm md:max-w-md overflow-hidden text-right leading-relaxed animate-in fade-in zoom-in-95 duration-200 border border-gray-100/80">
             <div className="px-6 py-4.5 bg-gray-50 border-b border-gray-150 flex justify-between items-center">
               <button onClick={() => setShowImportModal(false)} className="p-2 hover:bg-gray-150/70 rounded-full text-gray-400 hover:text-gray-700 transition-colors cursor-pointer">
                 <span className="material-symbols-outlined text-lg">close</span>
