@@ -18,7 +18,7 @@ export function useAgentSellerState(role: string | null, username: string) {
   const [operations, setOperations] = useState<Operation[]>(() => loadFromStorage('tele_operations', INITIAL_OPERATIONS));
   const [inventories, setInventories] = useState<OperatorInventory[]>(() => loadFromStorage('tele_inventories', INITIAL_INVENTORIES));
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('tele_role_tab') || 'home');
-  const [sellerCredentials, setSellerCredentials] = useState<{ username: string; password: string; sellerName: string } | null>(null);
+  const [sellerCredentials, setSellerCredentials] = useState<{ username: string; password: string; sellerName: string; mode?: 'create' | 'reset' } | null>(null);
 
   // Persist
   useEffect(() => { localStorage.setItem('tele_sellers', JSON.stringify(sellers)); }, [sellers]);
@@ -43,7 +43,7 @@ export function useAgentSellerState(role: string | null, username: string) {
       if (result.credentials) {
         credUsername = result.credentials.username;
       }
-      setSellerCredentials({ username: credUsername, password: credPassword, sellerName });
+      setSellerCredentials({ username: credUsername, password: credPassword, sellerName, mode: 'create' });
       handleSetRoleTab('sellers');
     } catch (err) {
       captureError(err, 'handleAddSellerForAgent');
@@ -111,12 +111,36 @@ export function useAgentSellerState(role: string | null, username: string) {
 
   const handleUpdateSellerStatusForAgent = (sellerId: string, status: 'active' | 'inactive') => {
     setSellers(prev => prev.map(s => s.id === sellerId ? { ...s, status } : s));
+    api.updateSeller(Number(sellerId), { status }).catch(err => {
+      captureError(err, 'handleUpdateSellerStatusForAgent');
+      alert('فشل تحديث حالة البائع. تحقق من اتصال الخادم.');
+    });
+  };
+
+  const handleEditSellerForAgent = async (seller: Seller) => {
+    setSellers(prev => prev.map(s => s.id === seller.id ? { ...s, name: seller.name, phone: seller.phone, region: seller.region } : s));
+  };
+
+  const handleDeleteSellerForAgent = async (sellerId: string): Promise<void> => {
+    try {
+      await api.deleteSeller(Number(sellerId));
+      setSellers(prev => prev.filter(s => s.id !== sellerId));
+    } catch (err) {
+      captureError(err, 'handleDeleteSellerForAgent');
+      throw err;
+    }
   };
 
   const handleResetSellerPasswordForAgent = async (sellerId: string) => {
     try {
+      const seller = sellers.find(s => s.id === sellerId);
       const result = await api.resetSellerPassword(Number(sellerId));
-      setSellerCredentials({ username: result.credentials.username, password: result.credentials.password, sellerName: sellerId });
+      setSellerCredentials({
+        username: result.credentials.username,
+        password: result.credentials.password,
+        sellerName: seller?.name || sellerId,
+        mode: 'reset'
+      });
     } catch (err) {
       captureError(err, 'handleResetSellerPasswordForAgent');
       const seller = sellers.find(s => s.id === sellerId);
@@ -140,6 +164,6 @@ export function useAgentSellerState(role: string | null, username: string) {
     sellers, sims, operations, inventories, activeTab, sellerCredentials, selfSellerData,
     handleSetRoleTab, setSellerCredentials, setSims, setSellers,
     handleAddSellerForAgent, handleTransferSimsForAgent, handleSimActivationForSeller,
-    handleUpdateSellerStatusForAgent, handleResetSellerPasswordForAgent, handleUpdateInventories,
+    handleUpdateSellerStatusForAgent, handleResetSellerPasswordForAgent, handleEditSellerForAgent, handleDeleteSellerForAgent, handleUpdateInventories,
   };
 }

@@ -53,6 +53,96 @@ export function StatsCardSkeleton() {
   );
 }
 
+export function SellerCardSkeleton() {
+  return (
+    <div className="bg-slate-900/60 border border-slate-800/50 rounded-2xl p-4 space-y-3 overflow-hidden relative">
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-800/30 to-transparent shimmer" />
+      <div className="flex items-center gap-3">
+        <Skeleton variant="circle" width="40px" height="40px" />
+        <div className="space-y-2 flex-1">
+          <Skeleton width="65%" />
+          <Skeleton width="35%" />
+        </div>
+        <Skeleton width="50px" height="20px" />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <Skeleton width="80%" />
+        <Skeleton width="60%" />
+        <Skeleton width="70%" />
+        <Skeleton width="55%" />
+      </div>
+      <div className="flex gap-2 pt-1">
+        <Skeleton width="48%" height="36px" />
+        <Skeleton width="48%" height="36px" />
+      </div>
+    </div>
+  );
+}
+
+export function SimCardSkeleton() {
+  return (
+    <div className="bg-slate-900/60 border border-slate-800/50 rounded-2xl p-4 space-y-3 overflow-hidden relative">
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-800/30 to-transparent shimmer" />
+      <div className="flex items-center gap-3">
+        <Skeleton variant="circle" width="36px" height="36px" />
+        <div className="space-y-2 flex-1">
+          <Skeleton width="70%" />
+          <Skeleton width="55%" />
+        </div>
+        <Skeleton width="45px" height="18px" />
+      </div>
+      <div className="flex justify-between">
+        <Skeleton width="40%" />
+        <Skeleton width="35%" />
+      </div>
+    </div>
+  );
+}
+
+export function DashboardSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="snap-dashboard">
+        {[1,2,3,4].map(i => (
+          <StatsCardSkeleton key={i} />
+        ))}
+      </div>
+      <div className="bg-slate-900/60 border border-slate-800/50 rounded-3xl p-5 space-y-4">
+        <Skeleton width="40%" height="18px" />
+        <div className="space-y-3">
+          {[1,2,3].map(i => (
+            <div key={i} className="flex gap-4">
+              <Skeleton width="15%" height="14px" />
+              <Skeleton width="25%" height="14px" />
+              <Skeleton width="20%" height="14px" />
+              <Skeleton width="15%" height="14px" />
+              <Skeleton width="15%" height="14px" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ProfileSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="bg-slate-900/60 border border-slate-800/50 rounded-3xl p-6 text-center space-y-4 overflow-hidden relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-800/30 to-transparent shimmer" />
+        <Skeleton variant="circle" width="64px" height="64px" className="mx-auto" />
+        <Skeleton width="50%" height="20px" className="mx-auto" />
+        <Skeleton width="35%" height="14px" className="mx-auto" />
+      </div>
+      <div className="snap-dashboard">
+        {[1,2,3,4].map(i => (
+          <StatsCardSkeleton key={i} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function TableSkeleton({ rows = 5 }: { rows?: number }) {
   return (
     <div className="space-y-3">

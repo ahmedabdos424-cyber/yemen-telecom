@@ -273,4 +273,25 @@ router.post('/:id/reset-password', requireRole('manager', 'agent'), async (req: 
   }
 });
 
+router.delete('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const existing = await query('SELECT * FROM sellers WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Seller not found' });
+    }
+    const seller = existing.rows[0];
+    if (seller.user_id) {
+      await query('UPDATE users SET status = $1 WHERE id = $2', ['inactive', seller.user_id]);
+    }
+    await query('DELETE FROM seller_sims WHERE seller_id = $1', [id]);
+    await query('DELETE FROM distribution_requests WHERE seller_id = $1', [id]);
+    await query('UPDATE sellers SET status = $1 WHERE id = $2', ['deleted', id]);
+    res.json({ message: 'Seller deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting seller:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;

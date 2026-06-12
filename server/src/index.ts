@@ -58,7 +58,7 @@ app.use(helmet({
     },
   },
 }));
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,http://10.0.0.185:3000,https://yemen-telecom-1699.web.app').split(',');
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,http://10.0.107.190:3000,http://10.0.0.185:3000,https://yemen-telecom-1699.web.app').split(',');
 const isCapacitorOrigin = (origin: string) =>
   origin === 'https://localhost' ||
   origin === 'capacitor://localhost' ||

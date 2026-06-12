@@ -2,10 +2,7 @@ import { tokenStorage } from '../services/tokenStorage.ts';
 import { captureTiming } from '../lib/monitor.ts';
 
 const isCapacitor = !!(window as any).Capacitor?.isNative;
-const hostname = window.location.hostname;
-const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
-const isDevProxy = isLocal && window.location.port !== '';
-const API_BASE = isCapacitor || (isLocal && !isDevProxy) || !isLocal
+const API_BASE = isCapacitor || !import.meta.env.DEV
   ? 'https://yemen-telecom-api.onrender.com/api'
   : '/api';
 
@@ -212,6 +209,8 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ amount }),
     }),
+  deleteSeller: (id: number) =>
+    request<any>(`/sellers/${id}`, { method: 'DELETE' }),
   resetSellerPassword: (id: number) =>
     request<{ message: string; credentials: { username: string; password: string } }>(
       `/sellers/${id}/reset-password`, { method: 'POST' }

@@ -302,7 +302,7 @@ function SellersView({ sellers, sims, onUpdateSeller, onAddBalance }: SellersVie
       {/* Add Balance Modal Dialog Box */}
       {showAddBalanceModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden text-right leading-relaxed animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm md:max-w-md overflow-hidden text-right leading-relaxed animate-in fade-in zoom-in-95 duration-150">
             <div className="px-5 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
               <button onClick={() => setShowAddBalanceModal(false)} className="text-gray-400 hover:text-gray-700">
                 <span className="material-symbols-outlined text-lg">close</span>
@@ -364,7 +364,7 @@ function SellersView({ sellers, sims, onUpdateSeller, onAddBalance }: SellersVie
       {/* Camera live viewfinder */}
       {showCam && !camPreview && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="relative w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
+          <div className="relative w-full max-w-lg xl:max-w-xl bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
             <div className="relative aspect-[4/3] bg-black flex items-center justify-center">
               <video ref={camVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
               <div className="absolute inset-0 border-[3px] border-dashed border-red-400/40 m-8 rounded-2xl pointer-events-none" />
@@ -393,7 +393,7 @@ function SellersView({ sellers, sims, onUpdateSeller, onAddBalance }: SellersVie
       {/* Camera preview confirm/retake */}
       {showCam && camPreview && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="relative w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
+          <div className="relative w-full max-w-lg xl:max-w-xl bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
             <div className="relative aspect-[4/3] bg-black flex items-center justify-center">
               <img src={camPreview} alt="المعاينة" className="w-full h-full object-contain" />
               <div className="absolute top-3 right-3 bg-emerald-500/20 border border-emerald-400/30 text-emerald-600 text-[10px] px-2.5 py-1 rounded-full font-bold">
