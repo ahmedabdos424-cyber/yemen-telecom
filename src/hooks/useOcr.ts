@@ -218,6 +218,51 @@ export function useOcr() {
     await getWorker(loggerRef.current);
   }, []);
 
+  const recognizeRaw = useCallback(async (imageData: string): Promise<string> => {
+    totalOcrCalls++;
+    const startTime = performance.now();
+    setProgress({ visible: true, progress: 10, stage: 'معالجة الصورة' });
+    const maxDim = 1200;
+    const processed = await new Promise<string>((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          const s = maxDim / Math.max(width, height);
+          width = Math.round(width * s);
+          height = Math.round(height * s);
+        }
+        const c = document.createElement('canvas');
+        c.width = width; c.height = height;
+        const ctx = c.getContext('2d');
+        if (!ctx) { resolve(imageData); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(c.toDataURL('image/jpeg', 0.8));
+        c.width = 0; c.height = 0;
+      };
+      img.onerror = () => resolve(imageData);
+      img.src = imageData;
+    });
+    setProgress(prev => ({ ...prev, progress: 50, stage: 'تشغيل OCR' }));
+    await initWorker();
+    const worker = await getWorker(loggerRef.current);
+    try {
+      const { data } = await recognizeWithTimeout(worker, processed, OCR_TIMEOUT_MS);
+      const cleaned = data.text
+        .split('\n')
+        .map(l => l.trim().replace(/[|\\{}[\]~`^_=+<>;:/*"'.,!@#$%^&*()\-_—–•·°™®©✓✗✘♦♣♠♥●○◘]/g, ' '))
+        .map(l => l.replace(/\s+/g, ' ').trim())
+        .filter(l => l.length > 0);
+      setProgress({ visible: false, progress: 0, stage: '' });
+      totalOcrTime += performance.now() - startTime;
+      return cleaned.filter((l, i, a) => a.indexOf(l) === i).join(' ');
+    } catch {
+      setProgress({ visible: false, progress: 0, stage: '' });
+      totalOcrTime += performance.now() - startTime;
+      return '';
+    }
+  }, [initWorker]);
+
   const recognize = useCallback(async (imageData: string): Promise<string> => {
     totalOcrCalls++;
     const startTime = performance.now();
@@ -327,7 +372,7 @@ export function useOcr() {
     };
   }, []);
 
-  return { recognize, progress, setProgress };
+  return { recognize, recognizeRaw, progress, setProgress };
 }
 
 export function getOcrStats() {

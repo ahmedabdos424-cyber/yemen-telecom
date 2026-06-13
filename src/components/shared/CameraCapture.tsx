@@ -1,5 +1,6 @@
 import React, { useRef, useCallback, useState, useEffect } from 'react';
-import { Camera, RefreshCw, X, Check, Settings } from 'lucide-react';
+import { Camera, RefreshCw, Settings } from 'lucide-react';
+import CameraPreviewModal from './CameraPreviewModal';
 
 interface CameraCaptureProps {
   onCapture: (imageData: string) => void;
@@ -109,11 +110,12 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
 
   const confirmCapture = useCallback(() => {
     if (previewImage) {
+      const img = previewImage;
       setPreviewImage(null);
-      onCapture(previewImage);
+      setShowViewfinder(false);
+      setScanning(false);
+      onCapture(img);
     }
-    setShowViewfinder(false);
-    setScanning(false);
   }, [previewImage, onCapture]);
 
   const retakeCapture = useCallback(() => {
@@ -150,64 +152,15 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
         {scanning ? <RefreshCw className="animate-spin" size={iconSize} /> : <Camera size={iconSize} />}
       </button>
 
-      {showViewfinder && !previewImage && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-           <div className="relative w-full max-w-lg md:max-w-xl bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
-              <div className="relative aspect-[4/3] bg-black flex items-center justify-center">
-                <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
-                <div className="absolute inset-0 border-[3px] border-dashed border-red-400/40 m-8 rounded-2xl pointer-events-none" />
-              </div>
-              <div className="flex gap-3 p-4 bg-slate-950">
-               <button
-                  type="button"
-                  onClick={captureFrame}
-                  className="btn btn-sm flex-1 bg-red-600 hover:bg-red-500 text-white flex items-center justify-center gap-2"
-                >
-                  <Camera size={16} />
-                  التقاط الصورة
-                </button>
-                <button
-                  type="button"
-                  onClick={stopCamera}
-                  className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300"
-                >
-                  إلغاء
-                </button>
-             </div>
-           </div>
-         </div>
-      )}
-
-      {showViewfinder && previewImage && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="relative w-full max-w-lg md:max-w-xl bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
-            <div className="relative aspect-[4/3] bg-black flex items-center justify-center">
-              <img src={previewImage} alt="المعاينة" className="w-full h-full object-contain" />
-              <div className="absolute top-3 right-3 bg-emerald-500/20 border border-emerald-400/30 text-emerald-400 text-[10px] px-2.5 py-1 rounded-full font-bold">
-                معاينة
-              </div>
-            </div>
-            <div className="flex gap-3 p-4 bg-slate-950">
-              <button
-                type="button"
-                onClick={confirmCapture}
-                className="btn btn-sm flex-1 bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2"
-              >
-                 <Check size={16} />
-                موافقة واستخدام الصورة
-              </button>
-              <button
-                type="button"
-                onClick={retakeCapture}
-                className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center gap-2"
-              >
-                <RefreshCw size={16} />
-                إعادة التقاط
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Preview modal — viewfinder or captured image */}
+      <CameraPreviewModal
+        show={showViewfinder}
+        previewImage={previewImage}
+        onCapture={captureFrame}
+        onConfirm={confirmCapture}
+        onRetake={retakeCapture}
+        onCancel={stopCamera}
+      />
 
       {permissionDenied && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
@@ -371,11 +324,12 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
 
   const confirmCapture = useCallback(() => {
     if (previewImage) {
+      const img = previewImage;
       setPreviewImage(null);
-      onCapture(previewImage);
+      setShowViewfinder(false);
+      setScanning(false);
+      onCapture(img);
     }
-    setShowViewfinder(false);
-    setScanning(false);
   }, [previewImage, onCapture]);
 
   const retakeCapture = useCallback(() => {
@@ -419,12 +373,12 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
           <div className="relative w-20 h-16 bg-slate-950 border border-slate-800 rounded-lg overflow-hidden shrink-0 flex items-center justify-center shadow">
             <img src={capturedImage} alt="Document" className="w-full h-full object-cover" />
             <div className="absolute top-1 right-1 bg-emerald-500 text-white rounded-full p-0.5 shadow">
-              <Check size={8} />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} className="w-2 h-2"><path d="M20 6L9 17l-5-5" /></svg>
             </div>
           </div>
           <div className="flex-1 text-right">
             <p className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
-              <Check size={14} />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5"><path d="M20 6L9 17l-5-5" /></svg>
               تم التقاط صورة المستند
             </p>
             <button
@@ -436,53 +390,20 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
             </button>
           </div>
           <button type="button" onClick={onRemove} className="text-slate-500 hover:text-red-400 p-1">
-            <X size={14} />
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
           </button>
         </div>
       )}
 
-      {showViewfinder && !previewImage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
-            <div className="relative aspect-[4/3] bg-black flex items-center justify-center">
-              <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
-              <div className="absolute inset-0 border-[3px] border-dashed border-red-400/40 m-8 rounded-2xl pointer-events-none" />
-            </div>
-            <div className="flex gap-3 p-4 bg-slate-950">
-              <button onClick={captureFrame} className="btn btn-sm flex-1 bg-red-600 hover:bg-red-500 text-white flex items-center justify-center gap-2">
-                 <Camera size={16} />
-                 التقاط الصورة
-               </button>
-               <button onClick={stopCamera} className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300">
-                إلغاء
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showViewfinder && previewImage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
-            <div className="relative aspect-[4/3] bg-black flex items-center justify-center">
-              <img src={previewImage} alt="المعاينة" className="w-full h-full object-contain" />
-              <div className="absolute top-3 right-3 bg-emerald-500/20 border border-emerald-400/30 text-emerald-400 text-[10px] px-2.5 py-1 rounded-full font-bold">
-                معاينة
-              </div>
-            </div>
-            <div className="flex gap-3 p-4 bg-slate-950">
-              <button onClick={confirmCapture} className="btn btn-sm flex-1 bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2">
-                <Check size={16} />
-                موافقة واستخدام الصورة
-              </button>
-              <button onClick={retakeCapture} className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center gap-2">
-                <RefreshCw size={16} />
-                إعادة التقاط
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Preview modal for DocumentCapture */}
+      <CameraPreviewModal
+        show={showViewfinder}
+        previewImage={previewImage}
+        onCapture={captureFrame}
+        onConfirm={confirmCapture}
+        onRetake={retakeCapture}
+        onCancel={stopCamera}
+      />
 
       {permissionDenied && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
