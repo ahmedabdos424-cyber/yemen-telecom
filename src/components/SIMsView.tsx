@@ -4,11 +4,13 @@
  */
 
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
+import { motion } from 'motion/react';
 import { SIM } from '../types';
-import { Upload } from 'lucide-react';
+import { Upload, RefreshCw, Check } from 'lucide-react';
 import CameraCapture from './shared/CameraCapture';
 import { StatsCardSkeleton } from './shared/Skeleton';
 import { useDebounce } from '../hooks/useDebounce';
+import { useOcr } from '../hooks/useOcr';
 
 interface SIMsViewProps {
   sims: SIM[];
@@ -33,6 +35,29 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
   const [formProvider, setFormProvider] = useState<'Yemen Mobile' | 'Sabafon' | 'YOU'>('Yemen Mobile');
   const [formPackage, setFormPackage] = useState('باقة مزايا الشهرية');
   const [formOwner, setFormOwner] = useState('المركز الرئيسي');
+
+  // Camera capture states
+  const [phoneCaptured, setPhoneCaptured] = useState(false);
+  const [iccidCaptured, setIccidCaptured] = useState(false);
+  const { recognize, recognizeRaw, progress: ocrProgress, setProgress: setOcrProgress } = useOcr();
+
+  const handlePhoneCapture = useCallback(async (imageData: string) => {
+    setPhoneCaptured(true);
+    const raw = await recognizeRaw(imageData);
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length >= 7) {
+      setFormPhone(digits);
+    }
+  }, [recognizeRaw]);
+
+  const handleIccidCapture = useCallback(async (imageData: string) => {
+    setIccidCaptured(true);
+    const raw = await recognizeRaw(imageData);
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length >= 10) {
+      setFormIccid(digits);
+    }
+  }, [recognizeRaw]);
 
   // CSV import state
   const [csvFile, setCsvFile] = useState<File | null>(null);
@@ -505,7 +530,12 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
                     placeholder="مثال: 777112233"
                     className="w-full pr-10 pl-12 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all font-mono"
                   />
-                  <CameraCapture onCapture={() => {}} />
+                  <CameraCapture onCapture={handlePhoneCapture} />
+                  {phoneCaptured && (
+                    <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1 mt-1">
+                      <Check size={12} /> تم التقاط الصورة
+                    </span>
+                  )}
                 </div>
               </div>
               <div>
@@ -520,7 +550,12 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
                     placeholder="89967000..."
                     className="w-full pr-10 pl-12 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all font-mono"
                   />
-                  <CameraCapture onCapture={() => {}} />
+                  <CameraCapture onCapture={handleIccidCapture} />
+                  {iccidCaptured && (
+                    <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1 mt-1">
+                      <Check size={12} /> تم التقاط الصورة
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -545,7 +580,7 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
                       onChange={(e) => setFormPackage(e.target.value)}
                       className="w-full pl-12 px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all"
                     />
-                    <CameraCapture onCapture={() => {}} />
+                    <CameraCapture onCapture={(data) => { setFormPackage(''); }} />
                   </div>
                 </div>
               </div>
@@ -558,7 +593,7 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
                     onChange={(e) => setFormOwner(e.target.value)}
                     className="w-full pl-12 px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all"
                   />
-                  <CameraCapture onCapture={() => {}} />
+                  <CameraCapture onCapture={(data) => { setFormOwner(''); }} />
                 </div>
               </div>
               <div className="flex gap-2 justify-end pt-4 border-t border-gray-100">
@@ -630,6 +665,23 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* OCR Progress Overlay */}
+      {ocrProgress.visible && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-xs bg-white border border-gray-200 rounded-2xl p-6 shadow-2xl text-center">
+            <RefreshCw size={32} className="mx-auto text-amber-500 mb-4 animate-spin" />
+            <p className="text-xs text-gray-700 mb-3 font-semibold">{ocrProgress.stage}</p>
+            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${ocrProgress.progress}%` }}
+                className="h-full bg-gradient-to-l from-primary to-primary/70 rounded-full"
+              />
+            </div>
+            <p className="text-[10px] text-gray-400 mt-2">{Math.round(ocrProgress.progress)}%</p>
           </div>
         </div>
       )}
