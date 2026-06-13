@@ -1308,3 +1308,32 @@ button:active,
     position: relative;
   }
 }
+
+/* ========== ADMIN RESPONSIVE IMPROVEMENTS ========== */
+@media (max-width: 639px) {
+  .admin-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .admin-stat-card {
+    padding: 0.75rem !important;
+  }
+  .admin-stat-card .stat-value {
+    font-size: 1.25rem !important;
+  }
+  .admin-content {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+  .admin-filter-bar {
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+  }
+  .admin-split-layout {
+    flex-direction: column !important;
+  }
+}
+@media (min-width: 640px) and (max-width: 1023px) {
+  .admin-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}

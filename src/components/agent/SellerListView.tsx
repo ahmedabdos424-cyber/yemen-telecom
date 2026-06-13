@@ -346,20 +346,20 @@ export default function SellerListView({
       {/* Three-Dots Seller Menu — Modern Redesign */}
       <AnimatePresence>
         {menuSeller && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" dir="rtl">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" dir="rtl">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setMenuSeller(null)}
-              className="absolute inset-0 bg-black/70 backdrop-blur-md"
+              className="absolute inset-0 bg-black/70 backdrop-blur-xl"
             />
             <motion.div
               initial={{ scale: 0.92, y: 20, opacity: 0 }}
               animate={{ scale: 1, y: 0, opacity: 1 }}
               exit={{ scale: 0.92, y: 20, opacity: 0 }}
               transition={{ type: 'spring', damping: 25, stiffness: 260 }}
-              className="relative w-full max-w-sm md:max-w-md bg-slate-900/95 backdrop-blur border border-slate-700/60 rounded-2xl p-0 shadow-2xl text-right text-slate-200 overflow-hidden"
+              className="relative w-[90vw] max-w-md bg-slate-900/80 backdrop-blur-xl border border-slate-700/50 rounded-3xl p-0 shadow-2xl shadow-black/40 text-right text-slate-200 overflow-hidden"
             >
               {/* Top accent bar */}
               <div className="h-1 bg-gradient-to-l from-red-500/60 via-amber-500/30 to-emerald-500/40" />
@@ -376,7 +376,7 @@ export default function SellerListView({
               </div>
 
               {/* Seller Info Section — glass card */}
-              <div className="mx-5 mb-4 p-4 bg-slate-950/60 backdrop-blur rounded-xl border border-slate-800/50 space-y-2.5">
+              <div className="mx-5 mb-4 p-4 bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 space-y-2.5">
                 <div className="flex items-center gap-3 pb-2 border-b border-slate-800/40">
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-600/20 to-red-800/10 border border-slate-700/50 flex items-center justify-center font-bold text-slate-300 text-sm flex-shrink-0">
                     {menuSeller.name.substring(0, 2)}
