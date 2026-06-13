@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Seller, Sim, Operation, OperatorInventory, Operator } from '../types';
-import { INITIAL_SELLERS, INITIAL_SIMS, INITIAL_INVENTORIES, INITIAL_OPERATIONS } from '../mockData';
 import { api } from '../api/client';
 import { captureError } from '../lib/monitor.ts';
 
@@ -13,10 +12,10 @@ function loadFromStorage<T>(key: string, fallback: T): T {
 }
 
 export function useAgentSellerState(role: string | null, username: string) {
-  const [sellers, setSellers] = useState<Seller[]>(() => loadFromStorage('tele_sellers', INITIAL_SELLERS));
-  const [sims, setSims] = useState<Sim[]>(() => loadFromStorage('tele_sims', INITIAL_SIMS));
-  const [operations, setOperations] = useState<Operation[]>(() => loadFromStorage('tele_operations', INITIAL_OPERATIONS));
-  const [inventories, setInventories] = useState<OperatorInventory[]>(() => loadFromStorage('tele_inventories', INITIAL_INVENTORIES));
+  const [sellers, setSellers] = useState<Seller[]>(() => loadFromStorage('tele_sellers', []));
+  const [sims, setSims] = useState<Sim[]>(() => loadFromStorage('tele_sims', []));
+  const [operations, setOperations] = useState<Operation[]>(() => loadFromStorage('tele_operations', []));
+  const [inventories, setInventories] = useState<OperatorInventory[]>(() => loadFromStorage('tele_inventories', []));
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('tele_role_tab') || 'home');
   const [sellerCredentials, setSellerCredentials] = useState<{ username: string; password: string; sellerName: string; mode?: 'create' | 'reset' } | null>(null);
 
@@ -152,12 +151,12 @@ export function useAgentSellerState(role: string | null, username: string) {
     setInventories(updated);
   };
 
-  // Self seller data for seller role
+  // Self seller data for seller role — starts empty for new accounts
   const selfSellerData: Seller = sellers.find(s => s.username === username || s.name === username || s.id === '99283') || {
-    id: '99283', name: username, storeName: 'معرض الجزيرة للاتصالات', idNumber: '1092837465',
-    phone: '0501234512', region: 'الرياض، العليا', regionCode: 'riyadh', status: 'active',
-    totalSales: 1248, currentStock: 252, efficiency: 85, creationDate: '2023/10/12',
-    lastLogin: 'الآن', simsCount: 252, sales30Days: 1248, salesGrowth: 15, activityRate: 85
+    id: '', name: username, storeName: '', idNumber: '',
+    phone: '', region: '', regionCode: '', status: 'active',
+    totalSales: 0, currentStock: 0, efficiency: 0, creationDate: '',
+    lastLogin: '', simsCount: 0, sales30Days: 0, salesGrowth: 0, activityRate: 0
   };
 
   return {

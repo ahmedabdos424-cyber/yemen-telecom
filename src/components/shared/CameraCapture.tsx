@@ -193,8 +193,8 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
                 onClick={confirmCapture}
                 className="btn btn-sm flex-1 bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2"
               >
-                <Check size={16} />
-                موافق
+                 <Check size={16} />
+                موافقة واستخدام الصورة
               </button>
               <button
                 type="button"
@@ -202,7 +202,7 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
                 className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center gap-2"
               >
                 <RefreshCw size={16} />
-                إعادة
+                إعادة التقاط
               </button>
             </div>
           </div>
@@ -473,11 +473,11 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
             <div className="flex gap-3 p-4 bg-slate-950">
               <button onClick={confirmCapture} className="btn btn-sm flex-1 bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2">
                 <Check size={16} />
-                موافق
+                موافقة واستخدام الصورة
               </button>
               <button onClick={retakeCapture} className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center gap-2">
                 <RefreshCw size={16} />
-                إعادة
+                إعادة التقاط
               </button>
             </div>
           </div>

@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Seller, Sim, OperatorInventory, Operator, Role } from '../types';
-import { Plus, RefreshCw, X, Send, ArrowLeft } from 'lucide-react';
+import { Plus, RefreshCw, X, Send, ArrowLeft, Activity } from 'lucide-react';
+import EmptyState from './shared/EmptyState';
 import SellerListView from './agent/SellerListView';
 import SimManagementView from './agent/SimManagementView';
 
@@ -378,54 +379,39 @@ export default function AgentDashboard({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/40">
-                  {[
-                    { id: '1', date: '2026/06/01', sellerName: 'محمد علي', operator: 'yemen_mobile', simsCount: 50, opType: 'توزيع شرياني/سيريال', status: 'success' },
-                    { id: '2', date: '2026/05/31', sellerName: 'متجر اتصالات الشرق', operator: 'you', simsCount: 30, opType: 'تحويل رصيد سيريال', status: 'success' },
-                    { id: '3', date: '2026/05/30', sellerName: 'خالد عمر', operator: 'sabafon', simsCount: 20, opType: 'تخصيص سيريال ICCID', status: 'success' },
-                    { id: '4', date: '2026/05/29', sellerName: 'محمد علي', operator: 'sabafon', simsCount: 15, opType: 'توزيع شرياني/سيريال', status: 'success' },
-                    { id: '5', date: '2026/05/28', sellerName: 'متجر اتصالات الشرق', operator: 'yemen_mobile', simsCount: 40, opType: 'توزيع شرياني/سيريال', status: 'success' },
-                    { id: '6', date: '2026/05/25', sellerName: 'خالد عمر', operator: 'you', simsCount: 10, opType: 'تحويل رصيد سيريال', status: 'failed' },
-                  ].map((op) => (
+                  {[].length > 0 ? [].map((op: any) => (
                     <tr key={op.id} className="hover:bg-slate-950/30 transition-colors">
-                      <td data-label="التاريخ" className="p-4 text-slate-400 font-medium">
-                        {op.date}
-                      </td>
-                      <td data-label="اسم البائع" className="p-4 font-bold text-slate-100">
-                        {op.sellerName}
-                      </td>
+                      <td data-label="التاريخ" className="p-4 text-slate-400 font-medium">{op.date}</td>
+                      <td data-label="اسم البائع" className="p-4 font-bold text-slate-100">{op.sellerName}</td>
                       <td data-label="المشغل" className="p-4">
-                        <span className={`badge ${
-                          op.operator === 'yemen_mobile' 
-                            ? 'badge-active' 
-                            : op.operator === 'you' 
-                            ? 'badge-pending' 
-                            : 'badge-available'
-                        }`}>
+                        <span className={`badge ${op.operator === 'yemen_mobile' ? 'badge-active' : op.operator === 'you' ? 'badge-pending' : 'badge-available'}`}>
                           {op.operator === 'yemen_mobile' ? 'يمن موبايل' : op.operator === 'you' ? 'YOU' : 'سبأفون'}
                         </span>
                       </td>
-                      <td data-label="عدد الشرائح" className="p-4 font-semibold text-slate-300 font-sans">
-                        {op.simsCount} شرائح
-                      </td>
-                      <td data-label="نوع العملية" className="p-4 text-slate-300 font-medium">
-                        {op.opType}
-                      </td>
+                      <td data-label="عدد الشرائح" className="p-4 font-semibold text-slate-300 font-sans">{op.simsCount} شرائح</td>
+                      <td data-label="نوع العملية" className="p-4 text-slate-300 font-medium">{op.opType}</td>
                       <td data-label="الحالة" className="p-4 text-center">
-                        <span className={`badge ${
-                          op.status === 'success'
-                            ? 'badge-success'
-                            : 'badge-failed'
-                        }`}>
+                        <span className={`badge ${op.status === 'success' ? 'badge-success' : 'badge-failed'}`}>
                           {op.status === 'success' ? 'ناجحة' : 'فشلت'}
                         </span>
                       </td>
                     </tr>
-                  ))}
+                  )) : (
+                    <tr>
+                      <td colSpan={6} className="p-8">
+                        <EmptyState
+                          icon={<Activity size={36} className="text-slate-600" />}
+                          title="لا توجد عمليات حديثة"
+                          description="عند تنفيذ أول عملية توزيع أو تفعيل، ستظهر هنا سجلات العمليات."
+                        />
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
             <div className="p-4 bg-slate-950/40 text-[10px] text-slate-500 flex justify-between items-center">
-              <span>آخر ٦ عمليات توزيع تمت بنجاح للوكيل الحالي</span>
+              <span>آخر العمليات المسجلة في النظام</span>
               <span>مزامنة مباشرة مع خادم يمن تليكوم</span>
             </div>
           </div>

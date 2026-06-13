@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { SIM, Agent, Seller, SystemAlert, Transaction, SystemSettings, ViewType } from '../types';
-import { INITIAL_SELLERS as ADMIN_SELLERS, INITIAL_AGENTS, INITIAL_SIMS as ADMIN_SIMS } from '../data';
 import { api } from '../api/client';
 import { captureError } from '../lib/monitor.ts';
 
@@ -13,9 +12,9 @@ function loadFromStorage<T>(key: string, fallback: T): T {
 }
 
 export function useManagerState(role: string | null) {
-  const [sims, setSims] = useState<SIM[]>(() => loadFromStorage('admin_sims', ADMIN_SIMS as SIM[]));
-  const [agents, setAgents] = useState<Agent[]>(() => loadFromStorage('admin_agents', INITIAL_AGENTS));
-  const [sellers, setSellers] = useState<Seller[]>(() => loadFromStorage('admin_sellers', ADMIN_SELLERS));
+  const [sims, setSims] = useState<SIM[]>(() => loadFromStorage('admin_sims', []));
+  const [agents, setAgents] = useState<Agent[]>(() => loadFromStorage('admin_agents', []));
+  const [sellers, setSellers] = useState<Seller[]>(() => loadFromStorage('admin_sellers', []));
   const [alerts, setAlerts] = useState<SystemAlert[]>(() => loadFromStorage('admin_alerts', []));
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [stats, setStats] = useState<any>({});
