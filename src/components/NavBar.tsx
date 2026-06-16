@@ -2,6 +2,7 @@ import React from 'react';
 import { Role } from '../types';
 import { Home, PlusCircle, UserPlus, Users, Cpu, UserCircle, LogOut } from 'lucide-react';
 import MobileBottomNav from './shared/MobileBottomNav';
+import ProfileAvatar from './shared/ProfileAvatar';
 
 interface NavBarProps {
   role: Role;
@@ -61,20 +62,17 @@ export default function NavBar({ role, activeTab, setActiveTab, username, onLogo
           </div>
 
           <div className="flex flex-col items-center px-4 py-5 bg-slate-950/30 rounded-2xl border border-slate-800/20 text-center shadow-md shadow-black/20">
-            <div className="w-14 h-14 rounded-full border-2 border-red-600 p-0.5 mb-3 overflow-hidden shadow-lg shadow-red-950/10">
-              <img loading="lazy"
-                alt={username}
-                src={
-                  isAgent
-                    ? 'https://lh3.googleusercontent.com/aida-public/AB6AXuC9hEiGBZLQzVZP4scYfo4sA80Ab8uKRYSP_bNQcLqRoHw4Q07TqXqRhc4tf_VN6dDT7rQDBO1BgNrEen7e8tNGT3o95su2G5mtFX7cjFo2-a7TpgqINjMwEygao3cgIyS24rfhdIip4JBZC3iQGMiEwtZaZRFf6MTaqnOuxp5Vt316wbaFNJ93vk8oE1fkjK-4P4-330UzYu28FQVb6yKEGG8KXvTC297y0K_P6zYIPvvn2Yi-p7wROhrchJY15Pdy0FoIZcH87v8'
-                    : 'https://lh3.googleusercontent.com/aida-public/AB6AXuCgz0srZX-fPTwrxphx6G-akOy2GKiaTrQYzHnp-47B3NYt2mOSmwRFetXfAXjkf47AGQwrVI7G6DK9bUagM6bRnQSANx7qimdKsdaA0EN8E6LCNHGgA8yQyx52j35ju6Koq_DAbeLPyKtMyX_V7FrARDH8pKlnSxB2D9iI7kriW-BylMZGFWZ513V_p0b7hFvnMxxpB13I9qjAgvyTY428duG4S_kNTi8m7wsUh-pcXE3VvCSRGQC5tXx87uBlg8XxFTURrPDKtKc'
-                }
-                className="w-full h-full rounded-full object-cover"
+            <div className="mb-3">
+              <ProfileAvatar
+                photo=""
+                name={username}
+                onPhotoChange={() => {}}
+                onPhotoDelete={() => {}}
+                size={56}
+                editable={false}
               />
             </div>
             <p className="font-bold text-sm text-slate-100">{username}</p>
-            <p className="text-[10px] text-slate-400 mt-0.5">{role === 'agent' ? 'الوكيل الإقليمي' : 'بائع معتمد'}</p>
-            <span className="text-[9px] font-mono font-bold bg-[#141d2e] border border-blue-900/30 text-blue-400 px-2 py-0.5 rounded-full mt-2">ID: 99283</span>
           </div>
 
           <nav className="space-y-1 bg-slate-950/20 rounded-2xl p-2 border border-slate-800/20">

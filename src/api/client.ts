@@ -2,7 +2,9 @@ import { tokenStorage } from '../services/tokenStorage.ts';
 import { captureTiming } from '../lib/monitor.ts';
 
 const isCapacitor = !!(window as any).Capacitor?.isNative;
-const API_BASE = isCapacitor || !import.meta.env.DEV
+const hostname = window.location.hostname;
+const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('10.') || hostname.startsWith('192.168.');
+const API_BASE = isCapacitor || (!import.meta.env.DEV && !isLocal)
   ? 'https://yemen-telecom-api.onrender.com/api'
   : '/api';
 
@@ -239,6 +241,22 @@ export const api = {
   getTransactions: () => request<any[]>('/admin/transactions'),
   getDuplicateIdentities: () => request<any[]>('/admin/duplicate-identities'),
   getAuditLogs: () => request<any[]>('/admin/audit-logs'),
+
+  // System: Backup
+  createBackup: () =>
+    request<{ success: boolean; filename: string; size: number; sizeFormatted: string; tables: number; records: number; downloadUrl: string }>('/admin/system/backup', { method: 'POST' }),
+  downloadBackup: (filename: string) =>
+    `${API_BASE}/admin/system/backup/download/${filename}`,
+
+  // System: Lockdown
+  toggleLockdown: () =>
+    request<{ success: boolean; locked: boolean; message: string }>('/admin/system/lockdown', { method: 'POST' }),
+  getLockdownStatus: () =>
+    request<{ locked: boolean }>('/admin/system/lockdown/status'),
+
+  // Account deletion
+  deleteAccount: () =>
+    request<{ success: boolean }>('/users/account', { method: 'DELETE' }),
 
   // Upload
   uploadFile,

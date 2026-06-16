@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, type FormEvent, type MouseEvent } from 're
 import { motion, AnimatePresence } from 'motion/react';
 import { Role } from '../types';
 import { Shield, User, Lock, Eye, EyeOff, ChevronLeft, Smartphone, Check } from 'lucide-react';
+import { useToast, ToastContainer } from '../hooks/useToast';
 
 interface LoginScreenProps {
   onLogin: (role: Role, username: string, password: string) => Promise<{ role: Role; commit: () => void } | null>;
@@ -33,13 +34,6 @@ const roleConfig: Record<Role, { label: string; gradient: string; btnClass: stri
   }
 };
 
-function detectRole(username: string): Role {
-  const clean = username.trim().toLowerCase();
-  if (clean === 'manager') return 'manager';
-  if (clean === 'agent') return 'agent';
-  return 'seller';
-}
-
 const ACCOUNTS_STORAGE_KEY = 'tele_recent_accounts';
 
 function getRecentUsernames(): string[] {
@@ -60,6 +54,7 @@ function removeUsername(u: string) {
 }
 
 export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScreenProps) {
+  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -76,8 +71,7 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
   const formRef = useRef<HTMLFormElement>(null);
   const abortRef = useRef(false);
 
-  const detected = detectRole(username);
-  const currentRole = roleConfig[detected];
+  const currentRole = roleConfig['manager'];
 
   useEffect(() => {
     if (recentAccounts.length > 0 && !username) {
@@ -104,7 +98,7 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
     saveUsername(clean);
     abortRef.current = false;
     try {
-      const result = await onLogin(detected, clean, password);
+      const result = await onLogin('manager', clean, password);
       if (abortRef.current) return;
       if (result) {
         setSuccess(true);
@@ -156,6 +150,7 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
       transition={{ duration: 0.4, ease: 'easeInOut' }}
       className={`min-h-dvh ${darkMode ? 'bg-[#0a0e1a]' : 'bg-gradient-to-br from-blue-50 via-white to-indigo-50'} flex flex-col relative overflow-hidden font-sans safe-bottom select-none`}
     >
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       {/* Ambient gradient orbs */}
       {darkMode && (
         <>
@@ -202,7 +197,7 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
         >
           يمن تليكوم
         </motion.h1>
-        {detected !== 'agent' && username.length > 2 && (
+        {username.length > 2 && (
           <motion.div
             initial={{ opacity: 0, y: -4, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -214,7 +209,7 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
             }}
           >
             <Shield size={12} />
-            تسجيل دخول كـ {currentRole.label}
+            {currentRole.label}
           </motion.div>
         )}
       </div>
@@ -309,8 +304,6 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
                       </span>
                     </div>
                     {recentAccounts.map((u) => {
-                      const r = detectRole(u);
-                      const c = roleConfig[r];
                       return (
                         <button
                           key={u}
@@ -318,12 +311,11 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
                           onMouseDown={() => selectRecent(u)}
                           className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-right cursor-pointer ${darkMode ? 'hover:bg-white/5 active:bg-white/10 border-b border-white/5 last:border-0' : 'hover:bg-gray-50 active:bg-gray-100 border-b border-gray-100 last:border-0'}`}
                         >
-                          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold" style={{ background: `${c.color}20`, color: c.color }}>
+                          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold" style={{ background: `${currentRole.color}20`, color: currentRole.color }}>
                             {u.charAt(0).toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className={`text-sm font-medium truncate ${darkMode ? 'text-white/80' : 'text-gray-800'}`}>{u}</div>
-                            <div className={`text-[10px] ${darkMode ? 'text-white/40' : 'text-gray-400'}`}>{c.label}</div>
                           </div>
                           <button
                             type="button"
@@ -354,7 +346,7 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
                 </label>
                 <button
                   type="button"
-                  onClick={() => alert('الرجاء مراجعة مدير النظام لإعادة تعيين كلمة المرور.')}
+                  onClick={() => toastInfo('الرجاء مراجعة مدير النظام لإعادة تعيين كلمة المرور.')}
                   disabled={isLoading || success}
                   className={`text-[11px] transition-colors cursor-pointer py-1 -my-1 disabled:opacity-40 disabled:cursor-not-allowed ${darkMode ? 'text-white/30 hover:text-white/50' : 'text-gray-400 hover:text-gray-600'}`}
                 >

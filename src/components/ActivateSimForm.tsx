@@ -1,9 +1,12 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Operator } from '../types';
+import { Operator, simProvider } from '../types';
 import { Check, Camera, RefreshCw, Save, X, Phone, User, Shield, CreditCard, Layers } from 'lucide-react';
 import CameraCapture, { DocumentCapture } from './shared/CameraCapture';
+import OperatorLogo from './shared/OperatorLogo';
 import { useOcr } from '../hooks/useOcr';
+import { useToast, ToastContainer } from '../hooks/useToast';
+import { api } from '../api/client';
 
 interface ActivateSimFormProps {
   onSimActivated: (simData: {
@@ -27,7 +30,9 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
   const [iccidCaptured, setIccidCaptured] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const { recognize, progress: ocrProgress } = useOcr();
+  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
 
   const handleNameCapture = useCallback(async (imageData: string) => {
     const name = await recognize(imageData);
@@ -42,35 +47,23 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
     switch (op) {
       case 'yemen_mobile':
         return {
-          colorClass: 'text-op-ym border-op-ym hover:border-op-ym hover:bg-op-ym/5',
           bgClass: 'bg-op-ym hover:bg-op-ym/90',
           ringClass: 'focus:border-op-ym focus:ring-op-ym',
-          glowColor: 'shadow-op-ym/20',
-          textColor: 'text-op-ym',
           borderColor: 'border-op-ym',
-          bgLight: 'bg-op-ym-light border-op-ym/30 text-op-ym',
           label: 'يمن موبايل'
         };
       case 'sabafon':
         return {
-          colorClass: 'text-op-sf border-op-sf hover:border-op-sf hover:bg-op-sf/5',
           bgClass: 'bg-op-sf hover:bg-op-sf/90',
           ringClass: 'focus:border-op-sf focus:ring-op-sf',
-          glowColor: 'shadow-op-sf/20',
-          textColor: 'text-op-sf',
           borderColor: 'border-op-sf',
-          bgLight: 'bg-op-sf-light border-op-sf/30 text-op-sf',
           label: 'سبأفون'
         };
       case 'you':
         return {
-          colorClass: 'text-op-you border-op-you hover:border-op-you hover:bg-op-you/5',
-          bgClass: 'bg-op-you hover:bg-op-you/90 text-[#1A1A1A]',
+          bgClass: 'bg-op-you hover:bg-op-you/90 text-you-text',
           ringClass: 'focus:border-op-you focus:ring-op-you',
-          glowColor: 'shadow-op-you/20',
-          textColor: 'text-op-you',
           borderColor: 'border-op-you',
-          bgLight: 'bg-op-you-light border-op-you/30 text-op-you',
           label: 'YOU'
         };
     }
@@ -90,28 +83,35 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
     setContractPhoto(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!fullName) {
-      alert('الرجاء إدخال اسم العميل الكامل');
+      toastWarning('الرجاء إدخال اسم العميل الكامل');
       return;
     }
     if (!idNumber) {
-      alert('الرجاء إدخال رقم الهوية للعميل');
+      toastWarning('الرجاء إدخال رقم الهوية للعميل');
       return;
     }
     if (!iccid) {
-      alert('الرجاء إدخال رقم شريحة الـ SIM (ICCID)');
+      toastWarning('الرجاء إدخال رقم شريحة الـ SIM (ICCID)');
       return;
     }
-    if (!phoneNumber) {
-      alert('الرجاء إدخال رقم هاتف التفعيل الجديد');
+    if (!phoneNumber || phoneNumber.length !== 9) {
+      toastWarning('الرجاء إدخال رقم هاتف صحيح مكون من 9 أرقام');
       return;
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
+    try {
+      await api.createOperation({
+        type: 'activate',
+        target: phoneNumber,
+        operator: simProvider(operator),
+        status: 'success',
+      });
+
       setIsSubmitting(false);
       onSimActivated({
         fullName,
@@ -123,13 +123,15 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
 
       setSuccessMsg(`تهانينا! تم تفعيل الشريحة رقم (${iccid}) بنجاح للشبكة المحددة وعميلها المتربط.`);
       handleClear();
-
-      setTimeout(() => setSuccessMsg(''), 3000);
-    }, 500);
+    } catch (err: any) {
+      setIsSubmitting(false);
+      toastError(err?.message || 'فشل تفعيل الشريحة. الرجاء المحاولة مرة أخرى.');
+    }
   };
 
   return (
     <div className="w-full max-w-2xl mx-auto bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl text-slate-100 font-sans">
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       
       {/* Form Header Title */}
       <div className="mb-6">
@@ -161,22 +163,16 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
           onClick={() => setOperator('yemen_mobile')}
           className={`relative flex flex-col items-center gap-2 p-4 border-2 rounded-2xl cursor-pointer transition-all duration-200 active:scale-[0.97] ${
             operator === 'yemen_mobile' 
-              ? 'bg-op-ym border-op-ym shadow-lg shadow-op-ym/30 scale-[1.02]' 
+              ? 'bg-op-ym border-op-ym shadow-lg scale-[1.02]' 
               : 'bg-slate-950 border-slate-800 hover:border-op-ym/60 hover:bg-op-ym-light/50'
            }`}
          >
-           <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 ${
-             operator === 'yemen_mobile' 
-               ? 'bg-white/20 text-white' 
-               : 'bg-op-ym text-white shadow-lg shadow-op-ym/20'
-           }`}>
-             <span className="material-symbols-outlined text-3xl">signal_cellular_alt</span>
-           </div>
+            <OperatorLogo provider="yemen_mobile" size="md" />
            <span className={`text-xs font-bold transition-colors duration-200 ${
              operator === 'yemen_mobile' ? 'text-white' : 'text-slate-100'
            }`}>يمن موبايل</span>
            {operator === 'yemen_mobile' && (
-             <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white text-op-ym rounded-full flex items-center justify-center text-[10px] border-2 border-op-ym shadow">
+              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white text-ym rounded-full flex items-center justify-center text-[10px] border-2 border-op-ym shadow">
                <Check size={10} strokeWidth={3} />
              </span>
           )}
@@ -187,22 +183,16 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
           onClick={() => setOperator('sabafon')}
           className={`relative flex flex-col items-center gap-2 p-4 border-2 rounded-2xl cursor-pointer transition-all duration-200 active:scale-[0.97] ${
             operator === 'sabafon' 
-              ? 'bg-op-sf border-op-sf shadow-lg shadow-op-sf/30 scale-[1.02]' 
+              ? 'bg-op-sf border-op-sf shadow-lg scale-[1.02]' 
               : 'bg-slate-950 border-slate-800 hover:border-op-sf/60 hover:bg-op-sf-light/50'
            }`}
          >
-           <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 ${
-             operator === 'sabafon' 
-               ? 'bg-white/20 text-white' 
-               : 'bg-op-sf text-white shadow-lg shadow-op-sf/20'
-           }`}>
-             <span className="material-symbols-outlined text-3xl">rss_feed</span>
-           </div>
+            <OperatorLogo provider="sabafon" size="md" />
            <span className={`text-xs font-bold transition-colors duration-200 ${
              operator === 'sabafon' ? 'text-white' : 'text-slate-100'
            }`}>سبأفون</span>
            {operator === 'sabafon' && (
-             <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white text-op-sf rounded-full flex items-center justify-center text-[10px] border-2 border-op-sf shadow">
+              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white text-sf rounded-full flex items-center justify-center text-[10px] border-2 border-op-sf shadow">
                <Check size={10} strokeWidth={3} />
              </span>
           )}
@@ -213,36 +203,23 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
           onClick={() => setOperator('you')}
           className={`relative flex flex-col items-center gap-2 p-4 border-2 rounded-2xl cursor-pointer transition-all duration-200 active:scale-[0.97] ${
             operator === 'you' 
-              ? 'bg-op-you border-op-you shadow-lg shadow-op-you/30 scale-[1.02]' 
+              ? 'bg-op-you border-op-you shadow-lg scale-[1.02]' 
               : 'bg-slate-950 border-slate-800 hover:border-op-you/60 hover:bg-op-you-light/50'
            }`}
          >
-           <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 ${
-             operator === 'you' 
-               ? 'bg-black/10 text-[#1A1A1A]' 
-               : 'bg-op-you text-[#1A1A1A] shadow-lg shadow-op-you/20'
-           }`}>
-             <span className="material-symbols-outlined text-3xl font-bold">sensors</span>
-           </div>
+            <OperatorLogo provider="you" size="md" />
            <span className={`text-xs font-bold transition-colors duration-200 ${
-             operator === 'you' ? 'text-[#1A1A1A]' : 'text-slate-100'
+              operator === 'you' ? 'text-you-text' : 'text-slate-100'
            }`}>YOU</span>
            {operator === 'you' && (
-             <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-[#1A1A1A] text-op-you rounded-full flex items-center justify-center text-[10px] border-2 border-op-you shadow">
+              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-you-text text-you rounded-full flex items-center justify-center text-[10px] border-2 border-op-you shadow">
                <Check size={10} strokeWidth={3} />
              </span>
           )}
         </div>
       </div>
 
-      {/* Styled Centered Divider */}
-      <div className="flex items-center gap-3 my-6">
-        <div className="h-[1px] flex-1 bg-slate-800"></div>
-        <h3 className={`text-xs font-bold px-4 tracking-wide uppercase ${brand.textColor}`}>
-          البيانات الشخصية والتعاقدية
-        </h3>
-        <div className="h-[1px] flex-1 bg-slate-800"></div>
-      </div>
+
 
       {/* Form Content */}
       <form onSubmit={handleSubmit} className="space-y-5">
@@ -296,7 +273,7 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
             <div className="flex flex-col gap-2">
               <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                 <CreditCard size={14} className="text-slate-500" />
-                رقم الهوية الوطنية / الإقامة
+                رقم الهوية الوطنية
               </label>
               <input
                 type="text"
@@ -321,7 +298,7 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
                   type="text"
                   value={iccid}
                   onChange={(e) => setIccid(e.target.value)}
-                  placeholder="89xxxxxxxxxxxxxxxx"
+                  placeholder="89967XXXXXXXXXXXX"
                   inputMode="numeric"
                   className={`input-field pl-20 bg-slate-900 border-slate-800 text-sm focus:outline-none focus:ring-1 ${brand.ringClass} font-sans`}
                   dir="ltr"
@@ -342,15 +319,36 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
                 <Phone size={14} className="text-slate-500" />
                 رقم الهاتف الجديد المراد تفعيله
               </label>
-              <input
-                type="tel"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="05xxxxxxxx"
-                className={`input-field bg-slate-900 border-slate-800 text-sm focus:outline-none focus:ring-1 ${brand.ringClass} font-sans`}
-                dir="ltr"
-                style={{ textAlign: 'right' }}
-              />
+              <div className="relative">
+                <input
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/[^\d]/g, '');
+                    if (v.length <= 9) {
+                      setPhoneNumber(v);
+                      if (v.length === 9) {
+                        setPhoneError('');
+                      } else if (v.length > 0) {
+                        setPhoneError('يجب أن يتكون الرقم من 9 أرقام');
+                      } else {
+                        setPhoneError('');
+                      }
+                    }
+                  }}
+                  placeholder="05xxxxxxxx"
+                  className={`input-field bg-slate-900 border-slate-800 text-sm focus:outline-none focus:ring-1 font-sans pl-12 ${phoneError ? 'border-red-500/50' : brand.ringClass}`}
+                  dir="ltr"
+                  style={{ textAlign: 'right' }}
+                  maxLength={9}
+                />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 font-mono">{phoneNumber.length}/9</span>
+              </div>
+              {phoneError && (
+                <span className="text-[10px] text-red-400 font-semibold flex items-center gap-1 mt-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500" /> {phoneError}
+                </span>
+              )}
             </div>
 
             {/* Contract Upload */}
@@ -400,7 +398,7 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`btn w-full md:w-auto text-xs shadow-md ${brand.bgClass} ${brand.glowColor} flex items-center justify-center gap-2`}
+              className={`btn w-full md:w-auto text-xs shadow-md ${brand.bgClass} flex items-center justify-center gap-2`}
             >
               {isSubmitting ? (
                 <>

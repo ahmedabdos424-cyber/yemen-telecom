@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { query } from '../db';
 import { requireRole } from '../middleware/auth';
 import { getPagination } from '../helpers';
+import { validate, createOperationSchema } from '../validation';
 
 const router = Router();
 
@@ -31,11 +32,8 @@ router.get('/', requireRole('manager', 'agent'), async (req: Request, res: Respo
   }
 });
 
-router.post('/', requireRole('manager', 'agent'), async (req: Request, res: Response) => {
+router.post('/', requireRole('manager', 'agent'), validate(createOperationSchema), async (req: Request, res: Response) => {
   const { type, target, operator, status } = req.body;
-  if (!type || !target) {
-    return res.status(400).json({ error: 'Type and target are required' });
-  }
   try {
     const opId = `op_${Date.now()}`;
     const now = new Date();

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Search, Cpu, X, Smartphone } from 'lucide-react';
 import { Sim } from '../../types';
 import EmptyState from '../shared/EmptyState';
+import OperatorLogo from '../shared/OperatorLogo';
 
 interface SimManagementViewProps {
   sims: Sim[];
@@ -10,7 +11,7 @@ interface SimManagementViewProps {
 }
 
 export default function SimManagementView({
-  sims,
+  sims = [],
   onUpdateSims
 }: SimManagementViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -30,9 +31,9 @@ export default function SimManagementView({
   }, {} as Record<string, { total: number; available: number; sold: number; reserved: number; allocated: number; damaged: number }>);
 
   const operatorsList = [
-    { key: 'yemen_mobile', name: 'يمن موبايل', iconColor: 'bg-op-ym-light op-ym border-op-ym', logo: 'YM' },
-    { key: 'you', name: 'YOU', iconColor: 'bg-op-you-light op-you border-op-you', logo: 'YOU' },
-    { key: 'sabafon', name: 'سبأفون', iconColor: 'bg-op-sf-light op-sf border-op-sf', logo: 'SF' }
+    { key: 'yemen_mobile', name: 'يمن موبايل', brandBg: 'bg-op-ym', brandBorder: 'border-op-ym', brandShadow: 'shadow-lg', brandText: 'text-white', brandInactiveHover: 'hover:border-op-ym/60 hover:bg-op-ym-light' },
+    { key: 'you', name: 'YOU', brandBg: 'bg-op-you', brandBorder: 'border-op-you', brandShadow: 'shadow-lg', brandText: 'text-you-text', brandInactiveHover: 'hover:border-op-you/60 hover:bg-op-you-light' },
+    { key: 'sabafon', name: 'سبأفون', brandBg: 'bg-op-sf', brandBorder: 'border-op-sf', brandShadow: 'shadow-lg', brandText: 'text-white', brandInactiveHover: 'hover:border-op-sf/60 hover:bg-op-sf-light' }
   ];
 
   const filtered = sims.filter(sim => {
@@ -77,30 +78,23 @@ export default function SimManagementView({
         {operatorsList.map(op => {
           const stat = computedStats[op.key] || { total: 0, available: 0, sold: 0, reserved: 0, allocated: 0, damaged: 0 };
           const consumptionRate = stat.total > 0 ? Math.round((stat.sold / stat.total) * 100) : 0;
-
+          const isActive = operatorFilter === op.key;
           return (
             <button
               key={op.key}
-              onClick={() => { setOperatorFilter(operatorFilter === op.key ? 'all' : op.key); setCurrentPage(1); }}
-              className={`flex-shrink-0 w-56 sm:w-64 bg-slate-900 border ${
-                operatorFilter === op.key ? 'border-red-500 shadow-md shadow-red-950/10' : 'border-slate-800'
-              } rounded-2xl p-4 text-right transition-all hover:border-slate-700`}
+              onClick={() => { setOperatorFilter(isActive ? 'all' : op.key); setCurrentPage(1); }}
+              className={`flex-shrink-0 w-56 sm:w-64 bg-slate-900 border-2 rounded-2xl p-4 text-right transition-all duration-200 active:scale-[0.98] ${isActive ? `${op.brandBorder} shadow-lg ${op.brandShadow}` : 'border-slate-800 hover:border-slate-600'}`}
             >
               <div className="flex justify-between items-start mb-3">
-                <div className={`w-9 h-9 rounded-xl ${op.iconColor} border flex items-center justify-center font-bold text-xs`}>
-                  {op.logo}
-                </div>
+                <OperatorLogo provider={op.key} size="md" />
                 <span className="text-[10px] text-slate-400 font-medium">معدل التوزيع: {consumptionRate}%</span>
               </div>
-              
               <h4 className="font-bold text-xs text-slate-100 pb-1">{op.name}</h4>
               <p className="text-xl font-bold text-slate-100 font-sans">{stat.total} <span className="text-[10px] text-slate-400 font-normal">شريحة</span></p>
-              
               <div className="w-full bg-slate-950 rounded-full h-1 mt-2.5 overflow-hidden">
-                <div className="bg-red-500 h-1 transition-all duration-500" style={{ width: `${consumptionRate}%` }} />
+                <div className={`h-1 transition-all duration-500 ${isActive ? op.brandBg : 'bg-slate-600'}`} style={{ width: `${consumptionRate}%` }} />
               </div>
-
-              <div className="flex justify-between items-center text-[10px] text-slate-400 font-sans mt-3">
+              <div className="flex items-center gap-4 text-[10px] text-slate-400 font-sans mt-3">
                 <span>متوفر بمستودعك: <strong className="text-emerald-400">{stat.available}</strong></span>
                 <span>مع البائعين: <strong className="text-blue-400">{stat.sold}</strong></span>
               </div>
@@ -127,24 +121,26 @@ export default function SimManagementView({
           )}
         </div>
 
-        <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
+        <div className="flex gap-2 w-full md:w-auto overflow-x-auto py-1" dir="rtl">
           <button
             onClick={() => { setOperatorFilter('all'); setCurrentPage(1); }}
-            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-colors ${
-              operatorFilter === 'all' ? 'bg-red-600/15 border-red-500/45 text-red-300' : 'bg-slate-950 border-slate-850 text-slate-400 hover:text-slate-100'
+            className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold border-2 transition-all duration-200 flex items-center gap-2 active:scale-[0.97] ${
+              operatorFilter === 'all' ? 'bg-red-600/15 border-red-500/45 text-red-400 shadow-sm' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-600 hover:text-slate-100'
             }`}
           >
-            الكل
+            <span className="material-symbols-outlined text-lg">apps</span>
+            <span>الكل</span>
           </button>
           {operatorsList.map(op => (
             <button
               key={op.key}
               onClick={() => { setOperatorFilter(op.key); setCurrentPage(1); }}
-              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-colors ${
-                operatorFilter === op.key ? op.iconColor : 'bg-slate-950 border-slate-850 text-slate-400'
+              className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold border-2 transition-all duration-200 flex items-center gap-2 active:scale-[0.97] ${
+                operatorFilter === op.key ? `${op.brandBg} ${op.brandBorder} ${op.brandShadow} ${op.brandText}` : `bg-slate-950 border-slate-800 text-slate-300 ${op.brandInactiveHover}`
               }`}
             >
-              {op.name}
+              <OperatorLogo provider={op.key} size="md" plain />
+              <span>{op.name}</span>
             </button>
           ))}
         </div>
@@ -163,10 +159,10 @@ export default function SimManagementView({
           <button
             key={tab.id}
             onClick={() => { setStatusFilter(tab.id); setCurrentPage(1); }}
-            className={`px-5 py-3 text-xs font-bold transition-all relative whitespace-nowrap ${
+            className={`px-5 py-3 text-xs font-bold transition-all duration-200 relative whitespace-nowrap ${
               statusFilter === tab.id
                 ? 'text-red-500 font-black border-b-2 border-red-600'
-                : 'text-slate-400 hover:text-white'
+                : 'text-slate-400 hover:text-slate-100'
             }`}
           >
             {tab.label}

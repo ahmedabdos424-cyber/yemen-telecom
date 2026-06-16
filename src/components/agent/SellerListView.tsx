@@ -5,8 +5,10 @@ import {
   Smartphone, Lock, MoreVertical, Check, Cpu, Trash2, UserX, Save, MapPin, Phone, User as UserIcon, Key
 } from 'lucide-react';
 import { Seller } from '../../types';
+import { useToast, ToastContainer } from '../../hooks/useToast';
 import ConfirmModal from '../shared/ConfirmModal';
 import EmptyState from '../shared/EmptyState';
+import profileImage from '../../assets/profile.png';
 import { api } from '../../api/client';
 
 interface SellerListViewProps {
@@ -20,7 +22,7 @@ interface SellerListViewProps {
 }
 
 export default function SellerListView({
-  sellers,
+  sellers = [],
   onAddSeller,
   onUpdateSellerStatus,
   onResetSellerPassword,
@@ -44,6 +46,8 @@ export default function SellerListView({
   const [editRegion, setEditRegion] = useState('');
   const [editSaving, setEditSaving] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
 
   // Compute stats for sellers
   const totalCount = sellers.length;
@@ -82,12 +86,13 @@ export default function SellerListView({
     if (onLockToggle) {
       onLockToggle(seller.id, lockState);
     } else {
-      alert(lockState ? `تم قفل الحساب المالي للمستخدم "${seller.name}" مؤقتاً!` : `تم فك قفل وسحب الحظر عن البائع "${seller.name}"!`);
+      toastSuccess(lockState ? `تم قفل الحساب المالي للمستخدم "${seller.name}" مؤقتاً!` : `تم فك قفل وسحب الحظر عن البائع "${seller.name}"!`);
     }
   };
 
   return (
     <div className="space-y-6 text-right">
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       
       {/* Stat Cards: Horizontal scroll on mobile, grid on desktop */}
       <div className="flex gap-4 overflow-x-auto pb-2 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:overflow-visible sm:pb-0 snap-x snap-mandatory scroll-smooth" dir="ltr">
@@ -198,8 +203,8 @@ export default function SellerListView({
                   return (
                     <tr key={seller.id} className="hover:bg-slate-955/15">
                       <td className="p-4 flex items-center gap-2.5">
-                        <div className="w-9 h-9 rounded-xl bg-slate-950 border border-slate-800/60 flex items-center justify-center font-bold text-slate-400">
-                          {seller.name.substring(0, 2)}
+                        <div className="w-9 h-9 rounded-xl bg-slate-950 border border-slate-800/60 overflow-hidden flex-shrink-0">
+                          <img src={profileImage} alt={seller.name} className="w-full h-full object-cover" />
                         </div>
                         <div>
                           <p className="font-bold text-slate-100 text-xs">{seller.name}</p>
@@ -262,7 +267,7 @@ export default function SellerListView({
 
                           <button
                             onClick={() => {
-                              alert(`الاسم: ${seller.name}\nالمتجر: ${seller.storeName}\nالرصيد المشحون: متوفر\nمعدل التشغيل: ممتاز`);
+                              toastInfo(`الاسم: ${seller.name} - المتجر: ${seller.storeName} - الرصيد المشحون: متوفر - معدل التشغيل: ممتاز`);
                             }}
                             className="btn-sm btn-ghost"
                           >
@@ -296,8 +301,8 @@ export default function SellerListView({
                     
                     {/* Header: Avatar + Name + Status */}
                     <div className="flex items-center gap-3 pt-1">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-600/20 to-red-800/10 border border-slate-700/50 flex items-center justify-center font-bold text-slate-300 text-sm flex-shrink-0">
-                        {seller.name.substring(0, 2)}
+                      <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 border border-slate-700/50">
+                        <img src={profileImage} alt={seller.name} className="w-full h-full object-cover" />
                       </div>
                       <div className="flex-1 min-w-0 text-right">
                         <h4 className="font-bold text-slate-100 text-sm truncate">{seller.name}</h4>
@@ -378,8 +383,8 @@ export default function SellerListView({
               {/* Seller Info Section — glass card */}
               <div className="mx-5 mb-4 p-4 bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 space-y-2.5">
                 <div className="flex items-center gap-3 pb-2 border-b border-slate-800/40">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-600/20 to-red-800/10 border border-slate-700/50 flex items-center justify-center font-bold text-slate-300 text-sm flex-shrink-0">
-                    {menuSeller.name.substring(0, 2)}
+                  <div className="w-10 h-10 rounded-xl overflow-hidden border border-slate-700/50 flex-shrink-0">
+                    <img src={profileImage} alt={menuSeller.name} className="w-full h-full object-cover" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-slate-100 truncate">{menuSeller.name}</p>
@@ -438,9 +443,9 @@ export default function SellerListView({
           setDeleteLoading(true);
           try {
             await onDeleteSeller(confirmDelete.id);
-            alert(`✅ تم حذف البائع "${confirmDelete.name}" بنجاح.`);
+            toastSuccess(`تم حذف البائع "${confirmDelete.name}" بنجاح.`);
           } catch {
-            alert('❌ فشل حذف البائع. تحقق من اتصال الخادم.');
+            toastError('فشل حذف البائع. تحقق من اتصال الخادم.');
           } finally {
             setDeleteLoading(false);
             setConfirmDelete(null);
@@ -463,9 +468,9 @@ export default function SellerListView({
           const statusLabel = newStatus === 'active' ? 'تفعيل' : 'تعطيل';
           try {
             onUpdateSellerStatus(confirmDisable.id, newStatus);
-            alert(`✅ تم ${statusLabel} حساب "${confirmDisable.name}" بنجاح.`);
+            toastSuccess(`تم ${statusLabel} حساب "${confirmDisable.name}" بنجاح.`);
           } catch {
-            alert(`❌ فشل ${statusLabel} الحساب. تحقق من اتصال الخادم.`);
+            toastError(`فشل ${statusLabel} الحساب. تحقق من اتصال الخادم.`);
           }
           setConfirmDisable(null);
         }}
@@ -550,7 +555,7 @@ export default function SellerListView({
                       if (onEditSeller) onEditSeller({ ...editModalSeller, name: editName.trim(), phone: editPhone.trim(), region: editRegion.trim() });
                       setEditModalSeller(null);
                     } catch (err) {
-                      alert('فشل تحديث بيانات البائع. تحقق من اتصال الخادم.');
+                      toastError('فشل تحديث بيانات البائع. تحقق من اتصال الخادم.');
                     } finally {
                       setEditSaving(false);
                     }
@@ -619,7 +624,7 @@ export default function SellerListView({
                     type="text"
                     value={allocFrom}
                     onChange={(e) => setAllocFrom(e.target.value.replace(/\D/g, ''))}
-                    placeholder="89961..."
+                    placeholder="89967XXXXXXXXXXXX"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs outline-none focus:border-red-600 transition-colors text-slate-200 font-sans"
                     dir="ltr"
                     style={{ textAlign: 'center' }}
@@ -632,7 +637,7 @@ export default function SellerListView({
                     type="text"
                     value={allocTo}
                     onChange={(e) => setAllocTo(e.target.value.replace(/\D/g, ''))}
-                    placeholder="89967..."
+                    placeholder="89967XXXXXXXXXXXX"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs outline-none focus:border-red-600 transition-colors text-slate-200 font-sans"
                     dir="ltr"
                     style={{ textAlign: 'center' }}
@@ -667,15 +672,15 @@ export default function SellerListView({
                       const from = parseInt(allocFrom);
                       const to = parseInt(allocTo);
                       if (!allocFrom || !allocTo || isNaN(from) || isNaN(to)) {
-                        alert('الرجاء إدخال نطاق أرقام صحيح');
+                        toastWarning('الرجاء إدخال نطاق أرقام صحيح');
                         return;
                       }
                       if (to < from) {
-                        alert('رقم (إلى) يجب أن يكون أكبر من أو يساوي رقم (من)');
+                        toastWarning('رقم (إلى) يجب أن يكون أكبر من أو يساوي رقم (من)');
                         return;
                       }
                       const count = to - from + 1;
-                      alert(`تم تخصيص ${count} شريحة من ${allocOp === 'yemen_mobile' ? 'يمن موبايل' : allocOp === 'sabafon' ? 'سبأفون' : 'YOU'} للبائع ${allocModalSeller.name}`);
+                      toastSuccess(`تم تخصيص ${count} شريحة من ${allocOp === 'yemen_mobile' ? 'يمن موبايل' : allocOp === 'sabafon' ? 'سبأفون' : 'YOU'} للبائع ${allocModalSeller.name}`);
                       setAllocModalSeller(null);
                       setAllocFrom('');
                       setAllocTo('');

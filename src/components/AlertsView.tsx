@@ -6,6 +6,7 @@
 import { useState, useMemo } from 'react';
 import { SystemAlert, SystemSettings } from '../types';
 import { CardSkeleton } from './shared/Skeleton';
+import { useToast, ToastContainer } from '../hooks/useToast';
 
 interface AlertsViewProps {
   alerts: SystemAlert[];
@@ -15,7 +16,7 @@ interface AlertsViewProps {
 }
 
 export default function AlertsView({
-  alerts,
+  alerts = [],
   onResolveAlert,
   settings,
   onUpdateSettings
@@ -23,6 +24,7 @@ export default function AlertsView({
   const [priorityFilter, setPriorityFilter] = useState<'all' | 'high' | 'medium'>('all');
   const [isVerifyingSecurity, setIsVerifyingSecurity] = useState(false);
   const [reorderLoaders, setReorderLoaders] = useState<Record<string, boolean>>({});
+  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
 
   const filteredAlerts = useMemo(() => alerts.filter((alert) => {
     if (priorityFilter === 'all') return true;
@@ -31,24 +33,31 @@ export default function AlertsView({
 
   const handleReorder = (alertId: string) => {
     setReorderLoaders((prev) => ({ ...prev, [alertId]: true }));
-    setTimeout(() => {
-      setReorderLoaders((prev) => ({ ...prev, [alertId]: false }));
+    try {
       onResolveAlert(alertId);
-      alert('تم معالجة التنبيه وإرسال طلب توريد شرائح تعويضية للفرع بنجاح!');
-    }, 500);
+      toastSuccess('تم معالجة التنبيه وإرسال طلب توريد شرائح تعويضية للفرع بنجاح!');
+    } catch {
+      toastError('فشل معالجة التنبيه');
+    } finally {
+      setReorderLoaders((prev) => ({ ...prev, [alertId]: false }));
+    }
   };
 
   const handleSecurityCheck = (alertId: string) => {
     setIsVerifyingSecurity(true);
-    setTimeout(() => {
-      setIsVerifyingSecurity(false);
+    try {
       onResolveAlert(alertId);
-      alert('اكتمل فحص بروتوكولات الأمان. تم تأمين العقدة بنجاح وتصفية التنبيه.');
-    }, 500);
+      toastSuccess('اكتمل فحص بروتوكولات الأمان. تم تأمين العقدة بنجاح وتصفية التنبيه.');
+    } catch {
+      toastError('فشل فحص الأمان');
+    } finally {
+      setIsVerifyingSecurity(false);
+    }
   };
 
   return (
     <div className="space-y-6">
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       {/* View Header row */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>

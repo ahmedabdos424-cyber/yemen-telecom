@@ -14,7 +14,7 @@ interface MobileBottomNavProps {
   badgeOnId?: string;
 }
 
-export default function MobileBottomNav({ items, activeId, onChange, badgeCount, badgeOnId }: MobileBottomNavProps) {
+export default function MobileBottomNav({ items = [], activeId, onChange, badgeCount, badgeOnId }: MobileBottomNavProps) {
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 shadow-[0_-4px_16px_rgba(0,0,0,0.15)] pb-[env(safe-area-inset-bottom)] nav-safe-bottom transition-all duration-200">
       <div className="max-w-7xl mx-auto h-14 px-1 flex justify-around items-center" dir="rtl">

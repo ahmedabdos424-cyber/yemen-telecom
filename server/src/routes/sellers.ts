@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { query, transaction } from '../db';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination } from '../helpers';
+import { validate, createSellerSchema, updateSellerSchema, updateSellerBalanceSchema } from '../validation';
 
 const router = Router();
 
@@ -108,14 +109,11 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post('/', requireRole('manager', 'agent'), async (req: Request, res: Response) => {
+router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), async (req: Request, res: Response) => {
   const {
     name, store_name, id_number, phone, region, region_code, status,
     username, password, agent_name
   } = req.body;
-  if (!name) {
-    return res.status(400).json({ error: 'Name is required' });
-  }
   try {
     // Support camelCase parameters
     const storeNameVal = store_name ?? req.body.storeName ?? '';
@@ -187,7 +185,7 @@ router.post('/', requireRole('manager', 'agent'), async (req: Request, res: Resp
   }
 });
 
-router.put('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
+router.put('/:id', requireRole('manager', 'agent'), validate(updateSellerSchema), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
     const existing = await query('SELECT * FROM sellers WHERE id = $1', [id]);
@@ -217,12 +215,9 @@ router.put('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, res
   }
 });
 
-router.put('/:id/balance', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
+router.put('/:id/balance', requireRole('manager', 'agent'), validate(updateSellerBalanceSchema), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   const { amount } = req.body;
-  if (amount === undefined || typeof amount !== 'number') {
-    return res.status(400).json({ error: 'Numeric amount is required' });
-  }
   try {
     const existing = await query('SELECT * FROM sellers WHERE id = $1', [id]);
     if (existing.rows.length === 0) {
@@ -284,7 +279,7 @@ router.delete('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, 
     if (seller.user_id) {
       await query('UPDATE users SET status = $1 WHERE id = $2', ['inactive', seller.user_id]);
     }
-    await query('DELETE FROM seller_sims WHERE seller_id = $1', [id]);
+    await query('UPDATE sims SET assigned_to = NULL, owner = $1 WHERE assigned_to = $2', ['المركز الرئيسي', id]);
     await query('DELETE FROM distribution_requests WHERE seller_id = $1', [id]);
     await query('UPDATE sellers SET status = $1 WHERE id = $2', ['deleted', id]);
     res.json({ message: 'Seller deleted successfully' });

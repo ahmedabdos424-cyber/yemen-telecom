@@ -1,5 +1,6 @@
+import path from 'path';
 import dotenv from 'dotenv';
-dotenv.config({ path: '.env' });
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
@@ -10,25 +11,37 @@ import { hashToken, isTokenBlacklisted } from '../middleware/auth';
 import { validate, loginSchema, refreshTokenSchema } from '../validation';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV !== 'production' ? crypto.randomBytes(64).toString('hex') : '');
-const REFRESH_SECRET = process.env.REFRESH_SECRET || (process.env.NODE_ENV !== 'production' ? crypto.randomBytes(64).toString('hex') : '');
+if (!process.env.JWT_SECRET || !process.env.REFRESH_SECRET) {
+  throw new Error('JWT_SECRET and REFRESH_SECRET environment variables are required');
+}
+const JWT_SECRET: string = process.env.JWT_SECRET;
+const REFRESH_SECRET: string = process.env.REFRESH_SECRET;
 
 router.post('/login', validate(loginSchema), async (req: Request, res: Response) => {
   const { username, password } = req.body;
+  console.log('[LOGIN] Step 1 — Request received', { username: username, passwordProvided: !!password, NODE_ENV: process.env.NODE_ENV, DB_HOST: process.env.DB_HOST, DB_USER: process.env.DB_USER, DB_NAME: process.env.DB_NAME, JWT_SECRET_set: !!process.env.JWT_SECRET });
   try {
+    console.log('[LOGIN] Step 2 — About to query DB for user', { username });
     const result = await query('SELECT * FROM users WHERE username = $1', [username]);
+    console.log('[LOGIN] Step 3 — Query completed', { rowCount: result.rows.length });
     if (result.rows.length === 0) {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
     const user = result.rows[0];
+    console.log('[LOGIN] Step 4 — User found', { id: user.id, role: user.role, hasPasswordHash: !!user.password_hash });
+    console.log('[LOGIN] Step 5 — About to compare password');
     const valid = await bcrypt.compare(password, user.password_hash);
+    console.log('[LOGIN] Step 6 — Password compared', { valid });
     if (!valid) {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
+    console.log('[LOGIN] Step 7 — Updating last_login');
     await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
+    console.log('[LOGIN] Step 8 — Generating JWT');
     const payload = { id: user.id, username: user.username, role: user.role };
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '24h', issuer: 'yemen-telecom', algorithm: 'HS256' });
     const refreshToken = jwt.sign(payload, REFRESH_SECRET, { expiresIn: '7d', issuer: 'yemen-telecom', algorithm: 'HS256' });
+    console.log('[LOGIN] Step 9 — Login complete, sending response');
     res.json({
       token,
       refreshToken,
@@ -41,9 +54,22 @@ router.post('/login', validate(loginSchema), async (req: Request, res: Response)
         region: user.region,
       },
     });
-  } catch (err) {
-    console.error('[LOGIN ERROR]:', err);
-    res.status(500).json({ error: 'Internal server error' });
+  } catch (err: any) {
+    console.error('[LOGIN ERROR]', {
+      message: err.message,
+      stack: err.stack,
+      code: err.code,
+      detail: err.detail,
+      name: err.name,
+    });
+    res.status(500).json({
+      error: 'Internal server error',
+      debug: {
+        message: err.message,
+        code: err.code,
+        name: err.name,
+      },
+    });
   }
 });
 

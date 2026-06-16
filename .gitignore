@@ -11,6 +11,7 @@ dist/
 firebase-service-account.json
 .domdump.txt
 android/app/release.keystore
+android/key.properties
 *.keystore
 *.jks
 keystore.properties

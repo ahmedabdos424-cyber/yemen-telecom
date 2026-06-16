@@ -38,6 +38,7 @@ export default function App() {
   const mgr = useManagerState(auth.role);
   const agt = useAgentSellerState(auth.role, auth.username);
 
+  const [dashboardSearch, setDashboardSearch] = useState('');
   const { role, username, darkMode, setDarkMode, isLoading, handleLogin, handleLogout, clearSession } = auth;
   const { setTokenWrapper } = auth;
   const isOnline = useNetworkStatus();
@@ -55,13 +56,13 @@ export default function App() {
     const renderAdminView = () => {
       switch (mgr.currentView) {
         case 'dashboard':
-          return <DashboardView stats={mgr.stats} alerts={mgr.alerts} transactions={mgr.transactions} sims={mgr.sims} setView={mgr.setView} />;
+          return <DashboardView stats={mgr.stats} alerts={mgr.alerts} transactions={mgr.transactions} sims={mgr.sims} setView={mgr.setView} onSearch={(q) => { setDashboardSearch(q); mgr.setView('sims'); }} onRefresh={mgr.refreshData} />;
         case 'sims':
-          return <SIMsView sims={mgr.sims} onAddSIM={mgr.handleAddSIM} />;
+          return <SIMsView sims={mgr.sims} onAddSIM={mgr.handleAddSIM} initialSearch={dashboardSearch} onUpdateSIM={mgr.handleUpdateSIM} />;
         case 'agents':
           return <AgentsView agents={mgr.agents} setView={mgr.setView} onUpdateAgent={mgr.handleUpdateAgent} />;
         case 'sellers':
-          return <SellersView sellers={mgr.sellers} sims={mgr.sims} onUpdateSeller={mgr.handleUpdateSeller} onAddBalance={mgr.handleAddBalance} />;
+          return <SellersView sellers={mgr.sellers} sims={mgr.sims} onUpdateSeller={mgr.handleUpdateSeller} onAddBalance={mgr.handleAddBalance} loading={mgr.loading} error={mgr.apiError} onRetry={mgr.refreshData} />;
         case 'alerts':
           return <AlertsView alerts={mgr.alerts} onResolveAlert={mgr.handleResolveAlert} settings={mgr.settings} onUpdateSettings={mgr.setSettings} />;
         case 'duplicate-identities':
@@ -101,7 +102,7 @@ export default function App() {
         {/* Toast notifications */}
         <div className="fixed top-20 left-4 z-40 w-full max-w-sm flex flex-col gap-3 pointer-events-none">
           <AnimatePresence>
-            {mgr.toasts.map((toast) => (
+            {(mgr.toasts ?? []).map((toast) => (
               <motion.div key={toast.id} initial={{ opacity: 0, x: -100, scale: 0.95 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -100, scale: 0.95 }} transition={{ duration: 0.3 }}
                 className="bg-slate-900/95 backdrop-blur border border-red-500/30 text-slate-100 rounded-xl p-4 shadow-xl pointer-events-auto flex flex-col gap-2 text-right">
                 <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-1.5">
@@ -109,16 +110,16 @@ export default function App() {
                     <span className="material-symbols-outlined text-sm">error</span>
                     <span>{toast.title}</span>
                   </div>
-                  <button onClick={() => {}} className="text-slate-500 hover:text-slate-100 transition-colors cursor-pointer">
+                  <button onClick={() => mgr.dismissToast(toast.id)} className="text-slate-500 hover:text-slate-100 transition-colors cursor-pointer">
                     <span className="material-symbols-outlined text-xs">close</span>
                   </button>
                 </div>
                 <p className="text-[11px] text-slate-300 leading-relaxed font-sans">{toast.message}</p>
                 <div className="flex justify-end gap-2 mt-1">
-                  <button onClick={() => { mgr.setView('duplicate-identities'); }} className="py-1 px-3 bg-[#b90e1a] hover:bg-red-700 text-white font-bold text-[10px] rounded-lg transition-colors cursor-pointer">
+                  <button onClick={() => { mgr.setView('duplicate-identities'); }} className="py-1 px-3 bg-secondary hover:bg-red-700 text-white font-bold text-[10px] rounded-lg transition-colors cursor-pointer">
                     شاشة مراقبة الهويات للتحقيق
                   </button>
-                  <button onClick={() => {}} className="py-1 px-2.5 bg-slate-800 hover:bg-slate-750 text-slate-300 font-medium text-[10px] rounded-lg transition-colors cursor-pointer">
+                  <button onClick={() => mgr.dismissToast(toast.id)} className="py-1 px-2.5 bg-slate-800 hover:bg-slate-750 text-slate-300 font-medium text-[10px] rounded-lg transition-colors cursor-pointer">
                     تجاهل
                   </button>
                 </div>
@@ -128,7 +129,7 @@ export default function App() {
         </div>
 
         <Suspense fallback={null}>
-          <BottomNav currentView={mgr.currentView} setView={mgr.setView} unresolvedAlertsCount={mgr.alerts.length} onLogout={handleLogout} />
+          <BottomNav currentView={mgr.currentView} setView={mgr.setView} unresolvedAlertsCount={(mgr.alerts ?? []).length} onLogout={handleLogout} />
         </Suspense>
       </div>
     );
@@ -137,7 +138,7 @@ export default function App() {
   // ===== AGENT / SELLER VIEW =====
   const renderRoleView = () => {
     if (role === 'agent') {
-      const agentSellers = agt.sellers.filter(s => s.agent_name === username);
+      const agentSellers = (agt.sellers ?? []).filter(s => s.agent_name === username);
       const sharedProps = {
         role: role as Role, activeTab: agt.activeTab, sellers: agentSellers, sims: agt.sims,
         inventories: agt.inventories,
@@ -167,13 +168,13 @@ export default function App() {
     } else if (role === 'seller') {
       switch (agt.activeTab) {
         case 'home':
-          return <SellerDashboard sellerData={agt.selfSellerData} sims={agt.sims.filter(s => s.status === 'available')} operations={agt.operations} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={() => {}} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} />;
+          return <SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? []).filter(s => s.status === 'available')} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={() => {}} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} />;
         case 'activate':
           return <ActivateSimForm onSimActivated={agt.handleSimActivationForSeller} />;
         case 'my_sims':
-          return <SellerDashboard sellerData={agt.selfSellerData} sims={agt.sims} operations={agt.operations} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={() => {}} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} />;
+          return <SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? [])} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={() => {}} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} />;
         case 'account':
-          return <SellerDashboard sellerData={agt.selfSellerData} sims={agt.sims} operations={agt.operations} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={() => {}} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} />;
+          return <SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? [])} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={() => {}} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} />;
         default:
           return null;
       }

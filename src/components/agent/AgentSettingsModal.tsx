@@ -270,7 +270,7 @@ export default function AgentSettingsModal({
                       setSettingsOpen(false);
                       setLogoutConfirmOpen(true);
                     }}
-                    className="w-full py-3 bg-[#b90e1a]/10 hover:bg-[#b90e1a] text-[#b90e1a] hover:text-white border border-[#b90e1a]/25 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                    className="w-full py-3 bg-secondary/10 hover:bg-secondary text-secondary hover:text-white border border-secondary/25 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
                   >
                     <LogOut size={13} />
                     <span>تسجيل الخروج من الحساب</span>
@@ -347,7 +347,7 @@ export default function AgentSettingsModal({
                       onLogout();
                     }
                   }}
-                  className="flex-1 py-3 bg-[#b90e1a] hover:bg-red-750 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer text-center"
+                  className="flex-1 py-3 bg-secondary hover:bg-red-750 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer text-center"
                 >
                   تسجيل الخروج
                 </button>

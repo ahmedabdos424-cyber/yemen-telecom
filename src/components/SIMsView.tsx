@@ -11,14 +11,19 @@ import CameraCapture from './shared/CameraCapture';
 import { StatsCardSkeleton } from './shared/Skeleton';
 import { useDebounce } from '../hooks/useDebounce';
 import { useOcr } from '../hooks/useOcr';
+import { useToast, ToastContainer } from '../hooks/useToast';
+import OperatorLogo from './shared/OperatorLogo';
 
 interface SIMsViewProps {
   sims: SIM[];
   onAddSIM: (sim: Partial<SIM>) => void;
+  initialSearch?: string;
+  onUpdateSIM?: (id: string, fields: Partial<SIM>) => void;
 }
 
-function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
-  const [searchTerm, setSearchTerm] = useState('');
+function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewProps) {
+  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
+  const [searchTerm, setSearchTerm] = useState(initialSearch || '');
   const debouncedSearch = useDebounce(searchTerm, 300);
   const [selectedProvider, setSelectedProvider] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
@@ -35,6 +40,36 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
   const [formProvider, setFormProvider] = useState<'Yemen Mobile' | 'Sabafon' | 'YOU'>('Yemen Mobile');
   const [formPackage, setFormPackage] = useState('باقة مزايا الشهرية');
   const [formOwner, setFormOwner] = useState('المركز الرئيسي');
+
+  const [selectedSimDetail, setSelectedSimDetail] = useState<SIM | null>(null);
+  const [selectedSimEdit, setSelectedSimEdit] = useState<SIM | null>(null);
+  const [editPhone, setEditPhone] = useState('');
+  const [editProvider, setEditProvider] = useState<'Yemen Mobile' | 'Sabafon' | 'YOU'>('Yemen Mobile');
+  const [editPackage, setEditPackage] = useState('');
+  const [editOwner, setEditOwner] = useState('');
+  const [editStatus, setEditStatus] = useState<'available' | 'sold' | 'reserved' | 'inactive'>('available');
+
+  const openEditModal = useCallback((sim: SIM) => {
+    setSelectedSimEdit(sim);
+    setEditPhone(sim.phone);
+    setEditProvider(sim.provider as 'Yemen Mobile' | 'Sabafon' | 'YOU');
+    setEditPackage(sim.packageType);
+    setEditOwner(sim.owner);
+    setEditStatus(sim.status as 'available' | 'sold' | 'reserved' | 'inactive');
+  }, []);
+
+  const handleEditSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedSimEdit || !onUpdateSIM) return;
+    onUpdateSIM(selectedSimEdit.id, {
+      phone: editPhone,
+      provider: editProvider,
+      packageType: editPackage,
+      owner: editOwner,
+      status: editStatus,
+    });
+    setSelectedSimEdit(null);
+  }, [selectedSimEdit, onUpdateSIM, editPhone, editProvider, editPackage, editOwner, editStatus]);
 
   // Camera capture states
   const [phoneCaptured, setPhoneCaptured] = useState(false);
@@ -76,9 +111,9 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
     const searchTokens = debouncedSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
     const matchesSearch = searchTokens.length === 0 || searchTokens.every(token => 
       sim.phone?.toLowerCase().includes(token) || 
-      sim.iccid.toLowerCase().includes(token) || 
-      sim.owner.toLowerCase().includes(token) || 
-      sim.packageType.toLowerCase().includes(token)
+      (sim.iccid ?? '').toLowerCase().includes(token) || 
+      (sim.owner ?? '').toLowerCase().includes(token) || 
+      (sim.packageType ?? '').toLowerCase().includes(token)
     );
 
     const matchesProvider = selectedProvider === 'all' || sim.provider === selectedProvider;
@@ -152,8 +187,10 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
     setCsvFile(file);
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const text = ev.target?.result as string;
-      const lines = text.split('\n').filter(line => line.trim());
+      const text = (ev.target?.result as string) ?? '';
+      if (!text) { setCsvPreview([]); return; }
+      const lines = text.split('\n').filter(line => (line ?? '').trim());
+      if (lines.length === 0) { setCsvPreview([]); return; }
       const records: Partial<SIM>[] = [];
       const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
       for (let i = 1; i < lines.length; i++) {
@@ -161,10 +198,11 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
         if (values.length < 2) continue;
         const record: Record<string, string> = {};
         headers.forEach((h, idx) => { record[h] = values[idx] || ''; });
+        const provider = record['provider'] || record['الشبكة'] || 'Yemen Mobile';
         records.push({
           phone: record['phone'] || record['رقم الهاتف'] || '',
           iccid: record['iccid'] || record['الرقم التسلسلي'] || '',
-          provider: (record['provider'] || record['الشبكة'] || 'Yemen Mobile') as any,
+          provider: (provider === 'Sabafon' || provider === 'YOU' ? provider : 'Yemen Mobile') as 'Yemen Mobile' | 'Sabafon' | 'YOU',
           packageType: record['package'] || record['package_type'] || record['الباقة'] || 'باقة مزايا الشهرية',
           owner: record['owner'] || record['المالك'] || 'المركز الرئيسي',
           status: 'available',
@@ -191,11 +229,12 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
     setCsvFile(null);
     setCsvPreview([]);
     setShowImportModal(false);
-    alert(`تم استيراد ${imported} شريحة بنجاح من ملف CSV.`);
+    toastSuccess(`تم استيراد ${imported} شريحة بنجاح من ملف CSV.`);
   }, [csvPreview, onAddSIM]);
 
   return (
     <div className="space-y-6">
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       {/* Header and Add Actions */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -234,7 +273,7 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <div className="stat-card stat-card-ym">
           <div className="flex justify-between items-start mb-2">
-            <span className="material-symbols-outlined op-ym bg-op-ym-light p-2 rounded-lg text-sm">sim_card</span>
+            <OperatorLogo provider="yemen_mobile" size="sm" />
             <span className="text-[11px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">+12%</span>
           </div>
           <p className="text-gray-400 text-[11px] font-bold">إجمالي الشرائح</p>
@@ -298,16 +337,40 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
           <div>
             <label className="block text-[11px] text-gray-400 font-bold mb-1">الشبكة المزودة</label>
-            <select
-              value={selectedProvider}
-              onChange={(e) => setSelectedProvider(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 text-xs py-2 px-3 rounded-lg cursor-pointer hover:bg-gray-100/75 text-gray-700 outline-none"
-            >
-              <option value="all">كل الشبكات</option>
-              <option value="Yemen Mobile">يمن موبايل (Yemen Mobile)</option>
-              <option value="Sabafon">سبأفون (Sabafon)</option>
-              <option value="YOU">يو (YOU)</option>
-            </select>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedProvider('all')}
+                className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold border-2 transition-all duration-200 flex items-center gap-2 active:scale-[0.97] ${selectedProvider === 'all' ? 'bg-gray-800 text-white border-gray-600 shadow-sm' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100 hover:border-gray-300'}`}
+              >
+                <span className="material-symbols-outlined text-lg">apps</span>
+                الكل
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedProvider('Yemen Mobile')}
+                className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold border-2 transition-all duration-200 flex items-center gap-2 active:scale-[0.97] ${selectedProvider === 'Yemen Mobile' ? 'bg-op-ym border-op-ym shadow-lg text-white' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-op-ym/60 hover:bg-op-ym-light'}`}
+              >
+                <OperatorLogo provider="Yemen Mobile" size="md" plain />
+                <span>يمن موبايل</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedProvider('Sabafon')}
+                className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold border-2 transition-all duration-200 flex items-center gap-2 active:scale-[0.97] ${selectedProvider === 'Sabafon' ? 'bg-op-sf border-op-sf shadow-lg text-white' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-op-sf/60 hover:bg-op-sf-light'}`}
+              >
+                <OperatorLogo provider="Sabafon" size="md" plain />
+                <span>سبأفون</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedProvider('YOU')}
+                className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold border-2 transition-all duration-200 flex items-center gap-2 active:scale-[0.97] ${selectedProvider === 'YOU' ? 'bg-op-you border-op-you shadow-lg text-you-text' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-op-you/60 hover:bg-op-you-light'}`}
+              >
+                <OperatorLogo provider="YOU" size="md" plain />
+                <span>YOU</span>
+              </button>
+            </div>
           </div>
 
           <div>
@@ -446,21 +509,17 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
             >
               <div className="flex justify-between items-start mb-3">
                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-[11px] text-white shrink-0 ${
-                    sim.provider === 'Yemen Mobile' ? 'bg-op-ym' : sim.provider === 'Sabafon' ? 'bg-op-sf' : 'bg-op-you'
-                  }`}>
-                    {sim.provider === 'Yemen Mobile' ? 'YM' : sim.provider === 'Sabafon' ? 'SF' : 'YOU'}
-                  </div>
+                  <OperatorLogo provider={sim.provider} size="sm" />
                   <div className="min-w-0">
                     <p className="text-xs font-bold text-gray-900 font-mono truncate">{highlightMatches(sim.phone, searchTerm)}</p>
                     <p className="text-[11px] text-gray-500 font-mono mt-0.5 truncate">{highlightMatches(sim.iccid, searchTerm)}</p>
                   </div>
                 </div>
                   <div className="flex items-center gap-1.5">
-                    <span className={`op-pill ${
+                    <span className={`op-pill flex items-center gap-1 ${
                       sim.provider === 'Yemen Mobile' ? 'op-pill-ym' : sim.provider === 'Sabafon' ? 'op-pill-sf' : 'op-pill-you'
                     }`}>
-                      {sim.provider === 'Yemen Mobile' ? 'YM' : sim.provider === 'Sabafon' ? 'SF' : 'YOU'}
+                      <OperatorLogo provider={sim.provider} size="sm" />
                     </span>
                     <span className={`badge ${
                       sim.status === 'available'
@@ -484,10 +543,20 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
                   </p>
                 </div>
                 <div className="flex gap-2 shrink-0">
-                  <button className="touch-target p-3 text-gray-600 hover:text-secondary bg-gray-100 rounded-xl transition-colors border border-gray-200 cursor-pointer">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSimDetail(sim)}
+                    className="touch-target p-3 text-gray-600 hover:text-secondary bg-gray-100 rounded-xl transition-colors border border-gray-200 cursor-pointer"
+                    title="عرض التفاصيل"
+                  >
                     <span className="material-symbols-outlined text-lg">visibility</span>
                   </button>
-                  <button className="touch-target p-3 text-gray-600 hover:text-secondary bg-gray-100 rounded-xl transition-colors border border-gray-200 cursor-pointer">
+                  <button
+                    type="button"
+                    onClick={() => openEditModal(sim)}
+                    className="touch-target p-3 text-gray-600 hover:text-secondary bg-gray-100 rounded-xl transition-colors border border-gray-200 cursor-pointer"
+                    title="تعديل الشريحة"
+                  >
                     <span className="material-symbols-outlined text-lg">edit_note</span>
                   </button>
                 </div>
@@ -527,7 +596,7 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
                     required
                     value={formPhone}
                     onChange={(e) => setFormPhone(e.target.value)}
-                    placeholder="مثال: 777112233"
+                    placeholder="7xxxxxx"
                     className="w-full pr-10 pl-12 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all font-mono"
                   />
                   <CameraCapture onCapture={handlePhoneCapture} />
@@ -547,7 +616,7 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
                     required
                     value={formIccid}
                     onChange={(e) => setFormIccid(e.target.value)}
-                    placeholder="89967000..."
+                    placeholder="89967XXXXXXXXXXXX"
                     className="w-full pr-10 pl-12 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all font-mono"
                   />
                   <CameraCapture onCapture={handleIccidCapture} />
@@ -563,7 +632,7 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
                   <label className="block text-[11px] font-bold text-gray-500 mb-1.5">الشبكة المزودة</label>
                   <select
                     value={formProvider}
-                    onChange={(e) => setFormProvider(e.target.value as any)}
+                    onChange={(e) => setFormProvider(e.target.value as 'Yemen Mobile' | 'Sabafon' | 'YOU')}
                     className="w-full px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs bg-white focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 outline-none cursor-pointer"
                   >
                     <option value="Yemen Mobile">يمن موبايل</option>
@@ -578,9 +647,8 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
                       type="text"
                       value={formPackage}
                       onChange={(e) => setFormPackage(e.target.value)}
-                      className="w-full pl-12 px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all"
+                      className="w-full px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all"
                     />
-                    <CameraCapture onCapture={(data) => { setFormPackage(''); }} />
                   </div>
                 </div>
               </div>
@@ -591,9 +659,8 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
                     type="text"
                     value={formOwner}
                     onChange={(e) => setFormOwner(e.target.value)}
-                    className="w-full pl-12 px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all"
+                    className="w-full px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all"
                   />
-                  <CameraCapture onCapture={(data) => { setFormOwner(''); }} />
                 </div>
               </div>
               <div className="flex gap-2 justify-end pt-4 border-t border-gray-100">
@@ -668,6 +735,155 @@ function SIMsView({ sims, onAddSIM }: SIMsViewProps) {
           </div>
         </div>
       )}
+      {/* SIM Detail Modal */}
+      {selectedSimDetail && (
+        <div className="fixed inset-0 bg-gray-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden text-right leading-relaxed animate-in fade-in zoom-in-95 duration-200 border border-gray-100/80">
+            <div className="px-6 py-4.5 bg-gray-50 border-b border-gray-150 flex justify-between items-center">
+              <button onClick={() => setSelectedSimDetail(null)} className="p-2 hover:bg-gray-150/70 rounded-full text-gray-400 hover:text-gray-700 transition-colors cursor-pointer">
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+              <h3 className="font-bold text-sm text-gray-800 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-sm text-primary">sim_card</span>
+                تفاصيل الشريحة
+              </h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[10px] text-gray-400 font-bold mb-1">رقم الهاتف</p>
+                  <p className="text-sm font-bold font-mono text-gray-900">{selectedSimDetail.phone}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-400 font-bold mb-1">ICCID</p>
+                  <p className="text-sm font-bold font-mono text-gray-900">{selectedSimDetail.iccid}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-400 font-bold mb-1">الشبكة</p>
+                  <p className="text-sm font-bold text-gray-900">{selectedSimDetail.provider}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-400 font-bold mb-1">الحالة</p>
+                  <span className={`badge ${selectedSimDetail.status === 'available' ? 'badge-available' : selectedSimDetail.status === 'sold' ? 'badge-sold' : selectedSimDetail.status === 'reserved' ? 'badge-reserved' : 'badge-inactive'}`}>
+                    {selectedSimDetail.status === 'available' ? 'متاح' : selectedSimDetail.status === 'sold' ? 'مباع' : selectedSimDetail.status === 'reserved' ? 'محجوز' : 'تالف'}
+                  </span>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-[10px] text-gray-400 font-bold mb-1">باقة البداية</p>
+                  <p className="text-sm font-bold text-gray-900">{selectedSimDetail.packageType}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-[10px] text-gray-400 font-bold mb-1">المالك</p>
+                  <p className="text-sm font-bold text-gray-900">{selectedSimDetail.owner}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-[10px] text-gray-400 font-bold mb-1">تاريخ الإضافة</p>
+                  <p className="text-sm font-bold text-gray-900">{selectedSimDetail.dateAdded}</p>
+                </div>
+              </div>
+              <div className="flex justify-end pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => { setSelectedSimDetail(null); openEditModal(selectedSimDetail); }}
+                  className="px-5 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:brightness-110 shadow-md active:scale-[0.98] transition-all cursor-pointer"
+                >
+                  تعديل الشريحة
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SIM Edit Modal */}
+      {selectedSimEdit && (
+        <div className="fixed inset-0 bg-gray-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md lg:max-w-lg overflow-hidden text-right leading-relaxed animate-in fade-in zoom-in-95 duration-200 border border-gray-100/80">
+            <div className="px-6 py-4.5 bg-gray-50 border-b border-gray-150 flex justify-between items-center">
+              <button onClick={() => setSelectedSimEdit(null)} className="p-2 hover:bg-gray-150/70 rounded-full text-gray-400 hover:text-gray-700 transition-colors cursor-pointer">
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+              <h3 className="font-bold text-sm text-gray-800 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-sm text-primary">edit_note</span>
+                تعديل الشريحة
+              </h3>
+            </div>
+            <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-[11px] font-bold text-gray-500 mb-1.5">رقم الهاتف</label>
+                <input
+                  type="text"
+                  required
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all font-mono"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-500 mb-1.5">الشبكة</label>
+                  <select
+                    value={editProvider}
+                    onChange={(e) => setEditProvider(e.target.value as 'Yemen Mobile' | 'Sabafon' | 'YOU')}
+                    className="w-full px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 outline-none cursor-pointer"
+                  >
+                    <option value="Yemen Mobile">يمن موبايل</option>
+                    <option value="Sabafon">سبأفون</option>
+                    <option value="YOU">يو</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-500 mb-1.5">الحالة</label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value as 'available' | 'sold' | 'reserved' | 'inactive')}
+                    className="w-full px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 outline-none cursor-pointer"
+                  >
+                    <option value="available">متاح</option>
+                    <option value="sold">مباع</option>
+                    <option value="reserved">محجوز</option>
+                    <option value="inactive">غير نشط</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-gray-500 mb-1.5">باقة البداية</label>
+                <input
+                  type="text"
+                  value={editPackage}
+                  onChange={(e) => setEditPackage(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-gray-500 mb-1.5">المالك</label>
+                <input
+                  type="text"
+                  value={editOwner}
+                  onChange={(e) => setEditOwner(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all"
+                />
+              </div>
+              <div className="flex gap-2 justify-end pt-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setSelectedSimEdit(null)}
+                  className="px-4 py-2 border border-gray-200 text-gray-700 bg-white hover:bg-gray-55/70 rounded-xl text-xs font-bold transition-all hover:border-gray-300 cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:brightness-110 shadow-md active:scale-[0.98] transition-all cursor-pointer"
+                >
+                  حفظ التعديلات
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* OCR Progress Overlay */}
       {ocrProgress.visible && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">

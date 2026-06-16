@@ -18,6 +18,8 @@ export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('[ErrorBoundary] Caught error:', error);
+    console.error('[ErrorBoundary] Component stack:', errorInfo.componentStack);
     captureError(error, `ErrorBoundary:${errorInfo.componentStack?.slice(0, 120)}`);
   }
 

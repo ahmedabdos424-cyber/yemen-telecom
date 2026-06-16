@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Seller, Operation, Sim } from '../types';
 import { api } from '../api/client';
+import { useToast, ToastContainer } from '../hooks/useToast';
 import SellerHome from './SellerHome';
 import SellerAccount from './SellerAccount';
 import SellerSimsView from './SellerSimsView';
@@ -28,8 +29,8 @@ interface SellerDashboardProps {
 
 export default function SellerDashboard({
   sellerData,
-  sims,
-  operations,
+  sims = [],
+  operations = [],
   activeTab,
   setActiveTab,
   onLogout,
@@ -40,6 +41,8 @@ export default function SellerDashboard({
   onUpdateSims
 }: SellerDashboardProps) {
   
+  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
+
   // Settings & Change Password modal state
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
@@ -90,10 +93,10 @@ export default function SellerDashboard({
 
   const handlePasswordChangeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!idNumberEntry) return alert('الرجاء إدخال رقم الهوية الخاصة بك للتحقق');
-    if (!newPassword || !confirmPassword) return alert('الرجاء تعبئة حقول كلمة المرور الجديدة');
-    if (newPassword !== confirmPassword) return alert('كلمتا المرور غير متطابقتين، الرجاء التحقق');
-    if (idNumberEntry !== sellerData.idNumber) return alert('رقم الهوية المدخل غير مطابق لهويتك المسجلة بالنظام');
+    if (!idNumberEntry) { toastWarning('الرجاء إدخال رقم الهوية الخاصة بك للتحقق'); return; }
+    if (!newPassword || !confirmPassword) { toastWarning('الرجاء تعبئة حقول كلمة المرور الجديدة'); return; }
+    if (newPassword !== confirmPassword) { toastWarning('كلمتا المرور غير متطابقتين، الرجاء التحقق'); return; }
+    if (idNumberEntry !== sellerData.idNumber) { toastWarning('رقم الهوية المدخل غير مطابق لهويتك المسجلة بالنظام'); return; }
 
     setIsChangingPass(true);
     try {
@@ -103,9 +106,9 @@ export default function SellerDashboard({
       setNewPassword('');
       setConfirmPassword('');
       setPasswordOpen(false);
-      alert('تم تحديث كلمة المرور الخاصة بك بنجاح!');
+      toastSuccess('تم تحديث كلمة المرور الخاصة بك بنجاح!');
     } catch (err: any) {
-      alert(err.message || 'فشل تحديث كلمة المرور. تحقق من اتصال الخادم.');
+      toastError(err?.message || 'فشل تحديث كلمة المرور. تحقق من اتصال الخادم.');
     } finally {
       setIsChangingPass(false);
     }
@@ -122,6 +125,7 @@ export default function SellerDashboard({
 
   return (
     <div className="space-y-6 lg:space-y-8 font-sans safe-bottom">
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       
       {activeTab === 'home' && (
         <SellerHome operations={operations} onNavigate={setActiveTab} />
@@ -417,7 +421,7 @@ export default function SellerDashboard({
                       setSettingsOpen(false);
                       setLogoutConfirmOpen(true);
                     }}
-                    className="w-full py-3 bg-[#b90e1a]/10 hover:bg-[#b90e1a] text-[#b90e1a] hover:text-white border border-[#b90e1a]/25 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-3 bg-secondary/10 hover:bg-secondary text-secondary hover:text-white border border-secondary/25 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <LogOut size={13} />
                     <span>تسجيل الخروج من الحساب</span>
@@ -489,7 +493,7 @@ export default function SellerDashboard({
                       onLogout();
                     }
                   }}
-                  className="flex-1 py-3 bg-[#b90e1a] hover:bg-red-750 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer text-center"
+                  className="flex-1 py-3 bg-secondary hover:bg-red-750 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer text-center"
                 >
                   تسجيل الخروج
                 </button>

@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { SIM, Agent, Seller, SystemAlert, Transaction, ViewType } from '../types';
+import OperatorLogo from './shared/OperatorLogo';
 
 interface DashboardViewProps {
   stats: {
@@ -23,39 +24,51 @@ interface DashboardViewProps {
   sims: SIM[];
   setView: (view: ViewType) => void;
   setSelectedEntity?: (entity: any) => void;
+  onSearch?: (query: string) => void;
+  onRefresh?: () => void;
 }
 
 export default function DashboardView({
   stats,
-  alerts,
-  transactions,
+  alerts = [],
+  transactions = [],
   sims,
   setView,
-  setSelectedEntity
+  setSelectedEntity,
+  onSearch,
+  onRefresh
 }: DashboardViewProps) {
   const s = {
-    total_sims: stats?.total_sims ?? 1240000,
-    sold_sims: stats?.sold_sims ?? 890200,
-    remaining_sims: stats?.remaining_sims ?? 349800,
-    active_sims: stats?.active_sims ?? 742000,
-    total_agents: stats?.total_agents ?? 142,
-    total_sellers: stats?.total_sellers ?? 3150,
-    sales_growth: stats?.sales_growth ?? 12.5,
-    sales_weekly: stats?.sales_weekly ?? 124500,
+    total_sims: stats?.total_sims ?? 0,
+    sold_sims: stats?.sold_sims ?? 0,
+    remaining_sims: stats?.remaining_sims ?? 0,
+    active_sims: stats?.active_sims ?? 0,
+    total_agents: stats?.total_agents ?? 0,
+    total_sellers: stats?.total_sellers ?? 0,
+    sales_growth: stats?.sales_growth ?? 0,
+    sales_weekly: stats?.sales_weekly ?? 0,
   };
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Search logic that searches through SIM ICCID, phone number or agent name
+  const handleSearch = () => {
+    if (searchQuery.trim() && onSearch) {
+      onSearch(searchQuery.trim());
+    } else {
+      setView('sims');
+    }
+  };
+
   const handleSearchKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      setView('sims'); // Forward search query context to SIM list
+      handleSearch();
     }
   };
 
   return (
     <div className="space-y-6">
-      {/* Search Input Bar */}
-      <div className="input-group shadow-sm">
+      <div className="flex items-center gap-2">
+        {/* Search Input Bar */}
+        <div className="input-group shadow-sm flex-1">
         <span className="material-symbols-outlined input-icon">
           search
         </span>
@@ -70,12 +83,21 @@ export default function DashboardView({
         {searchQuery && (
           <button 
             type="button"
-            onClick={() => setView('sims')}
+            onClick={handleSearch}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-secondary bg-red-100 hover:bg-red-200 px-3 py-2 rounded-lg transition-colors"
           >
             بحث متقدم
           </button>
         )}
+      </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          className="btn btn-ghost px-3 py-2 shrink-0"
+          title="تحديث البيانات"
+        >
+          <span className="material-symbols-outlined text-sm">refresh</span>
+        </button>
       </div>
 
       {/* Main Stats Bento Grid */}
@@ -245,9 +267,7 @@ export default function DashboardView({
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-secondary text-white font-bold text-sm flex items-center justify-center shadow-sm">
-                      YM
-                    </div>
+                    <OperatorLogo provider="yemen_mobile" size="md" />
                     <div>
                       <h4 className="font-bold text-xs text-gray-900">Yemen Mobile (يمن موبايل)</h4>
                       <p className="text-[11px] text-secondary font-bold">المزود الأكبر في السوق الوطنية</p>
@@ -264,9 +284,7 @@ export default function DashboardView({
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-blue-600 text-white font-bold text-sm flex items-center justify-center shadow-sm">
-                      S
-                    </div>
+                    <OperatorLogo provider="sabafon" size="md" />
                     <div>
                       <h4 className="font-bold text-xs text-gray-900">Sabafon (سبأفون)</h4>
                       <p className="text-[11px] text-blue-600 font-bold">نمو مستمر بقاعدة المشتركين</p>
@@ -276,6 +294,23 @@ export default function DashboardView({
                 </div>
                 <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                   <div className="h-full bg-blue-600 rounded-full transition-all" style={{ width: '42%' }}></div>
+                </div>
+              </div>
+
+              {/* YOU */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <OperatorLogo provider="you" size="md" />
+                    <div>
+                      <h4 className="font-bold text-xs text-gray-900">YOU (يو)</h4>
+                      <p className="text-[11px] text-amber-600 font-bold">شريحة الشباب والبيانات</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold font-mono">120,500 شريحة</span>
+                </div>
+                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-amber-400 rounded-full transition-all" style={{ width: '18%' }}></div>
                 </div>
               </div>
             </div>
@@ -309,7 +344,7 @@ export default function DashboardView({
                 <div>
                   <h4 className="font-bold text-xs text-gray-900">{tx.clientName}</h4>
                   <p className="text-[11px] text-gray-500 mt-1">
-                    {tx.provider === 'Yemen Mobile' ? 'يمن موبايل' : tx.provider === 'Sabafon' ? 'سبأفون' : 'YOU'} • {tx.simsCount.toLocaleString()} شريحة مخصصة
+                    {tx.provider === 'Yemen Mobile' ? 'يمن موبايل' : tx.provider === 'Sabafon' ? 'سبأفون' : 'YOU'} • {(tx.simsCount ?? 0).toLocaleString()} شريحة مخصصة
                   </p>
                 </div>
               </div>

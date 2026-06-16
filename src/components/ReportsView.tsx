@@ -4,28 +4,28 @@
  */
 
 import { useState } from 'react';
+import { useToast, ToastContainer } from '../hooks/useToast';
 
 export default function ReportsView() {
+  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
   const [operator, setOperator] = useState('الكل');
   const [region, setRegion] = useState('كافة المناطق');
   const [reportDate, setReportDate] = useState('2023-11-20');
 
   const downloads = [
-    { id: '1', title: 'ملخص مبيعات تعز الموزعة', file: 'PDF', date: '2023-11-20', maker: 'أحمد محمد' },
+    { id: '1', title: 'ملخص مبيعات تعز الموزعة', file: 'PDF', date: '2023-11-20', maker: '—' },
     { id: '2', title: 'جرد المستودع الرئيسي بالعقدة', file: 'XLS', date: '2023-11-20', maker: 'سارة خليل' },
     { id: '3', title: 'تقرير التدقيق الجغرافي السنوي', file: 'PDF', date: '2023-11-18', maker: 'نظام المراقبة' }
   ];
 
   const triggerExport = () => {
-    alert(`جاري تجهيز تقرير مخصص للشبكة: (${operator}) والمنطقة: (${region}) للتصدير بصيغة PDF...`);
-    setTimeout(() => {
-      alert('اكتمل التجهيز ومزامنة البيانات وتصدير الملف بنجاح!');
-    }, 500);
+    toastInfo(`تقرير مخصص للشبكة: (${operator}) والمنطقة: (${region}) — ميزة التصدير قيد التطوير`);
   };
 
   return (
     <div className="space-y-6">
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       {/* Top action metrics */}
       <div className="flex items-center gap-3">
         <button
@@ -156,7 +156,7 @@ export default function ReportsView() {
               </div>
             </div>
             <button
-              onClick={() => alert(`جاري تنزيل ملف ${dl.title} بصيغة .${dl.file.toLowerCase()}`)}
+              onClick={() => toastInfo(`جاري تنزيل ملف ${dl.title} بصيغة .${dl.file.toLowerCase()}`)}
               className="btn-icon text-gray-700 hover:text-secondary hover:bg-gray-50"
             >
               <span className="material-symbols-outlined text-xl">download</span>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Seller, Sim, Operation, OperatorInventory, Operator } from '../types';
 import { api } from '../api/client';
 import { captureError } from '../lib/monitor.ts';
+import { useMountedRef } from './useMountedRef';
 
 function loadFromStorage<T>(key: string, fallback: T): T {
   const saved = localStorage.getItem(key);
@@ -12,6 +13,7 @@ function loadFromStorage<T>(key: string, fallback: T): T {
 }
 
 export function useAgentSellerState(role: string | null, username: string) {
+  const mountedRef = useMountedRef();
   const [sellers, setSellers] = useState<Seller[]>(() => loadFromStorage('tele_sellers', []));
   const [sims, setSims] = useState<Sim[]>(() => loadFromStorage('tele_sims', []));
   const [operations, setOperations] = useState<Operation[]>(() => loadFromStorage('tele_operations', []));
@@ -37,71 +39,63 @@ export function useAgentSellerState(role: string | null, username: string) {
 
     try {
       const result = await api.createSeller({ ...data, agent_name: username });
-      const created = result.seller || result;
-      setSellers(prev => [created, ...prev]);
-      if (result.credentials) {
+      const created = result?.seller || result;
+      if (mountedRef.current) setSellers(prev => [created, ...prev]);
+      if (result?.credentials) {
         credUsername = result.credentials.username;
       }
-      setSellerCredentials({ username: credUsername, password: credPassword, sellerName, mode: 'create' });
+      if (mountedRef.current) setSellerCredentials({ username: credUsername, password: credPassword, sellerName, mode: 'create' });
       handleSetRoleTab('sellers');
     } catch (err) {
       captureError(err, 'handleAddSellerForAgent');
-      const message = err instanceof Error ? err.message : 'حدث خطأ غير متوقع';
-      alert(`فشل إنشاء البائع: ${message}\n\nيرجى التحقق من اتصال الخادم والمحاولة مرة أخرى.`);
     }
   };
 
   const handleTransferSimsForAgent = async (op: Operator, count: number, startSerial: string, endSerial: string, recipientName: string) => {
     try {
       await api.createOperation({
-        type: 'recharge', target: `#TRSF-${Math.floor(1000 + Math.random() * 9000)}`, operator: op, status: 'success',
+        type: 'recharge', target: `#TRSF-${Date.now()}`, operator: op, status: 'success',
       });
+      const updatedInv = await api.updateInventories([
+        { operator: op, available: 0, remaining: 0 }
+      ]);
+      if (mountedRef.current) setInventories(updatedInv);
     } catch (err) { captureError(err, 'handleTransferSimsForAgent'); }
 
-    setInventories(prev => prev.map(inv => {
-      if (inv.operator === op) {
-        return { ...inv, available: Math.max(0, inv.available - count), remaining: inv.remaining + count };
-      }
-      return inv;
-    }));
-
-    setSellers(prev => prev.map(s => {
+    if (mountedRef.current) setSellers(prev => prev.map(s => {
       if (s.name === recipientName) {
-        return { ...s, currentStock: (s.currentStock || 0) + count, simsCount: s.simsCount + count, efficiency: Math.min(100, (s.efficiency || 0) + 3) };
+        return { ...s, currentStock: (s.currentStock ?? 0) + count, simsCount: (s.simsCount ?? 0) + count, efficiency: Math.min(100, (s.efficiency ?? 0) + 3) };
       }
       return s;
     }));
-
-    const newSims: Sim[] = [];
-    for (let i = 0; i < Math.min(count, 5); i++) {
-      newSims.push({
-        id: `sim_gen_${Date.now()}_${i}`, iccid: `${startSerial.slice(0, 5)}...${String(Math.floor(Math.random() * 1000))}`,
-        provider: op === 'yemen_mobile' ? 'Yemen Mobile' : op === 'sabafon' ? 'Sabafon' : 'YOU',
-        category: 'Prepaid Secondary Range', status: 'available',
-        dateAdded: new Date().toISOString().split('T')[0].replace(/-/g, '/')
-      });
-    }
-    if (newSims.length > 0) setSims(prev => [...newSims, ...prev]);
   };
 
   const handleSimActivationForSeller = async (simData: { fullName: string; idNumber: string; iccid: string; phoneNumber: string; operator: Operator }) => {
-    const randomStatus: 'success' | 'failed' = Math.random() > 0.15 ? 'success' : 'failed';
     try {
-      await api.createOperation({ type: 'activate', target: simData.phoneNumber, operator: simData.operator, status: randomStatus });
-      const allSims = await api.getSims();
+      await api.createOperation({ type: 'activate', target: simData.phoneNumber, operator: simData.operator, status: 'success' });
+      const allSims = (await api.getSims()) ?? [];
       const target = allSims.find((s: any) => s.iccid === simData.iccid);
-      if (target) await api.updateSim(target.id, { status: 'sold' });
-    } catch (err) { captureError(err, 'handleSimActivationForSeller'); }
+      if (target) {
+        await api.updateSim(target.id, { status: 'sold' });
+      } else {
+        try {
+          await api.createSim({ iccid: simData.iccid, phone: simData.phoneNumber, provider: simData.operator === 'yemen_mobile' ? 'Yemen Mobile' : simData.operator === 'sabafon' ? 'Sabafon' : 'YOU', status: 'sold' });
+        } catch { /* sim may already exist */ }
+      }
+    } catch (err) {
+      captureError(err, 'handleSimActivationForSeller');
+      throw err;
+    }
 
-    setOperations(prev => [{
+    if (mountedRef.current) setOperations(prev => [{
       id: `op_act_${Date.now()}`, type: 'activate', target: simData.phoneNumber,
-      operator: simData.operator as any, date: new Date().toISOString().split('T')[0].replace(/-/g, '/'),
-      time: 'الآن', status: randomStatus
+      operator: simData.operator, date: new Date().toISOString().split('T')[0].replace(/-/g, '/'),
+      time: 'الآن', status: 'success'
     }, ...prev]);
 
     const toProvider = (o: Operator): 'Yemen Mobile' | 'Sabafon' | 'YOU' =>
       o === 'yemen_mobile' ? 'Yemen Mobile' : o === 'sabafon' ? 'Sabafon' : 'YOU';
-    setSims(prev => {
+    if (mountedRef.current) setSims(prev => {
       const match = prev.find(s => s.iccid === simData.iccid);
       if (match) return prev.map(s => s.iccid === simData.iccid ? { ...s, status: 'sold' as const } : s);
       return [{ id: `sim_act_${Date.now()}`, iccid: simData.iccid, provider: toProvider(simData.operator), category: 'Prepaid Mobile SIM', status: 'sold', dateAdded: new Date().toISOString().split('T')[0].replace(/-/g, '/') }, ...prev];
@@ -109,21 +103,26 @@ export function useAgentSellerState(role: string | null, username: string) {
   };
 
   const handleUpdateSellerStatusForAgent = (sellerId: string, status: 'active' | 'inactive') => {
-    setSellers(prev => prev.map(s => s.id === sellerId ? { ...s, status } : s));
+    if (mountedRef.current) setSellers(prev => prev.map(s => s.id === sellerId ? { ...s, status } : s));
     api.updateSeller(Number(sellerId), { status }).catch(err => {
       captureError(err, 'handleUpdateSellerStatusForAgent');
-      alert('فشل تحديث حالة البائع. تحقق من اتصال الخادم.');
     });
   };
 
   const handleEditSellerForAgent = async (seller: Seller) => {
-    setSellers(prev => prev.map(s => s.id === seller.id ? { ...s, name: seller.name, phone: seller.phone, region: seller.region } : s));
+    try {
+      const updated = await api.updateSeller(Number(seller.id), { name: seller.name, phone: seller.phone, region: seller.region });
+      if (mountedRef.current) setSellers(prev => prev.map(s => s.id === seller.id ? { ...s, ...updated } : s));
+    } catch (err) {
+      captureError(err, 'handleEditSellerForAgent');
+      throw err;
+    }
   };
 
   const handleDeleteSellerForAgent = async (sellerId: string): Promise<void> => {
     try {
       await api.deleteSeller(Number(sellerId));
-      setSellers(prev => prev.filter(s => s.id !== sellerId));
+      if (mountedRef.current) setSellers(prev => prev.filter(s => s.id !== sellerId));
     } catch (err) {
       captureError(err, 'handleDeleteSellerForAgent');
       throw err;
@@ -134,7 +133,7 @@ export function useAgentSellerState(role: string | null, username: string) {
     try {
       const seller = sellers.find(s => s.id === sellerId);
       const result = await api.resetSellerPassword(Number(sellerId));
-      setSellerCredentials({
+      if (mountedRef.current && result?.credentials) setSellerCredentials({
         username: result.credentials.username,
         password: result.credentials.password,
         sellerName: seller?.name || sellerId,
@@ -142,8 +141,6 @@ export function useAgentSellerState(role: string | null, username: string) {
       });
     } catch (err) {
       captureError(err, 'handleResetSellerPasswordForAgent');
-      const seller = sellers.find(s => s.id === sellerId);
-      alert(`تعذر إعادة تعيين كلمة المرور للبائع "${seller?.name}". تحقق من اتصال الخادم.`);
     }
   };
 

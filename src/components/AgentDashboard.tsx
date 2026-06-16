@@ -1,8 +1,11 @@
 import React, { useState, useMemo } from 'react';
+import { useToast, ToastContainer } from '../hooks/useToast';
+import OperatorLogo from './shared/OperatorLogo';
 import { motion, AnimatePresence } from 'motion/react';
 import { Seller, Sim, OperatorInventory, Operator, Role } from '../types';
 import { Plus, RefreshCw, X, Send, ArrowLeft, Activity } from 'lucide-react';
 import EmptyState from './shared/EmptyState';
+import profileImage from '../assets/profile.png';
 import SellerListView from './agent/SellerListView';
 import SimManagementView from './agent/SimManagementView';
 
@@ -32,9 +35,9 @@ interface AgentDashboardProps {
 export default function AgentDashboard({
   role,
   activeTab = 'home',
-  sellers,
-  sims,
-  inventories,
+  sellers = [],
+  sims = [],
+  inventories = [],
   onAddSeller,
   onActivateSim,
   onTransferSims,
@@ -113,9 +116,9 @@ export default function AgentDashboard({
         return i;
       });
       onUpdateInventories(updatedInventories);
-      alert(`تم تحديث بيانات المخزون لـ ${operatorName}.`);
+      toastSuccess(`تم تحديث بيانات المخزون لـ ${operatorName}.`);
     } catch {
-      alert('فشلت عملية تحديث المخزون. يرجى المحاولة لاحقاً.');
+      toastError('فشلت عملية تحديث المخزون. يرجى المحاولة لاحقاً.');
     } finally {
       setRefreshingOperator(null);
     }
@@ -135,27 +138,27 @@ export default function AgentDashboard({
   const handleTransferSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!transferOp) return alert('الرجاء اختيار شركة الاتصالات');
-    if (!startRange || !endRange) return alert('الرجاء إدخال نطاق الأرقام التسلسلية');
-    if (calculatedQty <= 0) return alert('الرجاء التأكد من صحة النطاق المدخل');
-    if (!targetSellerId) return alert('الرجاء تحديد البائع المستلم');
+    if (!transferOp) { toastWarning('الرجاء اختيار شركة الاتصالات'); return; }
+    if (!startRange || !endRange) { toastWarning('الرجاء إدخال نطاق الأرقام التسلسلية'); return; }
+    if (calculatedQty <= 0) { toastWarning('الرجاء التأكد من صحة النطاق المدخل'); return; }
+    if (!targetSellerId) { toastWarning('الرجاء تحديد البائع المستلم'); return; }
 
     const recipient = sellers.find(s => s.id === targetSellerId);
     if (!recipient) return;
 
     setIsTransferring(true);
-    setTimeout(() => {
-      setIsTransferring(false);
+    try {
       onTransferSims(transferOp, calculatedQty, startRange, endRange, recipient.name);
-      
-      // Reset Form and close modal
       setStartRange('');
       setEndRange('');
       setTargetSellerId('');
       setTransferModalOpen(false);
-
-      alert(`تم تحويل عدد ${calculatedQty} شريحة بنجاح إلى البائع ${recipient.name}.`);
-    }, 500);
+      toastSuccess(`تم تحويل عدد ${calculatedQty} شريحة بنجاح إلى البائع ${recipient.name}.`);
+    } catch {
+      toastError('فشل تحويل الشرائح. الرجاء المحاولة مرة أخرى.');
+    } finally {
+      setIsTransferring(false);
+    }
   };
 
   const handleOpenTransferWithSeller = (seller: Seller) => {
@@ -175,8 +178,11 @@ export default function AgentDashboard({
     setSellerActionsOpen(false);
   };
 
+  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
+
   return (
     <div dir="rtl" className="space-y-8 font-sans pb-16 safe-bottom">
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       
       {/* 1. Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-6">
@@ -184,9 +190,7 @@ export default function AgentDashboard({
           <h1 className="text-2xl font-bold text-slate-100 tracking-tight">
             {role === 'manager' 
               ? 'بوابة الرقابة والتحكم للمدير العام' 
-              : activeTab === 'sellers' 
-              ? 'إدارة الحسابات ورقابة البائعين' 
-              : 'إدارة مبيعات الوكيل'}
+              : ''}
           </h1>
 
         </div>
@@ -231,7 +235,7 @@ export default function AgentDashboard({
                 </p>
                 <button 
                   type="button" 
-                  onClick={() => alert('جاري معالجة قاعدة البيانات لتوليد التقرير المالي الموحد بصيغة PDF... تم الإرسال إلى بريدك المعتمد.')}
+                  onClick={() => toastInfo('جاري معالجة قاعدة البيانات لتوليد التقرير المالي الموحد بصيغة PDF... تم الإرسال إلى بريدك المعتمد.')}
                   className="btn btn-primary mt-3.5"
                 >
                   <span>تحميل التقرير الموحد لمبيعات الوكلاء</span>
@@ -246,7 +250,7 @@ export default function AgentDashboard({
                 {/* Quick action 1: تفعيل شريحة جديدة */}
                 <button
                   type="button"
-                  onClick={onActivateSim}
+                  onClick={() => onActivateSim?.()}
                   className="btn bg-gradient-to-r from-red-650/15 to-slate-900 border border-red-500/25 hover:border-red-500/50 p-4 rounded-xl flex items-center justify-between text-right cursor-pointer group transition-all"
                 >
                   <div className="flex items-center gap-3">
@@ -266,14 +270,13 @@ export default function AgentDashboard({
           )}
 
           {/* 3. Summary Cards for Operator Stock & Sellers Statistics */}
-          <h3 className="text-sm font-bold text-slate-300 pb-1 pt-4">مؤشرات الحصص وإحصائيات نقاط البيع</h3>
           <div className="snap-dashboard">
             {inventories.map((inv) => {
               const isYm = inv.operator === 'yemen_mobile' || inv.operator === 'Yemen Mobile';
               const isYou = inv.operator === 'you' || inv.operator === 'YOU';
-              const colorBorder = isYm ? 'border-op-ym' : isYou ? 'border-op-you' : 'border-op-sf';
-              const colorText = isYm ? 'op-ym' : isYou ? 'op-you' : 'op-sf';
-              const bgBadge = isYm ? 'bg-op-ym-light' : isYou ? 'bg-op-you-light' : 'bg-op-sf-light';
+              const colorBorder = isYm ? 'border-red-500' : isYou ? 'border-amber-400' : 'border-blue-500';
+              const colorText = isYm ? 'text-red-400' : isYou ? 'text-amber-400' : 'text-blue-400';
+              const bgBadge = isYm ? 'bg-red-950/40' : isYou ? 'bg-amber-950/40' : 'bg-blue-950/40';
               const badgeText = isYm ? 'يمن موبايل' : isYou ? 'YOU' : 'سبأفون';
 
               return (
@@ -281,9 +284,7 @@ export default function AgentDashboard({
                   <div>
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-2">
-                        <div className={`w-9 h-9 rounded-xl ${bgBadge} flex items-center justify-center shadow-lg shadow-black/20`}>
-                          <span className="material-symbols-outlined text-slate-100 text-[18px]">signal_cellular_alt</span>
-                        </div>
+                        <OperatorLogo provider={inv.operator} size="md" />
                         <span className="font-bold text-slate-100 text-sm">{badgeText}</span>
                       </div>
                     </div>
@@ -411,8 +412,6 @@ export default function AgentDashboard({
               </table>
             </div>
             <div className="p-4 bg-slate-950/40 text-[10px] text-slate-500 flex justify-between items-center">
-              <span>آخر العمليات المسجلة في النظام</span>
-              <span>مزامنة مباشرة مع خادم يمن تليكوم</span>
             </div>
           </div>
         </>
@@ -483,7 +482,7 @@ export default function AgentDashboard({
                         value={endRange}
                         onChange={(e) => setEndRange(e.target.value.replace(/\D/g, ''))}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-center outline-none focus:border-red-650 transition-colors font-sans"
-                        placeholder="89967..."
+                        placeholder="89967XXXXXXXXXXXX"
                       />
                     </div>
 
@@ -494,7 +493,7 @@ export default function AgentDashboard({
                         value={startRange}
                         onChange={(e) => setStartRange(e.target.value.replace(/\D/g, ''))}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-center outline-none focus:border-red-650 transition-colors font-sans"
-                        placeholder="89961..."
+                        placeholder="89967XXXXXXXXXXXX"
                       />
                     </div>
                   </div>
@@ -618,11 +617,7 @@ export default function AgentDashboard({
               {/* Profile card avatar content */}
               <div className="flex flex-col items-center mb-6">
                 <div className="w-24 h-24 rounded-full border-4 border-slate-850 shadow-md overflow-hidden bg-slate-950 mb-3 flex items-center justify-center">
-                  {selectedSeller.avatar ? (
-                    <img loading="lazy" src={selectedSeller.avatar} alt={selectedSeller.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="material-symbols-outlined text-4xl text-slate-600">store</span>
-                  )}
+                  <img loading="lazy" src={selectedSeller.avatar || profileImage} alt={selectedSeller.name} className="w-full h-full object-cover" />
                 </div>
                 <h4 className="font-bold text-lg text-slate-100">{selectedSeller.name}</h4>
                 <p className="text-xs text-slate-400 mt-1">{selectedSeller.storeName}</p>

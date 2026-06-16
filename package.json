@@ -39,10 +39,12 @@
     "sharp": "^0.34.5",
     "tesseract.js": "^7.0.0",
     "uuid": "^14.0.0",
-    "vite": "^6.2.3"
+    "vite": "^6.2.3",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.1",
+    "@capacitor/keyboard": "^8.0.1"
   },
   "devDependencies": {
-    "@capacitor/preferences": "^8.0.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/bcrypt": "^6.0.0",

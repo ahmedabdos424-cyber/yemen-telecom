@@ -1,9 +1,13 @@
 import { useState, useRef, type ChangeEvent, type FormEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Seller } from '../types';
+import ProfileAvatar from './shared/ProfileAvatar';
+import { useToast, ToastContainer } from '../hooks/useToast';
+import { api } from '../api/client';
 import {
   User, MapPin, TrendingUp, Smartphone, Layers, Award, Activity, Lock, Camera,
-  LogOut, ChevronLeft, X, Image, Clock, Settings
+  LogOut, ChevronLeft, X, Image, Settings, Palette, Sun, Moon, Type, Shield,
+  ShieldAlert, Fingerprint, Bell, Cpu, Check, Trash2
 } from 'lucide-react';
 
 interface SellerAccountProps {
@@ -19,16 +23,56 @@ export default function SellerAccount({
   sellerData, darkMode, setDarkMode,
   onPasswordChanged, onConfirmLogout, onLogout
 }: SellerAccountProps) {
+  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
-  const [idNumberEntry, setIdNumberEntry] = useState('');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsLogoutConfirmOpen, setSettingsLogoutConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [currentPasswordInput, setCurrentPasswordInput] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isChangingPass, setIsChangingPass] = useState(false);
+  const [fontSize, setFontSizeState] = useState<'sm' | 'base' | 'lg'>(() => {
+    return (localStorage.getItem('tele_font_size') as 'sm' | 'base' | 'lg') || 'base';
+  });
+  const [simNotifications, setSimNotifications] = useState<boolean>(() => {
+    return localStorage.getItem('tele_sim_notifications') !== 'false';
+  });
+  const [lowStockNotifications, setLowStockNotifications] = useState<boolean>(() => {
+    return localStorage.getItem('tele_low_stock_notifications') !== 'false';
+  });
+  const [biometricEnabled, setBiometricEnabled] = useState<boolean>(() => {
+    return localStorage.getItem('tele_biometric_enabled') === 'true';
+  });
+
+  const setFontSize = (size: 'sm' | 'base' | 'lg') => {
+    setFontSizeState(size);
+    localStorage.setItem('tele_font_size', size);
+  };
+
+  const handleToggleSimNotifications = () => {
+    const val = !simNotifications;
+    setSimNotifications(val);
+    localStorage.setItem('tele_sim_notifications', String(val));
+  };
+
+  const handleToggleLowStockNotifications = () => {
+    const val = !lowStockNotifications;
+    setLowStockNotifications(val);
+    localStorage.setItem('tele_low_stock_notifications', String(val));
+  };
+
+  const handleToggleBiometric = () => {
+    const val = !biometricEnabled;
+    setBiometricEnabled(val);
+    localStorage.setItem('tele_biometric_enabled', String(val));
+  };
 
   const [sellerPhoto, setSellerPhoto] = useState(
-    sellerData.avatar || 'https://lh3.googleusercontent.com/aida-public/AB6AXuCgz0srZX-fPTwrxphx6G-akOy2GKiaTrQYzHnp-47B3NYt2mOSmwRFetXfAXjkf47AGQwrVI7G6DK9bUagM6bRnQSANx7qimdKsdaA0EN8E6LCNHGgA8yQyx52j35ju6Koq_DAbeLPyKtMyX_V7FrARDH8pKlnSxB2D9iI7kriW-BylMZGFWZ513V_p0b7hFvnMxxpB13I9qjAgvyTY428duG4S_kNTi8m7wsUh-pcXE3VvCSRGQC5tXx87uBlg8XxFTURrPDKtKc'
+    sellerData.avatar || ''
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -59,33 +103,44 @@ export default function SellerAccount({
     }
   };
 
-  const handlePasswordChangeSubmit = (e: FormEvent) => {
+  const handlePasswordChangeSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!idNumberEntry) return alert('الرجاء إدخال رقم الهوية الخاصة بك للتحقق');
-    if (!newPassword || !confirmPassword) return alert('الرجاء تعبئة حقول كلمة المرور الجديدة');
-    if (newPassword !== confirmPassword) return alert('كلمتا المرور غير متطابقتين، الرجاء التحقق');
-    if (idNumberEntry !== sellerData.idNumber) return alert('رقم الهوية المدخل غير مطابق لهويتك المسجلة بالنظام');
+    if (!currentPasswordInput) { toastWarning('الرجاء إدخال كلمة المرور الحالية للتحقق'); return; }
+    if (!newPassword || !confirmPassword) { toastWarning('الرجاء تعبئة حقول كلمة المرور الجديدة'); return; }
+    if (newPassword !== confirmPassword) { toastWarning('كلمتا المرور غير متطابقتين، الرجاء التحقق'); return; }
 
     setIsChangingPass(true);
-    setTimeout(() => {
+    try {
+      await api.updatePassword(currentPasswordInput, newPassword);
       setIsChangingPass(false);
       onPasswordChanged(newPassword);
-      setIdNumberEntry('');
+      setCurrentPasswordInput('');
       setNewPassword('');
       setConfirmPassword('');
       setPasswordOpen(false);
-      alert('تم تحديث كلمة المرور الخاصة بك بنجاح!');
-    }, 500);
+      toastSuccess('تم تحديث كلمة المرور الخاصة بك بنجاح!');
+    } catch (err: any) {
+      setIsChangingPass(false);
+      toastError(err?.message || 'فشل تحديث كلمة المرور. الرجاء المحاولة مرة أخرى.');
+    }
   };
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 font-sans pb-24" dir="rtl">
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
       {/* Page Header */}
       <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 text-center relative overflow-hidden">
         <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-r from-red-950/20 to-transparent" />
-        {/* Header Actions: Dark Mode */}
-        <div className="absolute top-4 right-4 z-20">
+        {/* Header Actions: Dark Mode + Settings */}
+        <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            className="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/50 flex items-center justify-center text-slate-400 hover:text-blue-400 transition-all"
+          >
+            <Settings size={16} />
+          </button>
           <button
             type="button"
             onClick={() => setDarkMode(!darkMode)}
@@ -96,25 +151,16 @@ export default function SellerAccount({
             </span>
           </button>
         </div>
-        <div className="relative z-10">
-          <div className="w-24 h-24 rounded-full border-4 border-slate-800 mx-auto mb-4 overflow-hidden shadow-xl shadow-black/30 relative">
-            {sellerPhoto ? (
-              <img loading="lazy" src={sellerPhoto} alt={sellerData.name} className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full bg-slate-800 flex items-center justify-center">
-                <User size={32} className="text-slate-500" />
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={() => setPhotoModalOpen(true)}
-              className="absolute -top-1 -right-1 w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-500 border-2 border-slate-900 flex items-center justify-center text-white shadow-lg transition-all cursor-pointer z-10"
-            >
-              <Camera size={14} />
-            </button>
-          </div>
+        <div className="relative z-10 flex flex-col items-center">
+          <ProfileAvatar
+            photo={sellerPhoto}
+            name={sellerData.name}
+            onPhotoChange={(dataUrl) => { setSellerPhoto(dataUrl); setPhotoModalOpen(false); }}
+            onPhotoDelete={handleDeleteSellerPhoto}
+            size={120}
+            className="mb-4"
+          />
           <h2 className="text-xl font-bold text-slate-100">{sellerData.name}</h2>
-          <p className="text-xs text-red-400 font-bold mt-1">بائع معتمد</p>
           <div className="flex items-center justify-center gap-2 mt-2">
             <MapPin size={12} className="text-slate-500" />
             <span className="text-xs text-slate-400">منطقة: {sellerData.region}</span>
@@ -127,88 +173,91 @@ export default function SellerAccount({
       </div>
 
       {/* Basic Data Card */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5">
-        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-800/60">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5">
+        <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-800/60">
           <User size={14} className="text-red-500" />
           <h3 className="text-xs font-bold text-slate-100">البيانات الأساسية</h3>
         </div>
-        <div className="space-y-3 text-xs">
-          <div className="flex justify-between items-center py-2 border-b border-slate-800/30">
-            <span className="text-slate-400">اسم البائع</span>
-            <span className="text-slate-100 font-bold">{sellerData.name}</span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <div className="bg-slate-950/50 border border-slate-800/40 rounded-2xl p-3 sm:p-4">
+            <span className="text-slate-500 text-[10px]">اسم البائع</span>
+            <p className="text-slate-100 font-bold mt-1 truncate">{sellerData.name}</p>
           </div>
-          <div className="flex justify-between items-center py-2 border-b border-slate-800/30">
-            <span className="text-slate-400">اسم المحل</span>
-            <span className="text-slate-100 font-bold">{sellerData.storeName || '---'}</span>
+          <div className="bg-slate-950/50 border border-slate-800/40 rounded-2xl p-3 sm:p-4">
+            <span className="text-slate-500 text-[10px]">اسم المحل</span>
+            <p className="text-slate-100 font-bold mt-1 truncate">{sellerData.storeName || '---'}</p>
           </div>
-          <div className="flex justify-between items-center py-2 border-b border-slate-800/30">
-            <span className="text-slate-400">رقم الهوية</span>
-            <span className="text-slate-100 font-mono font-bold bg-slate-950 px-2 py-0.5 rounded border border-slate-800">{sellerData.idNumber || '---'}</span>
+          <div className="bg-slate-950/50 border border-slate-800/40 rounded-2xl p-3 sm:p-4">
+            <span className="text-slate-500 text-[10px]">رقم الهوية</span>
+            <p className="text-slate-100 font-mono font-bold mt-1 truncate bg-slate-950 px-2 py-1 rounded border border-slate-800 inline-block">{sellerData.idNumber || '---'}</p>
           </div>
-          <div className="flex justify-between items-center py-2 border-b border-slate-800/30">
-            <span className="text-slate-400">رقم التواصل</span>
-            <span className="text-slate-100 font-mono font-bold" dir="ltr">{sellerData.phone}</span>
+          <div className="bg-slate-950/50 border border-slate-800/40 rounded-2xl p-3 sm:p-4">
+            <span className="text-slate-500 text-[10px]">رقم التواصل</span>
+            <p className="text-slate-100 font-mono font-bold mt-1" dir="ltr">{sellerData.phone}</p>
           </div>
-          <div className="flex justify-between items-center py-2 border-b border-slate-800/30">
-            <span className="text-slate-400">المنطقة</span>
-            <span className="text-slate-100 font-bold">{sellerData.region}</span>
+          <div className="bg-slate-950/50 border border-slate-800/40 rounded-2xl p-3 sm:p-4">
+            <span className="text-slate-500 text-[10px]">المنطقة</span>
+            <p className="text-slate-100 font-bold mt-1">{sellerData.region}</p>
           </div>
-          <div className="flex justify-between items-center py-2 border-b border-slate-800/30">
-            <span className="text-slate-400">تاريخ التسجيل</span>
-            <span className="text-slate-100 font-bold">{sellerData.creationDate || '---'}</span>
+          <div className="bg-slate-950/50 border border-slate-800/40 rounded-2xl p-3 sm:p-4">
+            <span className="text-slate-500 text-[10px]">تاريخ التسجيل</span>
+            <p className="text-slate-100 font-bold mt-1">{sellerData.creationDate || '---'}</p>
           </div>
-          <div className="flex justify-between items-center py-2 border-b border-slate-800/30">
-            <span className="text-slate-400">آخر دخول</span>
-            <span className="text-slate-100 font-bold">{sellerData.lastLogin || '---'}</span>
-          </div>
-          <div className="flex justify-between items-center py-2">
-            <span className="text-slate-400">اسم المستخدم</span>
-            <span className="text-slate-100 font-mono font-bold bg-slate-950 px-2 py-0.5 rounded border border-slate-800">{sellerData.username || sellerData.name}</span>
+          <div className="bg-slate-950/50 border border-slate-800/40 rounded-2xl p-3 sm:p-4 sm:col-span-2">
+            <span className="text-slate-500 text-[10px]">اسم المستخدم</span>
+            <p className="text-slate-100 font-mono font-bold mt-1 truncate bg-slate-950 px-2 py-1 rounded border border-slate-800 inline-block">{sellerData.username || sellerData.name}</p>
           </div>
         </div>
       </div>
 
       {/* Personal Stats Card */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5">
-        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-800/60">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5">
+        <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-800/60">
           <TrendingUp size={14} className="text-red-500" />
           <h3 className="text-xs font-bold text-slate-100">الإحصائيات الشخصية</h3>
         </div>
-        <div className="flex gap-3 overflow-x-auto pb-4 snap-x scrollbar-hide">
-          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center min-w-[140px] flex-shrink-0 snap-center">
-            <Smartphone size={16} className="text-red-500 mx-auto mb-2" />
-            <p className="stat-card-value text-slate-100">{sellerData.simsCount}</p>
-            <p className="text-[10px] text-slate-400 mt-1">إجمالي الشرائح</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-3 sm:p-4 text-center">
+            <Smartphone size={16} className="text-red-500 mx-auto mb-1.5" />
+            <p className="text-xl sm:text-2xl font-bold text-slate-100">{sellerData.simsCount}</p>
+            <p className="text-[9px] sm:text-[10px] text-slate-400 mt-1 leading-tight">إجمالي الشرائح</p>
           </div>
-          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center min-w-[140px] flex-shrink-0 snap-center">
-            <TrendingUp size={16} className="text-amber-500 mx-auto mb-2" />
-            <p className="stat-card-value text-slate-100">{sellerData.totalSales?.toLocaleString() || sellerData.sales30Days}</p>
-            <p className="text-[10px] text-slate-400 mt-1">إجمالي المبيعات</p>
+          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-3 sm:p-4 text-center">
+            <TrendingUp size={16} className="text-amber-500 mx-auto mb-1.5" />
+            <p className="text-xl sm:text-2xl font-bold text-slate-100">{(sellerData.totalSales ?? sellerData.sales30Days ?? 0).toLocaleString()}</p>
+            <p className="text-[9px] sm:text-[10px] text-slate-400 mt-1 leading-tight">إجمالي المبيعات</p>
           </div>
-          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center min-w-[140px] flex-shrink-0 snap-center">
-            <Layers size={16} className="text-blue-500 mx-auto mb-2" />
-            <p className="stat-card-value text-slate-100">{sellerData.currentStock || 0}</p>
-            <p className="text-[10px] text-slate-400 mt-1">المخزون الحالي</p>
+          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-3 sm:p-4 text-center">
+            <Layers size={16} className="text-blue-500 mx-auto mb-1.5" />
+            <p className="text-xl sm:text-2xl font-bold text-slate-100">{sellerData.currentStock || 0}</p>
+            <p className="text-[9px] sm:text-[10px] text-slate-400 mt-1 leading-tight">المخزون الحالي</p>
           </div>
-          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center min-w-[140px] flex-shrink-0 snap-center">
-            <Award size={16} className="text-emerald-500 mx-auto mb-2" />
-            <p className="stat-card-value text-slate-100">{sellerData.efficiency || 0}%</p>
-            <p className="text-[10px] text-slate-400 mt-1">نسبة الكفاءة</p>
+          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-3 sm:p-4 text-center">
+            <Award size={16} className="text-emerald-500 mx-auto mb-1.5" />
+            <p className="text-xl sm:text-2xl font-bold text-slate-100">{sellerData.efficiency || 0}%</p>
+            <p className="text-[9px] sm:text-[10px] text-slate-400 mt-1 leading-tight">نسبة الكفاءة</p>
           </div>
-          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center min-w-[140px] flex-shrink-0 snap-center">
-            <TrendingUp size={16} className="text-purple-500 mx-auto mb-2" />
-            <p className="stat-card-value text-slate-100">%{sellerData.salesGrowth || 0}</p>
-            <p className="text-[10px] text-slate-400 mt-1">نمو المبيعات</p>
+          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-3 sm:p-4 text-center">
+            <TrendingUp size={16} className="text-purple-500 mx-auto mb-1.5" />
+            <p className="text-xl sm:text-2xl font-bold text-slate-100">%{sellerData.salesGrowth || 0}</p>
+            <p className="text-[9px] sm:text-[10px] text-slate-400 mt-1 leading-tight">نمو المبيعات</p>
           </div>
-          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 text-center min-w-[140px] flex-shrink-0 snap-center">
-            <Activity size={16} className="text-cyan-500 mx-auto mb-2" />
-            <p className="stat-card-value text-slate-100">%{sellerData.activityRate || 0}</p>
-            <p className="text-[10px] text-slate-400 mt-1">معدل النشاط</p>
+          <div className="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-3 sm:p-4 text-center">
+            <Activity size={16} className="text-cyan-500 mx-auto mb-1.5" />
+            <p className="text-xl sm:text-2xl font-bold text-slate-100">%{sellerData.activityRate || 0}</p>
+            <p className="text-[9px] sm:text-[10px] text-slate-400 mt-1 leading-tight">معدل النشاط</p>
           </div>
         </div>
       </div>
 
-      {/* Change Password Button */}
+      {/* Actions Section */}
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5">
+        <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-800/60">
+          <Activity size={14} className="text-red-500" />
+          <h3 className="text-xs font-bold text-slate-100">الإجراءات</h3>
+        </div>
+        <div className="space-y-2">
+          {/* Change Password Button */}
       <button
         type="button"
         onClick={() => setPasswordOpen(true)}
@@ -225,8 +274,6 @@ export default function SellerAccount({
         </div>
         <ChevronLeft size={16} className="text-slate-500 group-hover:text-slate-100 transition-colors" />
       </button>
-
-
 
       {/* Logout Button */}
       <button
@@ -246,87 +293,27 @@ export default function SellerAccount({
         <ChevronLeft size={16} className="text-slate-500 group-hover:text-slate-100 transition-colors" />
       </button>
 
-      {/* Photo Modal */}
-      <AnimatePresence>
-        {photoModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setPhotoModalOpen(false)}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ scale: 0.95, y: 15 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 15 }}
-              className="relative w-full max-w-sm md:max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl z-10 text-slate-200 max-h-[90vh] overflow-y-auto"
-              dir="rtl"
-            >
-              <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
-                <div className="flex items-center gap-2">
-                  <Camera size={16} className="text-blue-500" />
-                  <h3 className="text-sm font-bold text-slate-100">الصورة الشخصية</h3>
-                </div>
-                <button
-                  onClick={() => setPhotoModalOpen(false)}
-                  className="p-1.5 text-slate-500 hover:text-slate-100 hover:bg-slate-800/40 rounded-full transition-colors cursor-pointer"
-                >
-                  <X size={16} />
-                </button>
-              </div>
+       {/* Delete Account Button */}
+       <button
+         type="button"
+         onClick={() => setDeleteConfirmOpen(true)}
+         className="w-full flex items-center justify-between p-4 bg-red-950/10 border border-red-900/20 rounded-2xl hover:bg-red-950/30 transition-all group"
+       >
+         <div className="flex items-center gap-3">
+           <div className="w-10 h-10 rounded-xl bg-red-600/10 border border-red-500/20 flex items-center justify-center text-red-500 group-hover:scale-105 transition-transform">
+             <Trash2 size={18} />
+           </div>
+           <div className="text-right">
+             <p className="text-sm font-bold text-red-400">حذف الحساب</p>
+             <p className="text-[10px] text-slate-500 mt-0.5">حذف الحساب وجميع البيانات المرتبطة به</p>
+           </div>
+         </div>
+         <ChevronLeft size={16} className="text-slate-500 group-hover:text-slate-100 transition-colors" />
+       </button>
+        </div>
+      </div>
 
-              <div className="flex flex-col items-center space-y-4">
-                <div className="w-28 h-28 rounded-full border-4 border-slate-800 overflow-hidden shadow-lg">
-                  {sellerPhoto ? (
-                    <img loading="lazy" src={sellerPhoto} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full bg-slate-800 flex items-center justify-center">
-                      <Image size={40} className="text-slate-500" />
-                    </div>
-                  )}
-                </div>
 
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleSellerPhotoChange}
-                  className="hidden"
-                />
-
-                <div className="w-full space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    <Camera size={14} />
-                    <span>تغيير الصورة</span>
-                  </button>
-                  {sellerPhoto && (
-                    <button
-                      type="button"
-                      onClick={handleDeleteSellerPhoto}
-                      className="w-full py-3 bg-red-950/30 hover:bg-red-950/50 text-red-400 font-bold text-xs rounded-xl transition-all cursor-pointer border border-red-900/30"
-                    >
-                      حذف الصورة
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setPhotoModalOpen(false)}
-                    className="w-full py-2.5 text-slate-500 hover:text-slate-300 text-xs rounded-xl hover:bg-slate-800/40 transition-all cursor-pointer"
-                  >
-                    إلغاء
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* Logout Confirmation */}
       <AnimatePresence>
@@ -370,7 +357,7 @@ export default function SellerAccount({
               <div className="flex gap-3">
                 <button
                   onClick={handleSellerConfirmLogout}
-                  className="flex-1 py-3 bg-[#b90e1a] hover:bg-red-750 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer text-center"
+                  className="flex-1 py-3 bg-secondary hover:bg-red-750 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer text-center"
                 >
                   تسجيل الخروج
                 </button>
@@ -420,17 +407,17 @@ export default function SellerAccount({
               </div>
 
               <form onSubmit={handlePasswordChangeSubmit} className="space-y-5">
-                <div>
-                  <label className="block text-xs text-slate-400 mb-2">رقم الهوية للتحقق</label>
-                  <input
-                    type="text"
-                    value={idNumberEntry}
-                    onChange={(e) => setIdNumberEntry(e.target.value)}
-                    placeholder="أدخل رقم هويتك"
-                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-red-500/40 transition-all"
-                    dir="rtl"
-                  />
-                </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-2">كلمة المرور الحالية للتحقق</label>
+                    <input
+                      type="password"
+                      value={currentPasswordInput}
+                      onChange={(e) => setCurrentPasswordInput(e.target.value)}
+                      placeholder="أدخل كلمة المرور الحالية"
+                      className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-red-500/40 transition-all"
+                      dir="rtl"
+                    />
+                  </div>
                 <div>
                   <label className="block text-xs text-slate-400 mb-2">كلمة المرور الجديدة</label>
                   <input
@@ -478,6 +465,357 @@ export default function SellerAccount({
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Settings Modal */}
+      <AnimatePresence>
+        {settingsOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSettingsOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl overflow-hidden text-slate-200 z-10 max-h-[85vh] overflow-y-auto custom-scrollbar"
+              dir="rtl"
+            >
+              <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-red-650/10 border border-red-500/20 flex items-center justify-center text-red-500">
+                    <Settings size={18} />
+                  </div>
+                  <h3 className="text-sm font-bold text-white font-sans">إعدادات الحساب</h3>
+                </div>
+                <button
+                  onClick={() => setSettingsOpen(false)}
+                  className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-800/40 rounded-full transition-colors cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className={`space-y-6 ${fontSize === 'sm' ? 'text-xs' : fontSize === 'lg' ? 'text-base' : 'text-sm'}`}>
+
+                {/* 1. المظهر والتخصيص */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-slate-400 border-b border-slate-800/60 pb-1.5">
+                    <Palette size={14} className="text-red-500" />
+                    <span className="text-[11px] font-bold tracking-wider">المظهر والتخصيص</span>
+                  </div>
+                  <div className="bg-slate-950/60 border border-slate-850 rounded-2xl p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-xs text-slate-300">الوضع والمظهر</span>
+                      <div className="flex bg-slate-900 p-0.5 rounded-xl border border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => setDarkMode(false)}
+                          className={`flex items-center gap-1.5 py-1.5 px-3 rounded-lg text-[10px] font-bold transition-all ${!darkMode ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : 'text-slate-400 hover:text-white'}`}
+                        >
+                          <Sun size={12} />
+                          <span>فاتح</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDarkMode(true)}
+                          className={`flex items-center gap-1.5 py-1.5 px-3 rounded-lg text-[10px] font-bold transition-all ${darkMode ? 'bg-blue-500/10 text-blue-400 border border-blue-500/25' : 'text-slate-400 hover:text-white'}`}
+                        >
+                          <Moon size={12} />
+                          <span>داكن</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium text-xs text-slate-300">حجم الخط للتطبيق</span>
+                        <Type size={12} className="text-slate-500" />
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 bg-slate-900/60 p-1 rounded-xl border border-slate-800/80">
+                        <button
+                          type="button"
+                          onClick={() => setFontSize('sm')}
+                          className={`py-1.5 rounded-lg text-[10px] font-bold transition-all ${fontSize === 'sm' ? 'bg-red-500/15 text-red-400 border border-red-500/20' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'}`}
+                        >صغير (A-)</button>
+                        <button
+                          type="button"
+                          onClick={() => setFontSize('base')}
+                          className={`py-1.5 rounded-lg text-[10px] font-bold transition-all ${fontSize === 'base' ? 'bg-red-500/15 text-red-400 border border-red-500/20' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'}`}
+                        >متوسط (A)</button>
+                        <button
+                          type="button"
+                          onClick={() => setFontSize('lg')}
+                          className={`py-1.5 rounded-lg text-[10px] font-bold transition-all ${fontSize === 'lg' ? 'bg-red-500/15 text-red-400 border border-red-500/20' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'}`}
+                        >كبير (A+)</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. الأمان والحساب */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-slate-400 border-b border-slate-800/60 pb-1.5">
+                    <Shield size={14} className="text-red-500" />
+                    <span className="text-[11px] font-bold tracking-wider">الأمان والحساب</span>
+                  </div>
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => { setSettingsOpen(false); setPasswordOpen(true); }}
+                      className="w-full flex items-center justify-between p-3 rounded-2xl bg-slate-950/60 border border-slate-850 hover:bg-slate-800/30 active:scale-98 transition-all group text-right"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 group-hover:text-red-500 transition-colors">
+                          <Lock size={14} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-100">تغيير كلمة المرور</p>
+                          <p className="text-[9px] text-slate-500 mt-0.5">تحديث كود التمرير والاتصال الآمن</p>
+                        </div>
+                      </div>
+                      <ChevronLeft size={14} className="text-slate-500 group-hover:text-slate-100 transition-colors" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setSettingsOpen(false); setSettingsLogoutConfirmOpen(true); }}
+                      className="w-full flex items-center justify-between p-3 rounded-2xl bg-slate-950/60 border border-slate-850 hover:bg-slate-800/30 active:scale-98 transition-all group text-right"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 group-hover:text-red-500 transition-colors">
+                          <ShieldAlert size={14} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-100">تسجيل الخروج الآمن</p>
+                          <p className="text-[9px] text-slate-500 mt-0.5">إنهاء الجلسة وحذف مصادقة الاتصال مؤقتاً</p>
+                        </div>
+                      </div>
+                      <ChevronLeft size={14} className="text-slate-500 group-hover:text-slate-100 transition-colors" />
+                    </button>
+                    <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-950/60 border border-slate-850">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400">
+                          <Fingerprint size={14} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-100">بصمة الدخول</p>
+                          <p className="text-[9px] text-slate-500 mt-0.5">تسجيل الدخول ببصمة الإصبع</p>
+                        </div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={biometricEnabled}
+                          onChange={handleToggleBiometric}
+                          className="sr-only peer"
+                        />
+                        <div className="w-8 h-4.5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:-translate-x-full after:content-[''] after:absolute after:top-[2.5px] after:right-[2.5px] after:bg-white after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-red-650"></div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. الإشعارات */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-slate-400 border-b border-slate-800/60 pb-1.5">
+                    <Bell size={14} className="text-red-500" />
+                    <span className="text-[11px] font-bold tracking-wider">تفصيلات الإشعارات</span>
+                  </div>
+                  <div className="bg-slate-950/60 border border-slate-850 rounded-2xl p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5 ml-2 text-right">
+                        <p className="text-xs font-bold text-slate-100">إشعارات توزيع الشرائح</p>
+                        <p className="text-[9px] text-slate-500">استلام تنبيه فوري فور ترحيل وتوزيع الشرائح التلقائي للبائعين</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={simNotifications}
+                          onChange={handleToggleSimNotifications}
+                          className="sr-only peer"
+                        />
+                        <div className="w-8 h-4.5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:-translate-x-full after:content-[''] after:absolute after:top-[2.5px] after:right-[2.5px] after:bg-white after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-red-650"></div>
+                      </label>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-slate-900/60 pt-4">
+                      <div className="space-y-0.5 ml-2 text-right">
+                        <p className="text-xs font-bold text-slate-100">إشعارات المخزون المنخفض</p>
+                        <p className="text-[9px] text-slate-500">التنبيه المسبق عند انخفاض الرصيد العام المشترك للوكالة عن نسبة 10%</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={lowStockNotifications}
+                          onChange={handleToggleLowStockNotifications}
+                          className="sr-only peer"
+                        />
+                        <div className="w-8 h-4.5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:-translate-x-full after:content-[''] after:absolute after:top-[2.5px] after:right-[2.5px] after:bg-white after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-red-650"></div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. معلومات التطبيق */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-slate-400 border-b border-slate-800/60 pb-1.5">
+                    <Cpu size={14} className="text-red-500" />
+                    <span className="text-[11px] font-bold tracking-wider">معلومات التطبيق النظامية</span>
+                  </div>
+                  <div className="bg-slate-950/60 border border-slate-850 rounded-2xl p-4 space-y-2 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 font-medium">إصدار التطبيق</span>
+                      <span className="text-slate-200 font-mono font-bold bg-slate-900 px-2 py-0.5 rounded border border-slate-800">v2.4.0 (Enterprise Build)</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 font-medium">تاريخ آخر تحديث</span>
+                      <span className="text-slate-200 font-sans font-bold">2026/06/02</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 5. تسجيل الخروج السريع */}
+                <div className="pt-4 border-t border-slate-800/60 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setSettingsOpen(false); setSettingsLogoutConfirmOpen(true); }}
+                    className="w-full py-3 bg-secondary/10 hover:bg-secondary text-secondary hover:text-white border border-secondary/25 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                  >
+                    <LogOut size={13} />
+                    <span>تسجيل الخروج من الحساب</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSettingsOpen(false)}
+                    className="w-full py-2 text-slate-500 hover:text-slate-300 text-xs rounded-xl hover:bg-slate-950 transition-colors cursor-pointer"
+                  >
+                    إلغاء وإغلاق شاشة الإعدادات
+                  </button>
+                </div>
+
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Settings Logout Confirmation */}
+      <AnimatePresence>
+        {settingsLogoutConfirmOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSettingsLogoutConfirmOpen(false)}
+              className="absolute inset-0 bg-black/65 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="relative w-full max-w-sm md:max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-slate-200 z-10 text-right font-sans max-h-[90vh] overflow-y-auto"
+              dir="rtl"
+            >
+              <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-800/60">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-red-600/10 border border-red-500/20 flex items-center justify-center text-red-500">
+                    <LogOut size={14} />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-100">تسجيل الخروج</h3>
+                </div>
+                <button
+                  onClick={() => setSettingsLogoutConfirmOpen(false)}
+                  className="p-1 text-slate-500 hover:text-slate-100 rounded-full transition-colors cursor-pointer"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+              <div className="mb-6">
+                <p className="text-xs text-slate-300 leading-relaxed">هل أنت متأكد أنك تريد تسجيل الخروج من حسابك؟</p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setSettingsLogoutConfirmOpen(false);
+                    if (onConfirmLogout) { onConfirmLogout(); } else { onLogout(); }
+                  }}
+                  className="flex-1 py-3 bg-secondary hover:bg-red-750 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer text-center"
+                >تسجيل الخروج</button>
+                <button
+                  onClick={() => setSettingsLogoutConfirmOpen(false)}
+                  className="flex-1 py-3 bg-slate-800 hover:bg-slate-755 text-slate-300 font-medium rounded-xl border border-slate-700 transition-all cursor-pointer text-center"
+                >إلغاء</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Account Confirmation */}
+      <AnimatePresence>
+        {deleteConfirmOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { if (!deleting) setDeleteConfirmOpen(false); }}
+              className="absolute inset-0 bg-black/65 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="relative w-full max-w-sm md:max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-slate-200 z-10 text-right font-sans max-h-[90vh] overflow-y-auto"
+              dir="rtl"
+            >
+              <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-800/60">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-red-600/10 border border-red-500/20 flex items-center justify-center text-red-500">
+                    <Trash2 size={14} />
+                  </div>
+                  <h3 className="text-sm font-bold text-red-400">حذف الحساب</h3>
+                </div>
+                <button
+                  onClick={() => { if (!deleting) setDeleteConfirmOpen(false); }}
+                  className="p-1 text-slate-500 hover:text-slate-100 rounded-full transition-colors cursor-pointer"
+                  disabled={deleting}
+                >
+                  <X size={15} />
+                </button>
+              </div>
+              <div className="mb-6">
+                <p className="text-xs text-slate-300 leading-relaxed">هل أنت متأكد من حذف الحساب؟ سيتم حذف جميع البيانات المرتبطة بهذا الحساب نهائياً ولا يمكن التراجع عن هذا الإجراء.</p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={async () => {
+                    setDeleting(true);
+                    try {
+                      await api.deleteAccount();
+                      localStorage.clear();
+                      window.location.href = '/';
+                    } catch (err: any) {
+                      toastError(err?.message || 'فشل حذف الحساب');
+                      setDeleting(false);
+                      setDeleteConfirmOpen(false);
+                    }
+                  }}
+                  disabled={deleting}
+                  className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer text-center disabled:opacity-50"
+                >{deleting ? 'جاري الحذف...' : 'حذف'}</button>
+                <button
+                  onClick={() => setDeleteConfirmOpen(false)}
+                  disabled={deleting}
+                  className="flex-1 py-3 bg-slate-800 hover:bg-slate-755 text-slate-300 font-medium rounded-xl border border-slate-700 transition-all cursor-pointer text-center"
+                >إلغاء</button>
+              </div>
             </motion.div>
           </div>
         )}

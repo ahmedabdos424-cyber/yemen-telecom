@@ -1,9 +1,11 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Seller } from '../types';
 import { Check, Camera, RefreshCw, Lock, MapPin, Phone, CreditCard, ShoppingBag, User, X, Eye, EyeOff, Copy, CircleCheck } from 'lucide-react';
 import CameraCapture from './shared/CameraCapture';
 import { useOcr } from '../hooks/useOcr';
+import { useToast, ToastContainer } from '../hooks/useToast';
+import { api } from '../api/client';
 
 interface AddSellerFormProps {
   onSellerAdded: (newSeller: Omit<Seller, 'id' | 'creationDate' | 'lastLogin'>) => void;
@@ -26,6 +28,7 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
   const [credentialsData, setCredentialsData] = useState<{ username: string; password: string } | null>(null);
   const [progressStage, setProgressStage] = useState<'idle' | 25 | 50 | 75 | 100>('idle');
   const { recognize, progress: ocrProgress } = useOcr();
+  const { toasts, dismissToast, toastSuccess, toastError, toastWarning } = useToast();
 
   const handleNameCapture = useCallback(async (imageData: string) => {
     const name = await recognize(imageData);
@@ -35,61 +38,71 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
     setNameCaptured(imageData);
   }, [recognize]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!fullName.trim()) {
-      alert('الرجاء كتابة الاسم الكامل للبائع');
+      toastWarning('الرجاء كتابة الاسم الكامل للبائع');
       return;
     }
     if (!username.trim()) {
-      alert('الرجاء كتابة اسم المستخدم الجديد للبائع');
+      toastWarning('الرجاء كتابة اسم المستخدم الجديد للبائع');
       return;
     }
     if (!password.trim()) {
-      alert('الرجاء تعيين كلمة المرور للبائع');
+      toastWarning('الرجاء تعيين كلمة المرور للبائع');
       return;
     }
     if (!storeName.trim()) {
-      alert('الرجاء كتابة اسم المحل أو المركز');
+      toastWarning('الرجاء كتابة اسم المحل أو المركز');
       return;
     }
     if (!idNumber.trim()) {
-      alert('الرجاء التقاط صورة الهوية أو إدخال رقم الهوية الوطنية / الإقامة');
+      toastWarning('الرجاء التقاط صورة الهوية أو إدخال رقم الهوية الوطنية / الإقامة');
       return;
     }
     if (!phone.trim()) {
-      alert('الرجاء إدخال رقم الهاتف الجوال للبائع');
+      toastWarning('الرجاء إدخال رقم الهاتف الجوال للبائع');
       return;
     }
     if (!region.trim()) {
-      alert('الرجاء إدخال المنطقة أو النطاق والتغطية الجغرافية للمحل');
+      toastWarning('الرجاء إدخال المنطقة أو النطاق والتغطية الجغرافية للمحل');
       return;
     }
 
     setIsSubmitting(true);
     setProgressStage(25);
 
-    setTimeout(() => {
-      setProgressStage(50);
-    }, 400);
+    try {
+      const result = await api.createSeller({
+        name: fullName,
+        username,
+        password,
+        agent_name: agentName,
+        storeName,
+        idNumber,
+        phone,
+        region,
+        regionCode: region.substring(0, 5),
+      });
 
-    setTimeout(() => {
-      setProgressStage(75);
-    }, 800);
-
-    setTimeout(() => {
       setProgressStage(100);
       setIsSubmitting(false);
+
+      const creds = result.credentials || { username, password };
+      setShowCredentials(true);
+      setCredentialsData(creds);
+      setSuccessInfo(`تم إنشاء حساب البائع "${fullName}" بنجاح.`);
+
       onSellerAdded({
         name: fullName,
-        username: username,
-        password: password,
+        username: creds.username,
+        password: creds.password,
         agent_name: agentName,
-        storeName: storeName,
-        idNumber: idNumber,
-        phone: phone,
-        region: region,
+        storeName,
+        idNumber,
+        phone,
+        region,
         regionCode: region.substring(0, 5),
         status: 'active',
         totalSales: 0,
@@ -102,10 +115,6 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
         activityRate: 0
       });
 
-      setShowCredentials(true);
-      setCredentialsData({ username, password });
-      setSuccessInfo(`تم إنشاء حساب البائع "${fullName}" بنجاح.`);
-      
       setFullName('');
       setNameCaptured(null);
       setUsername('');
@@ -114,16 +123,16 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
       setIdNumber('');
       setPhone('');
       setRegion('');
-
-      setTimeout(() => {
-        setSuccessInfo('');
-        setProgressStage('idle');
-      }, 4000);
-    }, 1200);
+    } catch (err: any) {
+      setIsSubmitting(false);
+      setProgressStage('idle');
+      toastError(err?.message || 'فشل إنشاء البائع. الرجاء المحاولة مرة أخرى.');
+    }
   };
 
   return (
     <div dir="rtl" className="card w-full max-w-2xl mx-auto p-6 text-slate-100 font-sans" id="add-seller-form-container">
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       
       {/* Header */}
       <div className="border-b border-slate-800 pb-5 mb-6" id="add-seller-header">
@@ -146,7 +155,7 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
               id="full_name"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              placeholder="أدخل اسم البائع الكامل ثلاثياً"
+              placeholder="اسم البائع"
               className="input-field pl-12 bg-slate-950 border-slate-850 text-sm text-right placeholder:text-slate-700"
             />
             <CameraCapture onCapture={handleNameCapture} />
@@ -190,7 +199,7 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
               id="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="مثال: user_99"
+              placeholder="اسم المستخدم"
               className="input-field bg-slate-950 border-slate-850 text-sm text-right placeholder:text-slate-700"
             />
           </div>
@@ -206,7 +215,7 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
                 id="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="أدخل كلمة مرور قوية للبائع"
+                placeholder="كلمة المرور"
                 className="input-field pl-10 bg-slate-950 border-slate-850 text-sm text-right placeholder:text-slate-700"
               />
               <button
@@ -232,7 +241,7 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
             id="store_name"
             value={storeName}
             onChange={(e) => setStoreName(e.target.value)}
-            placeholder="مثال: محل التسهيلات الرقمية أو التميز للاتصالات"
+            placeholder="اسم المحل / المركز"
             className="input-field bg-slate-950 border-slate-850 text-sm text-right placeholder:text-slate-700"
           />
         </div>
@@ -248,7 +257,7 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
             id="id_number"
             value={idNumber}
             onChange={(e) => setIdNumber(e.target.value)}
-            placeholder="أدخل رقم الهوية المكون من 10 خانات"
+            placeholder="xxxxxxxxxx"
             inputMode="numeric"
             className="input-field bg-slate-950 border-slate-850 text-sm text-right placeholder:text-slate-700 font-sans"
           />
@@ -265,7 +274,7 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
             id="phone"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            placeholder="05XXXXXXXX - أدخل رقم الجوال كاملاً بدقة"
+            placeholder="7xxxxxx"
             className="input-field bg-slate-950 border-slate-850 text-sm text-right placeholder:text-slate-700 font-sans"
           />
         </div>
@@ -281,7 +290,7 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
             id="region"
             value={region}
             onChange={(e) => setRegion(e.target.value)}
-            placeholder="مثال: الرياض - حي الصحافة، أو تعز - شارع جمال"
+            placeholder="المدينة / المنطقة"
             className="input-field bg-slate-950 border-slate-850 text-sm text-right placeholder:text-slate-700"
           />
         </div>
@@ -389,9 +398,9 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
                       await navigator.clipboard.writeText(
                         `اسم المستخدم: ${credentialsData.username}\nكلمة المرور: ${credentialsData.password}`
                       );
-                      alert('تم نسخ بيانات الدخول بنجاح');
+                      toastSuccess('تم نسخ بيانات الدخول بنجاح');
                     } catch {
-                      alert('تعذر النسخ - الرجاء نسخ البيانات يدوياً');
+                      toastError('تعذر النسخ - الرجاء نسخ البيانات يدوياً');
                     }
                   }}
                   className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
