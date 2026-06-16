@@ -32,6 +32,12 @@ if (missingEnv.length > 0) {
   process.exit(1);
 }
 
+const envMode = process.env.NODE_ENV || 'development';
+if (envMode === 'development') {
+  console.warn('[ENV] NODE_ENV=development — CORS allows all origins, query logging enabled');
+}
+console.log(`[ENV] NODE_ENV=${envMode}`);
+
 const app = express();
 const PORT = parseInt(process.env.API_PORT || '4000');
 

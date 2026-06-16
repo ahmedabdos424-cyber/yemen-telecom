@@ -1,6 +1,14 @@
 import { tokenStorage } from '../services/tokenStorage.ts';
 import { captureTiming } from '../lib/monitor.ts';
 
+const REQUEST_TIMEOUT_MS = 15000;
+
+function fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timeoutId));
+}
+
 const isCapacitor = !!(window as any).Capacitor?.isNative;
 const hostname = window.location.hostname;
 const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('10.') || hostname.startsWith('192.168.');
@@ -40,7 +48,7 @@ export function clearTokens() {
 
 export async function fetchCsrfToken(): Promise<void> {
   try {
-    const res = await fetch(`${API_BASE}/csrf-token`, { credentials: 'include' });
+    const res = await fetchWithTimeout(`${API_BASE}/csrf-token`, { credentials: 'include' });
     if (res.ok) {
       const data = await res.json();
       csrfToken = data.token;
@@ -55,7 +63,7 @@ export async function fetchCsrfToken(): Promise<void> {
 async function refreshAccessToken(): Promise<string | null> {
   if (!refreshToken) return null;
   try {
-    const res = await fetch(`${API_BASE}/auth/refresh`, {
+    const res = await fetchWithTimeout(`${API_BASE}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
@@ -91,7 +99,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (refreshToken && isLogout) {
     headers['X-Refresh-Token'] = refreshToken;
   }
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const res = await fetchWithTimeout(`${API_BASE}${path}`, { ...options, headers });
   if (res.status === 403 && !path.startsWith('/auth/') && path !== '/csrf-token') {
     const errBody = await res.json().catch(() => ({}));
     if (errBody.error && (errBody.error.includes('CSRF'))) {
@@ -99,18 +107,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       if (csrfToken && csrfHash) {
         headers['X-CSRF-Token'] = csrfToken;
         headers['X-CSRF-Hash'] = csrfHash;
-        const retryRes = await fetch(`${API_BASE}${path}`, { ...options, headers });
-        if (retryRes.ok) {
-          const dur = performance.now() - start;
-          captureTiming(`${options.method || 'GET'} ${path} (csrf-retry)`, dur);
-          return retryRes.json();
-        }
+        const retryRes = await fetchWithTimeout(`${API_BASE}${path}`, { ...options, headers });
         if (!retryRes.ok) {
           const err2 = await retryRes.json().catch(() => ({ error: retryRes.statusText }));
           const dur = performance.now() - start;
           captureTiming(`${options.method || 'GET'} ${path} (csrf-retry)`, dur);
           throw new Error(err2.error || `HTTP ${retryRes.status}`);
         }
+        const dur = performance.now() - start;
+        captureTiming(`${options.method || 'GET'} ${path} (csrf-retry)`, dur);
+        return retryRes.json();
       }
       const dur = performance.now() - start;
       captureTiming(`${options.method || 'GET'} ${path}`, dur);
@@ -121,7 +127,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const newToken = await refreshAccessToken();
     if (newToken) {
       headers['Authorization'] = `Bearer ${newToken}`;
-      const retryRes = await fetch(`${API_BASE}${path}`, { ...options, headers });
+      const retryRes = await fetchWithTimeout(`${API_BASE}${path}`, { ...options, headers });
       if (!retryRes.ok) {
         const err = await retryRes.json().catch(() => ({ error: retryRes.statusText }));
         const dur = performance.now() - start;
@@ -155,7 +161,7 @@ async function uploadFile(file: File | Blob, fieldName = 'image'): Promise<{ url
     headers['X-CSRF-Token'] = csrfToken;
     headers['X-CSRF-Hash'] = csrfHash;
   }
-  const res = await fetch(`${API_BASE}/upload/image`, { method: 'POST', headers, body: form });
+  const res = await fetchWithTimeout(`${API_BASE}/upload/image`, { method: 'POST', headers, body: form });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || `HTTP ${res.status}`);
