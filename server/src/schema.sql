@@ -205,6 +205,10 @@ CREATE INDEX IF NOT EXISTS idx_distribution_agent ON distribution_requests(agent
 -- Remove the static duplicate_identities seed data since we now query dynamically
 DELETE FROM duplicate_identities WHERE id > 0;
 
+-- Allow soft-delete status for sellers
+ALTER TABLE sellers DROP CONSTRAINT IF EXISTS sellers_status_check;
+ALTER TABLE sellers ADD CONSTRAINT sellers_status_check CHECK (status IN ('active', 'inactive', 'suspended', 'low_stock', 'deleted'));
+
 -- Performance Indexes
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);

@@ -45,8 +45,8 @@
   --color-on-tertiary-container: #497cff;
 
   /* Telecom Company Colors (exact brand values) */
-  --color-ym: #E60000;
-  --color-ym-light: #FFEBEB;
+  --color-ym: #A02040;
+  --color-ym-light: #F2E6E8;
   --color-you: #FFCB05;
   --color-you-light: #FFF8D6;
   --color-you-text: #1A1A1A;
@@ -223,8 +223,8 @@ body {
 
 /* Card accent variants */
 .card-ym {
-  border-color: rgba(230, 0, 0, 0.25);
-  border-top: 3px solid #E60000;
+  border-color: rgba(160, 32, 64, 0.25);
+  border-top: 3px solid #A02040;
 }
 .card-sf {
   border-color: rgba(0, 87, 217, 0.25);
@@ -251,7 +251,7 @@ body {
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(to left, #E60000, #990000);
+  background: linear-gradient(to left, #A02040, #7A1832);
   opacity: 0.6;
 }
 .dark .stat-card::before {
@@ -265,11 +265,11 @@ body {
 }
 
 /* Stat card operator variants */
-.stat-card-ym::before { background: linear-gradient(to left, #E60000, #b30000); }
+.stat-card-ym::before { background: linear-gradient(to left, #A02040, #7A1832); }
 .stat-card-sf::before { background: linear-gradient(to left, #0057D9, #003d99); }
 .stat-card-you::before { background: linear-gradient(to left, #FFCB05, #d4a800); }
 
-.stat-card-ym { border-left: 3px solid rgba(230, 0, 0, 0.3); }
+.stat-card-ym { border-left: 3px solid rgba(160, 32, 64, 0.3); }
 .stat-card-sf { border-left: 3px solid rgba(0, 87, 217, 0.3); }
 .stat-card-you { border-left: 3px solid rgba(255, 203, 5, 0.3); }
 
@@ -317,14 +317,14 @@ body {
 }
 
 .btn-ym {
-  background: #E60000;
+  background: #A02040;
   color: white;
 }
 .btn-ym:hover {
-  background: #cc0000;
+  background: #8B1A36;
 }
 .btn-ym:active {
-  background: #b30000;
+  background: #7A1832;
 }
 
 .btn-sf {
@@ -450,12 +450,12 @@ body {
 
 /* Operator badge variants */
 .badge-ym {
-  background: rgba(230, 0, 0, 0.12);
-  color: #E60000;
+  background: rgba(160, 32, 64, 0.12);
+  color: #A02040;
 }
 .dark .badge-ym {
-  background: rgba(230, 0, 0, 0.2);
-  color: #ff4444;
+  background: rgba(160, 32, 64, 0.2);
+  color: #D06070;
 }
 
 .badge-sf {
@@ -477,21 +477,21 @@ body {
 }
 
 /* ========== OPERATOR COLOR HELPERS ========== */
-.op-ym { color: #E60000; }
+.op-ym { color: #A02040; }
 .op-you { color: #FFCB05; }
 .op-sf { color: #0057D9; }
 
-.bg-op-ym { background: #E60000; color: white; }
+.bg-op-ym { background: #A02040; color: white; }
 .bg-op-you { background: #FFCB05; color: #1A1A1A; }
 .bg-op-sf { background: #0057D9; color: white; }
 
 .bg-op-ym-light {
-  background: rgba(230, 0, 0, 0.1);
-  color: #E60000;
+  background: rgba(160, 32, 64, 0.1);
+  color: #A02040;
 }
 .dark .bg-op-ym-light {
-  background: rgba(230, 0, 0, 0.2);
-  color: #ff4444;
+  background: rgba(160, 32, 64, 0.2);
+  color: #D06070;
 }
 
 .bg-op-you-light {
@@ -512,7 +512,7 @@ body {
   color: #4488ff;
 }
 
-.border-op-ym { border-color: rgba(230, 0, 0, 0.3); }
+.border-op-ym { border-color: rgba(160, 32, 64, 0.3); }
 .border-op-you { border-color: rgba(255, 203, 5, 0.3); }
 .border-op-sf { border-color: rgba(0, 87, 217, 0.3); }
 
@@ -910,12 +910,12 @@ button:active,
   white-space: nowrap;
 }
 .op-pill-ym {
-  background: rgba(230, 0, 0, 0.12);
-  color: #E60000;
+  background: rgba(160, 32, 64, 0.12);
+  color: #A02040;
 }
 .dark .op-pill-ym {
-  background: rgba(230, 0, 0, 0.2);
-  color: #ff4444;
+  background: rgba(160, 32, 64, 0.2);
+  color: #D06070;
 }
 .op-pill-sf {
   background: rgba(0, 87, 217, 0.12);
@@ -1079,10 +1079,10 @@ button:active,
 }
 
 /* ========== OPERATOR SECONDARY BG (LIGHT THEME) ========== */
-.bg-ym-light { background-color: #FFEBEB; }
+.bg-ym-light { background-color: #F2E6E8; }
 .bg-you-light { background-color: #FFF8D6; }
 .bg-sf-light { background-color: #EAF2FF; }
-.text-ym { color: #E60000; }
+.text-ym { color: #A02040; }
 .text-sf { color: #0057D9; }
 .text-you { color: #CC9900; }
 
@@ -1095,7 +1095,7 @@ button:active,
   margin-left: 4px;
   vertical-align: middle;
 }
-.badge-dot-ym { background: #E60000; }
+.badge-dot-ym { background: #A02040; }
 .badge-dot-sf { background: #0057D9; }
 .badge-dot-you { background: #FFCB05; }
 

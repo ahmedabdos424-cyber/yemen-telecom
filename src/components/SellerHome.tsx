@@ -8,17 +8,12 @@ interface SellerHomeProps {
   onNavigate: (tab: string) => void;
 }
 
-export default function SellerHome({ operations, onNavigate }: SellerHomeProps) {
+export default function SellerHome({ operations = [], onNavigate }: SellerHomeProps) {
   return (
     <div className="space-y-6">
 
       {/* Welcome Panel */}
-      <div className="flex justify-between items-center text-right border-b border-slate-800 pb-4">
-        <h2 className="text-lg font-bold text-slate-100 tracking-tight flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse"></span>
-          بوابة العمليات والمبيعات الموحدة
-        </h2>
-      </div>
+      <div className="border-b border-slate-800 pb-2"></div>
 
       {/* Quick Action Button */}
       <div>

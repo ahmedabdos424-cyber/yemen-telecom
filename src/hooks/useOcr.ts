@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { createWorker } from 'tesseract.js';
+import { useMountedRef } from './useMountedRef';
 
 export interface OcrProgressState {
   visible: boolean;
@@ -59,6 +59,7 @@ function cleanOcrText(raw: string, confidence?: number): string[] {
   if (confidence !== undefined && confidence < CONFIDENCE_THRESHOLD) {
     return [];
   }
+  if (!raw) return [];
   return raw
     .split('\n')
     .map(l => l.trim())
@@ -155,7 +156,7 @@ function detectLowLight(dataUrl: string): Promise<number> {
   });
 }
 
-let singletonWorker: Awaited<ReturnType<typeof createWorker>> | null = null;
+let singletonWorker: OcrWorker | null = null;
 let singletonInitPromise: Promise<void> | null = null;
 
 async function getWorker(logger?: (m: { status: string; progress: number }) => void) {
@@ -165,7 +166,8 @@ async function getWorker(logger?: (m: { status: string; progress: number }) => v
     return singletonWorker!;
   }
   singletonInitPromise = (async () => {
-    singletonWorker = await createWorker('ara', 1, {
+    const { createWorker: loadWorker } = await import('tesseract.js');
+    singletonWorker = await loadWorker('ara', 1, {
       workerPath: '/tesseract/js/worker.min.js',
       corePath: '/tesseract/js/',
       langPath: '/tesseract/lang',
@@ -192,7 +194,8 @@ function terminateWorker() {
   }
 }
 
-async function recognizeWithTimeout(worker: Awaited<ReturnType<typeof createWorker>>, image: string, timeoutMs: number) {
+interface OcrWorker { recognize(image: string): Promise<{ data: { text: string; confidence: number } }>; terminate(): void; }
+async function recognizeWithTimeout(worker: OcrWorker, image: string, timeoutMs: number) {
   return Promise.race([
     worker.recognize(image),
     new Promise<never>((_, reject) =>
@@ -205,9 +208,10 @@ let totalOcrCalls = 0;
 let totalOcrTime = 0;
 
 export function useOcr() {
+  const mountedRef = useMountedRef();
   const [progress, setProgress] = useState<OcrProgressState>({ visible: false, progress: 0, stage: '' });
   const loggerRef = useRef<(m: { status: string; progress: number }) => void>((m) => {
-    setProgress(prev => ({
+    if (mountedRef.current) setProgress(prev => ({
       ...prev,
       progress: stageProgress(m.status, m.progress),
       stage: stages[m.status]?.label || prev.stage,
@@ -221,7 +225,7 @@ export function useOcr() {
   const recognizeRaw = useCallback(async (imageData: string): Promise<string> => {
     totalOcrCalls++;
     const startTime = performance.now();
-    setProgress({ visible: true, progress: 10, stage: 'معالجة الصورة' });
+    if (mountedRef.current) setProgress({ visible: true, progress: 10, stage: 'معالجة الصورة' });
     const maxDim = 1200;
     const processed = await new Promise<string>((resolve) => {
       const img = new Image();
@@ -243,21 +247,21 @@ export function useOcr() {
       img.onerror = () => resolve(imageData);
       img.src = imageData;
     });
-    setProgress(prev => ({ ...prev, progress: 50, stage: 'تشغيل OCR' }));
+    if (mountedRef.current) setProgress(prev => ({ ...prev, progress: 50, stage: 'تشغيل OCR' }));
     await initWorker();
     const worker = await getWorker(loggerRef.current);
     try {
       const { data } = await recognizeWithTimeout(worker, processed, OCR_TIMEOUT_MS);
-      const cleaned = data.text
+      const cleaned = (data?.text ?? '')
         .split('\n')
         .map(l => l.trim().replace(/[|\\{}[\]~`^_=+<>;:/*"'.,!@#$%^&*()\-_—–•·°™®©✓✗✘♦♣♠♥●○◘]/g, ' '))
         .map(l => l.replace(/\s+/g, ' ').trim())
         .filter(l => l.length > 0);
-      setProgress({ visible: false, progress: 0, stage: '' });
+      if (mountedRef.current) setProgress({ visible: false, progress: 0, stage: '' });
       totalOcrTime += performance.now() - startTime;
       return cleaned.filter((l, i, a) => a.indexOf(l) === i).join(' ');
     } catch {
-      setProgress({ visible: false, progress: 0, stage: '' });
+      if (mountedRef.current) setProgress({ visible: false, progress: 0, stage: '' });
       totalOcrTime += performance.now() - startTime;
       return '';
     }
@@ -278,7 +282,7 @@ export function useOcr() {
 
     const brightness = await detectLowLight(imageData);
     if (brightness < 40) {
-      setProgress({ visible: false, progress: 0, stage: '' });
+      if (mountedRef.current) setProgress({ visible: false, progress: 0, stage: '' });
       totalOcrTime += performance.now() - startTime;
       return 'DARK';
     }
@@ -317,7 +321,7 @@ export function useOcr() {
       img.src = imageData;
     });
 
-    setProgress(prev => ({ ...prev, progress: stageProgress('recognizing text', 0), stage: stages['recognizing text'].label }));
+    if (mountedRef.current) setProgress(prev => ({ ...prev, progress: stageProgress('recognizing text', 0), stage: stages['recognizing text'].label }));
     await initWorker();
 
     const worker = await getWorker(loggerRef.current);
@@ -327,8 +331,8 @@ export function useOcr() {
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
         const { data } = await recognizeWithTimeout(worker, preprocessed, OCR_TIMEOUT_MS);
-        text = data.text;
-        const ocrConfidence = data.confidence;
+        text = data?.text ?? '';
+        const ocrConfidence = data?.confidence;
         if (text.trim() === '' || (ocrConfidence !== undefined && ocrConfidence < 40 && attempt < MAX_RETRIES)) {
           lastError = new Error('LOW_CONFIDENCE');
           continue;
@@ -338,30 +342,30 @@ export function useOcr() {
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
         if (lastError.message === 'OCR_TIMEOUT' && attempt < MAX_RETRIES) {
-          setProgress(prev => ({ ...prev, progress: stageProgress('recognizing text', 0), stage: `محاولة ${attempt + 2}/${MAX_RETRIES + 1}` }));
+          if (mountedRef.current) setProgress(prev => ({ ...prev, progress: stageProgress('recognizing text', 0), stage: `محاولة ${attempt + 2}/${MAX_RETRIES + 1}` }));
           continue;
         }
         if (attempt >= MAX_RETRIES) {
-          setProgress({ visible: false, progress: 0, stage: '' });
+          if (mountedRef.current) setProgress({ visible: false, progress: 0, stage: '' });
           totalOcrTime += performance.now() - startTime;
           return '';
         }
       }
     }
 
-    setProgress(prev => ({ ...prev, progress: stageProgress('analyzing name', 0.5), stage: stages['analyzing name'].label }));
+    if (mountedRef.current) setProgress(prev => ({ ...prev, progress: stageProgress('analyzing name', 0.5), stage: stages['analyzing name'].label }));
 
     const lines = cleanOcrText(text);
     const name = extractArabicPersonName(lines);
 
     if (!name || name.length < 3 || /^\d+$/.test(name) || !/[\u0600-\u06FF]/.test(name)) {
-      setProgress({ visible: false, progress: 0, stage: '' });
+      if (mountedRef.current) setProgress({ visible: false, progress: 0, stage: '' });
       totalOcrTime += performance.now() - startTime;
       return '';
     }
 
-    setProgress({ visible: true, progress: 100, stage: stages.complete.label });
-    setTimeout(() => setProgress(prev => ({ ...prev, visible: false })), 800);
+    if (mountedRef.current) setProgress({ visible: true, progress: 100, stage: stages.complete.label });
+    setTimeout(() => { if (mountedRef.current) setProgress(prev => ({ ...prev, visible: false })); }, 800);
     totalOcrTime += performance.now() - startTime;
     return name;
   }, [initWorker]);

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="auth_prefs.xml" />
+        <exclude domain="sharedpref" path="token_storage.xml" />
+        <exclude domain="sharedpref" path="capacitor_settings.xml" />
+        <exclude domain="database" path="com_getcapacitor_android.db" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="auth_prefs.xml" />
+        <exclude domain="sharedpref" path="token_storage.xml" />
+        <exclude domain="sharedpref" path="capacitor_settings.xml" />
+        <exclude domain="database" path="com_getcapacitor_android.db" />
+    </device-transfer>
+</data-extraction-rules>

@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import multer from 'multer';
 import { getBucket } from '../firebase-admin';
+import { requireRole, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
@@ -36,7 +37,7 @@ async function uploadToFirebase(file: Express.Multer.File): Promise<{ url: strin
   });
 }
 
-router.post('/image', upload.single('image'), async (req: any, res: Response) => {
+router.post('/image', requireRole('manager', 'agent'), upload.single('image'), async (req: AuthRequest, res: Response) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No image file provided' });
   }
@@ -49,7 +50,7 @@ router.post('/image', upload.single('image'), async (req: any, res: Response) =>
   }
 });
 
-router.post('/images', upload.array('images', 5), async (req: any, res: Response) => {
+router.post('/images', requireRole('manager', 'agent'), upload.array('images', 5), async (req: AuthRequest, res: Response) => {
   const files = req.files as Express.Multer.File[] | undefined;
   if (!files || files.length === 0) {
     return res.status(400).json({ error: 'No image files provided' });

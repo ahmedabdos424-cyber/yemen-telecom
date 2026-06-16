@@ -28,6 +28,7 @@ export function useAuth() {
     if (savedToken && savedRole) {
       api.getMe()
         .then((user) => {
+          if (!user) { clearSession(); return; }
           if (user.role !== savedRole) {
             clearSession();
           }
@@ -71,6 +72,7 @@ export function useAuth() {
     };
     try {
       const result = await api.login(loggedUser, password);
+      if (!result?.user) throw new Error('Login response missing user');
       setTokenWrapper(result.token);
       if (result.refreshToken) setRefreshToken(result.refreshToken);
       const userRole = result.user.role as Role;

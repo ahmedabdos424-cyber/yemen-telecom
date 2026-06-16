@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { SIM, Agent, Seller, SystemAlert, Transaction, SystemSettings, ViewType } from '../types';
 import { api } from '../api/client';
 import { captureError } from '../lib/monitor.ts';
+import { useMountedRef } from './useMountedRef';
 
 function loadFromStorage<T>(key: string, fallback: T): T {
   const saved = localStorage.getItem(key);
@@ -11,20 +12,43 @@ function loadFromStorage<T>(key: string, fallback: T): T {
   return fallback;
 }
 
+const DEFAULT_SETTINGS: SystemSettings = {
+  twoFAEnabled: false,
+  email2FAEnabled: false,
+  trustedDevicesEnabled: false,
+  sessionTimeout: '15',
+  passwordSpecialRequired: true,
+  passwordExpiry90Days: false,
+  passwordNoReuse5: true,
+  maintenanceMode: false,
+  language: 'ar',
+  emailAlertsEnabled: true,
+  smsAlertsEnabled: true,
+  appNotificationsEnabled: true,
+  stockShortageThreshold: 10,
+  inactiveSimsThreshold: 30,
+  maxFailedLoginsThreshold: 5,
+  highRiskDuplicatesThreshold: 5,
+  identityRemindersEnabled: true,
+  identityRemindersFrequency: 'weekly',
+};
+
 export function useManagerState(role: string | null) {
+  const mountedRef = useMountedRef();
   const [sims, setSims] = useState<SIM[]>(() => loadFromStorage('admin_sims', []));
   const [agents, setAgents] = useState<Agent[]>(() => loadFromStorage('admin_agents', []));
   const [sellers, setSellers] = useState<Seller[]>(() => loadFromStorage('admin_sellers', []));
   const [alerts, setAlerts] = useState<SystemAlert[]>(() => loadFromStorage('admin_alerts', []));
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [stats, setStats] = useState<any>({});
-  const [settings, setSettings] = useState<SystemSettings>(() => loadFromStorage('admin_settings', null as any));
+  const [settings, setSettings] = useState<SystemSettings>(() => loadFromStorage('admin_settings', DEFAULT_SETTINGS));
   const [currentView, setCurrentView] = useState<ViewType>(() => {
     return (localStorage.getItem('tele_manager_view') as ViewType) || 'dashboard';
   });
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Array<{ id: string; title: string; message: string; identityNo: string; duplicatesCount: number }>>([]);
+  const dismissToast = (id: string) => setToasts(prev => prev.filter(t => t.id !== id));
 
   // Persist
   useEffect(() => { localStorage.setItem('admin_sims', JSON.stringify(sims)); }, [sims]);
@@ -39,13 +63,13 @@ export function useManagerState(role: string | null) {
   };
 
   const refreshData = () => Promise.all([
-    api.getSims().then(setSims).catch((err) => captureError(err, 'refresh:getSims')),
-    api.getAgents().then(setAgents).catch((err) => captureError(err, 'refresh:getAgents')),
-    api.getSellers().then(setSellers).catch((err) => captureError(err, 'refresh:getSellers')),
-    api.getAlerts().then(setAlerts).catch((err) => captureError(err, 'refresh:getAlerts')),
-    api.getSettings().then(setSettings).catch((err) => captureError(err, 'refresh:getSettings')),
-    api.getTransactions().then(setTransactions).catch((err) => captureError(err, 'refresh:getTransactions')),
-    api.getStats().then(setStats).catch((err) => captureError(err, 'refresh:getStats')),
+    api.getSims().then(data => { if (mountedRef.current) setSims(data ?? []); }).catch((err) => captureError(err, 'refresh:getSims')),
+    api.getAgents().then(data => { if (mountedRef.current) setAgents(data ?? []); }).catch((err) => captureError(err, 'refresh:getAgents')),
+    api.getSellers().then(data => { if (mountedRef.current) setSellers(data ?? []); }).catch((err) => captureError(err, 'refresh:getSellers')),
+    api.getAlerts().then(data => { if (mountedRef.current) setAlerts(data ?? []); }).catch((err) => captureError(err, 'refresh:getAlerts')),
+    api.getSettings().then(data => { if (mountedRef.current) setSettings(data ?? {}); }).catch((err) => captureError(err, 'refresh:getSettings')),
+    api.getTransactions().then(data => { if (mountedRef.current) setTransactions(data ?? []); }).catch((err) => captureError(err, 'refresh:getTransactions')),
+    api.getStats().then(data => { if (mountedRef.current) setStats(data ?? {}); }).catch((err) => captureError(err, 'refresh:getStats')),
   ]);
 
   useEffect(() => {
@@ -53,10 +77,12 @@ export function useManagerState(role: string | null) {
     setLoading(true);
     setApiError(null);
     refreshData()
-      .then(() => setLoading(false))
+      .then(() => { if (mountedRef.current) setLoading(false); })
       .catch(() => {
-        setApiError('تعذر الاتصال بالخادم. يتم استخدام البيانات المحلية.');
-        setLoading(false);
+        if (mountedRef.current) {
+          setApiError('تعذر الاتصال بالخادم. يتم استخدام البيانات المحلية.');
+          setLoading(false);
+        }
       });
   }, [role]);
 
@@ -65,7 +91,9 @@ export function useManagerState(role: string | null) {
     if (role !== 'manager') return;
     const threshold = settings?.highRiskDuplicatesThreshold ?? 5;
     api.getDuplicateIdentities().then((identities: any[]) => {
-      const critical = identities.filter((i: any) => i.duplicatesCount > threshold);
+      if (!mountedRef.current) return;
+      const list = Array.isArray(identities) ? identities : [];
+      const critical = list.filter((i: any) => i.duplicatesCount > threshold);
       setToasts(critical.map(item => ({
         id: `${item.idNo}-${threshold}`,
         title: '🚨 تنبيه: تسييل هوية مشبوهة',
@@ -73,76 +101,64 @@ export function useManagerState(role: string | null) {
         identityNo: item.idNo,
         duplicatesCount: item.duplicatesCount
       })));
-    }).catch((err) => { captureError(err, 'duplicate-identities'); setToasts([]); });
+    }).catch((err) => { captureError(err, 'duplicate-identities'); if (mountedRef.current) setToasts([]); });
   }, [settings?.highRiskDuplicatesThreshold, role]);
 
   // Handlers
   const handleAddSIM = async (newSIM: Partial<SIM>) => {
     try {
       const created = await api.createSim(newSIM);
-      setSims(prev => [created, ...prev]);
+      if (mountedRef.current) setSims(prev => [created, ...prev]);
     } catch (err) {
       captureError(err, 'handleAddSIM');
-      setSims(prev => [{
-        id: String(Date.now()),
-        phone: newSIM.phone || '',
-        iccid: newSIM.iccid || '',
-        provider: newSIM.provider || 'Yemen Mobile',
-        status: newSIM.status || 'available',
-        owner: newSIM.owner || 'المركز الرئيسي',
-        dateAdded: newSIM.dateAdded || new Date().toLocaleDateString('ar-YE'),
-        packageType: newSIM.packageType || 'باقة مزايا الشهرية'
-      } as SIM, ...prev]);
     }
   };
 
   const handleAddAgent = async (newAgent: Partial<Agent>) => {
     try {
       const created = await api.createAgent(newAgent);
-      setAgents(prev => [created, ...prev]);
+      if (mountedRef.current) setAgents(prev => [created, ...prev]);
     } catch (err) {
       captureError(err, 'handleAddAgent');
-      setAgents(prev => [{
-        id: String(Date.now()),
-        name: newAgent.name || '',
-        region: newAgent.region || '',
-        phone: newAgent.phone || '',
-        sellersCount: newAgent.sellersCount || 0,
-        simsCount: newAgent.simsCount || 0,
-        status: newAgent.status || 'active'
-      }, ...prev]);
     }
   };
 
   const handleUpdateAgent = (id: string, fields: Partial<Agent>) => {
     api.updateAgent(Number(id), fields).then(() => {
-      setAgents(prev => prev.map(a => a.id === id ? { ...a, ...fields } : a));
+      if (mountedRef.current) setAgents(prev => prev.map(a => a.id === id ? { ...a, ...fields } : a));
     }).catch((err) => captureError(err, 'handleUpdateAgent'));
   };
 
   const handleUpdateSeller = (id: string, fields: Partial<Seller>) => {
     api.updateSeller(Number(id), fields).then(() => {
-      setSellers(prev => prev.map(s => s.id === id ? { ...s, ...fields } : s));
+      if (mountedRef.current) setSellers(prev => prev.map(s => s.id === id ? { ...s, ...fields } : s));
     }).catch((err) => captureError(err, 'handleUpdateSeller'));
   };
 
   const handleAddBalance = (sellerId: string, amount: number) => {
     api.updateSellerBalance(Number(sellerId), amount).then(() => {
-      setSellers(prev => prev.map(s => s.id === sellerId ? { ...s, sales30Days: s.sales30Days + amount } : s));
+      if (mountedRef.current) setSellers(prev => prev.map(s => s.id === sellerId ? { ...s, sales30Days: s.sales30Days + amount } : s));
     }).catch((err) => captureError(err, 'handleAddBalance'));
   };
 
   const handleResolveAlert = (id: string) => {
     api.resolveAlert(Number(id)).then(() => {
-      setAlerts(prev => prev.filter(a => a.id !== id));
+      if (mountedRef.current) setAlerts(prev => prev.filter(a => a.id !== id));
     }).catch((err) => captureError(err, 'handleResolveAlert'));
+  };
+
+  const handleUpdateSIM = (id: string, fields: Partial<SIM>) => {
+    api.updateSim(Number(id), fields).then(() => {
+      if (mountedRef.current) setSims(prev => prev.map(s => s.id === id ? { ...s, ...fields } : s));
+    }).catch((err) => captureError(err, 'handleUpdateSIM'));
   };
 
   return {
     sims, agents, sellers, alerts, transactions, stats, settings, currentView,
     loading, apiError, toasts,
-    setView, setSettings, setSims,
+    setView, setSettings, setSims, dismissToast,
     handleAddSIM, handleAddAgent, handleUpdateAgent,
     handleUpdateSeller, handleAddBalance, handleResolveAlert,
+    handleUpdateSIM, refreshData,
   };
 }

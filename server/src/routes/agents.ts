@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { query } from '../db';
 import { requireRole } from '../middleware/auth';
 import { getPagination, paginatedQuery } from '../helpers';
+import { validate, createAgentSchema, updateAgentSchema } from '../validation';
 
 const router = Router();
 
@@ -26,11 +27,8 @@ router.get('/', requireRole('manager', 'agent'), async (req: Request, res: Respo
   }
 });
 
-router.post('/', requireRole('manager'), async (req: Request, res: Response) => {
+router.post('/', requireRole('manager'), validate(createAgentSchema), async (req: Request, res: Response) => {
   const { name, region, phone, sellers_count, sims_count, status, username, password } = req.body;
-  if (!name) {
-    return res.status(400).json({ error: 'Name is required' });
-  }
   try {
     // Create user account for the agent
     const agentUsername = (username || phone || `agent_${Date.now()}`).trim().toLowerCase();
@@ -70,7 +68,7 @@ router.post('/', requireRole('manager'), async (req: Request, res: Response) => 
   }
 });
 
-router.put('/:id', requireRole('manager'), async (req: Request, res: Response) => {
+router.put('/:id', requireRole('manager'), validate(updateAgentSchema), async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
     const existing = await query('SELECT * FROM agents WHERE id = $1', [id]);

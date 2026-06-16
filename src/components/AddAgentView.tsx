@@ -5,6 +5,8 @@
 
 import React, { useState } from 'react';
 import { Agent, ViewType } from '../types';
+import { useToast, ToastContainer } from '../hooks/useToast';
+import { api } from '../api/client';
 
 interface AddAgentViewProps {
   onAddAgent: (agent: Partial<Agent>) => void;
@@ -12,34 +14,54 @@ interface AddAgentViewProps {
 }
 
 export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps) {
+  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
   const [name, setName] = useState('');
   const [region, setRegion] = useState('أمانة العاصمة');
   const [phone, setPhone] = useState('');
   const [sellersCount, setSellersCount] = useState<number>(0);
   const [simsCount, setSimsCount] = useState<number>(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !phone) {
-      alert('الرجاء إدخال الاسم ورقم الجوال لتسجيل وكيل التوزيع المعتمد.');
+      toastWarning('الرجاء إدخال الاسم ورقم الجوال لتسجيل وكيل التوزيع المعتمد.');
       return;
     }
 
-    onAddAgent({
-      name,
-      region,
-      phone,
-      sellersCount,
-      simsCount,
-      status: 'active'
-    });
+    setIsSubmitting(true);
+    try {
+      const result = await api.createAgent({
+        name,
+        region,
+        phone,
+        sellers_count: sellersCount,
+        sims_count: simsCount,
+        status: 'active'
+      });
 
-    alert(`تم تسجيل الوكيل الموزع: "${name}" بنجاح في النظام وتخصيص العقدة الأمانية له.`);
-    setView('agents');
+      const agentData = result.agent || result;
+      onAddAgent({
+        name,
+        region,
+        phone,
+        sellersCount,
+        simsCount,
+        status: 'active'
+      });
+
+      toastSuccess(`تم تسجيل الوكيل الموزع: "${name}" بنجاح في النظام وتخصيص العقدة الأمانية له.`);
+      setView('agents');
+    } catch (err: any) {
+      toastError(err?.message || 'فشل تسجيل الوكيل. الرجاء المحاولة مرة أخرى.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="max-w-xl mx-auto card p-6">
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
         <div>
           <h2 className="font-headline-lg text-lg font-bold text-gray-905">تسجيل وكيل أو فرع توزيع معتمد</h2>
@@ -62,7 +84,7 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="مثال: شركة حضرموت للمقاولات والتوزيع المحدودة"
+            placeholder="الاسم التجاري"
             className="input-field"
            />
          </div>
@@ -74,7 +96,7 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
                type="text"
                value={region}
                onChange={(e) => setRegion(e.target.value)}
-               placeholder="مثال: أمانة العاصمة - صنعاء"
+                placeholder="المنطقة / المدينة"
                className="input-field"
             />
           </div>
@@ -86,7 +108,7 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
               required
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="مثال: 777300400"
+              placeholder="7xxxxxx"
               className="input-field"
             />
           </div>
@@ -100,7 +122,7 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
               min="0"
               value={sellersCount}
               onChange={(e) => setSellersCount(Number(e.target.value))}
-              placeholder="مثال: 12"
+              placeholder="عدد النقاط"
               className="input-field"
             />
           </div>
@@ -112,7 +134,7 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
               min="0"
               value={simsCount}
               onChange={(e) => setSimsCount(Number(e.target.value))}
-              placeholder="مثال: 500"
+              placeholder="عدد الشرائح"
               className="input-field"
             />
           </div>
@@ -134,11 +156,12 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
              إلغاء التراجع
            </button>
            <button
-             type="submit"
-             className="btn btn-primary"
-          >
-            تأكيد وتسجيل الوكيل
-          </button>
+              type="submit"
+              disabled={isSubmitting}
+              className="btn btn-primary"
+           >
+             {isSubmitting ? 'جاري التسجيل...' : 'تأكيد وتسجيل الوكيل'}
+           </button>
         </div>
       </form>
     </div>

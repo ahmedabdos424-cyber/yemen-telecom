@@ -5,8 +5,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
-import { DUPLICATE_IDENTITIES_MOCKS, AUDIT_LOGS } from '../data';
 import { AuditLog } from '../types';
+import { api } from '../api/client';
 import ConfirmModal from './shared/ConfirmModal';
 import { 
   Network, 
@@ -27,6 +27,7 @@ import {
   FileText,
   X
 } from 'lucide-react';
+import { useToast, ToastContainer } from '../hooks/useToast';
 
 interface OperationLogItem {
   id: string;
@@ -37,26 +38,6 @@ interface OperationLogItem {
 }
 
 const NODE_OPERATIONS_MAP: Record<string, OperationLogItem[]> = {
-  '1023485932': [
-    { id: 'op-1', action: 'محاولة تفعيل شريحة SIM مكررة', time: 'منذ ١٠ دقائق', status: 'warning', details: 'تكرار رقم الهوية عبر جهازين مختلفين في الفترات المتقاربة' },
-    { id: 'op-2', action: 'تفعيل شريحة يمن موبايل', time: 'منذ ساعتين', status: 'success', details: 'الرقم: 777123456 - باقة مزايا الشهرية' },
-    { id: 'op-3', action: 'تحقق من العنوان الوطني والمطابقة', time: 'أمس، ٠٣:٤٥ م', status: 'success', details: 'مطابق لسجلات الشؤون المدنية - صنعاء' },
-    { id: 'op-4', action: 'فحص البصمة الحيوية للعميل', time: 'منذ ٣ أيام', status: 'success', details: 'البصمة معتمدة ومطابقة كلياً' }
-  ],
-  '2094837501': [
-    { id: 'op-5', action: 'تفعيل شريحة سبأفون', time: 'منذ ساعة', status: 'success', details: 'الرقم: 711987654 - باقة البيانات 10GB' },
-    { id: 'op-6', action: 'إصدار شريحة بدل فاقد', time: 'منذ يومين', status: 'failed', details: 'تم رفض العملية لعدم تطابق البصمة الحيوية للعميل' },
-    { id: 'op-7', action: 'تحديث بيانات المشترك الأساسية', time: 'منذ ٤ أيام', status: 'success', details: 'تحديث العنوان الوطني إلى: عدن - كريتر' }
-  ],
-  '1088429103': [
-    { id: 'op-8', action: 'تسجيل شرائح جماعي مشبوه', time: 'أمس، ٠٣:١٥ م', status: 'warning', details: 'طلب تسجيل 8 شرائح في نفس الدقيقة بموقعين متباعدين بتعز والحديدة' },
-    { id: 'op-9', action: 'تفعيل رقم YOU جديد للعمليات الميدانية', time: 'أمس، ١٠:٠٠ ص', status: 'success', details: 'الرقم: 733554433 - باقة هلا الفضية' },
-    { id: 'op-10', action: 'نقل ملكية الشريحة القانونية', time: 'منذ ٥ أيام', status: 'success', details: 'نقل ملكية الشريحة من فاطمة القدسي إلى مؤسسة الأمل للتجارة' }
-  ],
-  '3014772154': [
-    { id: 'op-11', action: 'تفعيل شومة رقمية', time: 'منذ ٣ ساعات', status: 'success', details: 'الرقم المخصص المرتبط بالهوية: 731111222' },
-    { id: 'op-12', action: 'مراجعة أمنية احترازية للتحسين', time: 'منذ أسبوع', status: 'warning', details: 'تمت تصفية ومطابقة العقد مع سجلات الشؤون المدنية بحضرموت' }
-  ],
   'region-sanaa': [
     { id: 'op-s1', action: 'تحديث خوادم محطة تفعيل صنعاء', time: 'الآن', status: 'success', details: 'ربط قاعدة بيانات صنعاء بالأمانة المركزية بنجاح بنسبة ١٠٠٪' },
     { id: 'op-s2', action: 'تثبيت حظر هويات متلاعبة نشطة', time: 'منذ ساعات', status: 'warning', details: 'تجميد نشاط 14 شريحة مسجلة تحت هويات مشتتة جغرافياً' }
@@ -76,15 +57,45 @@ const NODE_OPERATIONS_MAP: Record<string, OperationLogItem[]> = {
 };
 
 export default function GeographicRiskView() {
-  const [mocks, setMocks] = useState(DUPLICATE_IDENTITIES_MOCKS);
-  const [logs, setLogs] = useState<AuditLog[]>(AUDIT_LOGS);
+  const [identities, setIdentities] = useState<any[]>([]);
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [searchWord, setSearchWord] = useState('');
   const [selectedNode, setSelectedNode] = useState<any>(null);
   const [dimensions, setDimensions] = useState({ width: 320, height: 280 });
   const [blockConfirm, setBlockConfirm] = useState<{idNo: string; name: string} | null>(null);
 
+  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
+
   const svgRef = useRef<SVGSVGElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    async function fetchData() {
+      try {
+        setLoading(true);
+        setFetchError(null);
+        const [idents, auditLogs] = await Promise.all([
+          api.getDuplicateIdentities(),
+          api.getAuditLogs(),
+        ]);
+        if (!mounted) return;
+        setIdentities(idents || []);
+        setLogs(auditLogs || []);
+      } catch (err: any) {
+        if (!mounted) return;
+        setFetchError(err?.message || 'فشل تحميل البيانات');
+        setIdentities([]);
+        setLogs([]);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    fetchData();
+    return () => { mounted = false; };
+  }, []);
 
   // Auto-resize tracker for responsive canvas
   useEffect(() => {
@@ -105,7 +116,7 @@ export default function GeographicRiskView() {
 
   // Handle flag risk alerts
   const handleFlagRow = (idNo: string, name: string) => {
-    alert(`تم إرسال بلاغ أمني لإشتباه الهوية: ${name} (ID: ${idNo}) إلى عقد المراجعة الفورية ورُفع بمستوى التحذير.`);
+    toastSuccess(`تم إرسال بلاغ أمني لإشتباه الهوية: ${name} (ID: ${idNo}) إلى عقد المراجعة الفورية ورُفع بمستوى التحذير.`);
     
     const newLog: AuditLog = {
       id: String(Date.now()),
@@ -137,8 +148,8 @@ export default function GeographicRiskView() {
     setBlockConfirm(null);
   };
 
-  const filteredMocks = mocks.filter(
-    (item) => item.name.includes(searchWord) || item.idNo.includes(searchWord) || item.region.includes(searchWord)
+  const filteredIdentities = identities.filter(
+    (item) => (item.name ?? '').includes(searchWord) || (item.idNo ?? '').includes(searchWord) || (item.region ?? '').includes(searchWord)
   );
 
   // D3 Interactive Simulation Engine logic
@@ -166,7 +177,7 @@ export default function GeographicRiskView() {
       { id: 'telecom-backbone', label: 'بوابة المراقبة والربط', type: 'checkpoint', color: '#64748b', size: 18, risk: 'آمن' }
     ];
 
-    const identityNodes = mocks.map(m => {
+    const identityNodes = identities.map(m => {
       const parentId = regionsMap[m.region] || 'telecom-backbone';
       return {
         id: m.idNo,
@@ -190,15 +201,11 @@ export default function GeographicRiskView() {
       { source: 'telecom-backbone', target: 'region-taiz', value: 2 },
       { source: 'telecom-backbone', target: 'region-mukalla', value: 2 },
       
-      ...mocks.map(m => ({
+      ...identities.map(m => ({
         source: m.idNo,
         target: regionsMap[m.region] || 'telecom-backbone',
         value: 1
       })),
-
-      // Cross-region suspicious linkages representing identity duplicates matching patterns
-      { source: '1023485932', target: '1088429103', value: 3 }, // Saleh to Fatima
-      { source: '2094837501', target: '3014772154', value: 3 }  // Nabil to Omar
     ];
 
     // Clone inputs safely to prevent react rendering loops
@@ -366,13 +373,43 @@ export default function GeographicRiskView() {
     return () => {
       simulation.stop();
     };
-  }, [dimensions, mocks]);
+  }, [dimensions, identities]);
 
   // Read associated operations for active interactive selection
   const activeLogs = selectedNode ? (NODE_OPERATIONS_MAP[selectedNode.id] || []) : [];
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+        <div className="w-8 h-8 border-2 border-slate-500 border-t-transparent rounded-full animate-spin mb-4" />
+        <p className="text-sm">جاري تحميل بيانات الهويات المكررة...</p>
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+        <ShieldAlert size={40} className="text-red-500 mb-4" />
+        <p className="text-sm text-red-400 mb-2">{fetchError}</p>
+        <button onClick={() => window.location.reload()} className="btn btn-sm mt-2">إعادة المحاولة</button>
+      </div>
+    );
+  }
+
+  if (identities.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+        <Shield size={40} className="text-slate-500 mb-4" />
+        <p className="text-base font-bold text-slate-300 mb-1">لا توجد بيانات مخاطر حالياً</p>
+        <p className="text-sm text-slate-500">لم يتم العثور على هويات مكررة في قاعدة البيانات</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       {/* Risk indicators grid panel */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {/* Level 0 indicator */}
@@ -443,7 +480,7 @@ export default function GeographicRiskView() {
             <span className="material-symbols-outlined absolute right-3 top-2 text-gray-450 text-sm">search</span>
           </div>
           <button 
-            onClick={() => { alert('تم تصدير تقرير تحليل الهويات كملف PDF لمراجعته مع الشؤون القانونية.'); }}
+            onClick={() => { toastSuccess('تم تصدير تقرير تحليل الهويات كملف PDF لمراجعته مع الشؤون القانونية.'); }}
              className="btn btn-sm w-full sm:w-auto flex items-center justify-center gap-2"
           >
             <Download size={14} />
@@ -465,7 +502,7 @@ export default function GeographicRiskView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-105">
-              {filteredMocks.map((item) => (
+              {filteredIdentities.map((item) => (
                 <tr key={item.idNo} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 font-mono font-bold text-gray-900">{item.idNo}</td>
                   <td className="px-6 py-4">
@@ -510,7 +547,7 @@ export default function GeographicRiskView() {
                          <span className="material-symbols-outlined text-lg">account_tree</span>
                        </button>
                        <button 
-                         onClick={() => alert(`تفاصيل الهوية: ${item.name}`)}
+                          onClick={() => toastInfo(`تفاصيل الهوية: ${item.name}`)}
                          className="btn-icon hover:bg-gray-100 text-gray-500 hover:text-gray-900 border-gray-100" 
                          title="تفاصيل الهوية ومستنداتها"
                        >
@@ -751,7 +788,7 @@ export default function GeographicRiskView() {
                     </>
                   ) : (
                     <button
-                      onClick={() => alert(`تنزيل كامل سجل تكرار المحطة الإقليمية لمدينة: ${selectedNode.label}`)}
+                      onClick={() => toastInfo(`تنزيل كامل سجل تكرار المحطة الإقليمية لمدينة: ${selectedNode.label}`)}
                       className="w-full py-2.5 bg-primary text-white rounded-lg flex items-center justify-center gap-1.5 hover:opacity-90 shadow-sm transition-all cursor-pointer"
                     >
                       <FileText size={14} />
@@ -809,7 +846,7 @@ export default function GeographicRiskView() {
           ))}
         </div>
         <button 
-          onClick={() => { alert('سجل التحقيق الكامل يحتوي على 1,280 ملف مؤرشف للسنوات السابقة.'); }}
+          onClick={() => { toastInfo('سجل التحقيق الكامل يحتوي على 1,280 ملف مؤرشف للسنوات السابقة.'); }}
           className="btn btn-ghost btn-sm w-full mt-4 text-xs"
         >
           مشاهدة الأرشيف الكامل للهويات

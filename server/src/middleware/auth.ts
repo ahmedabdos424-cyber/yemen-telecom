@@ -1,12 +1,16 @@
+import path from 'path';
 import dotenv from 'dotenv';
-dotenv.config({ path: '.env' });
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 import { Request, Response, NextFunction } from 'express';
 import jwt, { VerifyOptions } from 'jsonwebtoken';
 import crypto from 'crypto';
 import { query } from '../db';
 
-const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV !== 'production' ? crypto.randomBytes(64).toString('hex') : '');
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required');
+}
+const JWT_SECRET = process.env.JWT_SECRET;
 
 export interface AuthRequest extends Request {
   user?: { id: number; username: string; role: string };

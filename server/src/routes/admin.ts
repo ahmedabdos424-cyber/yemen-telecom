@@ -1,7 +1,9 @@
+import path from 'path';
 import { Router, Request, Response } from 'express';
 import { query } from '../db';
 import { requireRole } from '../middleware/auth';
 import { getPagination } from '../helpers';
+import { validate, updateSettingsSchema } from '../validation';
 
 const router = Router();
 
@@ -38,7 +40,7 @@ router.get('/settings', requireRole('manager'), async (_req: Request, res: Respo
   }
 });
 
-router.put('/settings', requireRole('manager'), async (req: Request, res: Response) => {
+router.put('/settings', requireRole('manager'), validate(updateSettingsSchema), async (req: Request, res: Response) => {
   const settings = req.body;
   try {
     const result = await query(
@@ -161,6 +163,103 @@ router.get('/audit-logs', requireRole('manager'), async (req: Request, res: Resp
   } catch (err) {
     console.error('Error fetching audit logs:', err);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ========================
+// System: Backup
+// ========================
+router.post('/system/backup', requireRole('manager'), async (_req: Request, res: Response) => {
+  try {
+    const tables = ['users', 'agents', 'sellers', 'sims', 'alerts', 'transactions', 'operations', 'inventories', 'audit_logs', 'system_settings', 'token_blacklist', 'duplicate_identities', 'customers', 'distribution_requests'];
+    const backup: Record<string, any[]> = {};
+    for (const table of tables) {
+      const orderBy = table === 'token_blacklist' ? 'token_hash' : 'id';
+      const result = await query(`SELECT * FROM ${table} ORDER BY ${orderBy}`);
+      backup[table] = result.rows;
+    }
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `backup-${timestamp}.json`;
+    const fs = await import('fs');
+    const backupDir = path.resolve(__dirname, '../../backups');
+    if (!fs.existsSync(backupDir)) {
+      fs.mkdirSync(backupDir, { recursive: true });
+    }
+    const filePath = path.join(backupDir, filename);
+    fs.writeFileSync(filePath, JSON.stringify(backup, null, 2), 'utf-8');
+    const stat = fs.statSync(filePath);
+    res.json({
+      success: true,
+      filename,
+      size: stat.size,
+      sizeFormatted: `${(stat.size / 1024 / 1024).toFixed(2)} MB`,
+      tables: tables.length,
+      records: Object.values(backup).reduce((sum, arr) => sum + arr.length, 0),
+      downloadUrl: `/api/system/backup/download/${filename}`,
+    });
+  } catch (err) {
+    console.error('Error creating backup:', err);
+    res.status(500).json({ error: 'Failed to create backup' });
+  }
+});
+
+router.get('/system/backup/download/:filename', requireRole('manager'), async (req: Request, res: Response) => {
+  try {
+    const fs = await import('fs');
+    const backupDir = path.resolve(__dirname, '../../backups');
+    const filename = path.basename(req.params.filename);
+    if (filename !== req.params.filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+      return res.status(400).json({ error: 'Invalid filename' });
+    }
+    const filePath = path.join(backupDir, filename);
+    const resolvedPath = path.resolve(filePath);
+    if (!resolvedPath.startsWith(backupDir)) {
+      return res.status(400).json({ error: 'Invalid file path' });
+    }
+    if (!fs.existsSync(resolvedPath)) {
+      return res.status(404).json({ error: 'Backup file not found' });
+    }
+    res.download(resolvedPath);
+  } catch (err) {
+    console.error('Error downloading backup:', err);
+    res.status(500).json({ error: 'Failed to download backup' });
+  }
+});
+
+// ========================
+// System: Emergency Lockdown
+// ========================
+router.post('/system/lockdown', requireRole('manager'), async (_req: Request, res: Response) => {
+  try {
+    const current = await query('SELECT maintenance_mode FROM system_settings WHERE id = 1');
+    const isCurrentlyLocked = current.rows[0]?.maintenance_mode || false;
+    await query(
+      `UPDATE system_settings SET maintenance_mode = $1 WHERE id = 1`,
+      [!isCurrentlyLocked]
+    );
+    await query(
+      `UPDATE sellers SET status = $1 WHERE status NOT IN ('deleted')`,
+      [!isCurrentlyLocked ? 'suspended' : 'active']
+    );
+    const newStatus = !isCurrentlyLocked;
+    res.json({
+      success: true,
+      locked: newStatus,
+      message: newStatus ? 'Emergency lockdown activated. All seller accounts suspended.' : 'Lockdown deactivated. All seller accounts restored.',
+    });
+  } catch (err) {
+    console.error('Error toggling lockdown:', err);
+    res.status(500).json({ error: 'Failed to toggle lockdown' });
+  }
+});
+
+router.get('/system/lockdown/status', requireRole('manager'), async (_req: Request, res: Response) => {
+  try {
+    const result = await query('SELECT maintenance_mode FROM system_settings WHERE id = 1');
+    res.json({ locked: result.rows[0]?.maintenance_mode || false });
+  } catch (err) {
+    console.error('Error checking lockdown status:', err);
+    res.status(500).json({ error: 'Failed to check lockdown status' });
   }
 });
 

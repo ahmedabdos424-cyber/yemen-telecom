@@ -8,7 +8,7 @@ import { SIM, Agent, Seller, SystemAlert, Transaction, AuditLog, SystemSettings 
 export const INITIAL_SIMS: SIM[] = [
   {
     id: '1',
-    phone: '777123456',
+    phone: '7xxxxxxxx',
     iccid: '8996701123456789012',
     provider: 'Yemen Mobile',
     status: 'available',
@@ -18,17 +18,17 @@ export const INITIAL_SIMS: SIM[] = [
   },
   {
     id: '2',
-    phone: '711987654',
+    phone: '7xxxxxxxx',
     iccid: '8996702233445566778',
     provider: 'Sabafon',
     status: 'sold',
-    owner: 'محمد سالم (بائع)',
+    owner: 'بائع',
     dateAdded: '2023/10/24',
     packageType: 'باقة البيانات 10GB'
   },
   {
     id: '3',
-    phone: '733554433',
+    phone: '7xxxxxxxx',
     iccid: '8996703344556677889',
     provider: 'YOU',
     status: 'reserved',
@@ -38,41 +38,41 @@ export const INITIAL_SIMS: SIM[] = [
   },
   {
     id: '4',
-    phone: '770987654',
+    phone: '7xxxxxxxx',
     iccid: '8996700012345678901',
     provider: 'Yemen Mobile',
     status: 'available',
-    owner: 'أحمد محمد الصنعاني (بائع)',
+    owner: 'بائع',
     dateAdded: '2023/10/25',
     packageType: 'باقة مزايا الشهرية'
   },
   {
     id: '5',
-    phone: '775432109',
+    phone: '7xxxxxxxx',
     iccid: '8996700012345678902',
     provider: 'Yemen Mobile',
     status: 'available',
-    owner: 'أحمد محمد الصنعاني (بائع)',
+    owner: 'بائع',
     dateAdded: '2023/10/24',
     packageType: 'باقة البيانات 10GB'
   },
   {
     id: '6',
-    phone: '712345678',
+    phone: '7xxxxxxxx',
     iccid: '8996700012345678903',
     provider: 'Sabafon',
     status: 'reserved',
-    owner: 'أحمد محمد الصنعاني (بائع)',
+    owner: 'بائع',
     dateAdded: '2023/10/24',
     packageType: 'باقة هلا الفضية'
   },
   {
     id: '7',
-    phone: '731111222',
+    phone: '7xxxxxxxx',
     iccid: '8996700012345678904',
     provider: 'YOU',
     status: 'inactive',
-    owner: 'أحمد محمد الصنعاني (بائع)',
+    owner: 'بائع',
     dateAdded: '2023/10/22',
     packageType: 'باقة مزايا الشهرية'
   }
@@ -83,7 +83,7 @@ export const INITIAL_AGENTS: Agent[] = [
     id: '1',
     name: 'محمد عبدالله الصبري',
     region: 'أمانة العاصمة',
-    phone: '1012398455',
+    phone: '10xxxxxxxx',
     sellersCount: 45,
     simsCount: 1240,
     status: 'active'
@@ -92,7 +92,7 @@ export const INITIAL_AGENTS: Agent[] = [
     id: '2',
     name: 'خالد ناصر الحميري',
     region: 'عدن - كريتر',
-    phone: '2039485761',
+    phone: '20xxxxxxxx',
     sellersCount: 12,
     simsCount: 340,
     status: 'inactive'
@@ -101,7 +101,7 @@ export const INITIAL_AGENTS: Agent[] = [
     id: '3',
     name: 'صالح علي القحطاني',
     region: 'تعز - الحوبان',
-    phone: '4012394844',
+    phone: '40xxxxxxxx',
     sellersCount: 28,
     simsCount: 890,
     status: 'active'
@@ -110,7 +110,7 @@ export const INITIAL_AGENTS: Agent[] = [
     id: '4',
     name: 'يسر محسن علوي',
     region: 'حضرموت - المكلا',
-    phone: '5012384742',
+    phone: '50xxxxxxxx',
     sellersCount: 19,
     simsCount: 620,
     status: 'active'
@@ -120,9 +120,9 @@ export const INITIAL_AGENTS: Agent[] = [
 export const INITIAL_SELLERS: Seller[] = [
   {
     id: 'SLR-99021',
-    name: 'أحمد محمد الصنعاني',
+    name: 'بائع تجزئة',
     region: 'صنعاء - الأمانة',
-    phone: '775323953',
+    phone: '7xxxxxxxx',
     simsCount: 452,
     sales30Days: 1820,
     salesGrowth: 5,
@@ -131,9 +131,9 @@ export const INITIAL_SELLERS: Seller[] = [
   },
   {
     id: 'SLR-88124',
-    name: 'سارة سالم اليافعي',
+    name: 'بائع تجزئة',
     region: 'عدن - خورمكسر',
-    phone: '711904533',
+    phone: '7xxxxxxxx',
     simsCount: 12,
     sales30Days: 0,
     salesGrowth: 0,
@@ -142,9 +142,9 @@ export const INITIAL_SELLERS: Seller[] = [
   },
   {
     id: 'SLR-11054',
-    name: 'خالد عبدالله تعز',
+    name: 'بائع تجزئة',
     region: 'تعز - الجوبان',
-    phone: '735912445',
+    phone: '7xxxxxxxx',
     simsCount: 1204,
     sales30Days: 3421,
     salesGrowth: 12,

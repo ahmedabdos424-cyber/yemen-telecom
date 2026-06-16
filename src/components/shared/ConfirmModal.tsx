@@ -76,7 +76,7 @@ export default function ConfirmModal({
 
             <div className="flex gap-3">
               <button
-                 onClick={() => { onConfirm(); onCancel(); }}
+                 onClick={onConfirm}
                  className={`btn flex-1 ${colors.btn} text-white shadow-md text-center`}
               >
                 {confirmLabel}

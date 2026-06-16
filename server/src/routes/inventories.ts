@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { query } from '../db';
 import { requireRole } from '../middleware/auth';
+import { validate, updateInventoriesSchema } from '../validation';
 
 const router = Router();
 
@@ -19,11 +20,8 @@ router.get('/', requireRole('manager', 'agent'), async (_req: Request, res: Resp
   }
 });
 
-router.put('/', requireRole('manager'), async (req: Request, res: Response) => {
+router.put('/', requireRole('manager'), validate(updateInventoriesSchema), async (req: Request, res: Response) => {
   const updates: Array<{ operator: string; available: number; remaining: number }> = req.body;
-  if (!Array.isArray(updates)) {
-    return res.status(400).json({ error: 'Body must be an array of inventory updates' });
-  }
   try {
     for (const inv of updates) {
       await query(

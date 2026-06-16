@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { query } from '../db';
 import { requireRole } from '../middleware/auth';
 import { getPagination, paginatedQuery } from '../helpers';
+import { validate, createSimSchema, updateSimSchema } from '../validation';
 
 const router = Router();
 
@@ -24,11 +25,8 @@ router.get('/', requireRole('manager', 'agent'), async (req: Request, res: Respo
   }
 });
 
-router.post('/', requireRole('manager'), async (req: Request, res: Response) => {
+router.post('/', requireRole('manager'), validate(createSimSchema), async (req: Request, res: Response) => {
   const { phone, iccid, provider, status, owner, package_type } = req.body;
-  if (!iccid) {
-    return res.status(400).json({ error: 'ICCID is required' });
-  }
   try {
     const result = await query(
       `INSERT INTO sims (phone, iccid, provider, status, owner, date_added, package_type)
@@ -46,7 +44,7 @@ router.post('/', requireRole('manager'), async (req: Request, res: Response) => 
   }
 });
 
-router.put('/:id', requireRole('manager'), async (req: Request, res: Response) => {
+router.put('/:id', requireRole('manager'), validate(updateSimSchema), async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
     const existing = await query('SELECT * FROM sims WHERE id = $1', [id]);

@@ -38,7 +38,10 @@ android {
                 System.getenv('KEY_PASSWORD')) {
                 signingConfig signingConfigs.release
             } else {
-                signingConfig signingConfigs.debug
+                throw new GradleException(
+                    "Missing Android signing configuration. " +
+                    "Set KEYSTORE_PASSWORD, KEYSTORE_ALIAS, and KEY_PASSWORD environment variables."
+                )
             }
         }
     }

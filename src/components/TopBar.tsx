@@ -5,6 +5,7 @@
 
 import { useState } from 'react';
 import { ViewType } from '../types';
+import ProfileAvatar from './shared/ProfileAvatar';
 
 interface TopBarProps {
   currentView: ViewType;
@@ -151,12 +152,16 @@ export default function TopBar({
         {/* Admin profile user header */}
         <div className="flex items-center gap-2">
           <div className="text-right hidden sm:block">
-            <p className="text-[11px] md:text-xs font-bold text-gray-900">{displayName || 'أحمد محمد'}</p>
-            <p className="text-[9px] md:text-[10px] text-gray-500">{role === 'manager' ? 'مسؤول النظام الأعلى' : role === 'agent' ? 'وكيل معتمد' : role === 'seller' ? 'بائع تجزئة' : 'مستخدم'}</p>
+            <p className="text-[11px] md:text-xs font-bold text-gray-900">{displayName || 'المستخدم'}</p>
           </div>
-          <div className="w-7 h-7 md:w-10 md:h-10 rounded-full bg-primary-container text-white flex items-center justify-center font-bold text-sm border border-gray-200 shadow-sm">
-            {(displayName || 'أحمد محمد').charAt(0)}
-          </div>
+          <ProfileAvatar
+            photo=""
+            name={displayName || 'المستخدم'}
+            onPhotoChange={() => {}}
+            onPhotoDelete={() => {}}
+            size={28}
+            editable={false}
+          />
         </div>
       </div>
     </header>

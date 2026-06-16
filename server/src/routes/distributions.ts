@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { query } from '../db';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination } from '../helpers';
+import { validate, createDistributionSchema, approveDistributionSchema } from '../validation';
 
 const router = Router();
 
@@ -61,14 +62,8 @@ router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: R
   }
 });
 
-router.post('/', requireRole('agent'), async (req: AuthRequest, res: Response) => {
+router.post('/', requireRole('agent'), validate(createDistributionSchema), async (req: AuthRequest, res: Response) => {
   const { seller_id, seller_name, operator, count, notes } = req.body;
-  if (!operator || !count) {
-    return res.status(400).json({ error: 'Operator and count are required' });
-  }
-  if (count < 1 || count > 10000) {
-    return res.status(400).json({ error: 'Count must be between 1 and 10000' });
-  }
   try {
     const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user!.id]);
     if (agentRes.rows.length === 0) {
@@ -93,11 +88,8 @@ router.post('/', requireRole('agent'), async (req: AuthRequest, res: Response) =
   }
 });
 
-router.put('/:id/approve', requireRole('manager'), async (req: AuthRequest, res: Response) => {
+router.put('/:id/approve', requireRole('manager'), validate(approveDistributionSchema), async (req: AuthRequest, res: Response) => {
   const { status: decision, notes } = req.body;
-  if (!decision || !['approved', 'rejected'].includes(decision)) {
-    return res.status(400).json({ error: 'Status must be "approved" or "rejected"' });
-  }
   try {
     const existing = await query('SELECT * FROM distribution_requests WHERE id = $1', [req.params.id]);
     if (existing.rows.length === 0) {

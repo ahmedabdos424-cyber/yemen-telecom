@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { query } from '../db';
 import { requireRole } from '../middleware/auth';
 import { getPagination } from '../helpers';
+import { validate, createCustomerSchema } from '../validation';
 
 const router = Router();
 
@@ -55,7 +56,7 @@ router.get('/:id', requireRole('manager', 'agent', 'seller'), async (req: any, r
   }
 });
 
-router.post('/', requireRole('manager', 'agent', 'seller'), async (req: any, res: Response) => {
+router.post('/', requireRole('manager', 'agent', 'seller'), validate(createCustomerSchema), async (req: any, res: Response) => {
   const { full_name, id_number, phone, region, activated_by } = req.body;
   try {
     const existing = await query('SELECT id FROM customers WHERE id_number = $1', [id_number]);

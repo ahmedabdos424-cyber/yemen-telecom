@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ViewType } from '../types';
+import { useToast, ToastContainer } from '../hooks/useToast';
+import { api } from '../api/client';
 
 interface AdminMoreDrawerProps {
   isMoreOpen: boolean;
@@ -11,62 +13,63 @@ interface AdminMoreDrawerProps {
 
 export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, onLogout }: AdminMoreDrawerProps) {
   const [activeSubScreen, setActiveSubScreen] = useState<string | null>(null);
+  const [showLogOutDialog, setShowLogOutDialog] = useState(false);
+
+  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
+
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditLogsLoading, setAuditLogsLoading] = useState(false);
+  const [backupsList, setBackupsList] = useState<any[]>([]);
   const [backupProgress, setBackupProgress] = useState<number | null>(null);
   const [backupStatus, setBackupStatus] = useState<'idle' | 'running' | 'completed'>('idle');
-  const [backupsList, setBackupsList] = useState([
-    { name: 'AUTO-BACKUP-20260531-0000.sql.gpg', size: '14.2 MB', date: '31/05/2026' },
-    { name: 'MANUAL-BACKUP-20260515-1422.sql.gpg', size: '13.9 MB', date: '15/05/2026' }
-  ]);
-  const [simulatedUsers, setSimulatedUsers] = useState([
-    { id: 'usr-101', name: 'أحمد صالح المهدي', email: 'ahmed.mahdi@telecom.ye', role: 'مدير العمليات', status: 'نشط', lastActive: 'الآن' },
-    { id: 'usr-102', name: 'يسرى عبدالله كحيل', email: 'y.kahil@telecom.ye', role: 'مشرف حسابات مالي', status: 'نشط', lastActive: 'منذ ١٢ دقيقة' },
-    { id: 'usr-103', name: 'محمد ناصر الحداء', email: 'm.haddah@telecom.ye', role: 'مدير الدعم والتحقق', status: 'توقيف مؤقت', lastActive: 'منذ يومين' },
-    { id: 'usr-104', name: 'خالد عبدالله الكبسي', email: 'k.kibsi@telecom.ye', role: 'مسؤول الرقابة المحيطية', status: 'نشط', lastActive: 'منذ ساعة' }
-  ]);
-  const [activeWebhooks, setActiveWebhooks] = useState([
-    { name: 'بوابة Yemen Mobile لتسييل الشرائح', url: 'https://api.yemenmobile.com.ye/v2/webhook', active: true },
-    { name: 'بوابة Sabafon للمطابقة الأوتوماتيكية', url: 'https://core.sabafon.com.ye/api/v1/sim-callback', active: false },
-    { name: 'نظام إرسال رسائل التحقق المزدوج SMS Gateway', url: 'https://sms-server.yemen.net/send_webhook', active: true }
-  ]);
-  const [rolePermissions, setRolePermissions] = useState({
-    admin: { label: 'مدير عام بالنظام كامل الصلاحيات', read: true, write: true, delete: true, suspend: true },
-    supervisor: { label: 'مشرف مبيعات الموزعين بالفرع', read: true, write: true, delete: false, suspend: true },
-    auditor: { label: 'مدقق ومفتش مالي للشرائح', read: true, write: false, delete: false, suspend: false }
-  });
-  const [showLogOutDialog, setShowLogOutDialog] = useState(false);
-  const [logoutMessageVisible, setLogoutMessageVisible] = useState(false);
 
-  const runBackupSimulation = () => {
+  useEffect(() => {
+    if (activeSubScreen === 'audit-logs' && auditLogs.length === 0 && !auditLogsLoading) {
+      setAuditLogsLoading(true);
+      api.getAuditLogs()
+        .then(data => { setAuditLogs(data || []); })
+        .catch(() => { toastError('فشل تحميل سجلات التدقيق'); })
+        .finally(() => setAuditLogsLoading(false));
+    }
+  }, [activeSubScreen, auditLogs.length, auditLogsLoading, toastError]);
+
+  useEffect(() => {
+    if (activeSubScreen === 'backup-restore') {
+      setBackupProgress(null);
+      setBackupStatus('idle');
+    }
+  }, [activeSubScreen]);
+
+  const createBackup = async () => {
     if (backupStatus === 'running') return;
     setBackupStatus('running');
     setBackupProgress(0);
+    try {
+      const result = await api.createBackup();
+      setBackupProgress(100);
+      setBackupStatus('completed');
+      setBackupsList(prev => [
+        { name: result.filename, size: result.sizeFormatted, date: new Date().toLocaleDateString('ar-YE') },
+        ...prev
+      ]);
+      toastSuccess(`تم إنشاء النسخة الاحتياطية بنجاح (${result.sizeFormatted})`);
+    } catch (err: any) {
+      setBackupStatus('idle');
+      setBackupProgress(null);
+      toastError(err?.message || 'فشل إنشاء النسخة الاحتياطية');
+    }
   };
 
-  useEffect(() => {
-    let t: any;
-    if (backupStatus === 'running' && backupProgress !== null) {
-      if (backupProgress < 100) {
-        t = setTimeout(() => {
-          setBackupProgress(p => (p !== null ? Math.min(p + 10, 100) : null));
-        }, 150);
-      } else {
-        setBackupStatus('completed');
-        const formattedDate = new Date().toLocaleDateString('ar-YE');
-        const fileName = `MANUAL-BACKUP-20260601-${Math.floor(1000 + Math.random() * 9000)}.sql.gpg`;
-        setBackupsList(prev => [
-          { name: fileName, size: '14.5 MB', date: formattedDate },
-          ...prev
-        ]);
-        setBackupProgress(null);
-      }
-    }
-    return () => clearTimeout(t);
-  }, [backupProgress, backupStatus]);
+  const downloadBackup = (filename: string) => {
+    const url = api.downloadBackup(filename);
+    window.open(url, '_blank');
+  };
 
   if (!isMoreOpen) return null;
 
   return (
     <>
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -100,28 +103,6 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
 
         <div className="bottom-sheet-body space-y-4">
           <div className="space-y-2">
-            <h4 className="text-[10px] text-slate-500 bg-slate-800/50 px-2.5 py-1 rounded-md font-bold inline-block select-none">👥 العمليات والوكلاء ومراقبة البيع</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <button onClick={() => { setActiveSubScreen('user-management'); }}
-                className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
-                <div className="flex items-center gap-2.5">
-                  <span className="material-symbols-outlined text-slate-400 group-hover:text-ym text-lg">person_search</span>
-                  <span className="text-xs font-bold text-slate-200">إدارة مستخدمي النظام</span>
-                </div>
-                <span className="material-symbols-outlined text-slate-600 text-sm group-hover:-translate-x-0.5 transition-transform">arrow_back</span>
-              </button>
-              <button onClick={() => { setView('sellers'); setIsMoreOpen(false); }}
-                className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
-                <div className="flex items-center gap-2.5">
-                  <span className="material-symbols-outlined text-slate-400 group-hover:text-ym text-lg">storefront</span>
-                  <span className="text-xs font-bold text-slate-200">إدارة البائعين ونقاط البيع</span>
-                </div>
-                <span className="text-[9px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full font-bold">نشط</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-2">
             <h4 className="text-[10px] text-slate-500 bg-slate-800/50 px-2.5 py-1 rounded-md font-bold inline-block select-none">🛡️ المراقبة والتدقيق الأمني</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <button onClick={() => { setView('duplicate-identities'); setIsMoreOpen(false); }}
@@ -144,48 +125,12 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
           </div>
 
           <div className="space-y-2">
-            <h4 className="text-[10px] text-slate-500 bg-slate-800/50 px-2.5 py-1 rounded-md font-bold inline-block select-none">🌐 الشبكات والبنية التحتية</h4>
+            <h4 className="text-[10px] text-slate-500 bg-slate-800/50 px-2.5 py-1 rounded-md font-bold inline-block select-none">🌐 البنية التحتية</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <button onClick={() => { setActiveSubScreen('operator-management'); }}
-                className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
-                <div className="flex items-center gap-2.5"><span className="material-symbols-outlined text-slate-400 group-hover:text-sf text-lg">cell_tower</span><span className="text-xs font-bold text-slate-200">إدارة مشغلي الاتصالات</span></div>
-                <span className="material-symbols-outlined text-slate-600 text-sm">arrow_back</span>
-              </button>
-              <button onClick={() => { setActiveSubScreen('storage-management'); }}
-                className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
-                <div className="flex items-center gap-2.5"><span className="material-symbols-outlined text-slate-400 group-hover:text-you text-lg">warehouse</span><span className="text-xs font-bold text-slate-200">إدارة المستودعات</span></div>
-                <span className="material-symbols-outlined text-slate-600 text-sm">arrow_back</span>
-              </button>
-              <button onClick={() => { setActiveSubScreen('system-health'); }}
-                className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
-                <div className="flex items-center gap-2.5"><span className="material-symbols-outlined text-slate-400 group-hover:text-green-500 text-lg">dns</span><span className="text-xs font-bold text-slate-200">صحة الخوادم</span></div>
-                <div className="flex items-center gap-1.5 font-mono text-[9px] font-bold text-green-400 bg-green-500/20 px-2 py-0.5 rounded-full"><span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>100%</div>
-              </button>
               <button onClick={() => { setActiveSubScreen('backup-restore'); }}
                 className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
                 <div className="flex items-center gap-2.5"><span className="material-symbols-outlined text-slate-400 group-hover:text-sf text-lg">backup</span><span className="text-xs font-bold text-slate-200">النسخ الاحتياطي</span></div>
                 <span className="material-symbols-outlined text-slate-600 text-sm">arrow_back</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <h4 className="text-[10px] text-slate-500 bg-slate-800/50 px-2.5 py-1 rounded-md font-bold inline-block select-none">🛡️ صلاحيات الموظفين والربط البرمجي</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <button onClick={() => { setActiveSubScreen('permissions-roles'); }}
-                className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
-                <div className="flex items-center gap-2.5"><span className="material-symbols-outlined text-slate-400 group-hover:text-ym text-lg">badge</span><span className="text-xs font-bold text-slate-200">الصلاحيات والأدوار</span></div>
-                <span className="material-symbols-outlined text-slate-600 text-sm">arrow_back</span>
-              </button>
-              <button onClick={() => { setActiveSubScreen('integrations'); }}
-                className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
-                <div className="flex items-center gap-2.5"><span className="material-symbols-outlined text-slate-400 group-hover:text-you text-lg">api</span><span className="text-xs font-bold text-slate-200">التكامل الخارجي API</span></div>
-                <span className="material-symbols-outlined text-slate-600 text-sm">arrow_back</span>
-              </button>
-              <button onClick={() => { setView('reports'); setIsMoreOpen(false); }}
-                className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer sm:col-span-2">
-                <div className="flex items-center gap-2.5"><span className="material-symbols-outlined text-slate-400 group-hover:text-ym text-lg">query_stats</span><span className="text-xs font-bold text-slate-200">تقارير وتحليلات متقدمة</span></div>
-                <span className="text-[9px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full font-bold">تقرير</span>
               </button>
             </div>
           </div>
@@ -247,27 +192,15 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
             <div className="bottom-sheet-header">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="material-symbols-outlined text-ym text-lg shrink-0">
-                  {activeSubScreen === 'user-management' && 'person_search'}
                   {activeSubScreen === 'audit-logs' && 'policy'}
-                  {activeSubScreen === 'operator-management' && 'cell_tower'}
-                  {activeSubScreen === 'storage-management' && 'warehouse'}
-                  {activeSubScreen === 'system-health' && 'dns'}
                   {activeSubScreen === 'backup-restore' && 'backup'}
-                  {activeSubScreen === 'permissions-roles' && 'badge'}
-                  {activeSubScreen === 'integrations' && 'api'}
                   {activeSubScreen === 'support-center' && 'contact_support'}
                   {activeSubScreen === 'help-guide' && 'help_outline'}
                   {activeSubScreen === 'about-system' && 'info'}
                 </span>
                 <span className="font-bold text-xs truncate">
-                  {activeSubScreen === 'user-management' && 'إدارة مستخدمي النظام'}
                   {activeSubScreen === 'audit-logs' && 'سجلات التدقيق الأمني'}
-                  {activeSubScreen === 'operator-management' && 'إدارة مشغلي الاتصالات'}
-                  {activeSubScreen === 'storage-management' && 'إدارة المستودعات'}
-                  {activeSubScreen === 'system-health' && 'صحة الخوادم'}
                   {activeSubScreen === 'backup-restore' && 'النسخ الاحتياطي'}
-                  {activeSubScreen === 'permissions-roles' && 'الصلاحيات والأدوار'}
-                  {activeSubScreen === 'integrations' && 'التكامل الخارجي API'}
                   {activeSubScreen === 'support-center' && 'مركز الدعم الفني'}
                   {activeSubScreen === 'help-guide' && 'دليل الاستخدام'}
                   {activeSubScreen === 'about-system' && 'حول النظام'}
@@ -280,197 +213,65 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
             </div>
 
             <div className="bottom-sheet-body space-y-3 select-text">
-              {activeSubScreen === 'user-management' && (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <p className="text-[11px] text-slate-500">مستخدمين مؤهلين للولوج لنظام يمن تليكوم الأعلى للاتصالات.</p>
-                    <button onClick={() => {
-                      const name = prompt('أدخل اسم المستخدم الجديد:');
-                      const email = prompt('أدخل البريد الإلكتروني للمسؤول:');
-                      const role = prompt('أدخل الدور الوظيفي (مثال: مشرف مبيعات):');
-                      if (name && email && role) {
-                        setSimulatedUsers(prev => [...prev, { id: `usr-${Math.floor(105 + Math.random() * 900)}`, name, email, role, status: 'نشط', lastActive: 'الآن' }]);
-                      }
-                    }} className="text-[10px] bg-secondary text-white px-2.5 py-1 rounded-lg font-bold hover:brightness-110 cursor-pointer">+ إضافة حساب مسؤول جديد</button>
-                  </div>
-                  <div className="border border-slate-300 rounded-xl overflow-hidden divide-y divide-slate-200 text-[11px]">
-                    {simulatedUsers.map(user => (
-                      <div key={user.id} className="p-3 bg-white hover:bg-slate-950 flex items-center justify-between">
-                        <div>
-                          <p className="font-bold text-slate-900">{user.name}</p>
-                          <p className="text-slate-400 text-[10px] font-mono mt-0.5">{user.email} • ID: {user.id}</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-slate-500 font-semibold">{user.role}</span>
-                          <span className={`inline-block px-1.5 py-0.5 rounded-full text-[9px] font-bold ${user.status === 'نشط' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>{user.status}</span>
-                          <button onClick={() => { setSimulatedUsers(prev => prev.map(u => u.id === user.id ? { ...u, status: u.status === 'نشط' ? 'محتجز' : 'نشط' } : u)); }}
-                            className="text-[9px] text-red-600 hover:underline font-bold">تعديل</button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {activeSubScreen === 'audit-logs' && (
                 <div className="space-y-3">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                    <p className="text-xs sm:text-[11px] text-slate-500 dark:text-slate-400">سجل تعقب الأحداث في الخادم للمسؤولين وحراس الأمان بالموقع.</p>
-                    <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2.5 py-1 rounded-full font-mono font-bold shrink-0">7 سجلات</span>
-                  </div>
-                  <div className="bg-gray-950 p-3 sm:p-4 rounded-xl font-mono text-[10px] sm:text-[11px] leading-relaxed overflow-y-auto max-h-[50vh] min-h-[200px] space-y-1.5 dir-ltr text-left border border-slate-800/40">
-                    {[
-                      '[01-06-2026 01:21:04] SYSINFO: Server started on port 3000.',
-                      '[01-06-2026 01:18:45] MONITOR: Warning — SIM allocation limit reached in Central Sanaa.',
-                      '[01-06-2026 01:14:02] SECURITY: Root permission token accessed by ahmedabdos424@gmail.com (IP: 10.144.152.8).',
-                      '[01-06-2026 01:06:46] AUDIT: PDF report of 20 Authorized agents generated.',
-                      '[01-06-2026 00:55:12] DB_MUTATION: Simulated agents database synced.',
-                      '[01-06-2026 00:30:19] SECURITY: 2-Factor Authentication validated.',
-                      '[01-06-2026 00:00:00] SYSTEM: Daily health check passed.'
-                    ].map((line, i) => {
-                      const parts = line.match(/\[(.*?)\]\s+(\w+):\s+(.*)/);
-                      if (!parts) return <p key={i} className="text-slate-400">{line}</p>;
-                      return <p key={i} className="text-slate-400"><span className="text-slate-600">[{parts[1]}]</span> <span className={parts[2] === 'SECURITY' ? 'text-red-400' : parts[2] === 'AUDIT' ? 'text-emerald-400' : parts[2] === 'MONITOR' ? 'text-yellow-300' : 'text-cyan-400'}>{parts[2]}</span>: <span className="text-gray-300">{parts[3]}</span></p>;
-                    })}
-                  </div>
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs sm:text-[11px]">
-                    <span className="text-slate-500 dark:text-slate-400 text-[11px]">ملفات الجرد المفرزة: <strong className="text-slate-800 dark:text-slate-200">54,233 واصفة</strong></span>
-                    <button onClick={() => {
-                      const logContent = `===== Audit Log - Yemen Telecom =====\nDate: ${new Date().toISOString()}\n${['[01-06-2026 01:21:04] SYSINFO: Server started', '[01-06-2026 01:18:45] MONITOR: SIM allocation limit', '[01-06-2026 01:14:02] SECURITY: Root token accessed', '[01-06-2026 01:06:46] AUDIT: PDF report generated', '[01-06-2026 00:55:12] DB_MUTATION: Agents DB synced', '[01-06-2026 00:30:19] SECURITY: 2FA validated'].join('\n')}\n===== END =====`;
-                      const blob = new Blob([logContent], { type: 'text/plain' });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `audit_log_${new Date().toISOString().slice(0,10)}.log`;
-                      a.click();
-                      URL.revokeObjectURL(url);
-                    }} className="text-secondary dark:text-red-400 font-bold hover:underline cursor-pointer py-1.5 px-2 -my-1.5 -mx-2 whitespace-nowrap">
-                      <span className="material-symbols-outlined text-sm align-middle ml-1">download</span> تنزيل السجل الكامل
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {activeSubScreen === 'operator-management' && (
-                <div className="space-y-4">
-                  <p className="text-[11px] text-slate-500">إدارة تكامل أبراج الاتصالات والترددات الخاصة بالخدمة وبناء الحزم.</p>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    {[
-                      { name: 'Yemen Mobile', desc: 'مشغل CDMA/4G/5G الأعلى', subs: '10.2M مشترك نشط', latency: '14ms' },
-                      { name: 'Sabafon', desc: 'مشغل GSM الذكي الأول', subs: '5.4M مشترك نشط', latency: '21ms' },
-                      { name: 'YOU Telecom', desc: 'بوابة 4G السريعة المتكاملة', subs: '4.9M مشترك نشط', latency: '18ms' }
-                    ].map(op => (
-                      <div key={op.name} className="p-4 bg-slate-950 border border-slate-300 rounded-xl space-y-2">
-                        <div className="flex justify-between items-center"><span className="font-bold text-slate-900 text-xs">{op.name}</span><span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span></div>
-                        <p className="text-[10px] text-slate-400">{op.desc}</p>
-                        <p className="text-xs font-bold font-mono text-slate-800 mt-2">{op.subs}</p>
-                        <p className="text-[10px] text-slate-500">زمن الاستجابة: {op.latency}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="p-3 bg-red-50 text-red-800 border-red-200 text-[10px] rounded-lg font-bold">⚠️ نظام توزيع الشرائح الآمن يرتبط أوتوماتيكياً عبر الـ Webhook.</div>
-                </div>
-              )}
-
-              {activeSubScreen === 'storage-management' && (
-                <div className="space-y-3 col-span-2">
-                  <p className="text-[11px] text-slate-500">تتبع توزيع مستودعات يمن تليكوم الفرعية ومراقبة مؤشرات السعة المتبقية.</p>
-                  <div className="space-y-2 text-[11px]">
-                    {[
-                      { name: 'مستودع أمانة العاصمة الرئيسي', pct: 74.3, color: 'bg-secondary' },
-                      { name: 'مستودع عدن المركزي (كريتر)', pct: 63, color: 'bg-sky-600' },
-                      { name: 'مستودع تعز (الحوبان والمحيط)', pct: 10.25, color: 'bg-red-600', critical: true }
-                    ].map(w => (
-                      <div key={w.name} className="p-3 bg-white border border-slate-700 rounded-xl">
-                        <div className="flex justify-between font-bold mb-1 text-slate-900"><span>{w.name}</span><span>{Math.round(w.pct * 1000 / 100)} / 100,000 شريحة</span></div>
-                        <div className="w-full bg-slate-300 h-2 rounded-full overflow-hidden"><div className={`${w.color} h-full rounded-full`} style={{ width: `${w.pct}%` }}></div></div>
-                        {(w as any).critical && <span className="text-[9px] text-red-600 font-bold mt-1 inline-block">⚠️ مخزون حرج! يلزم التزويد فوراً.</span>}
-                      </div>
-                    ))}
-                  </div>
+                  <p className="text-xs sm:text-[11px] text-slate-500">سجل تعقب الأحداث في الخادم للمسؤولين وحراس الأمان بالموقع.</p>
+                  {auditLogsLoading ? (
+                    <div className="text-center py-8 text-slate-500 text-xs">جاري التحميل...</div>
+                  ) : auditLogs.length === 0 ? (
+                    <div className="text-center py-8 text-slate-500 text-xs">لا توجد سجلات تدقيق متاحة</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {auditLogs.map((log: any, i: number) => (
+                        <div key={log.id || i} className="p-3 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between">
+                          <div className="space-y-1">
+                            <span className="text-xs font-bold text-slate-200 block">{log.title}</span>
+                            <span className="text-[10px] text-slate-500">{log.type} • {log.user}</span>
+                          </div>
+                          <div className="text-left">
+                            <span className="text-[10px] text-slate-500 block">{log.time}</span>
+                            <span className={`text-[9px] font-bold ${log.status === 'blocked' ? 'text-red-400' : log.status === 'verified' ? 'text-emerald-400' : log.status === 'analyzing' ? 'text-yellow-400' : 'text-slate-400'}`}>{log.status}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
               {activeSubScreen === 'backup-restore' && (
                 <div className="space-y-4">
-                  <div className="p-4 bg-slate-950 border border-slate-300 rounded-xl space-y-3">
-                    <h4 className="font-bold text-xs text-slate-950">توليد نسخة أمنية مشفرة</h4>
+                  <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-3">
+                    <h4 className="font-bold text-xs text-slate-200">توليد نسخة أمنية مشفرة</h4>
                     <p className="text-[11px] text-slate-500 leading-normal">سيقوم الخادم بحشد قاعدة البيانات بالكامل وضغطها ثم تشفيرها.</p>
                     {backupProgress !== null && (
                       <div className="space-y-1">
-                        <div className="flex justify-between text-[10px] font-bold text-secondary font-mono"><span>جاري الأرشفة...</span><span>{backupProgress}%</span></div>
-                        <div className="w-full bg-slate-700 h-2.5 rounded-full overflow-hidden"><div className="bg-secondary h-full rounded-full transition-all duration-150" style={{ width: `${backupProgress}%` }}></div></div>
+                        <div className="flex justify-between text-[10px] font-bold text-ym font-mono"><span>جاري الأرشفة...</span><span>{backupProgress}%</span></div>
+                        <div className="w-full bg-slate-700 h-2.5 rounded-full overflow-hidden"><div className="bg-ym h-full rounded-full transition-all duration-150" style={{ width: `${backupProgress}%` }}></div></div>
                       </div>
                     )}
-                    {backupStatus === 'completed' && <div className="p-2 bg-green-50 text-green-800 border border-green-200 rounded-lg text-[10px] font-semibold">✓ تم حزم النسخة الاحتياطية بنجاح.</div>}
-                    <button onClick={runBackupSimulation} disabled={backupStatus === 'running'}
-                      className="w-full bg-slate-950 hover:bg-slate-900 text-white font-bold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50">
+                    {backupStatus === 'completed' && <div className="p-2 bg-emerald-950/40 text-emerald-400 border border-emerald-800/40 rounded-lg text-[10px] font-semibold">✓ تم حزم النسخة الاحتياطية بنجاح.</div>}
+                    <button onClick={createBackup} disabled={backupStatus === 'running'}
+                      className="w-full bg-ym hover:bg-red-700 text-white font-bold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50">
                       <span className="material-symbols-outlined text-sm">backup</span>
                       {backupStatus === 'running' ? 'جاري...' : 'إجراء نسخ احتياطي'}
                     </button>
                   </div>
-                  <div className="space-y-2">
-                    <h4 className="font-extrabold text-[11px] text-slate-500">ملفات الأرشيف المتوفرة:</h4>
-                    <div className="border border-slate-700 rounded-xl divide-y divide-slate-300 text-[10.5px]">
-                      {backupsList.map((bk, i) => (
-                        <div key={i} className="p-3 bg-white hover:bg-slate-950 flex justify-between items-center font-mono">
-                          <div><p className="font-bold text-slate-900 text-xs">{bk.name}</p><p className="text-[10px] text-slate-400 mt-1">{bk.date} • {bk.size}</p></div>
-                          <button onClick={() => alert(`بدء تحميل ${bk.name}`)} className="text-secondary hover:underline font-bold text-xs flex items-center gap-1 cursor-pointer">
-                            <span className="material-symbols-outlined text-sm">download</span> تنزيل
-                          </button>
-                        </div>
-                      ))}
+                  {backupsList.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-extrabold text-[11px] text-slate-500">ملفات الأرشيف المتوفرة:</h4>
+                      <div className="border border-slate-800 rounded-xl divide-y divide-slate-800 text-[10.5px]">
+                        {backupsList.map((bk, i) => (
+                          <div key={i} className="p-3 bg-slate-950 flex justify-between items-center font-mono">
+                            <div><p className="font-bold text-slate-200 text-xs">{bk.name}</p><p className="text-[10px] text-slate-500 mt-1">{bk.date} • {bk.size}</p></div>
+                            <button onClick={() => downloadBackup(bk.name)} className="text-ym hover:underline font-bold text-xs flex items-center gap-1 cursor-pointer">
+                              <span className="material-symbols-outlined text-sm">download</span> تنزيل
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                </div>
-              )}
-
-              {activeSubScreen === 'permissions-roles' && (
-                <div className="space-y-4">
-                  <p className="text-[11px] text-slate-500">التحقق من توزيع صلاحيات الإدارة العليا.</p>
-                  <div className="space-y-3">
-                    {Object.entries(rolePermissions).map(([key, role]: [string, any]) => (
-                      <div key={key} className="p-3.5 bg-slate-950 rounded-xl border border-slate-300 space-y-2">
-                        <div className="flex justify-between items-center border-b border-slate-300/50 pb-1.5">
-                          <span className="font-bold text-slate-900 text-xs">
-                            {key === 'admin' ? '👤 مسؤول ومراقب النظام (Super Admin)' : key === 'supervisor' ? '💼 مشرف المبيعات' : '🔍 مفتش الجودة'}
-                          </span>
-                          <span className="text-[10.5px] text-slate-500 font-medium">{role.label}</span>
-                        </div>
-                        <div className="flex flex-wrap gap-2 text-[10px] font-bold">
-                          {['read', 'write', 'delete', 'suspend'].map(p => (
-                            <label key={p} className="inline-flex items-center gap-1.5 bg-white border border-slate-300 px-2 py-1 rounded-md">
-                              <input type="checkbox" checked={role[p]} readOnly className="accent-secondary" />
-                              <span>{p === 'read' ? 'قراءة' : p === 'write' ? 'تعديل' : p === 'delete' ? 'حذف' : 'تجميد'}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {activeSubScreen === 'integrations' && (
-                <div className="space-y-4">
-                  <p className="text-[11px] text-slate-500">ربط خوادم يمن تليكوم بالـ APIs الرسمية.</p>
-                  <div className="space-y-2.5">
-                    {activeWebhooks.map((wh, idx) => (
-                      <div key={idx} className="p-3 bg-white border border-slate-300/70 rounded-xl flex items-center justify-between">
-                        <div className="space-y-1">
-                          <span className="font-extrabold text-[11px] text-slate-950 block">{wh.name}</span>
-                          <span className="font-mono text-[9px] text-slate-400 select-all block">{wh.url}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`w-2 h-2 rounded-full ${wh.active ? 'bg-green-500 animate-pulse' : 'bg-slate-600'}`}></span>
-                          <button onClick={() => { setActiveWebhooks(prev => prev.map((w, i) => i === idx ? { ...w, active: !w.active } : w)); }}
-                            className={`text-[10px] px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${wh.active ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}>
-                            {wh.active ? 'تعطيل' : 'تفعيل'}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  )}
                 </div>
               )}
 
@@ -478,15 +279,13 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
                 <div className="space-y-3.5">
                   <p className="text-[11px] text-slate-500">مركز المساعدة والاتصال الموثق.</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]">
-                    <div className="p-4 bg-slate-950 border border-slate-700 rounded-xl space-y-1">
-                      <h4 className="font-extrabold text-slate-900 text-xs flex items-center gap-1"><span className="material-symbols-outlined text-secondary text-sm">phone_in_talk</span> رقم هاتف الدعم</h4>
-                      <p className="font-mono font-bold text-slate-700">800-TELESYSTEM</p>
-                      <p className="text-[10px] text-slate-500">متاح 24 ساعة للبلاغات الأمنية.</p>
+                    <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
+                      <h4 className="font-extrabold text-slate-200 text-xs">رقم هاتف الدعم</h4>
+                      <p className="font-mono font-bold text-slate-400">800-TELESYSTEM</p>
                     </div>
-                    <div className="p-4 bg-slate-950 border border-slate-700 rounded-xl space-y-1">
-                      <h4 className="font-extrabold text-slate-900 text-xs flex items-center gap-1"><span className="material-symbols-outlined text-secondary text-sm">mail</span> البريد الأمني</h4>
-                      <p className="font-mono font-bold text-slate-700">security-audit@telecom.ye</p>
-                      <p className="text-[10px] text-slate-500">لتبادل مستندات الفرز والمحاسبة.</p>
+                    <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
+                      <h4 className="font-extrabold text-slate-200 text-xs">البريد الأمني</h4>
+                      <p className="font-mono font-bold text-slate-400">audit@domain.com</p>
                     </div>
                   </div>
                 </div>
@@ -494,8 +293,8 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
 
               {activeSubScreen === 'help-guide' && (
                 <div className="space-y-4">
-                  <div className="space-y-3 text-[11px] leading-relaxed text-slate-700">
-                    <h4 className="font-bold text-xs text-slate-950">كتيب الإجراءات الوقائية:</h4>
+                  <div className="space-y-3 text-[11px] leading-relaxed text-slate-400">
+                    <h4 className="font-bold text-xs text-slate-200">كتيب الإجراءات الوقائية:</h4>
                     <p>١. <strong>تسييل الهويات:</strong> يجب على المسؤولين الرقابة على البائعين للتحقق من عدم تفعيل عدة شرائح لنفس الهوية.</p>
                     <p>٢. <strong>الجرد والتوزيع:</strong> توزيع كتلة الشرائح بطلب رسمي موثق من المركز المالي.</p>
                     <p>٣. <strong>التنبيهات الأمنية:</strong> عند استلام تنبيه عالي الخطورة، يتم تجميد حساب الوكيل المشتبه به احترازياً.</p>
@@ -505,14 +304,10 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
 
               {activeSubScreen === 'about-system' && (
                 <div className="text-center py-6 space-y-4">
-                  <div className="w-16 h-16 bg-secondary-container text-white text-3xl font-extrabold flex items-center justify-center rounded-full mx-auto shadow-md shadow-secondary/20">S</div>
                   <div>
-                    <h4 className="font-extrabold text-sm text-slate-950 font-sans tracking-wide">نظام إدارة توزيع الشرائح</h4>
-                    <p className="text-[10px] text-slate-400 font-bold mt-1">المؤسسة العامة للاتصالات - الجمهورية اليمنية</p>
-                    <p className="text-[9px] text-slate-500 font-mono mt-2">V-2.4.0 (YEMEN-TELECOM-PROD)</p>
-                  </div>
-                  <div className="max-w-md mx-auto text-[10.5px] text-slate-500 leading-normal border-t border-slate-200 pt-4">
-                    تم تطوير هذه اللوحة لمساعدة مديري الفروع على تتبع شبكات الوكلاء ونمو التوزيع للحد من التسييل غير القانوني.
+                    <h4 className="font-extrabold text-sm text-slate-200 font-sans tracking-wide">نظام إدارة توزيع الشرائح</h4>
+                    <p className="text-[10px] text-slate-500 font-bold mt-1">المؤسسة العامة للاتصالات - الجمهورية اليمنية</p>
+                    <p className="text-[9px] text-slate-600 font-mono mt-2">V-2.4.0 (YEMEN-TELECOM-PROD)</p>
                   </div>
                 </div>
               )}
@@ -542,14 +337,6 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
             </div>
           </motion.div>
         </div>
-      )}
-
-      {logoutMessageVisible && (
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
-          className="fixed top-6 left-1/2 -translate-x-1/2 z-[130] card border border-green-500/30 px-5 py-3 flex items-center gap-2.5 text-xs font-bold shadow-xl">
-          <span className="material-symbols-outlined text-green-500 font-bold">check_circle</span>
-          <span>تم تسجيل الخروج من جلسة الإدارة الآمنة.</span>
-        </motion.div>
       )}
     </>
   );

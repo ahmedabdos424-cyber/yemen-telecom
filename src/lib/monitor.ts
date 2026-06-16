@@ -1,3 +1,5 @@
+import { getErrorMessage } from './getErrorMessage';
+
 const SLOW_THRESHOLD_MS = 1000;
 const MAX_LOG_ENTRIES = 200;
 const LOG_PREFIX = '[YT]';
@@ -29,15 +31,13 @@ function push(type: LogEntry['type'], message: string, data?: unknown) {
 
 export function captureError(error: unknown, context?: string) {
   const msg = context ? `[${context}]` : '';
+  const safeMsg = redact(getErrorMessage(error, 'Unknown error'));
+  console.error(`${LOG_PREFIX}${msg}`, safeMsg);
   if (error instanceof Error) {
-    const safeMsg = redact(error.message);
     const safeStack = error.stack ? redact(error.stack) : undefined;
-    console.error(`${LOG_PREFIX}${msg}`, safeMsg);
     push('error', `${msg} ${safeMsg}`, { stack: safeStack, context });
   } else {
-    const safeStr = redact(String(error));
-    console.error(`${LOG_PREFIX}${msg}`, safeStr);
-    push('error', `${msg} ${safeStr}`, { context });
+    push('error', `${msg} ${safeMsg}`, { context });
   }
 }
 

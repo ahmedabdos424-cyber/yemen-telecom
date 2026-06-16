@@ -6,15 +6,41 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { Seller, SIM } from '../types';
 import { Check } from 'lucide-react';
+import profileImage from '../assets/profile.png';
+import { useToast, ToastContainer } from '../hooks/useToast';
+import { safeArray } from '../lib/safe';
 
 interface SellersViewProps {
   sellers: Seller[];
   sims: SIM[];
   onUpdateSeller: (id: string, updated: Partial<Seller>) => void;
   onAddBalance: (sellerId: string, amount: number) => void;
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
 }
 
-function SellersView({ sellers, sims, onUpdateSeller, onAddBalance }: SellersViewProps) {
+const EMPTY_SELLER: Seller = {
+  id: '',
+  name: '',
+  phone: '',
+  region: '',
+  status: 'active',
+  sales30Days: 0,
+  salesGrowth: 0,
+  simsCount: 0,
+  activityRate: 0,
+  storeName: '',
+  idNumber: '',
+  regionCode: '',
+  totalSales: 0,
+  currentStock: 0,
+  efficiency: 0,
+  creationDate: '',
+  lastLogin: '',
+};
+
+function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, loading, error, onRetry }: SellersViewProps) {
   const [selectedSellerId, setSelectedSellerId] = useState<string>('SLR-99021');
   const [activeTab, setActiveTab] = useState<'inventory' | 'customers' | 'transactions'>('inventory');
   const [showAddBalanceModal, setShowAddBalanceModal] = useState(false);
@@ -27,6 +53,8 @@ function SellersView({ sellers, sims, onUpdateSeller, onAddBalance }: SellersVie
   const camVideoRef = useRef<HTMLVideoElement>(null);
   const camCanvasRef = useRef<HTMLCanvasElement>(null);
   const camFileRef = useRef<HTMLInputElement>(null);
+
+  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
 
   const openInvoiceCam = useCallback(async () => {
     setShowCam(true);
@@ -73,11 +101,11 @@ function SellersView({ sellers, sims, onUpdateSeller, onAddBalance }: SellersVie
     setShowCam(false);
   }, [camStream]);
 
-  const selectedSeller = sellers.find((s) => s.id === selectedSellerId) || sellers[0];
+  const selectedSeller = sellers.find((s) => s.id === selectedSellerId) || sellers[0] || EMPTY_SELLER;
 
   // Specific SIM items assigned to the selected seller (Ahmed has some specific keys in the mock data, or we filter sims currently owned by him)
   const sellerSIMs = useMemo(() => sims.filter(
-    (sim) => sim.owner.includes(selectedSeller.name) || (selectedSeller.id === 'SLR-99021' && sim.id !== '1' && sim.id !== '2' && sim.id !== '3')
+    (sim) => (sim.owner ?? '').includes(selectedSeller.name) || (selectedSeller.id === 'SLR-99021' && sim.id !== '1' && sim.id !== '2' && sim.id !== '3')
   ), [sims, selectedSeller]);
 
   const toggleSellerStatus = useCallback((id: string, currentStatus: 'active' | 'inactive' | 'suspended' | 'low_stock') => {
@@ -89,11 +117,44 @@ function SellersView({ sellers, sims, onUpdateSeller, onAddBalance }: SellersVie
     e.preventDefault();
     onAddBalance(selectedSeller.id, balanceAmount);
     setShowAddBalanceModal(false);
-    alert(`تم إضافة رصيد مبيعات بقيمة ${balanceAmount} ر.ي للبائع ${selectedSeller.name} بنجاح!`);
+    toastSuccess(`تم إضافة رصيد مبيعات بقيمة ${balanceAmount} ر.ي للبائع ${selectedSeller.name} بنجاح!`);
   }, [onAddBalance, selectedSeller.id, selectedSeller.name, balanceAmount]);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 space-y-4">
+        <div className="w-8 h-8 border-4 border-secondary border-t-transparent rounded-full animate-spin" />
+        <p className="text-gray-500 font-bold text-sm">جاري التحميل...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 space-y-4">
+        <span className="material-symbols-outlined text-4xl text-red-400">error_outline</span>
+        <p className="text-gray-600 font-bold text-sm">{error}</p>
+        {onRetry && (
+          <button onClick={onRetry} className="btn btn-primary btn-sm">
+            إعادة المحاولة
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  if (sellers.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 space-y-4">
+        <span className="material-symbols-outlined text-4xl text-gray-300">group_off</span>
+        <p className="text-gray-500 font-bold text-sm">لا توجد بيانات</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       {/* Seller Header Profile Card */}
       <section className="card flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div className="flex items-center gap-4">
@@ -102,13 +163,7 @@ function SellersView({ sellers, sims, onUpdateSeller, onAddBalance }: SellersVie
               <img
                 alt="SellerProfile"
                 className="w-full h-full object-cover"
-                src={
-                  selectedSeller.id === 'SLR-99021'
-                    ? 'https://lh3.googleusercontent.com/aida-public/AB6AXuDzb7HIWuKPm5_eNDtGimQyNmb3F8g1f_UXCXmOPvAW7gee3u-RWNYTYLfzbS6HMig6JCeHsaQMvFVoKGRuryQs_81dEc9DGiDgRsjfuOq_ZMiRz2ZLWUSN0Jd8P0zkrVsr5lCHd7p48EfEGhjPsKW7Aj9K399biHM3Jm6IhWf-CqmOZQGDrsIroIzUbD9U-u739y5aqrryT7k9Co7EABGPfgO0gnLym9QmlZJdJXfVkv69NDeeezCjfU8PUrdyIByPQ6mCgxD_4BY'
-                    : selectedSeller.id === 'SLR-88124'
-                    ? 'https://lh3.googleusercontent.com/aida-public/AB6AXuDdoO1MxOooEPIMIX6a5jpY8AuUraH88xqfhwb2WMSZKVbsfKRZSgqASOR8WsVlGc3TaQ18FC0fVhLRjxvg3kh1WV7Hfo9ZZi1vbi2xMVmUN3-MkhWgbNeNeiEnqQ1-ubxT_z6VC4QyIqlhgPhq0aTBHpOgTT2evTZtExddZOf2bAHehRkLOWISPXwbKewQUJfaTdDd2Ee7_g-v6ZlwYUvrGuDOa4Nbl2pqzCIH0CBLNN8U78JLoIICUwUb5JsOX-qH9NghPeZEhzQ'
-                    : 'https://lh3.googleusercontent.com/aida-public/AB6AXuCskPTg0PPt134f9p13mCzkurWQRaKjB9oG-ODRUL4yGslUGe3gc49dgWXjadKNc1GhkThpYh_UR2ce30F9FPF0BANll_oXB7ibrsezX6gFA2mKnWZrNzjAkY4Rs_7VSgASqoMJRtnHsAvdKh7xbpzvqwKVoxQXnk61yDBkwzrzyHlH0at8UxveZxpdpx4iw8h3PD9RbA_cqCknn4G82OG5pzF6X--okNJDoBUvo4wU8UyqVtxhc_XGOCHM6ExxQYvEPgdhW_qKmPM'
-                }
+                src={profileImage}
               />
             </div>
             <span className={`absolute -bottom-1 -right-1 w-4.5 h-4.5 rounded-full border-4 border-white ${
@@ -182,11 +237,11 @@ function SellersView({ sellers, sims, onUpdateSeller, onAddBalance }: SellersVie
             <span className="text-gray-500 font-bold text-xs">إجمالي مبيعات البائع (30 يوم)</span>
             <span className="material-symbols-outlined text-blue-600 bg-blue-50 border border-blue-100 p-1.5 rounded-lg text-sm">payments</span>
           </div>
-          <h4 className="text-2xl font-bold text-gray-900 font-mono">{selectedSeller.sales30Days.toLocaleString()}</h4>
+          <h4 className="text-2xl font-bold text-gray-900 font-mono">{(selectedSeller.sales30Days ?? 0).toLocaleString()}</h4>
           {selectedSeller.salesGrowth > 0 ? (
             <p className="text-green-600 font-bold text-[11px] mt-2 flex items-center gap-0.5">
               <span className="material-symbols-outlined text-[13px]">trending_up</span>
-              +{selectedSeller.salesGrowth}% عن الشهر السالف
+              +{(selectedSeller.salesGrowth ?? 0)}% عن الشهر السالف
             </p>
           ) : (
             <p className="text-gray-400 text-[11px] mt-2">لا يوجد نمو مسجل</p>
@@ -321,7 +376,7 @@ function SellersView({ sellers, sims, onUpdateSeller, onAddBalance }: SellersVie
                     required
                     value={balanceAmount}
                     onChange={(e) => setBalanceAmount(Number(e.target.value))}
-                    placeholder="مثال: 10000"
+                    placeholder="مبلغ الشحن"
                     className="input-field with-icon-left"
                   />
                   <button type="button" onClick={openInvoiceCam} className="input-camera-btn" title="تصوير الفاتورة">

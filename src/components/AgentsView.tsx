@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { Agent, ViewType } from '../types';
+import { safeArray, safeString } from '../lib/safe';
 
 interface AgentsViewProps {
   agents: Agent[];
@@ -12,25 +13,43 @@ interface AgentsViewProps {
   onUpdateAgent: (id: string, updated: Partial<Agent>) => void;
 }
 
-function AgentsView({ agents, setView, onUpdateAgent }: AgentsViewProps) {
+function AgentsView({ agents = [], setView, onUpdateAgent }: AgentsViewProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [regionFilter, setRegionFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [minSimsFilter, setMinSimsFilter] = useState('all');
   const [showPrintModal, setShowPrintModal] = useState(false);
+  const [editAgent, setEditAgent] = useState<Agent | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editRegion, setEditRegion] = useState('');
+
+  const openEditModal = (agent: Agent) => {
+    setEditAgent(agent);
+    setEditName(agent.name);
+    setEditPhone(agent.phone);
+    setEditRegion(agent.region);
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editAgent) return;
+    onUpdateAgent(editAgent.id, { name: editName, phone: editPhone, region: editRegion });
+    setEditAgent(null);
+  };
 
   const filteredAgents = agents.filter((agent) => {
     // 1. Multi-token search matching across name, phone, region, status, id
     const searchTokens = searchTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
     const matchesSearch = searchTokens.length === 0 || searchTokens.every(token => 
-      agent.name.toLowerCase().includes(token) || 
-      agent.phone.toLowerCase().includes(token) || 
-      agent.id.toLowerCase().includes(token) ||
-      agent.region.toLowerCase().includes(token)
+      safeString(agent.name).toLowerCase().includes(token) || 
+      safeString(agent.phone).toLowerCase().includes(token) || 
+      safeString(agent.id).toLowerCase().includes(token) ||
+      safeString(agent.region).toLowerCase().includes(token)
     );
 
     // 2. Select filters
-    const matchesRegion = regionFilter === 'all' || agent.region.includes(regionFilter);
+    const matchesRegion = regionFilter === 'all' || safeString(agent.region).includes(regionFilter);
     const matchesStatus = statusFilter === 'all' || agent.status === statusFilter;
     
     let matchesMinSims = true;
@@ -331,7 +350,7 @@ function AgentsView({ agents, setView, onUpdateAgent }: AgentsViewProps) {
           </div>
           <div class="metadata-item">
             <span class="metadata-label">المسؤول المستخرج للملف (المدير):</span>
-            <span class="metadata-value mono-txt">ahmedabdos424@gmail.com</span>
+            <span class="metadata-value mono-txt">admin@domain.com</span>
           </div>
           <div class="metadata-item">
             <span class="metadata-label">نطاق فلترة البيانات النشطة:</span>
@@ -362,8 +381,8 @@ function AgentsView({ agents, setView, onUpdateAgent }: AgentsViewProps) {
                 <td style="font-weight: 700; color: #0f172a;">${agent.name}</td>
                 <td class="mono-txt">${agent.phone}</td>
                 <td style="font-weight: 500;">${agent.region}</td>
-                <td style="text-align: center;" class="mono-txt">${agent.sellersCount}</td>
-                <td style="text-align: center; font-weight: 700;" class="mono-txt">${agent.simsCount.toLocaleString()}</td>
+                <td style="text-align: center;" class="mono-txt">${agent.sellersCount ?? 0}</td>
+                <td style="text-align: center; font-weight: 700;" class="mono-txt">${(agent.simsCount ?? 0).toLocaleString()}</td>
                 <td style="text-align: center;">
                   <span class="status-badge ${agent.status === 'active' ? 'status-active' : 'status-inactive'}">
                     ${agent.status === 'active' ? 'نشط وقائم' : 'معطل وموقف'}
@@ -613,7 +632,7 @@ function AgentsView({ agents, setView, onUpdateAgent }: AgentsViewProps) {
               <div className="p-4 flex justify-between items-start border-b border-gray-100 bg-gray-50/10">
                 <div className="flex gap-3">
                   <div className="w-12 h-12 rounded-xl bg-primary-container text-white flex items-center justify-center text-sm font-bold shadow-sm">
-                    {agent.name.split(' ').map(n=>n[0]).slice(0,2).join(' ')}
+                    {safeString(agent.name).split(' ').filter(Boolean).map(n=>n[0]).slice(0,2).join(' ')}
                   </div>
                   <div>
                     <h3 className="font-bold text-xs text-gray-900">{highlightMatches(agent.name, searchTerm)}</h3>
@@ -635,11 +654,11 @@ function AgentsView({ agents, setView, onUpdateAgent }: AgentsViewProps) {
               <div className="grid grid-cols-2 p-4 bg-gray-50/50 gap-4 border-b border-gray-100">
                 <div className="flex flex-col">
                   <span className="text-[11px] text-gray-400 font-bold">عدد نقاط البيع / البائعين</span>
-                  <span className="text-xs font-bold text-gray-955 mt-1 font-mono">{agent.sellersCount} بائع</span>
+                  <span className="text-xs font-bold text-gray-955 mt-1 font-mono">{(agent.sellersCount ?? 0)} بائع</span>
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[11px] text-gray-400 font-bold">مخزون الشرائح الكلي</span>
-                  <span className="text-xs font-bold text-gray-955 mt-1 font-mono">{agent.simsCount.toLocaleString()} شريحة</span>
+                  <span className="text-xs font-bold text-gray-955 mt-1 font-mono">{(agent.simsCount ?? 0).toLocaleString()} شريحة</span>
                 </div>
               </div>
 
@@ -653,7 +672,7 @@ function AgentsView({ agents, setView, onUpdateAgent }: AgentsViewProps) {
                   اتصال
                 </a>
                 <button
-                  onClick={() => alert(`تعديل بيانات الوكيل: ${agent.name}`)}
+                  onClick={() => openEditModal(agent)}
                   className="flex-1 btn btn-ghost btn-sm"
                 >
                   <span className="material-symbols-outlined text-xs text-gray-500 font-bold">edit</span>
@@ -736,7 +755,7 @@ function AgentsView({ agents, setView, onUpdateAgent }: AgentsViewProps) {
                   </div>
                   <div className="flex justify-between border-b border-dashed border-gray-200 pb-1.5 md:border-none md:pb-0">
                     <span className="font-bold text-gray-550">المستخدم المستخرِج:</span>
-                    <span className="font-semibold font-mono">ahmedabdos424@gmail.com</span>
+                    <span className="font-semibold font-mono">admin@domain.com</span>
                   </div>
                   <div className="flex justify-between border-b border-dashed border-gray-250 pb-1.5 md:border-none md:pb-0">
                     <span className="font-bold text-gray-550">مستوى الفلترة النشط:</span>
@@ -774,8 +793,8 @@ function AgentsView({ agents, setView, onUpdateAgent }: AgentsViewProps) {
                           <td className="p-2 font-bold text-gray-900">{agent.name}</td>
                           <td className="p-2 font-mono text-gray-650">{agent.phone}</td>
                           <td className="p-2 font-semibold text-gray-700">{agent.region}</td>
-                          <td className="p-2 text-center font-mono">{agent.sellersCount}</td>
-                          <td className="p-2 text-center font-bold font-mono text-gray-800">{agent.simsCount.toLocaleString()}</td>
+                          <td className="p-2 text-center font-mono">{agent.sellersCount ?? 0}</td>
+                          <td className="p-2 text-center font-bold font-mono text-gray-800">{(agent.simsCount ?? 0).toLocaleString()}</td>
                           <td className="p-2 text-center">
                             <span className={`inline-block px-1.5 py-0.5 rounded-full text-[8.5px] font-bold ${
                               agent.status === 'active' 
@@ -843,6 +862,70 @@ function AgentsView({ agents, setView, onUpdateAgent }: AgentsViewProps) {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Agent Edit Modal */}
+      {editAgent && (
+        <div className="fixed inset-0 bg-gray-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden text-right leading-relaxed animate-in fade-in zoom-in-95 duration-200 border border-gray-100/80">
+            <div className="px-6 py-4.5 bg-gray-50 border-b border-gray-150 flex justify-between items-center">
+              <button onClick={() => setEditAgent(null)} className="p-2 hover:bg-gray-150/70 rounded-full text-gray-400 hover:text-gray-700 transition-colors cursor-pointer">
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+              <h3 className="font-bold text-sm text-gray-800 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-sm text-primary">edit</span>
+                تعديل بيانات الوكيل
+              </h3>
+            </div>
+            <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-[11px] font-bold text-gray-500 mb-1.5">اسم الوكيل</label>
+                <input
+                  type="text"
+                  required
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-gray-500 mb-1.5">رقم الهاتف</label>
+                <input
+                  type="text"
+                  required
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-gray-500 mb-1.5">المنطقة</label>
+                <input
+                  type="text"
+                  required
+                  value={editRegion}
+                  onChange={(e) => setEditRegion(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all"
+                />
+              </div>
+              <div className="flex gap-2 justify-end pt-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setEditAgent(null)}
+                  className="px-4 py-2 border border-gray-200 text-gray-700 bg-white hover:bg-gray-55/70 rounded-xl text-xs font-bold transition-all hover:border-gray-300 cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:brightness-110 shadow-md active:scale-[0.98] transition-all cursor-pointer"
+                >
+                  حفظ التعديلات
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

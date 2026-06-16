@@ -7,15 +7,17 @@ import {
   Smartphone, Search, X, Eye, Edit, ArrowRightLeft, BookMarked, RefreshCw, Check, Printer, Trash2,
   MoreVertical, Cpu
 } from 'lucide-react';
+import { useToast, ToastContainer } from '../hooks/useToast';
+import OperatorLogo from './shared/OperatorLogo';
 
 interface SellerSimsViewProps {
   sims: Sim[];
   onUpdateSims?: (updated: Sim[]) => void;
 }
 
-export default function SellerSimsView({ sims, onUpdateSims }: SellerSimsViewProps) {
+export default function SellerSimsView({ sims = [], onUpdateSims }: SellerSimsViewProps) {
   const [simSearchQuery, setSimSearchQuery] = useState('');
-  const [simStatusFilter, setSimStatusFilter] = useState<'all' | 'available' | 'sold' | 'reserved' | 'allocated' | 'damaged'>('all');
+  const [simStatusFilter, setSimStatusFilter] = useState<'all' | 'available' | 'sold'>('all');
   const [simOperatorFilter, setSimOperatorFilter] = useState<string>('all');
   const [simCurrentPage, setSimCurrentPage] = useState(1);
   const [activeMenuSimId, setActiveMenuSimId] = useState<string | null>(null);
@@ -29,21 +31,21 @@ export default function SellerSimsView({ sims, onUpdateSims }: SellerSimsViewPro
   const [transferToSellerName, setTransferToSellerName] = useState('');
   const [deleteConfirmSimId, setDeleteConfirmSimId] = useState<string | null>(null);
 
+  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
+
   const computedStats = sims.reduce((acc, sim) => {
     const op = (sim.operator || 'yemen_mobile').toLowerCase();
-    if (!acc[op]) acc[op] = { total: 0, available: 0, sold: 0, reserved: 0, allocated: 0, damaged: 0 };
+    if (!acc[op]) acc[op] = { total: 0, available: 0, sold: 0 };
     acc[op].total += 1;
     if (sim.status === 'available') acc[op].available += 1;
     else if (sim.status === 'sold') acc[op].sold += 1;
-    else if (sim.status === 'reserved' || sim.status === 'suspended') acc[op].reserved += 1;
-    else if (sim.status === 'inactive' || sim.status === 'damaged') acc[op].damaged += 1;
     return acc;
-  }, {} as Record<string, { total: number; available: number; sold: number; reserved: number; allocated: number; damaged: number }>);
+  }, {} as Record<string, { total: number; available: number; sold: number }>);
 
   const operatorsList = [
-    { key: 'yemen_mobile', name: 'يمن موبايل', iconColor: 'bg-red-600/10 text-red-500 border-red-500/20', logo: 'YM' },
-    { key: 'you', name: 'YOU', iconColor: 'bg-amber-500/15 text-amber-500 border-amber-500/25', logo: 'YOU' },
-    { key: 'sabafon', name: 'سبأفون', iconColor: 'bg-blue-600/15 text-blue-400 border-blue-500/25', logo: 'SF' }
+    { key: 'yemen_mobile', name: 'يمن موبايل', iconColor: 'bg-ym-light/20 border-ym-light/30 text-ym', brandBg: 'bg-op-ym', brandBorder: 'border-op-ym', brandShadow: 'shadow-lg', brandText: 'text-white', brandInactiveHover: 'hover:border-op-ym/60 hover:bg-op-ym-light' },
+    { key: 'you', name: 'YOU', iconColor: 'bg-amber-950/40 border-amber-900/40 text-amber-400', brandBg: 'bg-op-you', brandBorder: 'border-op-you', brandShadow: 'shadow-lg', brandText: 'text-you-text', brandInactiveHover: 'hover:border-op-you/60 hover:bg-op-you-light' },
+    { key: 'sabafon', name: 'سبأفون', iconColor: 'bg-blue-950/40 border-blue-900/40 text-blue-400', brandBg: 'bg-op-sf', brandBorder: 'border-op-sf', brandShadow: 'shadow-lg', brandText: 'text-white', brandInactiveHover: 'hover:border-op-sf/60 hover:bg-op-sf-light' }
   ];
 
   const filtered = sims.filter(sim => {
@@ -55,9 +57,6 @@ export default function SellerSimsView({ sims, onUpdateSims }: SellerSimsViewPro
     let matchesStatus = true;
     if (simStatusFilter === 'available') matchesStatus = sim.status === 'available';
     else if (simStatusFilter === 'sold') matchesStatus = sim.status === 'sold';
-    else if (simStatusFilter === 'reserved') matchesStatus = sim.status === 'reserved';
-    else if (simStatusFilter === 'allocated') matchesStatus = (sim.status as any) === 'allocated' || (sim.status as any) === 'suspended';
-    else if (simStatusFilter === 'damaged') matchesStatus = (sim.status as any) === 'damaged' || (sim.status as any) === 'inactive';
     let matchesOperator = true;
     if (simOperatorFilter !== 'all') {
       matchesOperator = (sim.operator || '').toLowerCase() === simOperatorFilter.toLowerCase();
@@ -106,6 +105,7 @@ export default function SellerSimsView({ sims, onUpdateSims }: SellerSimsViewPro
 
   return (
     <div className="space-y-6 text-right">
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       <div className="border-b border-slate-800 pb-4">
         <h2 className="text-base font-bold text-slate-100 tracking-tight flex items-center gap-2">
           <Cpu className="text-red-500" size={18} />
@@ -116,27 +116,27 @@ export default function SellerSimsView({ sims, onUpdateSims }: SellerSimsViewPro
 
       <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-none" dir="rtl">
         {operatorsList.map(op => {
-          const stat = computedStats[op.key] || { total: 0, available: 0, sold: 0, reserved: 0, allocated: 0, damaged: 0 };
+          const stat = computedStats[op.key] || { total: 0, available: 0, sold: 0 };
           const consumptionRate = stat.total > 0 ? Math.round((stat.sold / stat.total) * 100) : 0;
+          const isActive = simOperatorFilter === op.key;
           return (
             <button
               key={op.key}
-              onClick={() => setSimOperatorFilter(simOperatorFilter === op.key ? 'all' : op.key)}
-              className={`flex-shrink-0 w-56 sm:w-64 bg-slate-900 border ${simOperatorFilter === op.key ? 'border-red-500 shadow-md shadow-red-950/10' : 'border-slate-800'} rounded-2xl p-4 text-right transition-all hover:border-slate-700`}
+              onClick={() => setSimOperatorFilter(isActive ? 'all' : op.key)}
+              className={`flex-shrink-0 w-56 sm:w-64 bg-slate-900 border-2 rounded-2xl p-4 text-right transition-all duration-200 active:scale-[0.98] ${isActive ? `${op.brandBorder} shadow-lg ${op.brandShadow}` : 'border-slate-800 hover:border-slate-600'}`}
             >
               <div className="flex justify-between items-start mb-3">
-                <div className={`w-9 h-9 rounded-xl ${op.iconColor} border flex items-center justify-center font-bold text-xs`}>{op.logo}</div>
+                <OperatorLogo provider={op.key} size="md" />
                 <span className="text-[10px] text-slate-400 font-medium">معدل تسييل: {consumptionRate}%</span>
               </div>
               <h4 className="font-bold text-xs text-slate-100 pb-1">{op.name}</h4>
               <p className="text-xl font-bold text-slate-100 font-sans">{stat.total} <span className="text-[10px] text-slate-400 font-normal">شريحة</span></p>
               <div className="w-full bg-slate-950 rounded-full h-1 mt-2.5 overflow-hidden">
-                <div className="bg-red-500 h-1 transition-all duration-500" style={{ width: `${consumptionRate}%` }} />
+                <div className={`h-1 transition-all duration-500 ${isActive ? op.brandBg : 'bg-slate-600'}`} style={{ width: `${consumptionRate}%` }} />
               </div>
-              <div className="flex justify-between items-center text-[10px] text-slate-400 font-sans mt-3">
+              <div className="flex items-center gap-4 text-[10px] text-slate-400 font-sans mt-3">
                 <span>متوفر: <strong className="text-emerald-400">{stat.available}</strong></span>
                 <span>مباع: <strong className="text-blue-400">{stat.sold}</strong></span>
-                <span>تالف: <strong className="text-red-400">{stat.damaged}</strong></span>
               </div>
             </button>
           );
@@ -155,20 +155,25 @@ export default function SellerSimsView({ sims, onUpdateSims }: SellerSimsViewPro
             </button>
           )}
         </div>
-        <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
+        <div className="flex gap-2 w-full md:w-auto overflow-x-auto py-1" dir="rtl">
           <button onClick={() => { setSimOperatorFilter('all'); setSimCurrentPage(1); }}
-            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-colors ${simOperatorFilter === 'all' ? 'bg-red-600/15 border-red-500/45 text-red-400' : 'bg-slate-950 border-slate-850 text-slate-400 hover:text-slate-100'}`}>الكل</button>
+            className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold border-2 transition-all duration-200 flex items-center gap-2 active:scale-[0.97] ${simOperatorFilter === 'all' ? 'bg-red-600/15 border-red-500/45 text-red-400 shadow-sm' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-600 hover:text-slate-100'}`}>
+            <span className="material-symbols-outlined text-lg">apps</span>
+            <span>الكل</span>
+          </button>
           {operatorsList.map(op => (
             <button key={op.key} onClick={() => { setSimOperatorFilter(op.key); setSimCurrentPage(1); }}
-              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-colors ${simOperatorFilter === op.key ? 'bg-red-600/15 border-red-500/45 text-red-400' : 'bg-slate-950 border-slate-850 text-slate-400'}`}>{op.name}</button>
+              className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold border-2 transition-all duration-200 flex items-center gap-2 active:scale-[0.97] ${simOperatorFilter === op.key ? `${op.brandBg} ${op.brandBorder} ${op.brandShadow} ${op.brandText}` : `bg-slate-950 border-slate-800 text-slate-300 ${op.brandInactiveHover}`}`}>
+              <OperatorLogo provider={op.key} size="md" plain />
+              <span>{op.name}</span>
+            </button>
           ))}
         </div>
       </div>
 
       <div className="flex border-b border-slate-800 overflow-x-auto scrollbar-none" dir="rtl">
         {[
-          { id: 'all', label: 'الكل' }, { id: 'available', label: 'المتوفر' }, { id: 'sold', label: 'المباع' },
-          { id: 'reserved', label: 'المحجوز' }, { id: 'allocated', label: 'المخصص' }, { id: 'damaged', label: 'التالف' }
+          { id: 'all', label: 'الكل' }, { id: 'available', label: 'المتوفر' }, { id: 'sold', label: 'المباع' }
         ].map(tab => (
           <button key={tab.id} onClick={() => { setSimStatusFilter(tab.id as any); setSimCurrentPage(1); }}
             className={`px-5 py-3 text-xs font-bold transition-all relative whitespace-nowrap ${simStatusFilter === tab.id ? 'text-red-500 font-black border-b-2 border-red-600' : 'text-slate-400 hover:text-slate-100'}`}>{tab.label}</button>
@@ -201,7 +206,7 @@ export default function SellerSimsView({ sims, onUpdateSims }: SellerSimsViewPro
                         <td className="p-4"><p className="font-mono font-bold text-slate-100" dir="ltr">{sim.iccid}</p>{sim.phone && <span className="text-[10px] text-slate-500 font-mono">{sim.phone}</span>}</td>
                         <td className="p-4 text-slate-300 font-medium">{sim.category || 'مسبقة الدفع'}</td>
                         <td className="p-4">
-                          <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black ${sim.operator === 'yemen_mobile' ? 'bg-red-950/40 text-red-400 border border-red-900/40' : sim.operator === 'you' ? 'bg-amber-950/40 text-amber-500 border border-amber-900/40' : 'bg-blue-950/40 text-blue-400 border border-blue-900/40'}`}>{operatorLabel}</span>
+                          <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black ${sim.operator === 'yemen_mobile' ? 'bg-ym-light/20 text-ym border border-ym-light/30' : sim.operator === 'you' ? 'bg-amber-950/40 text-amber-500 border border-amber-900/40' : 'bg-blue-950/40 text-blue-400 border border-blue-900/40'}`}>{operatorLabel}</span>
                         </td>
                         <td className="p-4">
                           <span className={`badge ${sim.status === 'available' ? 'badge-available' : sim.status === 'sold' ? 'badge-sold' : sim.status === 'reserved' ? 'badge-reserved' : (sim.status as any) === 'allocated' || (sim.status as any) === 'suspended' ? 'badge-pending' : 'badge-damaged'}`}>
@@ -226,7 +231,7 @@ export default function SellerSimsView({ sims, onUpdateSims }: SellerSimsViewPro
                                     <button onClick={() => handleStatusChange(sim.id, 'available')} className="w-full text-right px-3 py-2 text-[10px] text-emerald-400 hover:bg-slate-900 rounded-lg flex items-center gap-2"><RefreshCw size={12} /><span>إلغاء الحجز</span></button>
                                   )}
                                   <button onClick={() => handleStatusChange(sim.id, 'sold')} className="w-full text-right px-3 py-2 text-[10px] text-blue-400 hover:bg-slate-900 rounded-lg flex items-center gap-2"><Check size={12} /><span>بيع الشريحة</span></button>
-                                  <button onClick={() => { alert(`جاري طباعة بيانات الشريحة...\nالمشغل: ${operatorLabel}\nICCID: ${sim.iccid}\nالحالة الحالية: ${sim.status}`); setActiveMenuSimId(null); }} className="w-full text-right px-3 py-2 text-[10px] text-slate-300 hover:bg-slate-900 hover:text-slate-100 rounded-lg flex items-center gap-2"><Printer size={12} /><span>طباعة بيانات الشريحة</span></button>
+                                  <button onClick={() => { toastInfo(`جاري طباعة بيانات الشريحة...\nالمشغل: ${operatorLabel}\nICCID: ${sim.iccid}\nالحالة الحالية: ${sim.status}`); setActiveMenuSimId(null); }} className="w-full text-right px-3 py-2 text-[10px] text-slate-300 hover:bg-slate-900 hover:text-slate-100 rounded-lg flex items-center gap-2"><Printer size={12} /><span>طباعة بيانات الشريحة</span></button>
                                   <button onClick={() => handleDeleteSim(sim.id)} className="w-full text-right px-3 py-2 text-[10px] text-red-500 hover:bg-red-950/20 rounded-lg flex items-center gap-2 border-t border-slate-900 mt-1 pb-1"><Trash2 size={12} /><span>حذف الشريحة</span></button>
                                 </div>
                               </>
@@ -275,7 +280,7 @@ export default function SellerSimsView({ sims, onUpdateSims }: SellerSimsViewPro
                               <button onClick={() => handleStatusChange(sim.id, 'available')} className="w-full text-right px-3 py-2 text-[10px] text-emerald-400 hover:bg-slate-900 rounded-lg flex items-center gap-2"><RefreshCw size={12} /><span>إلغاء الحجز</span></button>
                             )}
                             <button onClick={() => { setTransferSim(sim); setActiveMenuSimId(null); }} className="w-full text-right px-3 py-2 text-[10px] text-slate-300 hover:bg-slate-900 hover:text-slate-100 rounded-lg flex items-center gap-2"><ArrowRightLeft size={12} /><span>نقل الشريحة</span></button>
-                            <button onClick={() => { alert(`جاري طباعة بيانات الشريحة...\nICCID: ${sim.iccid}\nالحالة: ${sim.status}`); setActiveMenuSimId(null); }} className="w-full text-right px-3 py-2 text-[10px] text-slate-300 hover:bg-slate-900 hover:text-slate-100 rounded-lg flex items-center gap-2"><Printer size={12} /><span>طباعة</span></button>
+                            <button onClick={() => { toastInfo(`جاري طباعة بيانات الشريحة...\nICCID: ${sim.iccid}\nالحالة: ${sim.status}`); setActiveMenuSimId(null); }} className="w-full text-right px-3 py-2 text-[10px] text-slate-300 hover:bg-slate-900 hover:text-slate-100 rounded-lg flex items-center gap-2"><Printer size={12} /><span>طباعة</span></button>
                           </div>
                         </>
                       )}
@@ -381,7 +386,7 @@ export default function SellerSimsView({ sims, onUpdateSims }: SellerSimsViewPro
                 </div>
                 <div className="flex gap-2 pt-2">
                   <button type="button" onClick={() => {
-                    if (!transferToSellerName) return alert('يرجى تحديد المحل أو البائع المستلم');
+                    if (!transferToSellerName) { toastWarning('يرجى تحديد المحل أو البائع المستلم'); return; }
                     if (onUpdateSims) {
                       const updated = sims.map(s => s.id === transferSim.id ? { ...s, owner: transferToSellerName, status: 'allocated' as any } : s);
                       onUpdateSims(updated);

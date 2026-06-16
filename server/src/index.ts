@@ -1,3 +1,4 @@
+import path from 'path';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -21,16 +22,14 @@ import customersRoutes from './routes/customers';
 import distributionsRoutes from './routes/distributions';
 import reportsRoutes from './routes/reports';
 
-dotenv.config({ path: '.env' });
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
-// Production environment validation
-if (process.env.NODE_ENV === 'production') {
-  const required = ['JWT_SECRET', 'REFRESH_SECRET', 'CSRF_SECRET'];
-  const missing = required.filter(k => !process.env[k]);
-  if (missing.length > 0) {
-    console.error(`Missing required environment variables: ${missing.join(', ')}`);
-    process.exit(1);
-  }
+// Environment validation — all envs require these secrets
+const requiredEnv = ['JWT_SECRET', 'REFRESH_SECRET', 'CSRF_SECRET'];
+const missingEnv = requiredEnv.filter(k => !process.env[k]);
+if (missingEnv.length > 0) {
+  console.error(`Missing required environment variables: ${missingEnv.join(', ')}`);
+  process.exit(1);
 }
 
 const app = express();
@@ -39,8 +38,7 @@ const PORT = parseInt(process.env.API_PORT || '4000');
 // Trust proxy for rate limiter behind Render's reverse proxy
 app.set('trust proxy', 1);
 
-// CSRF token generation endpoint
-const CSRF_SECRET = process.env.CSRF_SECRET || (process.env.NODE_ENV !== 'production' ? crypto.randomBytes(32).toString('hex') : '');
+const CSRF_SECRET = process.env.CSRF_SECRET!;
 
 // Security middleware
 app.use(helmet({
@@ -58,15 +56,17 @@ app.use(helmet({
     },
   },
 }));
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,http://10.0.107.190:3000,http://10.0.0.185:3000,https://yemen-telecom-1699.web.app').split(',');
+const isDev = process.env.NODE_ENV !== 'production';
+const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,https://yemen-telecom-1699.web.app').split(',');
 const isCapacitorOrigin = (origin: string) =>
   origin === 'https://localhost' ||
   origin === 'capacitor://localhost' ||
   origin.startsWith('https://localhost:') ||
-  origin.startsWith('http://localhost:') && origin !== 'http://localhost:3000'; // 3000 handled above
+  origin.startsWith('http://localhost:') ||
+  origin.startsWith('capacitor://');
 app.use(cors({
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    if (!origin || allowedOrigins.includes(origin) || (origin && isCapacitorOrigin(origin))) {
+    if (!origin || isDev || corsOrigins.includes(origin) || (origin && isCapacitorOrigin(origin))) {
       callback(null, true);
     } else {
       console.warn(`CORS blocked origin: ${origin}`);
@@ -80,6 +80,7 @@ app.use(cors({
 app.use(compression());
 app.use(express.json({ limit: '1mb' }));
 app.use('/uploads', express.static('uploads'));
+app.use(express.static('dist'));
 
 // CSRF token generation endpoint (must be after CORS middleware)
 app.get('/api/csrf-token', (req, res) => {
@@ -168,20 +169,20 @@ function listRoutes(): { method: string; path: string }[] {
   const stack = (app as any)._router?.stack || [];
   for (const layer of stack) {
     if (layer.route) {
-      const methods = Object.keys(layer.route.methods).join(',').toUpperCase();
+      const methods = Object.keys(layer.route.methods || {}).join(',').toUpperCase();
       routes.push({ method: methods, path: layer.route.path });
     } else if (layer.name === 'router' && layer.handle?.stack) {
       const mountPath = extractMountPath(layer.regexp);
       for (const sub of layer.handle.stack) {
         if (sub.route) {
-          const methods = Object.keys(sub.route.methods).join(',').toUpperCase();
+          const methods = Object.keys(sub.route.methods || {}).join(',').toUpperCase();
           const subPath = sub.route.path === '/' ? '' : sub.route.path;
           routes.push({ method: methods, path: mountPath + subPath });
         } else if (sub.name === 'router' && sub.handle?.stack) {
           const subMountPath = extractMountPath(sub.regexp);
           for (const inner of sub.handle.stack) {
             if (inner.route) {
-              const methods = Object.keys(inner.route.methods).join(',').toUpperCase();
+              const methods = Object.keys(inner.route.methods || {}).join(',').toUpperCase();
               routes.push({ method: methods, path: mountPath + subMountPath + inner.route.path });
             }
           }
