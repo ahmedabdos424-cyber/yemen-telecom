@@ -4,8 +4,8 @@ android {
     namespace = "com.yemen.telecom"
     compileSdk = rootProject.ext.compileSdkVersion
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
     }
     defaultConfig {
         applicationId "com.yemen.telecom"
@@ -20,7 +20,7 @@ android {
     }
     signingConfigs {
         release {
-            storeFile file('release.keystore')
+            storeFile file(System.getenv('KEYSTORE_PATH') ?: 'release.keystore')
             storePassword System.getenv('KEYSTORE_PASSWORD')
             keyAlias System.getenv('KEYSTORE_ALIAS')
             keyPassword System.getenv('KEY_PASSWORD')
@@ -33,12 +33,14 @@ android {
         release {
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            if (System.getenv('KEYSTORE_PASSWORD') &&
+            def hasSigning = System.getenv('KEYSTORE_PASSWORD') &&
                 System.getenv('KEYSTORE_ALIAS') &&
-                System.getenv('KEY_PASSWORD')) {
+                System.getenv('KEY_PASSWORD')
+            if (hasSigning) {
                 signingConfig signingConfigs.release
             } else {
-                logger.warn('WARNING: Release signing credentials not set. Release builds will be unsigned.')
+                signingConfig signingConfigs.debug
+                logger.warn('Release signing credentials not set; falling back to debug signing for validation.')
             }
         }
     }

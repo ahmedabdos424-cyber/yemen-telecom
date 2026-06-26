@@ -103,7 +103,7 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
       if (result) {
         setSuccess(true);
         setIsLoading(false);
-        setTimeout(() => {
+        const commitTimer = setTimeout(() => {
           if (!abortRef.current) result.commit();
         }, 450);
       } else {

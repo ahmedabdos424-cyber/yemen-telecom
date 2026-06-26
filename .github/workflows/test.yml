@@ -30,10 +30,9 @@ jobs:
 
       - name: TypeScript type check (frontend)
         run: npx tsc --noEmit
-        continue-on-error: true
 
       - name: Run frontend tests
-        run: npm test -- --run
+        run: npm test
 
       - name: Install server dependencies
         working-directory: server
@@ -42,15 +41,13 @@ jobs:
       - name: TypeScript type check (server)
         working-directory: server
         run: npx tsc --noEmit
-        continue-on-error: true
 
       - name: Run server tests
         working-directory: server
-        run: npm test -- --run
+        run: npm test
 
       - name: Build production bundle
         run: npm run build
 
       - name: Run npm audit
         run: npm audit --audit-level=high
-        continue-on-error: true

@@ -1,7 +1,7 @@
 # Yemen Telecom - Database Backup Script
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $backupDir = "C:\Users\Ahmed\Desktop\yemen-telecom-backups"
-$env:PGPASSWORD = "postgres"
+$env:PGPASSWORD = $env:DB_PASSWORD
 
 # Create backup directory if not exists
 New-Item -ItemType Directory -Force -Path $backupDir | Out-Null

@@ -25,19 +25,21 @@ ALTER TABLE sellers ADD CONSTRAINT sellers_created_by_fkey
   FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL;
 
 -- ============================================================
--- sims → sellers (seller_id)
+-- sims → sellers (assigned_to — aliased as seller_id in older schema)
 -- ============================================================
 DO $$
 BEGIN
   IF EXISTS (
     SELECT 1 FROM information_schema.table_constraints
     WHERE constraint_name = 'sims_seller_id_fkey'
+      OR constraint_name = 'sims_assigned_to_fkey'
   ) THEN
-    ALTER TABLE sims DROP CONSTRAINT sims_seller_id_fkey;
+    ALTER TABLE sims DROP CONSTRAINT IF EXISTS sims_seller_id_fkey;
+    ALTER TABLE sims DROP CONSTRAINT IF EXISTS sims_assigned_to_fkey;
   END IF;
 END $$;
-ALTER TABLE sims ADD CONSTRAINT sims_seller_id_fkey
-  FOREIGN KEY (seller_id) REFERENCES sellers(id) ON DELETE SET NULL;
+ALTER TABLE sims ADD CONSTRAINT sims_assigned_to_fkey
+  FOREIGN KEY (assigned_to) REFERENCES sellers(id) ON DELETE SET NULL;
 
 -- ============================================================
 -- sims → users (activated_by)

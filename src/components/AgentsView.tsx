@@ -431,12 +431,15 @@ function AgentsView({ agents = [], setView, onUpdateAgent }: AgentsViewProps) {
     doc.write(htmlContent);
     doc.close();
 
-    setTimeout(() => {
+    const printTimer = setTimeout(() => {
       iframe.contentWindow?.focus();
       iframe.contentWindow?.print();
-      setTimeout(() => {
-        document.body.removeChild(iframe);
+      const cleanupTimer = setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
       }, 500);
+      return () => clearTimeout(cleanupTimer);
     }, 400);
   };
 

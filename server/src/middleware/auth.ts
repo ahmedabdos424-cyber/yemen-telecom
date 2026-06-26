@@ -16,6 +16,15 @@ export interface AuthRequest extends Request {
   user?: { id: number; username: string; role: string };
 }
 
+export interface TokenPayload {
+  id: number;
+  username: string;
+  role: string;
+  iat?: number;
+  exp?: number;
+  iss?: string;
+}
+
 export function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
@@ -45,10 +54,14 @@ export async function authenticateToken(req: AuthRequest, res: Response, next: N
     const decoded = jwt.verify(token, JWT_SECRET, {
       issuer: 'yemen-telecom',
       algorithms: ['HS256'],
-    }) as any;
+    }) as TokenPayload;
     const blacklisted = await isTokenBlacklisted(token);
     if (blacklisted) {
       return res.status(401).json({ error: 'Token has been revoked' });
+    }
+    const userCheck = await query('SELECT status FROM users WHERE id = $1', [decoded.id]);
+    if (userCheck.rows.length === 0 || userCheck.rows[0].status !== 'active') {
+      return res.status(401).json({ error: 'Account is not active' });
     }
     req.user = { id: decoded.id, username: decoded.username, role: decoded.role };
     next();

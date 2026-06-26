@@ -209,6 +209,7 @@ let totalOcrTime = 0;
 
 export function useOcr() {
   const mountedRef = useMountedRef();
+  const progressHideRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [progress, setProgress] = useState<OcrProgressState>({ visible: false, progress: 0, stage: '' });
   const loggerRef = useRef<(m: { status: string; progress: number }) => void>((m) => {
     if (mountedRef.current) setProgress(prev => ({
@@ -265,7 +266,7 @@ export function useOcr() {
       totalOcrTime += performance.now() - startTime;
       return '';
     }
-  }, [initWorker]);
+  }, [initWorker, mountedRef]);
 
   const recognize = useCallback(async (imageData: string): Promise<string> => {
     totalOcrCalls++;
@@ -365,14 +366,16 @@ export function useOcr() {
     }
 
     if (mountedRef.current) setProgress({ visible: true, progress: 100, stage: stages.complete.label });
-    setTimeout(() => { if (mountedRef.current) setProgress(prev => ({ ...prev, visible: false })); }, 800);
+    if (progressHideRef.current) clearTimeout(progressHideRef.current);
+    progressHideRef.current = setTimeout(() => { if (mountedRef.current) setProgress(prev => ({ ...prev, visible: false })); }, 800);
     totalOcrTime += performance.now() - startTime;
     return name;
-  }, [initWorker]);
+  }, [initWorker, mountedRef]);
 
   useEffect(() => {
     return () => {
       setProgress({ visible: false, progress: 0, stage: '' });
+      if (progressHideRef.current) clearTimeout(progressHideRef.current);
     };
   }, []);
 

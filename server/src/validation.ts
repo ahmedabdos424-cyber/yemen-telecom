@@ -29,7 +29,7 @@ function so(max = 200) {
 // Auth
 export const loginSchema = z.object({
   username: s(1, 100),
-  password: z.string().min(1, 'Password is required').max(200),
+  password: z.string().min(8, 'Password must be at least 8 characters').max(200),
 });
 
 export const refreshTokenSchema = z.object({
@@ -39,7 +39,10 @@ export const refreshTokenSchema = z.object({
 // Users
 export const updatePasswordSchema = z.object({
   currentPassword: z.string().min(1),
-  newPassword: z.string().min(8, 'Password must be at least 8 characters').max(200),
+  newPassword: z.string().min(8, 'Password must be at least 8 characters').max(200)
+    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+    .regex(/[0-9]/, 'Password must contain at least one digit'),
 });
 
 export const updateProfileSchema = z.object({
@@ -77,7 +80,10 @@ export const createAgentSchema = z.object({
   sims_count: z.number().int().min(0).optional().default(0),
   status: z.enum(['active', 'inactive']).optional().default('active'),
   username: z.string().max(100).optional(),
-  password: z.string().max(200).optional(),
+  password: z.string().min(8, 'Password must be at least 8 characters').max(200)
+    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+    .regex(/[0-9]/, 'Password must contain at least one digit').optional(),
 });
 
 export const updateAgentSchema = z.object({
@@ -102,7 +108,10 @@ export const createSellerSchema = z.object({
   regionCode: z.string().max(50).optional(),
   status: z.enum(['active', 'inactive', 'suspended', 'low_stock']).optional().default('active'),
   username: z.string().max(100).optional(),
-  password: z.string().max(200).optional(),
+  password: z.string().min(8, 'Password must be at least 8 characters').max(200)
+    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+    .regex(/[0-9]/, 'Password must contain at least one digit').optional(),
   agent_name: so(200),
   seller_id: z.string().max(50).optional(),
   sellerId: z.string().max(50).optional(),
@@ -125,17 +134,54 @@ export const updateSellerBalanceSchema = z.object({
   amount: z.number().refine(v => !isNaN(v), 'Numeric amount is required'),
 });
 
+// Operator normalization — accepts both snake_case and Title Case, normalizes to snake_case
+const OPERATOR_MAP: Record<string, string> = {
+  'yemen_mobile': 'yemen_mobile',
+  'Yemen Mobile': 'yemen_mobile',
+  'sabafon': 'sabafon',
+  'Sabafon': 'sabafon',
+  'you': 'you',
+  'YOU': 'you',
+};
+const VALID_OPERATORS = ['yemen_mobile', 'sabafon', 'you'] as const;
+
+export function normalizeOperator(v: string): string {
+  return OPERATOR_MAP[v] || v;
+}
+
+function isValidOperator(v: string): boolean {
+  return (VALID_OPERATORS as readonly string[]).includes(v);
+}
+
+// Required operator field (distributions, inventories)
+function requiredOperator() {
+  return z.string().min(1).max(50)
+    .transform(v => normalizeOperator(v))
+    .refine(v => isValidOperator(v), {
+      message: 'Invalid operator. Expected one of: yemen_mobile, sabafon, you',
+    });
+}
+
+// Optional operator field (operations — empty string allowed)
+function optionalOperator() {
+  return z.string().max(50).optional().default('')
+    .transform(v => v ? normalizeOperator(v) : v)
+    .refine(v => v === '' || isValidOperator(v), {
+      message: 'Invalid operator. Expected one of: yemen_mobile, sabafon, you',
+    });
+}
+
 // Operations
 export const createOperationSchema = z.object({
   type: z.enum(['activate', 'recharge']).refine(v => v, 'Operation type is required'),
   target: s(1, 100),
-  operator: z.string().max(50).optional().default(''),
+  operator: optionalOperator(),
   status: z.enum(['success', 'failed', 'pending']).optional().default('success'),
 });
 
 // Inventories
 export const updateInventoriesSchema = z.array(z.object({
-  operator: z.string().min(1),
+  operator: requiredOperator(),
   available: z.number().int().min(0),
   remaining: z.number().int().min(0),
 })).min(1);
@@ -179,7 +225,7 @@ export const createDistributionSchema = z.object({
   seller_id: z.number().int().optional(),
   sellerId: z.number().int().optional(),
   seller_name: so(200),
-  operator: z.string().min(1).max(50),
+  operator: requiredOperator(),
   count: z.number().int().min(1, 'Count must be at least 1').max(10000),
   notes: so(200).default(''),
 });

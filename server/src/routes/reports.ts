@@ -1,10 +1,10 @@
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import { query } from '../db';
-import { requireRole } from '../middleware/auth';
+import { requireRole, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
-router.get('/daily-sales', requireRole('manager'), async (_req: any, res: Response) => {
+router.get('/daily-sales', requireRole('manager'), async (_req: Request, res: Response) => {
   try {
     const result = await query(`
       SELECT
@@ -24,7 +24,7 @@ router.get('/daily-sales', requireRole('manager'), async (_req: any, res: Respon
   }
 });
 
-router.get('/agent-performance', requireRole('manager'), async (_req: any, res: Response) => {
+router.get('/agent-performance', requireRole('manager'), async (_req: Request, res: Response) => {
   try {
     const result = await query(`
       SELECT
@@ -45,7 +45,7 @@ router.get('/agent-performance', requireRole('manager'), async (_req: any, res: 
   }
 });
 
-router.get('/operator-distribution', requireRole('manager'), async (_req: any, res: Response) => {
+router.get('/operator-distribution', requireRole('manager'), async (_req: Request, res: Response) => {
   try {
     const sims = await query(`
       SELECT provider AS operator, COUNT(*) AS count, status
@@ -62,8 +62,18 @@ router.get('/operator-distribution', requireRole('manager'), async (_req: any, r
   }
 });
 
-router.get('/seller-performance', requireRole('manager', 'agent'), async (_req: any, res: Response) => {
+router.get('/seller-performance', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
   try {
+    let whereClause = '';
+    let params: any[] | undefined;
+    if (req.user?.role === 'agent') {
+      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
+      if (agentRes.rows.length === 0) {
+        return res.json([]);
+      }
+      whereClause = ' WHERE s.agent_id = $1';
+      params = [agentRes.rows[0].id];
+    }
     const result = await query(`
       SELECT
         s.id, s.name, s.store_name, s.region,
@@ -72,9 +82,10 @@ router.get('/seller-performance', requireRole('manager', 'agent'), async (_req: 
         a.name AS agent_name
       FROM sellers s
       LEFT JOIN agents a ON s.agent_id = a.id
+      ${whereClause}
       ORDER BY s.sales_30_days DESC
       LIMIT 100
-    `);
+    `, params);
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching seller performance:', err);

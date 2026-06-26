@@ -7,7 +7,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { query } from '../db';
-import { hashToken, isTokenBlacklisted } from '../middleware/auth';
+import { hashToken, isTokenBlacklisted, TokenPayload } from '../middleware/auth';
 import { validate, loginSchema, refreshTokenSchema } from '../validation';
 
 const router = Router();
@@ -19,29 +19,29 @@ const REFRESH_SECRET: string = process.env.REFRESH_SECRET;
 
 router.post('/login', validate(loginSchema), async (req: Request, res: Response) => {
   const { username, password } = req.body;
-  console.log('[LOGIN] Step 1 — Request received', { username: username, passwordProvided: !!password, NODE_ENV: process.env.NODE_ENV, DB_HOST: process.env.DB_HOST, DB_USER: process.env.DB_USER, DB_NAME: process.env.DB_NAME, JWT_SECRET_set: !!process.env.JWT_SECRET });
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[LOGIN] Step 1 — Request received', { username, passwordProvided: !!password });
+  }
   try {
-    console.log('[LOGIN] Step 2 — About to query DB for user', { username });
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[LOGIN] Step 2 — About to query DB for user', { username });
+    }
     const result = await query('SELECT * FROM users WHERE username = $1', [username]);
-    console.log('[LOGIN] Step 3 — Query completed', { rowCount: result.rows.length });
     if (result.rows.length === 0) {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
     const user = result.rows[0];
-    console.log('[LOGIN] Step 4 — User found', { id: user.id, role: user.role, hasPasswordHash: !!user.password_hash });
-    console.log('[LOGIN] Step 5 — About to compare password');
     const valid = await bcrypt.compare(password, user.password_hash);
-    console.log('[LOGIN] Step 6 — Password compared', { valid });
     if (!valid) {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
-    console.log('[LOGIN] Step 7 — Updating last_login');
+    if (user.status !== 'active') {
+      return res.status(403).json({ error: 'Account disabled' });
+    }
     await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
-    console.log('[LOGIN] Step 8 — Generating JWT');
     const payload = { id: user.id, username: user.username, role: user.role };
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '24h', issuer: 'yemen-telecom', algorithm: 'HS256' });
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h', issuer: 'yemen-telecom', algorithm: 'HS256' });
     const refreshToken = jwt.sign(payload, REFRESH_SECRET, { expiresIn: '7d', issuer: 'yemen-telecom', algorithm: 'HS256' });
-    console.log('[LOGIN] Step 9 — Login complete, sending response');
     res.json({
       token,
       refreshToken,
@@ -55,21 +55,16 @@ router.post('/login', validate(loginSchema), async (req: Request, res: Response)
       },
     });
   } catch (err: any) {
-    console.error('[LOGIN ERROR]', {
-      message: err.message,
-      stack: err.stack,
-      code: err.code,
-      detail: err.detail,
-      name: err.name,
-    });
-    res.status(500).json({
-      error: 'Internal server error',
-      debug: {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[LOGIN ERROR]', {
         message: err.message,
+        stack: err.stack,
         code: err.code,
+        detail: err.detail,
         name: err.name,
-      },
-    });
+      });
+    }
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -80,9 +75,20 @@ router.post('/refresh', validate(refreshTokenSchema), async (req: Request, res: 
     if (blacklisted) {
       return res.status(401).json({ error: 'Refresh token has been revoked' });
     }
-    const decoded = jwt.verify(refreshToken, REFRESH_SECRET, { issuer: 'yemen-telecom', algorithms: ['HS256'] }) as any;
+    const decoded = jwt.verify(refreshToken, REFRESH_SECRET, { issuer: 'yemen-telecom', algorithms: ['HS256'] }) as TokenPayload;
+    const rtExp = decoded.exp;
+    if (rtExp) {
+      await query(
+        'INSERT INTO token_blacklist (token_hash, expires_at, user_id) VALUES ($1, $2, $3) ON CONFLICT (token_hash) DO NOTHING',
+        [hashToken(refreshToken), new Date(rtExp * 1000).toISOString(), decoded.id]
+      );
+    }
+    const userRes = await query('SELECT status FROM users WHERE id = $1', [decoded.id]);
+    if (userRes.rows.length === 0 || userRes.rows[0].status !== 'active') {
+      return res.status(403).json({ error: 'Account disabled' });
+    }
     const payload = { id: decoded.id, username: decoded.username, role: decoded.role };
-    const newToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '24h', issuer: 'yemen-telecom', algorithm: 'HS256' });
+    const newToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h', issuer: 'yemen-telecom', algorithm: 'HS256' });
     const newRefreshToken = jwt.sign(payload, REFRESH_SECRET, { expiresIn: '7d', issuer: 'yemen-telecom', algorithm: 'HS256' });
     res.json({ token: newToken, refreshToken: newRefreshToken });
   } catch (err: any) {
@@ -101,23 +107,23 @@ router.post('/logout', async (req: Request, res: Response) => {
   }
   try {
     const token = auth.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET, { issuer: 'yemen-telecom', algorithms: ['HS256'] }) as any;
+    const decoded = jwt.verify(token, JWT_SECRET, { issuer: 'yemen-telecom', algorithms: ['HS256'] }) as TokenPayload;
     if (decoded.exp) {
       const expiresAt = new Date(decoded.exp * 1000).toISOString();
       await query(
-        'INSERT INTO token_blacklist (token_hash, expires_at) VALUES ($1, $2) ON CONFLICT (token_hash) DO NOTHING',
-        [hashToken(token), expiresAt]
+        'INSERT INTO token_blacklist (token_hash, expires_at, user_id) VALUES ($1, $2, $3) ON CONFLICT (token_hash) DO NOTHING',
+        [hashToken(token), expiresAt, decoded.id]
       );
     }
     const refreshTokenHeader = req.headers['x-refresh-token'] as string;
     if (refreshTokenHeader) {
       try {
-        const rtDecoded = jwt.verify(refreshTokenHeader, REFRESH_SECRET) as any;
+        const rtDecoded = jwt.verify(refreshTokenHeader, REFRESH_SECRET, { algorithms: ['HS256'] }) as TokenPayload;
         if (rtDecoded.exp) {
           const rtExpiresAt = new Date(rtDecoded.exp * 1000).toISOString();
           await query(
-            'INSERT INTO token_blacklist (token_hash, expires_at) VALUES ($1, $2) ON CONFLICT (token_hash) DO NOTHING',
-            [hashToken(refreshTokenHeader), rtExpiresAt]
+            'INSERT INTO token_blacklist (token_hash, expires_at, user_id) VALUES ($1, $2, $3) ON CONFLICT (token_hash) DO NOTHING',
+            [hashToken(refreshTokenHeader), rtExpiresAt, decoded.id]
           );
         }
       } catch { /* refresh token already expired — ignore */ }
@@ -132,7 +138,9 @@ router.post('/logout', async (req: Request, res: Response) => {
   }
 });
 
-console.log('[AUTH] AUTH ROUTES LOADED — /login /refresh /logout /me');
+if (process.env.NODE_ENV !== 'production') {
+  console.log('[AUTH] AUTH ROUTES LOADED — /login /refresh /logout /me');
+}
 
 router.get('/me', async (req: Request, res: Response) => {
   const auth = req.headers.authorization;
@@ -141,7 +149,7 @@ router.get('/me', async (req: Request, res: Response) => {
   }
   try {
     const token = auth.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET, { issuer: 'yemen-telecom', algorithms: ['HS256'] }) as any;
+    const decoded = jwt.verify(token, JWT_SECRET, { issuer: 'yemen-telecom', algorithms: ['HS256'] }) as TokenPayload;
     const blacklisted = await isTokenBlacklisted(token);
     if (blacklisted) {
       return res.status(401).json({ error: 'Token has been revoked' });

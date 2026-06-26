@@ -9,19 +9,21 @@ function fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Respo
   return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timeoutId));
 }
 
-const isCapacitor = !!(window as any).Capacitor?.isNative;
+const isCapacitor = !!(window as unknown as { Capacitor?: { isNative?: boolean } }).Capacitor?.isNative;
 const hostname = window.location.hostname;
 const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('10.') || hostname.startsWith('192.168.');
 const API_BASE = isCapacitor || (!import.meta.env.DEV && !isLocal)
   ? 'https://yemen-telecom-api.onrender.com/api'
   : '/api';
 
-let authToken: string | null = tokenStorage.getAuthTokenSync();
-let refreshToken: string | null = tokenStorage.getRefreshTokenSync();
+let authToken: string | null = null;
+let refreshToken: string | null = null;
 let csrfToken: string | null = null;
 let csrfHash: string | null = null;
 let isRefreshing = false;
 let pendingRequests: Array<(token: string) => void> = [];
+let tokensLoaded = false;
+let tokensLoadPromise: Promise<void> | null = null;
 
 export function setToken(token: string | null) {
   authToken = token;
@@ -46,6 +48,24 @@ export function clearTokens() {
   setRefreshToken(null);
 }
 
+export async function loadTokens(): Promise<{ authToken: string | null; refreshToken: string | null }> {
+  if (!tokensLoaded) {
+    if (!tokensLoadPromise) {
+      tokensLoadPromise = (async () => {
+        authToken = await tokenStorage.getAuthToken();
+        refreshToken = await tokenStorage.getRefreshToken();
+        tokensLoaded = true;
+      })();
+    }
+    await tokensLoadPromise;
+  }
+  return { authToken, refreshToken };
+}
+
+export function getLoadedTokens(): { authToken: string | null; refreshToken: string | null } {
+  return { authToken, refreshToken };
+}
+
 export async function fetchCsrfToken(): Promise<void> {
   try {
     const res = await fetchWithTimeout(`${API_BASE}/csrf-token`, { credentials: 'include' });
@@ -61,6 +81,7 @@ export async function fetchCsrfToken(): Promise<void> {
 }
 
 async function refreshAccessToken(): Promise<string | null> {
+  await loadTokens();
   if (!refreshToken) return null;
   try {
     const res = await fetchWithTimeout(`${API_BASE}/auth/refresh`, {
@@ -83,6 +104,7 @@ async function refreshAccessToken(): Promise<string | null> {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  await loadTokens();
   const start = performance.now();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -151,6 +173,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 async function uploadFile(file: File | Blob, fieldName = 'image'): Promise<{ url: string; filename: string }> {
+  await loadTokens();
   const form = new FormData();
   form.append(fieldName, file);
   const headers: Record<string, string> = {};
@@ -169,16 +192,22 @@ async function uploadFile(file: File | Blob, fieldName = 'image'): Promise<{ url
   return res.json();
 }
 
+export interface ApiLoginResponse { token: string; refreshToken: string; user: { id: number; username: string; displayName: string; role: string; phone: string; region: string } }
+export interface ApiMeResponse { id: number; username: string; displayName: string; role: string; phone: string; region: string; lastLogin: string }
+export interface ApiBackupResponse { success: boolean; filename: string; size: number; sizeFormatted: string; tables: number; records: number; downloadUrl: string }
+export interface ApiLockdownResponse { success: boolean; locked: boolean; message: string }
+export interface ApiResetPasswordResponse { message: string; credentials: { username: string; password: string } }
+
 export const api = {
   // Auth
   login: (username: string, password: string) =>
-    request<{ token: string; refreshToken: string; user: any }>('/auth/login', {
+    request<ApiLoginResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     }),
 
-  getMe: () => request<any>('/auth/me'),
-  logout: () => request<any>('/auth/logout', { method: 'POST' }),
+  getMe: () => request<ApiMeResponse>('/auth/me'),
+  logout: () => request<Record<string, unknown>>('/auth/logout', { method: 'POST' }),
   refresh: () => refreshAccessToken(),
 
   // Users (profile, password)
@@ -220,7 +249,7 @@ export const api = {
   deleteSeller: (id: number) =>
     request<any>(`/sellers/${id}`, { method: 'DELETE' }),
   resetSellerPassword: (id: number) =>
-    request<{ message: string; credentials: { username: string; password: string } }>(
+    request<ApiResetPasswordResponse>(
       `/sellers/${id}/reset-password`, { method: 'POST' }
     ),
 
@@ -250,13 +279,13 @@ export const api = {
 
   // System: Backup
   createBackup: () =>
-    request<{ success: boolean; filename: string; size: number; sizeFormatted: string; tables: number; records: number; downloadUrl: string }>('/admin/system/backup', { method: 'POST' }),
+    request<ApiBackupResponse>('/admin/system/backup', { method: 'POST' }),
   downloadBackup: (filename: string) =>
     `${API_BASE}/admin/system/backup/download/${filename}`,
 
   // System: Lockdown
   toggleLockdown: () =>
-    request<{ success: boolean; locked: boolean; message: string }>('/admin/system/lockdown', { method: 'POST' }),
+    request<ApiLockdownResponse>('/admin/system/lockdown', { method: 'POST' }),
   getLockdownStatus: () =>
     request<{ locked: boolean }>('/admin/system/lockdown/status'),
 

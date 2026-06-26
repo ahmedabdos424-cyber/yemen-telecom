@@ -40,7 +40,7 @@ router.delete('/account', async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
     const user = userResult.rows[0];
-    await query('DELETE FROM token_blacklist WHERE token_hash IN (SELECT token_hash FROM token_blacklist WHERE expires_at > NOW())');
+    await query('UPDATE token_blacklist SET token_hash = token_hash || \'_revoked\' WHERE user_id = $1', [userId]);
     await query('UPDATE users SET status = \'deleted\', password_hash = \'\', username = CONCAT(username, \'_\', id, \'_deleted\') WHERE id = $1', [userId]);
     res.json({ success: true });
   } catch (err) {

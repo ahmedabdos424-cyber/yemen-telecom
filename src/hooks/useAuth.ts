@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Role } from '../types';
-import { api, setToken, setRefreshToken, clearTokens, fetchCsrfToken } from '../api/client';
+import { api, setToken, setRefreshToken, clearTokens, fetchCsrfToken, loadTokens, getLoadedTokens } from '../api/client';
 
 export function useAuth() {
   const [role, setRole] = useState<Role | null>(() => {
@@ -8,50 +8,15 @@ export function useAuth() {
   });
   const [username, setUsername] = useState(() => localStorage.getItem('tele_username') || '');
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('tele_dark') === 'true');
-  const [token, setAppToken] = useState<string | null>(() => localStorage.getItem('auth_token'));
+  const [token, setAppToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const setTokenWrapper = (t: string | null) => {
+  const setTokenWrapper = useCallback((t: string | null) => {
     setAppToken(t);
     setToken(t);
-  };
-
-  useEffect(() => {
-    const t = setTimeout(() => setIsLoading(false), 800);
-    return () => clearTimeout(t);
   }, []);
 
-  // Verify JWT on mount
-  useEffect(() => {
-    const savedToken = localStorage.getItem('auth_token');
-    const savedRole = localStorage.getItem('tele_role');
-    if (savedToken && savedRole) {
-      api.getMe()
-        .then((user) => {
-          if (!user) { clearSession(); return; }
-          if (user.role !== savedRole) {
-            clearSession();
-          }
-          fetchCsrfToken();
-        })
-        .catch(async () => {
-          const newToken = await api.refresh();
-          if (newToken) {
-            setTokenWrapper(newToken);
-            fetchCsrfToken();
-          } else {
-            clearSession();
-          }
-        });
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('tele_dark', String(darkMode));
-    document.documentElement.classList.toggle('dark', darkMode);
-  }, [darkMode]);
-
-  const clearSession = () => {
+  const clearSession = useCallback(() => {
     clearTokens();
     localStorage.removeItem('tele_role');
     localStorage.removeItem('tele_username');
@@ -60,7 +25,51 @@ export function useAuth() {
     setRole(null);
     setUsername('');
     setTokenWrapper(null);
-  };
+  }, [setTokenWrapper]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const startTime = Date.now();
+    (async () => {
+      await loadTokens();
+      if (cancelled) return;
+      const { authToken: savedToken } = getLoadedTokens();
+      const savedRole = localStorage.getItem('tele_role');
+      if (savedToken && savedRole) {
+        setAppToken(savedToken);
+        try {
+          const user = await api.getMe();
+          if (cancelled) return;
+          if (!user) { clearSession(); return; }
+          if (user.role !== savedRole) {
+            clearSession();
+            return;
+          }
+          fetchCsrfToken();
+        } catch {
+          if (cancelled) return;
+          const newToken = await api.refresh();
+          if (newToken) {
+            setTokenWrapper(newToken);
+            fetchCsrfToken();
+          } else {
+            clearSession();
+          }
+        }
+      }
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 800) {
+        await new Promise(r => setTimeout(r, 800 - elapsed));
+      }
+      if (!cancelled) setIsLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [clearSession, setTokenWrapper]);
+
+  useEffect(() => {
+    localStorage.setItem('tele_dark', String(darkMode));
+    document.documentElement.classList.toggle('dark', darkMode);
+  }, [darkMode]);
 
   const handleLogin = async (_selectedRole: Role, loggedUser: string, password: string): Promise<{ role: Role; commit: () => void } | null> => {
     const apply = (userRole: Role, displayName: string) => {
@@ -86,10 +95,10 @@ export function useAuth() {
     return null;
   };
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     api.logout().catch(() => {});
     clearSession();
-  };
+  }, [clearSession]);
 
   return {
     role, setRole, username, setUsername,

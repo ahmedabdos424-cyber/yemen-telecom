@@ -31,17 +31,7 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
 
     setIsSubmitting(true);
     try {
-      const result = await api.createAgent({
-        name,
-        region,
-        phone,
-        sellers_count: sellersCount,
-        sims_count: simsCount,
-        status: 'active'
-      });
-
-      const agentData = result.agent || result;
-      onAddAgent({
+      await onAddAgent({
         name,
         region,
         phone,

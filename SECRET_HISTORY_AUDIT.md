@@ -18,7 +18,7 @@ Scanned all commits in `main` branch (15 commits) for:
 | `PASSWORD=` | All `.env*` files | Full commit content |
 | All `*env*` file additions | Full repo | File additions only |
 | All `*.jks` / `*.keystore` additions | Full repo | File additions only |
-| Real secrets by value | Full repo | `sRPzEKEfR3uaeM`, `yemen-telecom-jwt-secret-2026` |
+| Real secrets by value | Full repo | `[REDACTED]`, `[REDACTED]` |
 
 ---
 
@@ -51,10 +51,10 @@ new file mode 100644
 
 | Secret Value | Found in History? | Evidence |
 |-------------|-------------------|----------|
-| `sRPzEKEfR3uaeM#` (DB_PASSWORD) | ❌ Not found | No commit contains this string |
-| `yemen-telecom-jwt-secret-2026` | ❌ Not found | No commit contains this string |
-| `yemen-telecom-csrf-secret-2026` | ❌ Not found | No commit contains this string |
-| `yemen-telecom-refresh-secret-2026` | ❌ Not found | No commit contains this string |
+| `[REDACTED]` (DB_PASSWORD) | ❌ Not found | No commit contains this string |
+| `[REDACTED]` | ❌ Not found | No commit contains this string |
+| `[REDACTED]` | ❌ Not found | No commit contains this string |
+| `[REDACTED]` | ❌ Not found | No commit contains this string |
 
 ### 4. Secrets Added to History (all file types)
 

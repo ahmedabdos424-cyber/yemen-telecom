@@ -16,6 +16,7 @@ import {
   approveDistributionSchema,
   updateInventoriesSchema,
   updateSettingsSchema,
+  normalizeOperator,
 } from '../validation';
 
 describe('Validation — Login Schema', () => {
@@ -54,7 +55,7 @@ describe('Validation — Login Schema', () => {
   });
 
   it('should strip angle brackets from username', () => {
-    const result = loginSchema.safeParse({ username: 'admin>test', password: 'secret' });
+    const result = loginSchema.safeParse({ username: 'admin>test', password: 'secret123' });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.username).not.toContain('>');
@@ -329,8 +330,20 @@ describe('Validation — Password Schema', () => {
   });
 
   it('should accept password at exact min length', () => {
-    const result = updatePasswordSchema.safeParse({ currentPassword: 'old', newPassword: '12345678' });
+    const result = updatePasswordSchema.safeParse({ currentPassword: 'old', newPassword: 'Abcd1234' });
     expect(result.success).toBe(true);
+  });
+  it('should reject password without uppercase', () => {
+    const result = updatePasswordSchema.safeParse({ currentPassword: 'old', newPassword: 'lowercase1' });
+    expect(result.success).toBe(false);
+  });
+  it('should reject password without lowercase', () => {
+    const result = updatePasswordSchema.safeParse({ currentPassword: 'old', newPassword: 'UPPERCASE1' });
+    expect(result.success).toBe(false);
+  });
+  it('should reject password without digit', () => {
+    const result = updatePasswordSchema.safeParse({ currentPassword: 'old', newPassword: 'NoDigitsNo' });
+    expect(result.success).toBe(false);
   });
 });
 
@@ -455,5 +468,100 @@ describe('Validation — Settings Schema', () => {
   it('should accept empty settings object', () => {
     const result = updateSettingsSchema.safeParse({});
     expect(result.success).toBe(true);
+  });
+});
+
+describe('P0-05: Operator Normalization', () => {
+  describe('normalizeOperator helper', () => {
+    it('accepts snake_case yemen_mobile', () => {
+      expect(normalizeOperator('yemen_mobile')).toBe('yemen_mobile');
+    });
+    it('accepts Title Case Yemen Mobile', () => {
+      expect(normalizeOperator('Yemen Mobile')).toBe('yemen_mobile');
+    });
+    it('accepts snake_case sabafon', () => {
+      expect(normalizeOperator('sabafon')).toBe('sabafon');
+    });
+    it('accepts Title Case Sabafon', () => {
+      expect(normalizeOperator('Sabafon')).toBe('sabafon');
+    });
+    it('accepts snake_case you', () => {
+      expect(normalizeOperator('you')).toBe('you');
+    });
+    it('accepts Title Case YOU', () => {
+      expect(normalizeOperator('YOU')).toBe('you');
+    });
+    it('returns unknown value as-is (validation at schema level)', () => {
+      expect(normalizeOperator('unknown')).toBe('unknown');
+    });
+    it('returns empty string as-is', () => {
+      expect(normalizeOperator('')).toBe('');
+    });
+  });
+
+  describe('createDistributionSchema normalizes operator', () => {
+    it('normalizes Yemen Mobile → yemen_mobile', () => {
+      const r = createDistributionSchema.safeParse({ seller_name: 'بائع', operator: 'Yemen Mobile', count: 10 });
+      expect(r.success).toBe(true);
+      if (r.success) expect(r.data.operator).toBe('yemen_mobile');
+    });
+    it('normalizes Sabafon → sabafon', () => {
+      const r = createDistributionSchema.safeParse({ seller_name: 'بائع', operator: 'Sabafon', count: 10 });
+      expect(r.success).toBe(true);
+      if (r.success) expect(r.data.operator).toBe('sabafon');
+    });
+    it('normalizes YOU → you', () => {
+      const r = createDistributionSchema.safeParse({ seller_name: 'بائع', operator: 'YOU', count: 10 });
+      expect(r.success).toBe(true);
+      if (r.success) expect(r.data.operator).toBe('you');
+    });
+    it('keeps yemen_mobile as-is', () => {
+      const r = createDistributionSchema.safeParse({ seller_name: 'بائع', operator: 'yemen_mobile', count: 10 });
+      expect(r.success).toBe(true);
+      if (r.success) expect(r.data.operator).toBe('yemen_mobile');
+    });
+    it('rejects invalid operator string', () => {
+      const r = createDistributionSchema.safeParse({ seller_name: 'بائع', operator: 'invalid_op', count: 10 });
+      expect(r.success).toBe(false);
+    });
+  });
+
+  describe('updateInventoriesSchema normalizes operator', () => {
+    it('normalizes Yemen Mobile → yemen_mobile', () => {
+      const r = updateInventoriesSchema.safeParse([{ operator: 'Yemen Mobile', available: 100, remaining: 50 }]);
+      expect(r.success).toBe(true);
+      if (r.success) expect(r.data[0].operator).toBe('yemen_mobile');
+    });
+    it('keeps sabafon as-is', () => {
+      const r = updateInventoriesSchema.safeParse([{ operator: 'sabafon', available: 100, remaining: 50 }]);
+      expect(r.success).toBe(true);
+      if (r.success) expect(r.data[0].operator).toBe('sabafon');
+    });
+    it('normalizes YOU → you', () => {
+      const r = updateInventoriesSchema.safeParse([{ operator: 'YOU', available: 100, remaining: 50 }]);
+      expect(r.success).toBe(true);
+      if (r.success) expect(r.data[0].operator).toBe('you');
+    });
+    it('rejects invalid operator', () => {
+      const r = updateInventoriesSchema.safeParse([{ operator: 'bogus', available: 100, remaining: 50 }]);
+      expect(r.success).toBe(false);
+    });
+  });
+
+  describe('createOperationSchema normalizes operator', () => {
+    it('normalizes Yemen Mobile → yemen_mobile', () => {
+      const r = createOperationSchema.safeParse({ type: 'activate', target: '777000000', operator: 'Yemen Mobile' });
+      expect(r.success).toBe(true);
+      if (r.success) expect(r.data.operator).toBe('yemen_mobile');
+    });
+    it('defaults to empty string when missing', () => {
+      const r = createOperationSchema.safeParse({ type: 'activate', target: '777000000' });
+      expect(r.success).toBe(true);
+      if (r.success) expect(r.data.operator).toBe('');
+    });
+    it('rejects invalid operator string', () => {
+      const r = createOperationSchema.safeParse({ type: 'activate', target: '777000000', operator: 'invalid_op' });
+      expect(r.success).toBe(false);
+    });
   });
 });

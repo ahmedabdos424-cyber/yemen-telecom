@@ -192,6 +192,12 @@ router.put('/:id', requireRole('manager', 'agent'), validate(updateSellerSchema)
     if (existing.rows.length === 0) {
       return res.status(404).json({ error: 'Seller not found' });
     }
+    if (req.user?.role === 'agent') {
+      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
+      if (agentRes.rows.length === 0 || agentRes.rows[0].id !== existing.rows[0].agent_id) {
+        return res.status(403).json({ error: 'Access denied: this seller does not belong to your agency' });
+      }
+    }
     const cur = existing.rows[0];
     const name = req.body.name ?? cur.name;
     const store_name = req.body.store_name ?? req.body.storeName ?? cur.store_name;
@@ -223,6 +229,12 @@ router.put('/:id/balance', requireRole('manager', 'agent'), validate(updateSelle
     if (existing.rows.length === 0) {
       return res.status(404).json({ error: 'Seller not found' });
     }
+    if (req.user?.role === 'agent') {
+      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
+      if (agentRes.rows.length === 0 || agentRes.rows[0].id !== existing.rows[0].agent_id) {
+        return res.status(403).json({ error: 'Access denied: this seller does not belong to your agency' });
+      }
+    }
     const cur = existing.rows[0];
     const newSales = (cur.sales_30_days || 0) + amount;
     const result = await query(
@@ -246,6 +258,12 @@ router.post('/:id/reset-password', requireRole('manager', 'agent'), async (req: 
     const sellerRes = await query('SELECT * FROM sellers WHERE id = $1', [id]);
     if (sellerRes.rows.length === 0) {
       return res.status(404).json({ error: 'Seller not found' });
+    }
+    if (req.user?.role === 'agent') {
+      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
+      if (agentRes.rows.length === 0 || agentRes.rows[0].id !== sellerRes.rows[0].agent_id) {
+        return res.status(403).json({ error: 'Access denied: this seller does not belong to your agency' });
+      }
     }
     const seller = sellerRes.rows[0];
     if (!seller.user_id) {
@@ -274,6 +292,12 @@ router.delete('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, 
     const existing = await query('SELECT * FROM sellers WHERE id = $1', [id]);
     if (existing.rows.length === 0) {
       return res.status(404).json({ error: 'Seller not found' });
+    }
+    if (req.user?.role === 'agent') {
+      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
+      if (agentRes.rows.length === 0 || agentRes.rows[0].id !== existing.rows[0].agent_id) {
+        return res.status(403).json({ error: 'Access denied: this seller does not belong to your agency' });
+      }
     }
     const seller = existing.rows[0];
     if (seller.user_id) {

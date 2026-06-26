@@ -8,7 +8,7 @@ const router = Router();
 router.get('/', requireRole('manager', 'agent'), async (_req: Request, res: Response) => {
   try {
     const result = await query('SELECT * FROM inventories ORDER BY id');
-    res.json(result.rows.map((r: any) => ({
+    res.json(result.rows.map((r: { operator: string; available: number; remaining: number; period_days: number }) => ({
       operator: r.operator,
       available: r.available,
       remaining: r.remaining,
@@ -30,7 +30,7 @@ router.put('/', requireRole('manager'), validate(updateInventoriesSchema), async
       );
     }
     const result = await query('SELECT * FROM inventories ORDER BY id');
-    res.json(result.rows.map((r: any) => ({
+    res.json(result.rows.map((r: { operator: string; available: number; remaining: number; period_days: number }) => ({
       operator: r.operator,
       available: r.available,
       remaining: r.remaining,

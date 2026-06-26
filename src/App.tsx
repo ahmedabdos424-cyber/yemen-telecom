@@ -241,14 +241,10 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        {/* Logout modal */}
-        <AnimatePresence>
-          {false && (
-            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="fixed bottom-0 left-0 right-0 z-50 sm:relative sm:max-w-sm sm:mx-auto sm:my-auto sm:rounded-3xl card-enhanced rounded-t-3xl p-5 pb-8">
-              <button onClick={handleLogout} className="flex-1 py-3.5 bg-ym hover:bg-red-700 active:scale-[0.98] text-white font-bold text-xs sm:text-sm rounded-xl transition-all cursor-pointer text-center min-h-[48px]">تسجيل الخروج</button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Logout button */}
+        <div className="fixed bottom-4 left-4 z-50">
+          <button onClick={handleLogout} className="px-4 py-2 bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-lg">تسجيل الخروج</button>
+        </div>
       </>
       )}
     </div>
