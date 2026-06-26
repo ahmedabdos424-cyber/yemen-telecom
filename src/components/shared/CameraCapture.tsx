@@ -156,6 +156,7 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
       <CameraPreviewModal
         show={showViewfinder}
         previewImage={previewImage}
+        videoRef={videoRef}
         onCapture={captureFrame}
         onConfirm={confirmCapture}
         onRetake={retakeCapture}
@@ -399,6 +400,7 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
       <CameraPreviewModal
         show={showViewfinder}
         previewImage={previewImage}
+        videoRef={videoRef}
         onCapture={captureFrame}
         onConfirm={confirmCapture}
         onRetake={retakeCapture}

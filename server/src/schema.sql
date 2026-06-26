@@ -155,8 +155,11 @@ CREATE TABLE IF NOT EXISTS system_settings (
 
 CREATE TABLE IF NOT EXISTS token_blacklist (
   token_hash VARCHAR(64) PRIMARY KEY,
-  expires_at TIMESTAMP NOT NULL
+  expires_at TIMESTAMP NOT NULL,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
 );
+CREATE INDEX IF NOT EXISTS idx_token_blacklist_user_id ON token_blacklist(user_id);
+CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires_user ON token_blacklist(expires_at, user_id);
 
 CREATE TABLE IF NOT EXISTS duplicate_identities (
   id SERIAL PRIMARY KEY,
@@ -179,7 +182,8 @@ CREATE TABLE IF NOT EXISTS customers (
   first_activation TIMESTAMP DEFAULT NOW(),
   last_activation TIMESTAMP DEFAULT NOW(),
   created_at TIMESTAMP DEFAULT NOW(),
-  activated_by INTEGER REFERENCES sellers(id) ON DELETE SET NULL
+  activated_by INTEGER REFERENCES sellers(id) ON DELETE SET NULL,
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS distribution_requests (
@@ -208,6 +212,20 @@ DELETE FROM duplicate_identities WHERE id > 0;
 -- Allow soft-delete status for sellers
 ALTER TABLE sellers DROP CONSTRAINT IF EXISTS sellers_status_check;
 ALTER TABLE sellers ADD CONSTRAINT sellers_status_check CHECK (status IN ('active', 'inactive', 'suspended', 'low_stock', 'deleted'));
+
+-- Add FK columns for audit trail (migration 002 compatibility)
+ALTER TABLE sellers ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE sims ADD COLUMN IF NOT EXISTS activated_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE operations ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE alerts ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE distribution_requests ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+
+-- Add UNIQUE constraint on customers.id_number
+ALTER TABLE customers ADD CONSTRAINT IF NOT EXISTS customers_id_number_unique UNIQUE (id_number);
+
+-- Add created_at to transactions if missing
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
 
 -- Performance Indexes
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
@@ -240,9 +258,9 @@ $$ LANGUAGE plpgsql;
 -- SEED DATA
 
 INSERT INTO users (username, password_hash, display_name, role, status) VALUES
-  ('manager', '$2a$10$LS1.tsnmbo8M8Uz8MEKuHOUWcRtEIq468TV05kTcMSYHzVGP4Ou02', 'أحمد محمد', 'manager', 'active'),
-  ('agent', '$2a$10$LS1.tsnmbo8M8Uz8MEKuHOUWcRtEIq468TV05kTcMSYHzVGP4Ou02', 'الوكيل أحمد محمد', 'agent', 'active'),
-  ('seller', '$2a$10$LS1.tsnmbo8M8Uz8MEKuHOUWcRtEIq468TV05kTcMSYHzVGP4Ou02', 'البائع عبدالرحمن العتيبي', 'seller', 'active')
+  ('manager', 'SEED_REQUIRED_RUN_NPM_RUN_DB_SEED', 'أحمد محمد', 'manager', 'active'),
+  ('agent', 'SEED_REQUIRED_RUN_NPM_RUN_DB_SEED', 'الوكيل أحمد محمد', 'agent', 'active'),
+  ('seller', 'SEED_REQUIRED_RUN_NPM_RUN_DB_SEED', 'البائع عبدالرحمن العتيبي', 'seller', 'active')
 ON CONFLICT (username) DO NOTHING;
 
 INSERT INTO sims (phone, iccid, provider, status, owner, date_added, package_type) VALUES

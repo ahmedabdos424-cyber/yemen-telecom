@@ -66,11 +66,12 @@ export function useToast() {
     const id = `toast_${++counterRef.current}_${Date.now()}`;
     setToasts(prev => [...prev, { id, type, title, message }]);
     if (duration > 0) {
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         setToasts(prev => prev.filter(t => t.id !== id));
       }, duration);
+      return { id, timeoutId };
     }
-    return id;
+    return { id };
   }, []);
 
   const toastSuccess = useCallback((title: string, message?: string) => addToast('success', title, message || ''), [addToast]);

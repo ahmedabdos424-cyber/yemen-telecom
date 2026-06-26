@@ -24,11 +24,11 @@ import reportsRoutes from './routes/reports';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
-// Environment validation — all envs require these secrets
+// Environment validation — fail fast on missing secrets
 const requiredEnv = ['JWT_SECRET', 'REFRESH_SECRET', 'CSRF_SECRET'];
 const missingEnv = requiredEnv.filter(k => !process.env[k]);
 if (missingEnv.length > 0) {
-  console.error(`Missing required environment variables: ${missingEnv.join(', ')}`);
+  console.error(`FATAL: Missing required environment variables: ${missingEnv.join(', ')}`);
   process.exit(1);
 }
 
@@ -52,18 +52,29 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      // 'unsafe-inline' on scriptSrc and styleSrc are required because Vite's SPA
+      // build injects inline scripts and Tailwind generates dynamic classes at runtime.
+      // 'unsafe-eval' removed — not needed in React production mode (Vite build strips eval).
+      // Future hardening: implement nonce-based CSP via Vite plugin.
+      // 'unsafe-inline' required for SPA build and Tailwind dynamic classes.
+      // Future: implement nonce-based CSP via Vite plugin.
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      // Inline styles required for dynamic Tailwind classes in React components
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:"],
       connectSrc: ["'self'"],
       frameSrc: ["'none'"],
       objectSrc: ["'none'"],
+      formAction: ["'self'"],
     },
   },
 }));
 const isDev = process.env.NODE_ENV !== 'production';
-const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,https://yemen-telecom-1699.web.app').split(',');
+const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,https://yemen-telecom-1699.web.app')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
 const isCapacitorOrigin = (origin: string) =>
   origin === 'https://localhost' ||
   origin === 'capacitor://localhost' ||
@@ -104,7 +115,9 @@ app.use('/api', (req, res, next) => {
       return res.status(403).json({ error: 'CSRF token and hash required' });
     }
     const expectedHash = crypto.createHmac('sha256', CSRF_SECRET).update(csrfHeader).digest('hex');
-    if (csrfHash !== expectedHash) {
+    const csrfBuf = Buffer.from(csrfHash, 'utf-8');
+    const expectedBuf = Buffer.from(expectedHash, 'utf-8');
+    if (csrfBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(csrfBuf, expectedBuf)) {
       return res.status(403).json({ error: 'Invalid CSRF token' });
     }
   }
@@ -143,8 +156,15 @@ const apiLimiter = rateLimit({
 app.use('/api', apiLimiter);
 
 // Health check endpoint (public — no auth required)
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', environment: process.env.NODE_ENV, timestamp: new Date().toISOString(), uptime: process.uptime() });
+app.get('/api/health', async (_req, res) => {
+  let dbOk = true;
+  try {
+    await query('SELECT 1');
+  } catch {
+    dbOk = false;
+  }
+  const status = dbOk ? 'ok' : 'degraded';
+  res.status(dbOk ? 200 : 503).json({ status, db: dbOk ? 'connected' : 'disconnected', timestamp: new Date().toISOString() });
 });
 
 // Apply write rate limiter to all POST/PUT/DELETE routes
@@ -157,6 +177,19 @@ app.use('/api', (req, res, next) => {
 
 // Apply JWT auth to all /api routes except auth (routes debug is dev-only)
 app.use(/^\/api\/(?!auth).*/, authenticateToken);
+
+// Maintenance mode middleware — block mutation requests when maintenance_mode is on
+app.use('/api', async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (req.method === 'GET') return next();
+  if (req.path.startsWith('/auth/')) return next();
+  try {
+    const result = await query('SELECT maintenance_mode FROM system_settings WHERE id = 1');
+    if (result.rows.length > 0 && result.rows[0].maintenance_mode) {
+      return res.status(503).json({ error: 'System is in maintenance mode. Please try again later.' });
+    }
+  } catch { }
+  next();
+});
 
 // Extract a mount path from an Express layer's regexp
 // Pattern: ^\/path\/?(?=\/|$) or ^\/path\/?$
@@ -200,9 +233,7 @@ function listRoutes(): { method: string; path: string }[] {
 }
 
 // Routes
-console.log('[REGISTER] REGISTERING AUTH ROUTES');
 app.use('/api/auth', authRoutes);
-console.log('[REGISTER] AUTH ROUTES REGISTERED');
 app.use('/api/sims', simsRoutes);
 app.use('/api/agents', agentsRoutes);
 app.use('/api/sellers', sellersRoutes);
@@ -280,10 +311,38 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+// OCR asset check — warn if tesseract assets are missing
+const tesseractPath = path.resolve(__dirname, '../../dist/tesseract');
+try {
+  const fs = require('fs');
+  if (!fs.existsSync(tesseractPath) || !fs.existsSync(path.join(tesseractPath, 'lang', 'ara.traineddata.gz'))) {
+    console.warn('[WARN] OCR tesseract assets not found at dist/tesseract/ — client-side OCR will be unavailable');
+  }
+} catch { }
+
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`[INIT] Server running on http://0.0.0.0:${PORT}`);
   console.log(`[INIT] Routes (${listRoutes().length} total):`);
   for (const r of listRoutes()) {
     console.log(`  ${r.method.padEnd(6)} ${r.path}`);
   }
+});
+
+// Graceful shutdown
+function shutdown(signal: string) {
+  console.log(`[SHUTDOWN] Received ${signal}. Closing server...`);
+  server.close(() => {
+    console.log('[SHUTDOWN] Server closed.');
+    process.exit(0);
+  });
+  setTimeout(() => {
+    console.error('[SHUTDOWN] Forced exit after timeout.');
+    process.exit(1);
+  }, 10000);
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('unhandledRejection', (reason) => {
+  console.error('[ERROR] Unhandled rejection:', reason);
 });

@@ -204,7 +204,7 @@ git push origin v1.0.0
 
 ## Risk Items
 
-1. **server/.env** contains real database password (`sRPzEKEfR3uaeM#`) and JWT secrets — handle with care, never commit
+1. **server/.env** contains real database password (`[REDACTED]`) and JWT secrets — handle with care, never commit
 2. Firebase service account JSON on disk — gitignored but rotate if compromised
 3. Pre-existing TypeScript errors in GeographicRiskView.tsx — fix before next release
 4. Empty vendor-firebase chunk — verify Firebase functionality still works in production

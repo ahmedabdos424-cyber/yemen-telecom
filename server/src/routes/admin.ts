@@ -82,7 +82,7 @@ router.get('/transactions', requireRole('manager'), async (req: Request, res: Re
       : 'SELECT * FROM transactions ORDER BY id';
     const params = paginate ? [limit, offset] : [];
     const result = await query(queryText, params);
-    res.json(result.rows.map((r: any) => ({
+    res.json(result.rows.map((r: { id: string; client_name: string; provider: string; sims_count: number; status: string; relative_time: string }) => ({
       id: r.id,
       clientName: r.client_name,
       provider: r.provider,
@@ -123,15 +123,15 @@ router.get('/duplicate-identities', requireRole('manager'), async (req: Request,
       seen.add(r.id_no);
       return true;
     });
-    res.json(deduped.map((r: any) => {
-      const count = r.duplicates_count;
+    res.json(deduped.map((r: { id_no: string; name: string; sims_count: string; duplicates_count: string; region: string }) => {
+      const count = parseInt(r.duplicates_count);
       const risk = count >= 5 ? 'مرتفع جداً' : count >= 3 ? 'مرتفع' : 'متوسط';
       const initials = r.name ? r.name.split(' ').slice(0, 2).map((s: string) => s[0]).join(' ') : '';
       return {
         idNo: r.id_no,
         name: r.name,
         simsCount: parseInt(r.sims_count) || 0,
-        duplicatesCount: parseInt(r.duplicates_count) || 0,
+        duplicatesCount: count || 0,
         risk,
         region: r.region || '',
         avatarInitials: initials,
@@ -152,7 +152,7 @@ router.get('/audit-logs', requireRole('manager'), async (req: Request, res: Resp
       : 'SELECT * FROM audit_logs ORDER BY id';
     const params = paginate ? [limit, offset] : [];
     const result = await query(queryText, params);
-    res.json(result.rows.map((r: any) => ({
+    res.json(result.rows.map((r: { log_id: string; type: string; title: string; username: string; time: string; status: string }) => ({
       id: r.log_id,
       type: r.type,
       title: r.title,
@@ -171,31 +171,40 @@ router.get('/audit-logs', requireRole('manager'), async (req: Request, res: Resp
 // ========================
 router.post('/system/backup', requireRole('manager'), async (_req: Request, res: Response) => {
   try {
-    const tables = ['users', 'agents', 'sellers', 'sims', 'alerts', 'transactions', 'operations', 'inventories', 'audit_logs', 'system_settings', 'token_blacklist', 'duplicate_identities', 'customers', 'distribution_requests'];
+    const allowedTables: Record<string, string> = {
+      users: 'SELECT * FROM users ORDER BY id',
+      agents: 'SELECT * FROM agents ORDER BY id',
+      sellers: 'SELECT * FROM sellers ORDER BY id',
+      sims: 'SELECT * FROM sims ORDER BY id',
+      alerts: 'SELECT * FROM alerts ORDER BY id',
+      transactions: 'SELECT * FROM transactions ORDER BY id',
+      operations: 'SELECT * FROM operations ORDER BY id',
+      inventories: 'SELECT * FROM inventories ORDER BY id',
+      audit_logs: 'SELECT * FROM audit_logs ORDER BY id',
+      system_settings: 'SELECT * FROM system_settings ORDER BY id',
+      token_blacklist: 'SELECT * FROM token_blacklist ORDER BY token_hash',
+      duplicate_identities: 'SELECT * FROM duplicate_identities ORDER BY id',
+      customers: 'SELECT * FROM customers ORDER BY id',
+      distribution_requests: 'SELECT * FROM distribution_requests ORDER BY id',
+    };
     const backup: Record<string, any[]> = {};
-    for (const table of tables) {
-      const orderBy = table === 'token_blacklist' ? 'token_hash' : 'id';
-      const result = await query(`SELECT * FROM ${table} ORDER BY ${orderBy}`);
+    for (const [table, queryText] of Object.entries(allowedTables)) {
+      const result = await query(queryText);
       backup[table] = result.rows;
     }
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `backup-${timestamp}.json`;
-    const fs = await import('fs');
-    const backupDir = path.resolve(__dirname, '../../backups');
-    if (!fs.existsSync(backupDir)) {
-      fs.mkdirSync(backupDir, { recursive: true });
+    const { uploadBackup, isConfigured } = await import('../backup-storage');
+    if (!isConfigured()) {
+      return res.status(500).json({ error: 'External backup storage not configured. Set BACKUP_S3_* environment variables.' });
     }
-    const filePath = path.join(backupDir, filename);
-    fs.writeFileSync(filePath, JSON.stringify(backup, null, 2), 'utf-8');
-    const stat = fs.statSync(filePath);
+    const result = await uploadBackup(backup);
     res.json({
       success: true,
-      filename,
-      size: stat.size,
-      sizeFormatted: `${(stat.size / 1024 / 1024).toFixed(2)} MB`,
-      tables: tables.length,
+      filename: result.filename,
+      size: result.size,
+      sizeFormatted: `${(result.size / 1024 / 1024).toFixed(2)} MB`,
+      tables: Object.keys(allowedTables).length,
       records: Object.values(backup).reduce((sum, arr) => sum + arr.length, 0),
-      downloadUrl: `/api/system/backup/download/${filename}`,
+      downloadUrl: result.url,
     });
   } catch (err) {
     console.error('Error creating backup:', err);
@@ -205,21 +214,19 @@ router.post('/system/backup', requireRole('manager'), async (_req: Request, res:
 
 router.get('/system/backup/download/:filename', requireRole('manager'), async (req: Request, res: Response) => {
   try {
-    const fs = await import('fs');
-    const backupDir = path.resolve(__dirname, '../../backups');
     const filename = path.basename(req.params.filename);
     if (filename !== req.params.filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
       return res.status(400).json({ error: 'Invalid filename' });
     }
-    const filePath = path.join(backupDir, filename);
-    const resolvedPath = path.resolve(filePath);
-    if (!resolvedPath.startsWith(backupDir)) {
-      return res.status(400).json({ error: 'Invalid file path' });
+    const { downloadBackup, isConfigured } = await import('../backup-storage');
+    if (!isConfigured()) {
+      return res.status(500).json({ error: 'External backup storage not configured.' });
     }
-    if (!fs.existsSync(resolvedPath)) {
+    const url = await downloadBackup(filename);
+    if (!url) {
       return res.status(404).json({ error: 'Backup file not found' });
     }
-    res.download(resolvedPath);
+    res.redirect(url);
   } catch (err) {
     console.error('Error downloading backup:', err);
     res.status(500).json({ error: 'Failed to download backup' });

@@ -7,13 +7,14 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, '.'),
+      '@': path.resolve(__dirname, './src'),
     },
   },
   build: {
-    sourcemap: 'hidden',
+    target: 'es2022',
+    sourcemap: false,
+    chunkSizeWarningLimit: 2000,
     rollupOptions: {
-      external: ['@capacitor/preferences'],
       output: {
         manualChunks: {
           'vendor-motion': ['motion'],

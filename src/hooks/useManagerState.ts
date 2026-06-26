@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { SIM, Agent, Seller, SystemAlert, Transaction, SystemSettings, ViewType } from '../types';
 import { api } from '../api/client';
 import { captureError } from '../lib/monitor.ts';
@@ -62,7 +62,7 @@ export function useManagerState(role: string | null) {
     localStorage.setItem('tele_manager_view', view);
   };
 
-  const refreshData = () => Promise.all([
+  const refreshData = useCallback(() => Promise.all([
     api.getSims().then(data => { if (mountedRef.current) setSims(data ?? []); }).catch((err) => captureError(err, 'refresh:getSims')),
     api.getAgents().then(data => { if (mountedRef.current) setAgents(data ?? []); }).catch((err) => captureError(err, 'refresh:getAgents')),
     api.getSellers().then(data => { if (mountedRef.current) setSellers(data ?? []); }).catch((err) => captureError(err, 'refresh:getSellers')),
@@ -70,7 +70,7 @@ export function useManagerState(role: string | null) {
     api.getSettings().then(data => { if (mountedRef.current) setSettings(data ?? {}); }).catch((err) => captureError(err, 'refresh:getSettings')),
     api.getTransactions().then(data => { if (mountedRef.current) setTransactions(data ?? []); }).catch((err) => captureError(err, 'refresh:getTransactions')),
     api.getStats().then(data => { if (mountedRef.current) setStats(data ?? {}); }).catch((err) => captureError(err, 'refresh:getStats')),
-  ]);
+  ]), [mountedRef]);
 
   useEffect(() => {
     if (role !== 'manager') return;
@@ -84,7 +84,7 @@ export function useManagerState(role: string | null) {
           setLoading(false);
         }
       });
-  }, [role]);
+  }, [role, refreshData]);
 
   // Duplicate identity toasts
   useEffect(() => {
@@ -120,6 +120,7 @@ export function useManagerState(role: string | null) {
       if (mountedRef.current) setAgents(prev => [created, ...prev]);
     } catch (err) {
       captureError(err, 'handleAddAgent');
+      throw err;
     }
   };
 

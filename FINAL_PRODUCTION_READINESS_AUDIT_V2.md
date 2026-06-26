@@ -128,7 +128,7 @@
 |-------|--------|
 | **الملف** | `server/.env` |
 | **السطر** | 8, 10, 11 |
-| **الكود** | `JWT_SECRET=yemen-telecom-jwt-secret-2026` / `CSRF_SECRET=yemen-telecom-csrf-secret-2026` / `REFRESH_SECRET=yemen-telecom-refresh-secret-2026` |
+| **الكود** | `JWT_SECRET=[REDACTED]` / `CSRF_SECRET=[REDACTED]` / `REFRESH_SECRET=[REDACTED]` |
 | **الخطورة** | CRITICAL — مفاتيح تخمينية في ملف `.env` على git |
 | **التأثير** | يمكن تزوير JWT tokens والوصول إلى النظام |
 | **الحل** | مفاتيح عشوائية 64 char + حقنها كـ Environment Variables في بيئة الإنتاج فقط |
@@ -138,7 +138,7 @@
 |-------|--------|
 | **الملف** | `firebase-service-account.json` |
 | **السطر** | الملف بأكمله |
-| **الكود** | `-----BEGIN PRIVATE KEY-----\n...` (2382 بايت) |
+| **الكود** | `-----BEGIN PRIVATE KEY-----\n...` [REDACTED] |
 | **الخطورة** | HIGH — مفتاح Firebase حقيقي على القرص |
 | **التأثير** | إذا اخترق الجهاز، يمكن الوصول إلى Firebase |
 | **الحل** | إزالة الملف والاعتماد على Environment Variables |

@@ -11,9 +11,9 @@
 | # | Variable | Current Status | Risk | Action |
 |---|----------|---------------|------|--------|
 | 1 | `DB_PASSWORD` | **LIVE** - Supabase password in plaintext | 🔴 Critical | Rotate in Supabase dashboard, update `.env` |
-| 2 | `JWT_SECRET` | **LIVE** - `yemen-telecom-jwt-secret-2026` (weak, shared) | 🔴 Critical | Generate new 64-byte random hex |
-| 3 | `REFRESH_SECRET` | **LIVE** - `yemen-telecom-refresh-secret-2026` (weak, shared) | 🔴 Critical | Generate new 64-byte random hex |
-| 4 | `CSRF_SECRET` | **LIVE** - `yemen-telecom-csrf-secret-2026` (weak, shared) | 🔴 Critical | Generate new 64-byte random hex |
+| 2 | `JWT_SECRET` | **LIVE** - `[REDACTED]` (weak, shared) | 🔴 Critical | Generate new 64-byte random hex |
+| 3 | `REFRESH_SECRET` | **LIVE** - `[REDACTED]` (weak, shared) | 🔴 Critical | Generate new 64-byte random hex |
+| 4 | `CSRF_SECRET` | **LIVE** - `[REDACTED]` (weak, shared) | 🔴 Critical | Generate new 64-byte random hex |
 | 5 | `DB_HOST` | **LIVE** - Supabase pooler host exposed | 🟡 Warning | Rotate by creating new Supabase project OR restrict IP |
 | 6 | `DB_USER` | **LIVE** - Supabase user with project ref exposed | 🟡 Warning | Rotate by creating new Supabase project OR restrict IP |
 | 7 | `FIREBASE_STORAGE_BUCKET` | **LIVE** - Firebase project ID exposed | 🟢 Low | Bucket name is public by design; rotate if compromised |

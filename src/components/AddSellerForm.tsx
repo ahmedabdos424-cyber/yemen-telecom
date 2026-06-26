@@ -86,34 +86,15 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
         regionCode: region.substring(0, 5),
       });
 
-      setProgressStage(100);
-      setIsSubmitting(false);
-
       const creds = result.credentials || { username, password };
       setShowCredentials(true);
       setCredentialsData(creds);
       setSuccessInfo(`تم إنشاء حساب البائع "${fullName}" بنجاح.`);
 
-      onSellerAdded({
-        name: fullName,
-        username: creds.username,
-        password: creds.password,
-        agent_name: agentName,
-        storeName,
-        idNumber,
-        phone,
-        region,
-        regionCode: region.substring(0, 5),
-        status: 'active',
-        totalSales: 0,
-        currentStock: 0,
-        efficiency: 0,
-        avatar: '',
-        simsCount: 0,
-        sales30Days: 0,
-        salesGrowth: 0,
-        activityRate: 0
-      });
+      onSellerAdded(result);
+
+      setProgressStage(100);
+      setIsSubmitting(false);
 
       setFullName('');
       setNameCaptured(null);

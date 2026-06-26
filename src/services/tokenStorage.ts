@@ -7,6 +7,11 @@
  *
  * Auto-detects platform and uses appropriate storage.
  * Backward compatible with existing localStorage-based tokens.
+ *
+ * TODO: Migrate to httpOnly cookies (server-set) to prevent XSS token theft.
+ *       localStorage tokens are accessible to any JS running on the page.
+ *       This requires: 1) Server-side cookie setting on login/refresh,
+ *       2) CSRF token in response body, 3) No JS access to cookie.
  */
 
 const STORAGE_KEYS = {
@@ -16,7 +21,7 @@ const STORAGE_KEYS = {
 
 let isCapacitor = false;
 try {
-  isCapacitor = !!(window as any).Capacitor?.isNative;
+  isCapacitor = !!(window as unknown as { Capacitor?: { isNative?: boolean } }).Capacitor?.isNative;
 } catch {
   // Not in a browser/Capacitor environment
 }

@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { query } from '../db';
-import { requireRole } from '../middleware/auth';
+import { query, transaction } from '../db';
+import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination, paginatedQuery } from '../helpers';
 import { validate, createAgentSchema, updateAgentSchema } from '../validation';
 
@@ -30,10 +30,8 @@ router.get('/', requireRole('manager', 'agent'), async (req: Request, res: Respo
 router.post('/', requireRole('manager'), validate(createAgentSchema), async (req: Request, res: Response) => {
   const { name, region, phone, sellers_count, sims_count, status, username, password } = req.body;
   try {
-    // Create user account for the agent
     const agentUsername = (username || phone || `agent_${Date.now()}`).trim().toLowerCase();
-    
-    // Prevent takeover/downgrade of existing users (e.g. admin)
+
     const userExists = await query('SELECT id FROM users WHERE username = $1', [agentUsername]);
     if (userExists.rows.length > 0) {
       return res.status(409).json({ error: 'Username is already registered by another account' });
@@ -42,21 +40,25 @@ router.post('/', requireRole('manager'), validate(createAgentSchema), async (req
     const agentPassword = password || crypto.randomBytes(4).toString('hex');
     const passwordHash = await bcrypt.hash(agentPassword, 10);
 
-    const userResult = await query(
-      `INSERT INTO users (username, password_hash, display_name, role, status, phone, region)
-       VALUES ($1, $2, $3, 'agent', 'active', $4, $5)
-       RETURNING id`,
-      [agentUsername, passwordHash, name, phone || '', region || '']
-    );
-    const userId = userResult.rows[0].id;
+    const { userId, agent } = await transaction(async (client) => {
+      const userRes = await client.query(
+        `INSERT INTO users (username, password_hash, display_name, role, status, phone, region)
+         VALUES ($1, $2, $3, 'agent', 'active', $4, $5)
+         RETURNING id`,
+        [agentUsername, passwordHash, name, phone || '', region || '']
+      );
+      const uid = userRes.rows[0].id;
 
-    const result = await query(
-      `INSERT INTO agents (user_id, name, region, phone, sellers_count, sims_count, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [userId, name, region || '', phone || '', sellers_count || 0, sims_count || 0, status || 'active']
-    );
+      const agentRes = await client.query(
+        `INSERT INTO agents (user_id, name, region, phone, sellers_count, sims_count, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+        [uid, name, region || '', phone || '', sellers_count || 0, sims_count || 0, status || 'active']
+      );
+      return { userId: uid, agent: agentRes.rows[0] };
+    });
+
     res.status(201).json({
-      agent: result.rows[0],
+      agent,
       credentials: {
         username: agentUsername,
         password: agentPassword

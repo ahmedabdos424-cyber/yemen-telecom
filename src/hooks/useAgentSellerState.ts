@@ -32,19 +32,18 @@ export function useAgentSellerState(role: string | null, username: string) {
     localStorage.setItem('tele_role_tab', tab);
   };
 
-  const handleAddSellerForAgent = async (data: Omit<Seller, 'id' | 'creationDate' | 'lastLogin'>) => {
-    let credUsername = (data.username || data.phone || `seller_${Date.now()}`).trim().toLowerCase();
-    const credPassword = data.password || Math.random().toString(36).substring(2, 8);
-    const sellerName = data.name;
-
+  const handleAddSellerForAgent = async (data: any) => {
     try {
-      const result = await api.createSeller({ ...data, agent_name: username });
-      const created = result?.seller || result;
+      const created = data?.seller || data;
       if (mountedRef.current) setSellers(prev => [created, ...prev]);
-      if (result?.credentials) {
-        credUsername = result.credentials.username;
+      if (data?.credentials) {
+        if (mountedRef.current) setSellerCredentials({
+          username: data.credentials.username,
+          password: data.credentials.password || '',
+          sellerName: created.name || '',
+          mode: 'create'
+        });
       }
-      if (mountedRef.current) setSellerCredentials({ username: credUsername, password: credPassword, sellerName, mode: 'create' });
       handleSetRoleTab('sellers');
     } catch (err) {
       captureError(err, 'handleAddSellerForAgent');

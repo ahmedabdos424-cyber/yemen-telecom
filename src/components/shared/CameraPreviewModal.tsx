@@ -6,6 +6,7 @@ interface CameraPreviewModalProps {
   show: boolean;
   previewImage: string | null;
   isViewfinder?: boolean;
+  videoRef?: React.RefObject<HTMLVideoElement | null>;
   onCapture: () => void;
   onConfirm: () => void;
   onRetake: () => void;
@@ -16,6 +17,7 @@ export default function CameraPreviewModal({
   show,
   previewImage,
   isViewfinder = false,
+  videoRef,
   onCapture,
   onConfirm,
   onRetake,
@@ -47,7 +49,7 @@ export default function CameraPreviewModal({
                 </>
               ) : (
                 <>
-                  <video autoPlay playsInline className="w-full h-full object-cover" />
+                  <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
                   <div className="absolute inset-0 border-[3px] border-dashed border-red-400/40 m-8 rounded-2xl pointer-events-none" />
                 </>
               )}

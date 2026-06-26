@@ -105,21 +105,15 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
 
     setIsSubmitting(true);
     try {
-      await api.createOperation({
-        type: 'activate',
-        target: phoneNumber,
-        operator: simProvider(operator),
-        status: 'success',
-      });
-
-      setIsSubmitting(false);
-      onSimActivated({
+      await onSimActivated({
         fullName,
         idNumber,
         iccid,
         phoneNumber,
         operator,
       });
+
+      setIsSubmitting(false);
 
       setSuccessMsg(`تهانينا! تم تفعيل الشريحة رقم (${iccid}) بنجاح للشبكة المحددة وعميلها المتربط.`);
       handleClear();

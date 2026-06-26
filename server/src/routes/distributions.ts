@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { query } from '../db';
+import { query, transaction } from '../db';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination } from '../helpers';
 import { validate, createDistributionSchema, approveDistributionSchema } from '../validation';
@@ -91,26 +91,35 @@ router.post('/', requireRole('agent'), validate(createDistributionSchema), async
 router.put('/:id/approve', requireRole('manager'), validate(approveDistributionSchema), async (req: AuthRequest, res: Response) => {
   const { status: decision, notes } = req.body;
   try {
-    const existing = await query('SELECT * FROM distribution_requests WHERE id = $1', [req.params.id]);
-    if (existing.rows.length === 0) {
+    await transaction(async (client) => {
+      const existing = await client.query('SELECT * FROM distribution_requests WHERE id = $1 FOR UPDATE', [req.params.id]);
+      if (existing.rows.length === 0) {
+        throw new Error('DISTRIBUTION_NOT_FOUND');
+      }
+      const dr = existing.rows[0];
+      if (dr.status !== 'pending') {
+        throw new Error(`DISTRIBUTION_ALREADY_${dr.status.toUpperCase()}`);
+      }
+      await client.query(
+        'UPDATE distribution_requests SET status=$1, approved_by=$2, approved_at=NOW(), notes=COALESCE($3, notes) WHERE id=$4',
+        [decision, req.user!.id, notes || null, req.params.id]
+      );
+      if (decision === 'approved') {
+        await client.query(
+          'UPDATE inventories SET available=GREATEST(available-$1, 0), remaining=remaining+$1 WHERE operator=$2',
+          [dr.count, dr.operator]
+        );
+      }
+    });
+    res.json({ message: `Request ${decision} successfully` });
+  } catch (err: any) {
+    if (err.message === 'DISTRIBUTION_NOT_FOUND') {
       return res.status(404).json({ error: 'Distribution request not found' });
     }
-    const dr = existing.rows[0];
-    if (dr.status !== 'pending') {
-      return res.status(400).json({ error: `Request is already ${dr.status}` });
+    if (err.message.startsWith('DISTRIBUTION_ALREADY_')) {
+      const status = err.message.replace('DISTRIBUTION_ALREADY_', '').toLowerCase();
+      return res.status(400).json({ error: `Request is already ${status}` });
     }
-    await query(
-      `UPDATE distribution_requests SET status=$1, approved_by=$2, approved_at=NOW(), notes=COALESCE($3, notes) WHERE id=$4`,
-      [decision, req.user!.id, notes || null, req.params.id]
-    );
-    if (decision === 'approved') {
-      await query(
-        `UPDATE inventories SET available=GREATEST(available-$1, 0), remaining=remaining+$1 WHERE operator=$2`,
-        [dr.count, dr.operator]
-      );
-    }
-    res.json({ message: `Request ${decision} successfully` });
-  } catch (err) {
     console.error('Error approving distribution request:', err);
     res.status(500).json({ error: 'Internal server error' });
   }

@@ -380,24 +380,7 @@ export default function AgentDashboard({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/40">
-                  {[].length > 0 ? [].map((op: any) => (
-                    <tr key={op.id} className="hover:bg-slate-950/30 transition-colors">
-                      <td data-label="التاريخ" className="p-4 text-slate-400 font-medium">{op.date}</td>
-                      <td data-label="اسم البائع" className="p-4 font-bold text-slate-100">{op.sellerName}</td>
-                      <td data-label="المشغل" className="p-4">
-                        <span className={`badge ${op.operator === 'yemen_mobile' ? 'badge-active' : op.operator === 'you' ? 'badge-pending' : 'badge-available'}`}>
-                          {op.operator === 'yemen_mobile' ? 'يمن موبايل' : op.operator === 'you' ? 'YOU' : 'سبأفون'}
-                        </span>
-                      </td>
-                      <td data-label="عدد الشرائح" className="p-4 font-semibold text-slate-300 font-sans">{op.simsCount} شرائح</td>
-                      <td data-label="نوع العملية" className="p-4 text-slate-300 font-medium">{op.opType}</td>
-                      <td data-label="الحالة" className="p-4 text-center">
-                        <span className={`badge ${op.status === 'success' ? 'badge-success' : 'badge-failed'}`}>
-                          {op.status === 'success' ? 'ناجحة' : 'فشلت'}
-                        </span>
-                      </td>
-                    </tr>
-                  )) : (
+                  {(false) ? null : (
                     <tr>
                       <td colSpan={6} className="p-8">
                         <EmptyState
