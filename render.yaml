@@ -4,12 +4,14 @@ services:
     env: node
     region: oregon
     plan: free
-    buildCommand: npm install && cd server && npm install && cd .. && npm run build && cd server && npx tsc --skipLibCheck
-    startCommand: cd server && node dist/index.js
+    buildCommand: npm install && npm run build
+    startCommand: npm start
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
+      - key: PORT
+        value: "4000"
       - key: API_PORT
         value: "4000"
       - key: DB_HOST
@@ -23,9 +25,15 @@ services:
       - key: DB_NAME
         sync: false
       - key: DB_SSL_REJECT_UNAUTHORIZED
-        sync: false
+        value: "true"
       - key: DB_SSL_CA_CERT
         sync: false
+      - key: DB_MAX_CONNECTIONS
+        value: "10"
+      - key: DB_SLOW_QUERY_MS
+        value: "500"
+      - key: DB_FAMILY
+        value: "4"
       - key: JWT_SECRET
         sync: false
       - key: REFRESH_SECRET
