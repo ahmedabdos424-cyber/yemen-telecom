@@ -25,12 +25,14 @@ server/server.err
 server/backups/
 .firebase/*.cache
 
-# Stale AI session audit artifacts (generated during development)
+# AI-generated audit & secret artifacts (remove from version control)
+AUDIT/
+SECRET_*
+*_AUDIT.md
 *_REPORT.md
 *_PLAN.md
 *_VERIFICATION.md
 *_ANALYSIS.md
-*AUDIT.md
 *_CHECKLIST.md
 *_DECISION.md
 *_REGReview.md
