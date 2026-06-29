@@ -19,6 +19,15 @@ interface DashboardViewProps {
     sales_growth?: number;
     sales_weekly?: number;
     operators?: Array<{ provider: string; count: number; percentage: number }>;
+    total_sims_growth?: number;
+    sold_sims_growth?: number;
+    active_sims_growth?: number;
+    agent_growth?: number;
+    seller_growth?: number;
+    sims_added_30d?: number;
+    activations_30d?: number;
+    agents_added_30d?: number;
+    sellers_added_30d?: number;
   };
   alerts: SystemAlert[];
   transactions: Transaction[];
@@ -57,6 +66,11 @@ export default function DashboardView({
     total_sellers: stats?.total_sellers ?? 0,
     sales_growth: stats?.sales_growth ?? 0,
     sales_weekly: stats?.sales_weekly ?? 0,
+    total_sims_growth: stats?.total_sims_growth ?? 0,
+    sold_sims_growth: stats?.sold_sims_growth ?? 0,
+    active_sims_growth: stats?.active_sims_growth ?? 0,
+    agents_added_30d: stats?.agents_added_30d ?? 0,
+    sellers_added_30d: stats?.sellers_added_30d ?? 0,
   };
   const operators = (stats?.operators ?? []) as Array<{ provider: string; count: number; percentage: number }>;
   const [searchQuery, setSearchQuery] = useState('');
@@ -123,7 +137,7 @@ export default function DashboardView({
             <div className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center text-gray-900 border border-gray-100 group-hover:bg-primary group-hover:text-white transition-colors duration-205">
               <span className="material-symbols-outlined text-[18px]">sim_card</span>
             </div>
-            <span className="text-green-600 font-extrabold text-[11px] bg-green-50/70 border border-green-100/50 px-2 py-0.5 rounded-full inline-flex items-center gap-0.5">+{s.sales_growth}%</span>
+            <span className={`font-extrabold text-[11px] bg-green-50/70 border border-green-100/50 px-2 py-0.5 rounded-full inline-flex items-center gap-0.5 ${s.total_sims_growth >= 0 ? 'text-green-600' : 'text-red-600'}`}>{s.total_sims_growth >= 0 ? '+' : ''}{s.total_sims_growth}%</span>
           </div>
           <div>
             <p className="text-[11px] text-gray-400 font-bold tracking-wide">إجمالي الشرائح</p>
@@ -141,7 +155,7 @@ export default function DashboardView({
             <div className="w-9 h-9 rounded-xl bg-red-50/65 flex items-center justify-center text-secondary border border-red-100/50 group-hover:bg-secondary group-hover:text-white transition-colors duration-205">
               <span className="material-symbols-outlined text-[18px]">sell</span>
             </div>
-            <span className="text-green-600 font-extrabold text-[11px] bg-green-50/70 border border-green-100/50 px-2 py-0.5 rounded-full inline-flex items-center gap-0.5">+{Math.round(s.sales_growth / 1.5)}%</span>
+            <span className={`font-extrabold text-[11px] bg-green-50/70 border border-green-100/50 px-2 py-0.5 rounded-full inline-flex items-center gap-0.5 ${s.sold_sims_growth >= 0 ? 'text-green-600' : 'text-red-600'}`}>{s.sold_sims_growth >= 0 ? '+' : ''}{s.sold_sims_growth}%</span>
           </div>
           <div>
             <p className="text-[11px] text-gray-400 font-bold tracking-wide">الشرائح المباعة</p>
@@ -159,7 +173,7 @@ export default function DashboardView({
             <div className="w-9 h-9 rounded-xl bg-blue-50/65 flex items-center justify-center text-blue-600 border border-blue-100/50 group-hover:bg-blue-600 group-hover:text-white transition-colors duration-205">
               <span className="material-symbols-outlined text-[18px]">inventory_2</span>
             </div>
-            <span className="text-red-500 font-extrabold text-[11px] bg-red-50/70 border border-red-100/50 px-2 py-0.5 rounded-full inline-flex items-center gap-0.5">-{Math.abs(s.sold_sims > s.total_sims / 2 ? 2 : 5)}%</span>
+            <span className="text-gray-400 font-extrabold text-[11px] bg-gray-50/80 border border-gray-200/50 px-2 py-0.5 rounded-full inline-flex items-center gap-0.5">{s.remaining_sims > 0 ? `${Math.round((s.remaining_sims / Math.max(s.total_sims, 1)) * 100)}%` : '0%'}</span>
           </div>
           <div>
             <p className="text-[11px] text-gray-400 font-bold tracking-wide">المخزون المتبقي</p>
@@ -177,7 +191,7 @@ export default function DashboardView({
             <div className="w-9 h-9 rounded-xl bg-green-50/65 flex items-center justify-center text-green-600 border border-green-100/50 group-hover:bg-green-600 group-hover:text-white transition-colors duration-205">
               <span className="material-symbols-outlined text-[18px]">check_circle</span>
             </div>
-            <span className="text-green-600 font-extrabold text-[11px] bg-green-50/70 border border-green-100/50 px-2 py-0.5 rounded-full inline-flex items-center gap-0.5">+{Math.round(s.active_sims / 50000)}%</span>
+            <span className={`font-extrabold text-[11px] bg-green-50/70 border border-green-100/50 px-2 py-0.5 rounded-full inline-flex items-center gap-0.5 ${s.active_sims_growth >= 0 ? 'text-green-600' : 'text-red-600'}`}>{s.active_sims_growth >= 0 ? '+' : ''}{s.active_sims_growth}%</span>
           </div>
           <div>
             <p className="text-[11px] text-gray-400 font-bold tracking-wide">الهواتف النشطة</p>
@@ -195,7 +209,7 @@ export default function DashboardView({
             <div className="w-9 h-9 rounded-xl bg-purple-50/65 flex items-center justify-center text-purple-600 border border-purple-100/50 group-hover:bg-purple-600 group-hover:text-white transition-colors duration-205">
               <span className="material-symbols-outlined text-[18px]">badge</span>
             </div>
-            <span className="text-primary font-extrabold text-[11px] bg-gray-50/80 border border-gray-200/50 px-2 py-0.5 rounded-full inline-flex items-center gap-0.5">+{Math.round(s.total_agents / 40)} فرع</span>
+            <span className="text-primary font-extrabold text-[11px] bg-gray-50/80 border border-gray-200/50 px-2 py-0.5 rounded-full inline-flex items-center gap-0.5">+{s.agents_added_30d} جديد</span>
           </div>
           <div>
             <p className="text-[11px] text-gray-400 font-bold tracking-wide">الوكلاء المعتمدين</p>
@@ -213,7 +227,7 @@ export default function DashboardView({
             <div className="w-9 h-9 rounded-xl bg-orange-50/65 flex items-center justify-center text-orange-600 border border-orange-100/50 group-hover:bg-orange-600 group-hover:text-white transition-colors duration-205">
               <span className="material-symbols-outlined text-[18px]">shopping_cart</span>
             </div>
-            <span className="text-primary font-extrabold text-[11px] bg-gray-50/80 border border-gray-200/50 px-2 py-0.5 rounded-full inline-flex items-center gap-0.5">+{Math.round(s.total_sellers / 250)} نقطة</span>
+            <span className="text-primary font-extrabold text-[11px] bg-gray-50/80 border border-gray-200/50 px-2 py-0.5 rounded-full inline-flex items-center gap-0.5">+{s.sellers_added_30d} جديد</span>
           </div>
           <div>
             <p className="text-[11px] text-gray-400 font-bold tracking-wide">نقاط بيع البائعين</p>
