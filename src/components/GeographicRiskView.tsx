@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import * as d3 from 'd3';
 import { AuditLog } from '../types';
 import { api } from '../api/client';
@@ -97,6 +97,20 @@ export default function GeographicRiskView() {
     return () => { mounted = false; };
   }, []);
 
+  const summaryStats = useMemo(() => {
+    const total = identities.length;
+    const highRiskCount = identities.filter((i: any) => i.risk === 'مرتفع جداً').length;
+    const mediumRiskCount = identities.filter((i: any) => i.risk === 'مرتفع').length;
+    const lowRiskCount = identities.filter((i: any) => i.risk === 'متوسط').length;
+    const riskPct = total > 0 ? ((highRiskCount / total) * 100) : 0;
+    const underReview = identities.filter((i: any) => i.duplicatesCount >= 3).length;
+    const underReviewPct = total > 0 ? ((underReview / total) * 100) : 0;
+    const highBarPct = total > 0 ? (highRiskCount / total * 100) : 0;
+    const medBarPct = total > 0 ? (mediumRiskCount / total * 100) : 0;
+    const lowBarPct = total > 0 ? (lowRiskCount / total * 100) : 0;
+    return { total, highRiskCount, mediumRiskCount, lowRiskCount, riskPct, underReview, underReviewPct, highBarPct, medBarPct, lowBarPct };
+  }, [identities]);
+
   // Auto-resize tracker for responsive canvas
   useEffect(() => {
     if (!containerRef.current) return;
@@ -160,20 +174,20 @@ export default function GeographicRiskView() {
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove(); // clear contents before update
 
-    // Map names to region IDs
-    const regionsMap: Record<string, string> = {
-      'أمانة العاصمة': 'region-sanaa',
-      'محافظة عدن': 'region-aden',
-      'تعز - المدينة': 'region-taiz',
-      'حضرموت - المكلا': 'region-mukalla'
-    };
+    // Map region names from API data to dynamic node IDs
+    const regionNames = [...new Set(identities.map((m: any) => m.region).filter(Boolean))];
+    const regionsMap: Record<string, string> = {};
+    regionNames.forEach((r: string, idx: number) => { regionsMap[r] = `region-${idx}`; });
 
     // 1. Build Nodes
     const baseNodes = [
-      { id: 'region-sanaa', label: 'صنعاء (أمانة العاصمة)', type: 'city', color: '#ef4444', size: 24, risk: 'مرتفع جداً' },
-      { id: 'region-aden', label: 'عدن (كريتر)', type: 'city', color: '#3b82f6', size: 24, risk: 'متوسط' },
-      { id: 'region-taiz', label: 'تعز (المدينة)', type: 'city', color: '#f59e0b', size: 24, risk: 'مرتفع جداً' },
-      { id: 'region-mukalla', label: 'حضرموت (المكلا)', type: 'city', color: '#8b5cf6', size: 24, risk: 'متوسط' },
+      ...Object.entries(regionsMap).map(([regionName, regionId]) => {
+        const regionIdentities = identities.filter((m: any) => m.region === regionName);
+        const hrc = regionIdentities.filter((m: any) => m.risk === 'مرتفع جداً').length;
+        const riskLevel: string = hrc > 2 ? 'مرتفع جداً' : hrc > 0 ? 'متوسط' : 'منخفض';
+        const color = riskLevel === 'مرتفع جداً' ? '#ef4444' : riskLevel === 'متوسط' ? '#f59e0b' : '#3b82f6';
+        return { id: regionId, label: regionName, type: 'city', color, size: 24, risk: riskLevel };
+      }),
       { id: 'telecom-backbone', label: 'بوابة المراقبة والربط', type: 'checkpoint', color: '#64748b', size: 18, risk: 'آمن' }
     ];
 
@@ -196,10 +210,7 @@ export default function GeographicRiskView() {
 
     // 2. Build Links representation
     const graphLinks = [
-      { source: 'telecom-backbone', target: 'region-sanaa', value: 2 },
-      { source: 'telecom-backbone', target: 'region-aden', value: 2 },
-      { source: 'telecom-backbone', target: 'region-taiz', value: 2 },
-      { source: 'telecom-backbone', target: 'region-mukalla', value: 2 },
+      ...baseNodes.filter(n => n.id !== 'telecom-backbone').map(n => ({ source: 'telecom-backbone', target: n.id, value: 2 })),
       
       ...identities.map(m => ({
         source: m.idNo,
@@ -421,7 +432,7 @@ export default function GeographicRiskView() {
               <span className="px-2.5 py-0.5 bg-red-100 text-secondary border border-red-200 rounded-full text-[11px] font-bold">تحذير مرتفع</span>
             </div>
             <div className="flex items-end gap-3">
-              <h3 className="text-4xl font-bold text-gray-900 leading-none">84.2%</h3>
+              <h3 className="text-4xl font-bold text-gray-900 leading-none">{summaryStats.riskPct.toFixed(1)}%</h3>
               <div className="flex items-center text-secondary text-xs font-bold pb-1 font-mono">
                 <span className="material-symbols-outlined text-sm">trending_up</span>
                 <span>+12.4%</span>
@@ -431,9 +442,9 @@ export default function GeographicRiskView() {
               تم اكتشاف زيادة ملحوظة في عمليات تسجيل الهويات المكررة خلال الـ 24 ساعة الماضية، معظمها يتركز في إقليم الأمانة.
             </p>
             <div className="mt-5 h-2 bg-gray-100 rounded-full overflow-hidden flex">
-              <div className="w-[60%] bg-secondary h-full"></div>
-              <div className="w-[25%] bg-orange-500 h-full"></div>
-              <div className="w-[15%] bg-green-500 h-full"></div>
+              <div className="bg-secondary h-full" style={{ width: `${summaryStats.highBarPct}%` }}></div>
+              <div className="bg-orange-500 h-full" style={{ width: `${summaryStats.medBarPct}%` }}></div>
+              <div className="bg-green-500 h-full" style={{ width: `${summaryStats.lowBarPct}%` }}></div>
             </div>
           </div>
         </div>
@@ -447,7 +458,7 @@ export default function GeographicRiskView() {
             <span className="text-xs text-gray-500 font-bold">إجمالي الهويات المكررة</span>
           </div>
           <div>
-            <h4 className="text-2xl font-bold text-gray-900 font-mono">1,402</h4>
+            <h4 className="text-2xl font-bold text-gray-900 font-mono">{summaryStats.total.toLocaleString()}</h4>
             <p className="text-[11px] text-gray-400 mt-1">حالة مكررة مشتبه بها نشطة</p>
           </div>
         </div>
@@ -460,8 +471,8 @@ export default function GeographicRiskView() {
             <span className="text-xs text-gray-500 font-bold">الحالات الخاضعة للمراجعة</span>
           </div>
           <div>
-            <h4 className="text-2xl font-bold text-gray-900 font-mono">842</h4>
-            <p className="text-[11px] text-green-600 font-semibold mt-1">60% من إجمالي التكرارات في العقد</p>
+            <h4 className="text-2xl font-bold text-gray-900 font-mono">{summaryStats.underReview.toLocaleString()}</h4>
+            <p className="text-[11px] text-green-600 font-semibold mt-1">{summaryStats.underReviewPct.toFixed(0)}% من إجمالي التكرارات في العقد</p>
           </div>
         </div>
       </div>

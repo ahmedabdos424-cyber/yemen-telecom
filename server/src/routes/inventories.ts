@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { query } from '../db';
+import { logger } from '../logger';
 import { requireRole } from '../middleware/auth';
 import { validate, updateInventoriesSchema } from '../validation';
 
@@ -15,7 +16,7 @@ router.get('/', requireRole('manager', 'agent'), async (_req: Request, res: Resp
       periodDays: r.period_days,
     })));
   } catch (err) {
-    console.error('Error fetching inventories:', err);
+    logger.error('Error fetching inventories:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -37,7 +38,7 @@ router.put('/', requireRole('manager'), validate(updateInventoriesSchema), async
       periodDays: r.period_days,
     })));
   } catch (err) {
-    console.error('Error updating inventories:', err);
+    logger.error('Error updating inventories:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "start": "node server/dist/index.js",
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
     "build:android": "vite build && npx cap copy",
@@ -38,6 +39,7 @@
     "motion": "12.42.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
+    "react-router-dom": "^7.18.0",
     "sharp": "^0.34.5",
     "tesseract.js": "^7.0.0",
     "uuid": "14.0.1"
@@ -62,5 +64,15 @@
     "typescript": "~5.8.2",
     "vite": "6.4.3",
     "vitest": "4.1.9"
+  },
+  "allowScripts": {
+    "@firebase/util@1.15.1": true,
+    "@google/genai@2.7.0": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.1": true,
+    "ngrok@5.0.0-beta.2": true,
+    "protobufjs@7.6.4": true,
+    "sharp@0.34.5": true,
+    "tesseract.js@7.0.0": true
   }
 }

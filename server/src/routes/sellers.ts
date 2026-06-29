@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { query, transaction } from '../db';
+import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination } from '../helpers';
 import { validate, createSellerSchema, updateSellerSchema, updateSellerBalanceSchema } from '../validation';
@@ -104,7 +105,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     }
     res.json(result.rows.map(mapSeller));
   } catch (err) {
-    console.error('Error fetching sellers:', err);
+    logger.error('Error fetching sellers:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -180,7 +181,7 @@ router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), 
     if (err.statusCode === 409) {
       return res.status(409).json({ error: err.message });
     }
-    console.error('Error creating seller:', err);
+    logger.error('Error creating seller:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -216,7 +217,7 @@ router.put('/:id', requireRole('manager', 'agent'), validate(updateSellerSchema)
     );
     res.json(mapSeller(updated.rows[0]));
   } catch (err) {
-    console.error('Error updating seller:', err);
+    logger.error('Error updating seller:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -247,7 +248,7 @@ router.put('/:id/balance', requireRole('manager', 'agent'), validate(updateSelle
     );
     res.json(mapSeller(updated.rows[0]));
   } catch (err) {
-    console.error('Error updating seller balance:', err);
+    logger.error('Error updating seller balance:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -281,7 +282,7 @@ router.post('/:id/reset-password', requireRole('manager', 'agent'), async (req: 
       },
     });
   } catch (err) {
-    console.error('Error resetting seller password:', err);
+    logger.error('Error resetting seller password:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -308,7 +309,7 @@ router.delete('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, 
     await query('UPDATE sellers SET status = $1 WHERE id = $2', ['deleted', id]);
     res.json({ message: 'Seller deleted successfully' });
   } catch (err) {
-    console.error('Error deleting seller:', err);
+    logger.error('Error deleting seller:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

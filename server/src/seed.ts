@@ -4,13 +4,14 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
+import { logger } from './logger';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function seed() {
   if (process.env.NODE_ENV === 'production') {
-    console.error('[SEED] Refusing to seed database in production. Run with NODE_ENV=development to seed.');
+    logger.error('[SEED] Refusing to seed database in production. Run with NODE_ENV=development to seed.');
     process.exit(1);
   }
   const client = await pool.connect();
@@ -27,7 +28,7 @@ async function seed() {
       const envKey = `SEED_PASSWORD_${username.toUpperCase()}`;
       let pw = process.env[envKey];
       if (pw && !/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d).{8,}$/.test(pw)) {
-        console.warn(`[WARN] ${envKey} is weak — must have uppercase, lowercase, and digit (min 8 chars). Using generated password.`);
+        logger.warn(`[WARN] ${envKey} is weak — must have uppercase, lowercase, and digit (min 8 chars). Using generated password.`);
         pw = undefined;
       }
       passwords[username] = pw || crypto.randomBytes(16).toString('base64url');
@@ -42,17 +43,17 @@ async function seed() {
       }
     }
 
-    console.log('\n══════════════════════════════════════════════');
-    console.log('  Database seeded successfully!');
+    logger.info('\n══════════════════════════════════════════════');
+    logger.info('  Database seeded successfully!');
     if (process.env.NODE_ENV !== 'production') {
       for (const username of seedUsers) {
-        console.log(`  ${username}: ${passwords[username]}`);
+        logger.info(`  ${username}: ${passwords[username]}`);
       }
     }
-    console.log('  Set individual SEED_PASSWORD_MANAGER / SEED_PASSWORD_AGENT / SEED_PASSWORD_SELLER env vars to customize');
-    console.log('══════════════════════════════════════════════\n');
+    logger.info('  Set individual SEED_PASSWORD_MANAGER / SEED_PASSWORD_AGENT / SEED_PASSWORD_SELLER env vars to customize');
+    logger.info('══════════════════════════════════════════════\n');
   } catch (err) {
-    console.error('Error seeding database:', err);
+    logger.error('Error seeding database:', err);
     throw err;
   } finally {
     client.release();

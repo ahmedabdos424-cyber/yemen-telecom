@@ -1,10 +1,14 @@
 import { Router, Request, Response } from 'express';
 import { query } from '../db';
+import { logger } from '../logger';
+import { cacheGet, cacheSet } from '../cache';
 import { requireRole, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
 router.get('/daily-sales', requireRole('manager'), async (_req: Request, res: Response) => {
+  const cached = cacheGet('report:daily-sales');
+  if (cached) return res.json(cached);
   try {
     const result = await query(`
       SELECT
@@ -17,14 +21,17 @@ router.get('/daily-sales', requireRole('manager'), async (_req: Request, res: Re
       GROUP BY DATE(created_at), operator
       ORDER BY day DESC
     `);
+    cacheSet('report:daily-sales', result.rows, 300_000);
     res.json(result.rows);
   } catch (err) {
-    console.error('Error fetching daily sales:', err);
+    logger.error('Error fetching daily sales:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 router.get('/agent-performance', requireRole('manager'), async (_req: Request, res: Response) => {
+  const cached = cacheGet('report:agent-performance');
+  if (cached) return res.json(cached);
   try {
     const result = await query(`
       SELECT
@@ -38,14 +45,17 @@ router.get('/agent-performance', requireRole('manager'), async (_req: Request, r
       GROUP BY a.id, a.name, a.region
       ORDER BY sales_30_days DESC
     `);
+    cacheSet('report:agent-performance', result.rows, 300_000);
     res.json(result.rows);
   } catch (err) {
-    console.error('Error fetching agent performance:', err);
+    logger.error('Error fetching agent performance:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 router.get('/operator-distribution', requireRole('manager'), async (_req: Request, res: Response) => {
+  const cached = cacheGet('report:operator-distribution');
+  if (cached) return res.json(cached);
   try {
     const sims = await query(`
       SELECT provider AS operator, COUNT(*) AS count, status
@@ -55,14 +65,19 @@ router.get('/operator-distribution', requireRole('manager'), async (_req: Reques
       SELECT operator, COUNT(*) AS count, status
       FROM operations GROUP BY operator, status ORDER BY operator
     `);
-    res.json({ sims: sims.rows, operations: ops.rows });
+    const data = { sims: sims.rows, operations: ops.rows };
+    cacheSet('report:operator-distribution', data, 300_000);
+    res.json(data);
   } catch (err) {
-    console.error('Error fetching operator distribution:', err);
+    logger.error('Error fetching operator distribution:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 router.get('/seller-performance', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
+  const cacheKey = `report:seller-performance:${req.user?.id || 'anon'}`;
+  const cached = cacheGet(cacheKey);
+  if (cached) return res.json(cached);
   try {
     let whereClause = '';
     let params: any[] | undefined;
@@ -86,9 +101,10 @@ router.get('/seller-performance', requireRole('manager', 'agent'), async (req: A
       ORDER BY s.sales_30_days DESC
       LIMIT 100
     `, params);
+    cacheSet(cacheKey, result.rows, 120_000);
     res.json(result.rows);
   } catch (err) {
-    console.error('Error fetching seller performance:', err);
+    logger.error('Error fetching seller performance:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

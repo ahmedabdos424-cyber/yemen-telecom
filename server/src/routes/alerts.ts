@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { query } from '../db';
+import { logger } from '../logger';
 import { requireRole } from '../middleware/auth';
 import { getPagination } from '../helpers';
 
@@ -18,7 +19,7 @@ router.get('/', requireRole('manager'), async (req: Request, res: Response) => {
     const result = await query(sql, params);
     res.json(result.rows);
   } catch (err) {
-    console.error('Error fetching alerts:', err);
+    logger.error('Error fetching alerts:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -29,7 +30,7 @@ router.delete('/:id', requireRole('manager'), async (req: Request, res: Response
     await query('DELETE FROM alerts WHERE id = $1', [id]);
     res.json({ success: true });
   } catch (err) {
-    console.error('Error deleting alert:', err);
+    logger.error('Error deleting alert:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

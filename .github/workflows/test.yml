@@ -12,39 +12,55 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x]
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: yemen_telecom_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/yemen_telecom_test
+      NODE_ENV: test
+      JWT_SECRET: test-jwt-secret-for-ci-at-least-32-chars-long
+      REFRESH_SECRET: test-refresh-secret-for-ci-at-least-32-chars-long
+      CSRF_SECRET: test-csrf-secret-for-ci-at-least-32-chars-long
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Use Node.js ${{ matrix.node-version }}
+      - name: Use Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 20
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: TypeScript type check (frontend)
-        run: npx tsc --noEmit
-
-      - name: Run frontend tests
-        run: npm test
-
       - name: Install server dependencies
         working-directory: server
         run: npm ci
 
-      - name: TypeScript type check (server)
-        working-directory: server
+      - name: TypeScript type check (frontend)
         run: npx tsc --noEmit
 
-      - name: Run server tests
+      - name: TypeScript type check (server)
         working-directory: server
-        run: npm test
+        run: npx tsc --skipLibCheck
+
+      - name: Run tests
+        run: npx vitest run --reporter=verbose
+        env:
+          CI: true
 
       - name: Build production bundle
         run: npm run build

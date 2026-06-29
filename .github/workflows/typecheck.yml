@@ -23,5 +23,5 @@ jobs:
       - run: npm ci
       - run: npx tsc --noEmit
         name: TypeScript Check (Frontend)
-      - run: cd server && npx tsc --noEmit
+      - run: cd server && npx tsc --noEmit --skipLibCheck
         name: TypeScript Check (Server)

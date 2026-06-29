@@ -1,4 +1,5 @@
-import React, { Suspense, lazy, useState, useCallback } from 'react';
+import React, { Suspense, lazy, useState, useCallback, useEffect } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { ViewType, Role, Operator } from './types';
 
 import SplashScreen from './components/SplashScreen';
@@ -30,10 +31,11 @@ const SellerDashboard = lazy(() => import('./components/SellerDashboard'));
 const BottomNav = lazy(() => import('./components/BottomNav'));
 
 import { AnimatePresence, motion } from 'motion/react';
-import { LogOut, Check, Copy, X } from 'lucide-react';
+import { Check, Copy, X } from 'lucide-react';
 
-export default function App() {
-  const [splashDone, setSplashDone] = useState(false);
+function AuthenticatedApp() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const auth = useAuth();
   const mgr = useManagerState(auth.role);
   const agt = useAgentSellerState(auth.role, auth.username);
@@ -43,107 +45,120 @@ export default function App() {
   const { setTokenWrapper } = auth;
   const isOnline = useNetworkStatus();
 
-  if (!splashDone) {
-    return <SplashScreen onFinish={() => setSplashDone(true)} />;
-  }
+  useEffect(() => {
+    if (!role) return;
+    const pathParts = location.pathname.split('/').filter(Boolean);
+    if (pathParts.length < 2) {
+      const defaultPath = role === 'manager' ? '/manager/dashboard' : role === 'agent' ? '/agent/home' : '/seller/home';
+      navigate(defaultPath, { replace: true });
+      return;
+    }
+    const viewFromUrl = pathParts[1].replace(/-/g, '_');
+    if (role === 'manager') {
+      const validViews: string[] = ['dashboard', 'sims', 'agents', 'sellers', 'alerts', 'duplicate-identities', 'reports', 'settings', 'add-agent'];
+      if (validViews.includes(viewFromUrl) && viewFromUrl !== mgr.currentView) {
+        mgr.setView(viewFromUrl as ViewType);
+      }
+    } else if (role === 'agent' || role === 'seller') {
+      const validTabs = role === 'agent'
+        ? ['home', 'activate', 'add_seller', 'sellers', 'my_sims', 'account']
+        : ['home', 'activate', 'my_sims', 'account'];
+      if (validTabs.includes(viewFromUrl) && viewFromUrl !== agt.activeTab) {
+        agt.handleSetRoleTab(viewFromUrl);
+      }
+    }
+  }, [location.pathname]);
 
   if (!role) {
-    return <LoginScreen onLogin={handleLogin} darkMode={darkMode} setDarkMode={setDarkMode} />;
+    return (
+      <ErrorBoundary>
+        <LoginScreen onLogin={handleLogin} darkMode={darkMode} setDarkMode={setDarkMode} />
+      </ErrorBoundary>
+    );
   }
 
-  // ===== MANAGER VIEW =====
-  if (role === 'manager') {
-    const renderAdminView = () => {
-      switch (mgr.currentView) {
-        case 'dashboard':
-          return <DashboardView stats={mgr.stats} alerts={mgr.alerts} transactions={mgr.transactions} sims={mgr.sims} setView={mgr.setView} onSearch={(q) => { setDashboardSearch(q); mgr.setView('sims'); }} onRefresh={mgr.refreshData} />;
-        case 'sims':
-          return <SIMsView sims={mgr.sims} onAddSIM={mgr.handleAddSIM} initialSearch={dashboardSearch} onUpdateSIM={mgr.handleUpdateSIM} />;
-        case 'agents':
-          return <AgentsView agents={mgr.agents} setView={mgr.setView} onUpdateAgent={mgr.handleUpdateAgent} />;
-        case 'sellers':
-          return <SellersView sellers={mgr.sellers} sims={mgr.sims} onUpdateSeller={mgr.handleUpdateSeller} onAddBalance={mgr.handleAddBalance} loading={mgr.loading} error={mgr.apiError} onRetry={mgr.refreshData} />;
-        case 'alerts':
-          return <AlertsView alerts={mgr.alerts} onResolveAlert={mgr.handleResolveAlert} settings={mgr.settings} onUpdateSettings={mgr.setSettings} />;
-        case 'duplicate-identities':
-          return <GeographicRiskView />;
-        case 'reports':
-          return <ReportsView />;
-        case 'settings':
-          return <SettingsView settings={mgr.settings} onUpdateSettings={mgr.setSettings} />;
-        case 'add-agent':
-          return <AddAgentView onAddAgent={mgr.handleAddAgent} setView={mgr.setView} />;
-        default:
-          return <DashboardView stats={mgr.stats} alerts={mgr.alerts} transactions={mgr.transactions} sims={mgr.sims} setView={mgr.setView} />;
-      }
-    };
+  const SharedOfflineBanner = () => (
+    !isOnline ? (
+      <div className="fixed top-0 left-0 right-0 z-[60] bg-red-600 text-white text-center py-1.5 text-[11px] font-bold shadow-lg flex items-center justify-center gap-2" role="alert" aria-live="assertive">
+        <span className="material-symbols-outlined text-xs">wifi_off</span>
+        لا يوجد اتصال بالإنترنت
+      </div>
+    ) : null
+  );
 
+  const ToastNotifications = () => (
+    <div className="fixed top-20 left-4 z-40 w-full max-w-sm flex flex-col gap-3 pointer-events-none">
+      <AnimatePresence>
+        {(mgr.toasts ?? []).map((toast) => (
+          <motion.div key={toast.id} initial={{ opacity: 0, x: -100, scale: 0.95 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -100, scale: 0.95 }} transition={{ duration: 0.3 }}
+            className="bg-slate-900/95 backdrop-blur border border-red-500/30 text-slate-100 rounded-xl p-4 shadow-xl pointer-events-auto flex flex-col gap-2 text-right">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-1.5">
+              <div className="flex items-center gap-1.5 text-red-400 font-bold text-xs">
+                <span className="material-symbols-outlined text-sm">error</span>
+                <span>{toast.title}</span>
+              </div>
+              <button onClick={() => mgr.dismissToast(toast.id)} className="text-slate-500 hover:text-slate-100 transition-colors cursor-pointer">
+                <span className="material-symbols-outlined text-xs">close</span>
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-300 leading-relaxed font-sans">{toast.message}</p>
+            <div className="flex justify-end gap-2 mt-1">
+              <button onClick={() => { navigate('/manager/duplicate-identities'); }} className="py-1 px-3 bg-secondary hover:bg-red-700 text-white font-bold text-[10px] rounded-lg transition-colors cursor-pointer">
+                شاشة مراقبة الهويات للتحقيق
+              </button>
+              <button onClick={() => mgr.dismissToast(toast.id)} className="py-1 px-2.5 bg-slate-800 hover:bg-slate-750 text-slate-300 font-medium text-[10px] rounded-lg transition-colors cursor-pointer">
+                تجاهل
+              </button>
+            </div>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+
+  if (role === 'manager') {
     return (
       <div className="min-h-dvh bg-theme-background font-sans antialiased text-slate-100 pb-[calc(4rem+env(safe-area-inset-bottom))]">
-        {!isOnline && (
-          <div className="fixed top-0 left-0 right-0 z-[60] bg-red-600 text-white text-center py-1.5 text-[11px] font-bold shadow-lg flex items-center justify-center gap-2" role="alert" aria-live="assertive">
-            <span className="material-symbols-outlined text-xs">wifi_off</span>
-            لا يوجد اتصال بالإنترنت
-          </div>
-        )}
-        <TopBar currentView={mgr.currentView} setView={mgr.setView} onMenuToggle={() => {}} unresolvedAlertsCount={mgr.alerts.length} displayName={username} role={role} />
+        <SharedOfflineBanner />
+        <TopBar currentView={mgr.currentView} setView={(v) => { mgr.setView(v); navigate(`/manager/${v}`); }} onMenuToggle={() => {}} unresolvedAlertsCount={mgr.alerts.length} displayName={username} role={role} />
         <div className="flex pt-[calc(4rem+env(safe-area-inset-top))] min-h-dvh">
           <main className="flex-1 px-3 sm:px-4 md:px-8 py-4 md:py-8 lg:pt-10">
             <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
               <ErrorBoundary>
                 <Suspense fallback={<div className="flex justify-center py-12"><span className="w-6 h-6 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" /></div>}>
-                  {renderAdminView()}
+                  <Routes>
+                    <Route path="/manager/dashboard" element={<DashboardView stats={mgr.stats} alerts={mgr.alerts} transactions={mgr.transactions} sims={mgr.sims} setView={(v) => { mgr.setView(v); navigate(`/manager/${v}`); }} onSearch={(q) => { setDashboardSearch(q); navigate('/manager/sims'); }} onRefresh={mgr.refreshData} />} />
+                    <Route path="/manager/sims" element={<SIMsView sims={mgr.sims} onAddSIM={mgr.handleAddSIM} initialSearch={dashboardSearch} onUpdateSIM={mgr.handleUpdateSIM} />} />
+                    <Route path="/manager/agents" element={<AgentsView agents={mgr.agents} setView={(v) => { mgr.setView(v); navigate(`/manager/${v}`); }} onUpdateAgent={mgr.handleUpdateAgent} />} />
+                    <Route path="/manager/sellers" element={<SellersView sellers={mgr.sellers} sims={mgr.sims} onUpdateSeller={mgr.handleUpdateSeller} onAddBalance={mgr.handleAddBalance} loading={mgr.loading} error={mgr.apiError} onRetry={mgr.refreshData} />} />
+                    <Route path="/manager/alerts" element={<AlertsView alerts={mgr.alerts} onResolveAlert={mgr.handleResolveAlert} settings={mgr.settings} onUpdateSettings={mgr.setSettings} />} />
+                    <Route path="/manager/duplicate-identities" element={<GeographicRiskView />} />
+                    <Route path="/manager/reports" element={<ReportsView />} />
+                    <Route path="/manager/settings" element={<SettingsView settings={mgr.settings} onUpdateSettings={mgr.setSettings} />} />
+                    <Route path="/manager/add-agent" element={<AddAgentView onAddAgent={mgr.handleAddAgent} setView={(v) => { mgr.setView(v); navigate(`/manager/${v}`); }} />} />
+                    <Route path="*" element={<Navigate to="/manager/dashboard" replace />} />
+                  </Routes>
                 </Suspense>
               </ErrorBoundary>
             </div>
           </main>
         </div>
-
-        {/* Toast notifications */}
-        <div className="fixed top-20 left-4 z-40 w-full max-w-sm flex flex-col gap-3 pointer-events-none">
-          <AnimatePresence>
-            {(mgr.toasts ?? []).map((toast) => (
-              <motion.div key={toast.id} initial={{ opacity: 0, x: -100, scale: 0.95 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -100, scale: 0.95 }} transition={{ duration: 0.3 }}
-                className="bg-slate-900/95 backdrop-blur border border-red-500/30 text-slate-100 rounded-xl p-4 shadow-xl pointer-events-auto flex flex-col gap-2 text-right">
-                <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-1.5">
-                  <div className="flex items-center gap-1.5 text-red-400 font-bold text-xs">
-                    <span className="material-symbols-outlined text-sm">error</span>
-                    <span>{toast.title}</span>
-                  </div>
-                  <button onClick={() => mgr.dismissToast(toast.id)} className="text-slate-500 hover:text-slate-100 transition-colors cursor-pointer">
-                    <span className="material-symbols-outlined text-xs">close</span>
-                  </button>
-                </div>
-                <p className="text-[11px] text-slate-300 leading-relaxed font-sans">{toast.message}</p>
-                <div className="flex justify-end gap-2 mt-1">
-                  <button onClick={() => { mgr.setView('duplicate-identities'); }} className="py-1 px-3 bg-secondary hover:bg-red-700 text-white font-bold text-[10px] rounded-lg transition-colors cursor-pointer">
-                    شاشة مراقبة الهويات للتحقيق
-                  </button>
-                  <button onClick={() => mgr.dismissToast(toast.id)} className="py-1 px-2.5 bg-slate-800 hover:bg-slate-750 text-slate-300 font-medium text-[10px] rounded-lg transition-colors cursor-pointer">
-                    تجاهل
-                  </button>
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
-
+        <ToastNotifications />
         <Suspense fallback={null}>
-          <BottomNav currentView={mgr.currentView} setView={mgr.setView} unresolvedAlertsCount={(mgr.alerts ?? []).length} onLogout={handleLogout} />
+          <BottomNav currentView={mgr.currentView} setView={(v) => { mgr.setView(v); navigate(`/manager/${v}`); }} unresolvedAlertsCount={(mgr.alerts ?? []).length} onLogout={handleLogout} />
         </Suspense>
       </div>
     );
   }
 
-  // ===== AGENT / SELLER VIEW =====
   const renderRoleView = () => {
     if (role === 'agent') {
       const agentSellers = (agt.sellers ?? []).filter(s => s.agent_name === username);
       const sharedProps = {
         role: role as Role, activeTab: agt.activeTab, sellers: agentSellers, sims: agt.sims,
         inventories: agt.inventories,
-        onAddSeller: () => agt.handleSetRoleTab('add_seller'),
-        onActivateSim: () => agt.handleSetRoleTab('activate'),
+        onAddSeller: () => navigate('/agent/add_seller'),
+        onActivateSim: () => navigate('/agent/activate'),
         onTransferSims: agt.handleTransferSimsForAgent,
         onUpdateSellerStatus: agt.handleUpdateSellerStatusForAgent,
         onResetSellerPassword: agt.handleResetSellerPasswordForAgent,
@@ -153,47 +168,38 @@ export default function App() {
         username, onLogout: () => {}, onConfirmLogout: handleLogout,
         darkMode, setDarkMode,
       };
-      switch (agt.activeTab) {
-        case 'home': case 'sellers': case 'my_sims':
-          return <AgentDashboard {...sharedProps} />;
-        case 'activate':
-          return <ActivateSimForm onSimActivated={agt.handleSimActivationForSeller} />;
-        case 'add_seller':
-          return <AddSellerForm onSellerAdded={agt.handleAddSellerForAgent} agentName={username} />;
-        case 'account':
-          return <AgentProfileView username={username} role={role} sellersCount={agentSellers.length} inventories={agt.inventories} onLogout={() => {}} onConfirmLogout={handleLogout} darkMode={darkMode} setDarkMode={setDarkMode} />;
-        default:
-          return null;
-      }
+      return (
+        <Routes>
+          <Route path="/agent/home" element={<AgentDashboard {...sharedProps} />} />
+          <Route path="/agent/sellers" element={<AgentDashboard {...sharedProps} />} />
+          <Route path="/agent/my-sims" element={<AgentDashboard {...sharedProps} />} />
+          <Route path="/agent/activate" element={<ActivateSimForm onSimActivated={agt.handleSimActivationForSeller} />} />
+          <Route path="/agent/add-seller" element={<AddSellerForm onSellerAdded={agt.handleAddSellerForAgent} agentName={username} />} />
+          <Route path="/agent/account" element={<AgentProfileView username={username} role={role} sellersCount={agentSellers.length} inventories={agt.inventories} onLogout={() => {}} onConfirmLogout={handleLogout} darkMode={darkMode} setDarkMode={setDarkMode} />} />
+          <Route path="*" element={<Navigate to="/agent/home" replace />} />
+        </Routes>
+      );
     } else if (role === 'seller') {
-      switch (agt.activeTab) {
-        case 'home':
-          return <SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? []).filter(s => s.status === 'available')} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={() => {}} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} />;
-        case 'activate':
-          return <ActivateSimForm onSimActivated={agt.handleSimActivationForSeller} />;
-        case 'my_sims':
-          return <SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? [])} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={() => {}} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} />;
-        case 'account':
-          return <SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? [])} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={() => {}} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} />;
-        default:
-          return null;
-      }
+      return (
+        <Routes>
+          <Route path="/seller/home" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? []).filter(s => s.status === 'available')} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={() => {}} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} />} />
+          <Route path="/seller/activate" element={<ActivateSimForm onSimActivated={agt.handleSimActivationForSeller} />} />
+          <Route path="/seller/my-sims" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? [])} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={() => {}} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} />} />
+          <Route path="/seller/account" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? [])} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={() => {}} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} />} />
+          <Route path="*" element={<Navigate to="/seller/home" replace />} />
+        </Routes>
+      );
     }
     return null;
   };
 
   return (
     <div className="min-h-screen transition-colors duration-300 font-sans bg-slate-950 text-slate-100">
-      {!isOnline && (
-        <div className="fixed top-0 left-0 right-0 z-[60] bg-red-600 text-white text-center py-1.5 text-[11px] font-bold shadow-lg flex items-center justify-center gap-2" role="alert" aria-live="assertive">
-          <span className="material-symbols-outlined text-xs">wifi_off</span>
-          لا يوجد اتصال بالإنترنت
-        </div>
-      )}
+      <SharedOfflineBanner />
       {isLoading && !role ? <LoadingScreen /> : (
       <>
         <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:32px_32px] opacity-15 pointer-events-none" />
-        <NavBar role={role} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} username={username} onLogout={() => {}} />
+        <NavBar role={role} activeTab={agt.activeTab} setActiveTab={(tab) => { agt.handleSetRoleTab(tab); navigate(`/${role}/${tab.replace(/_/g, '-')}`); }} username={username} onLogout={() => {}} />
         <main className="lg:pr-70 pt-6 pb-[4.5rem] px-3 sm:px-4 md:px-8 max-w-5xl mx-auto relative z-10 transition-all">
           <AnimatePresence mode="wait">
             <motion.div key={agt.activeTab + '_' + role} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.25 }}>
@@ -206,7 +212,6 @@ export default function App() {
           </AnimatePresence>
         </main>
 
-        {/* Seller credentials modal */}
         <AnimatePresence>
           {agt.sellerCredentials && (
             <>
@@ -230,7 +235,7 @@ export default function App() {
                   <div className="bg-slate-950 rounded-xl p-3 border border-slate-800">
                     <span className="input-label">كلمة المرور</span>
                     <div className="flex items-center justify-between gap-2">
-                      <code className="text-sm font-mono text-amber-400 bg-slate-900 px-3 py-1.5 rounded-lg flex-1 text-left dir-ltr" dir="ltr">{agt.sellerCredentials.password}</code>
+                      <code className="text-sm font-mono text-amber-400 bg-slate-950 px-3 py-1.5 rounded-lg flex-1 text-left dir-ltr" dir="ltr">{agt.sellerCredentials.password}</code>
                       <button onClick={() => navigator.clipboard.writeText(agt.sellerCredentials!.password)} className="copy-btn" title="نسخ كلمة المرور"><Copy size={14} /></button>
                     </div>
                   </div>
@@ -241,7 +246,6 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        {/* Logout button */}
         <div className="fixed bottom-4 left-4 z-50">
           <button onClick={handleLogout} className="px-4 py-2 bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-lg">تسجيل الخروج</button>
         </div>
@@ -251,4 +255,20 @@ export default function App() {
   );
 }
 
+export default function App() {
+  const [splashDone, setSplashDone] = useState(false);
 
+  if (!splashDone) {
+    return (
+      <ErrorBoundary>
+        <SplashScreen onFinish={() => setSplashDone(true)} />
+      </ErrorBoundary>
+    );
+  }
+
+  return (
+    <ErrorBoundary>
+      <AuthenticatedApp />
+    </ErrorBoundary>
+  );
+}

@@ -2,11 +2,12 @@ import path from 'path';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import compression from 'compression';
+import { compression } from './compression';
 import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
 import { query } from './db';
+import { cacheGet, cacheSet, cacheStats } from './cache';
 import { authenticateToken, requireRole } from './middleware/auth';
 import authRoutes from './routes/auth';
 import simsRoutes from './routes/sims';
@@ -22,27 +23,33 @@ import customersRoutes from './routes/customers';
 import distributionsRoutes from './routes/distributions';
 import reportsRoutes from './routes/reports';
 
+import { logger } from './logger';
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 // Environment validation — fail fast on missing secrets
 const requiredEnv = ['JWT_SECRET', 'REFRESH_SECRET', 'CSRF_SECRET'];
 const missingEnv = requiredEnv.filter(k => !process.env[k]);
 if (missingEnv.length > 0) {
-  console.error(`FATAL: Missing required environment variables: ${missingEnv.join(', ')}`);
+  logger.error(`FATAL: Missing required environment variables: ${missingEnv.join(', ')}`);
   process.exit(1);
 }
 
 const envMode = process.env.NODE_ENV || 'development';
 if (envMode === 'development') {
-  console.warn('[ENV] NODE_ENV=development — CORS allows all origins, query logging enabled');
+  logger.warn('[ENV] NODE_ENV=development — CORS allows all origins, query logging enabled');
 }
-console.log(`[ENV] NODE_ENV=${envMode}`);
+logger.info(`[ENV] NODE_ENV=${envMode}`);
 
 const app = express();
 const PORT = parseInt(process.env.API_PORT || '4000');
+const START_TIME = Date.now();
+let requestCount = 0;
 
 // Trust proxy for rate limiter behind Render's reverse proxy
 app.set('trust proxy', 1);
+
+// Request counter middleware for metrics
+app.use((_req, _res, next) => { requestCount++; next(); });
 
 const CSRF_SECRET = process.env.CSRF_SECRET!;
 
@@ -52,13 +59,12 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      // 'unsafe-inline' on scriptSrc and styleSrc are required because Vite's SPA
-      // build injects inline scripts and Tailwind generates dynamic classes at runtime.
-      // 'unsafe-eval' removed — not needed in React production mode (Vite build strips eval).
-      // Future hardening: implement nonce-based CSP via Vite plugin.
-      // 'unsafe-inline' required for SPA build and Tailwind dynamic classes.
+      // script-src 'unsafe-inline' removed — Vite production build outputs
+      // external module scripts only. No inline scripts in production.
+      // style-src 'unsafe-inline' still required for inline <style> block
+      // in index.html, React inline styles, and motion animation library.
       // Future: implement nonce-based CSP via Vite plugin.
-      scriptSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
       // Inline styles required for dynamic Tailwind classes in React components
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
@@ -86,7 +92,7 @@ app.use(cors({
     if (!origin || isDev || corsOrigins.includes(origin) || (origin && isCapacitorOrigin(origin))) {
       callback(null, true);
     } else {
-      console.warn(`CORS blocked origin: ${origin}`);
+      logger.warn(`CORS blocked origin: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -96,8 +102,8 @@ app.use(cors({
 }));
 app.use(compression());
 app.use(express.json({ limit: '1mb' }));
-app.use('/uploads', express.static('uploads'));
-app.use(express.static('dist'));
+app.use('/uploads', express.static('uploads', { maxAge: '1d', etag: true }));
+app.use(express.static('dist', { maxAge: '1y', immutable: true, etag: true }));
 
 // CSRF token generation endpoint (must be after CORS middleware)
 app.get('/api/csrf-token', (req, res) => {
@@ -163,8 +169,18 @@ app.get('/api/health', async (_req, res) => {
   } catch {
     dbOk = false;
   }
+  const mem = process.memoryUsage();
   const status = dbOk ? 'ok' : 'degraded';
-  res.status(dbOk ? 200 : 503).json({ status, db: dbOk ? 'connected' : 'disconnected', timestamp: new Date().toISOString() });
+  res.status(dbOk ? 200 : 503).json({
+    status,
+    db: dbOk ? 'connected' : 'disconnected',
+    uptime: Math.floor((Date.now() - START_TIME) / 1000),
+    requests: requestCount,
+    memory: { rss: Math.round(mem.rss / 1024 / 1024) + 'MB', heap: Math.round(mem.heapUsed / 1024 / 1024) + 'MB' },
+    node: process.version,
+    env: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // Apply write rate limiter to all POST/PUT/DELETE routes
@@ -249,15 +265,10 @@ app.use('/api/reports', reportsRoutes);
 
 
 
-// In-memory cache for stats
-let statsCache: { data: any; timestamp: number } | null = null;
-const STATS_CACHE_TTL = 300_000; // 5 minutes
-
-// Stats endpoint (manager only)
+// Stats endpoint (manager only) — cached 5 minutes
 app.get('/api/stats', requireRole('manager'), async (_req, res) => {
-  if (statsCache && Date.now() - statsCache.timestamp < STATS_CACHE_TTL) {
-    return res.json(statsCache.data);
-  }
+  const cached = cacheGet<Record<string, unknown>>('stats:overview');
+  if (cached) return res.json(cached);
   try {
     const result = await query(`
       SELECT
@@ -272,31 +283,54 @@ app.get('/api/stats', requireRole('manager'), async (_req, res) => {
         (SELECT COALESCE((SUM(sales_30_days) - SUM(total_sales)) * 100.0 / NULLIF(SUM(total_sales), 0), 0) FROM sellers) AS sales_growth
     `);
 
+    const operatorResult = await query(`
+      SELECT
+        provider,
+        COUNT(*) AS count
+      FROM sims
+      GROUP BY provider
+      ORDER BY count DESC
+    `);
+
     const s = result.rows[0];
+    const totalSims = parseInt(s.total_sims);
+    const operators = operatorResult.rows.map((r: { provider: string; count: string }) => {
+      const count = parseInt(r.count);
+      return {
+        provider: r.provider,
+        count,
+        percentage: totalSims > 0 ? Math.round((count / totalSims) * 100) : 0,
+      };
+    });
+
     const data = {
       sales_weekly: Math.round(parseFloat(s.sales_weekly)),
       sales_growth: Math.round(parseFloat(s.sales_growth) * 10) / 10,
       active_sellers: parseInt(s.active_sellers),
       available_stock: parseInt(s.available_stock),
-      total_sims: parseInt(s.total_sims),
+      total_sims: totalSims,
       sold_sims: parseInt(s.sold_sims),
-      remaining_sims: parseInt(s.total_sims) - parseInt(s.sold_sims),
+      remaining_sims: totalSims - parseInt(s.sold_sims),
       active_sims: parseInt(s.active_sims),
       total_agents: parseInt(s.total_agents),
       total_sellers: parseInt(s.total_sellers),
+      operators,
     };
-    statsCache = { data, timestamp: Date.now() };
+    cacheSet('stats:overview', data, 300_000);
     res.json(data);
   } catch (err) {
-    console.error('Error fetching stats:', err);
+    logger.error('Error fetching stats:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Debug route listing endpoint (disabled in production)
+// Debug route listing and cache stats endpoints (disabled in production)
 if (process.env.NODE_ENV !== 'production') {
   app.get('/api/routes', (_req, res) => {
     res.json({ routes: listRoutes() });
+  });
+  app.get('/api/cache-stats', (_req, res) => {
+    res.json(cacheStats());
   });
 }
 
@@ -305,9 +339,24 @@ app.use('/api/*', (_req, res) => {
   res.status(404).json({ error: 'API endpoint not found' });
 });
 
+// API error response logger — logs 4xx/5xx responses
+app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const originalJson = res.json.bind(res);
+  res.json = function (body: unknown) {
+    const statusCode = res.statusCode;
+    if (statusCode >= 400 && statusCode < 500) {
+      logger.warn(`[API] ${req.method} ${req.path} → ${statusCode}`, body);
+    } else if (statusCode >= 500) {
+      logger.error(`[API] ${req.method} ${req.path} → ${statusCode}`, body);
+    }
+    return originalJson(body);
+  } as typeof res.json;
+  next();
+});
+
 // Global error handler
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error('Unhandled error:', err);
+  logger.error('Unhandled error:', err);
   res.status(500).json({ error: 'Internal server error' });
 });
 
@@ -316,27 +365,39 @@ const tesseractPath = path.resolve(__dirname, '../../dist/tesseract');
 try {
   const fs = require('fs');
   if (!fs.existsSync(tesseractPath) || !fs.existsSync(path.join(tesseractPath, 'lang', 'ara.traineddata.gz'))) {
-    console.warn('[WARN] OCR tesseract assets not found at dist/tesseract/ — client-side OCR will be unavailable');
+    logger.warn('[WARN] OCR tesseract assets not found at dist/tesseract/ — client-side OCR will be unavailable');
   }
 } catch { }
 
 const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[INIT] Server running on http://0.0.0.0:${PORT}`);
-  console.log(`[INIT] Routes (${listRoutes().length} total):`);
+  logger.info(`[INIT] Server running on http://0.0.0.0:${PORT}`);
+  logger.info(`[INIT] Routes (${listRoutes().length} total):`);
   for (const r of listRoutes()) {
-    console.log(`  ${r.method.padEnd(6)} ${r.path}`);
+    logger.info(`  ${r.method.padEnd(6)} ${r.path}`);
   }
 });
 
+// Periodic cleanup of expired blacklisted tokens (every hour)
+setInterval(async () => {
+  try {
+    const result = await query('DELETE FROM token_blacklist WHERE expires_at < NOW()');
+    if (result.rowCount && result.rowCount > 0) {
+      logger.info(`[CLEANUP] Removed ${result.rowCount} expired blacklisted tokens`);
+    }
+  } catch (err) {
+    logger.error('[CLEANUP] Token cleanup failed:', err);
+  }
+}, 60 * 60 * 1000);
+
 // Graceful shutdown
 function shutdown(signal: string) {
-  console.log(`[SHUTDOWN] Received ${signal}. Closing server...`);
+  logger.info(`[SHUTDOWN] Received ${signal}. Closing server...`);
   server.close(() => {
-    console.log('[SHUTDOWN] Server closed.');
+    logger.info('[SHUTDOWN] Server closed.');
     process.exit(0);
   });
   setTimeout(() => {
-    console.error('[SHUTDOWN] Forced exit after timeout.');
+    logger.error('[SHUTDOWN] Forced exit after timeout.');
     process.exit(1);
   }, 10000);
 }
@@ -344,5 +405,8 @@ function shutdown(signal: string) {
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('unhandledRejection', (reason) => {
-  console.error('[ERROR] Unhandled rejection:', reason);
+  logger.error('[FATAL] Unhandled rejection:', reason);
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1);
+  }
 });

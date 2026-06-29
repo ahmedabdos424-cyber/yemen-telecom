@@ -6,6 +6,7 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import { logger } from '../logger';
 import { query } from '../db';
 import { hashToken, isTokenBlacklisted, TokenPayload } from '../middleware/auth';
 import { validate, loginSchema, refreshTokenSchema } from '../validation';
@@ -19,26 +20,29 @@ const REFRESH_SECRET: string = process.env.REFRESH_SECRET;
 
 router.post('/login', validate(loginSchema), async (req: Request, res: Response) => {
   const { username, password } = req.body;
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('[LOGIN] Step 1 — Request received', { username, passwordProvided: !!password });
-  }
   try {
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[LOGIN] Step 2 — About to query DB for user', { username });
-    }
     const result = await query('SELECT * FROM users WHERE username = $1', [username]);
     if (result.rows.length === 0) {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
     const user = result.rows[0];
-    const valid = await bcrypt.compare(password, user.password_hash);
-    if (!valid) {
-      return res.status(401).json({ error: 'Invalid username or password' });
-    }
     if (user.status !== 'active') {
       return res.status(403).json({ error: 'Account disabled' });
     }
-    await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
+    const threshold = (await query('SELECT max_failed_logins_threshold FROM system_settings WHERE id = 1')).rows[0]?.max_failed_logins_threshold ?? 5;
+    if (user.locked_until && new Date(user.locked_until) > new Date()) {
+      return res.status(429).json({ error: 'Account temporarily locked. Try again later.' });
+    }
+    if (user.failed_attempts >= threshold) {
+      await query('UPDATE users SET locked_until = NOW() + INTERVAL \'15 minutes\' WHERE id = $1', [user.id]);
+      return res.status(429).json({ error: 'Account temporarily locked. Try again later.' });
+    }
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) {
+      await query('UPDATE users SET failed_attempts = COALESCE(failed_attempts, 0) + 1 WHERE id = $1', [user.id]);
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+    await query('UPDATE users SET last_login = NOW(), failed_attempts = 0, locked_until = NULL WHERE id = $1', [user.id]);
     const payload = { id: user.id, username: user.username, role: user.role };
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h', issuer: 'yemen-telecom', algorithm: 'HS256' });
     const refreshToken = jwt.sign(payload, REFRESH_SECRET, { expiresIn: '7d', issuer: 'yemen-telecom', algorithm: 'HS256' });
@@ -56,7 +60,7 @@ router.post('/login', validate(loginSchema), async (req: Request, res: Response)
     });
   } catch (err: any) {
     if (process.env.NODE_ENV !== 'production') {
-      console.error('[LOGIN ERROR]', {
+      logger.error('[LOGIN ERROR]', {
         message: err.message,
         stack: err.stack,
         code: err.code,
@@ -95,7 +99,7 @@ router.post('/refresh', validate(refreshTokenSchema), async (req: Request, res: 
     if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
       return res.status(401).json({ error: 'Invalid or expired refresh token' });
     }
-    console.error('Refresh token error:', err);
+    logger.error('Refresh token error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -133,13 +137,13 @@ router.post('/logout', async (req: Request, res: Response) => {
     if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
       return res.status(401).json({ error: 'Invalid token' });
     }
-    console.error('Logout error:', err);
+    logger.error('Logout error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 if (process.env.NODE_ENV !== 'production') {
-  console.log('[AUTH] AUTH ROUTES LOADED — /login /refresh /logout /me');
+  logger.info('[AUTH] AUTH ROUTES LOADED — /login /refresh /logout /me');
 }
 
 router.get('/me', async (req: Request, res: Response) => {
@@ -172,7 +176,7 @@ router.get('/me', async (req: Request, res: Response) => {
     if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
       return res.status(401).json({ error: 'Invalid token' });
     }
-    console.error('Auth me error:', err);
+    logger.error('Auth me error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

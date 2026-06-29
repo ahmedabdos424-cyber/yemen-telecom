@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { query } from '../db';
+import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination } from '../helpers';
 import { validate, createCustomerSchema } from '../validation';
@@ -28,7 +29,7 @@ router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: R
     const result = await query(queryText, params);
     res.json(result.rows);
   } catch (err) {
-    console.error('Error fetching customers:', err);
+    logger.error('Error fetching customers:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -49,7 +50,7 @@ router.get('/search', requireRole('manager', 'agent'), async (req: AuthRequest, 
     const result = await query(sql, params);
     res.json(result.rows);
   } catch (err) {
-    console.error('Error searching customers:', err);
+    logger.error('Error searching customers:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -74,7 +75,7 @@ router.get('/:id', requireRole('manager', 'agent', 'seller'), async (req: AuthRe
     );
     res.json({ ...result.rows[0], operations: ops.rows });
   } catch (err) {
-    console.error('Error fetching customer:', err);
+    logger.error('Error fetching customer:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -101,7 +102,7 @@ router.post('/', requireRole('manager', 'agent', 'seller'), validate(createCusto
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error('Error creating customer:', err);
+    logger.error('Error creating customer:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

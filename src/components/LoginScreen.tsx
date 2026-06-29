@@ -269,6 +269,7 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
                   autoCorrect="off"
                   spellCheck="false"
                   disabled={isLoading || success}
+                  autoFocus
                   className={focusClasses('username')}
                 />
                 <span className={`absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none ${darkMode ? 'text-white/30' : 'text-gray-400'}`}>

@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { query } from '../db';
+import { logger } from '../logger';
 import { AuthRequest } from '../middleware/auth';
 import { validate, updatePasswordSchema, updateProfileSchema } from '../validation';
 
@@ -24,7 +25,7 @@ router.put('/password', validate(updatePasswordSchema), async (req: AuthRequest,
     await query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, req.user.id]);
     res.json({ message: 'Password updated successfully' });
   } catch (err) {
-    console.error('Error updating password:', err);
+    logger.error('Error updating password:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -33,20 +34,7 @@ router.delete('/account', async (req: AuthRequest, res: Response) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  try {
-    const userId = req.user.id;
-    const userResult = await query('SELECT id, username, role FROM users WHERE id = $1', [userId]);
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    const user = userResult.rows[0];
-    await query('UPDATE token_blacklist SET token_hash = token_hash || \'_revoked\' WHERE user_id = $1', [userId]);
-    await query('UPDATE users SET status = \'deleted\', password_hash = \'\', username = CONCAT(username, \'_\', id, \'_deleted\') WHERE id = $1', [userId]);
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Error deleting account:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+  return res.status(409).json({ error: 'Self account deletion is disabled.' });
 });
 
 router.put('/profile', validate(updateProfileSchema), async (req: AuthRequest, res: Response) => {
@@ -67,7 +55,7 @@ router.put('/profile', validate(updateProfileSchema), async (req: AuthRequest, r
       role: u.role, phone: u.phone, region: u.region,
     });
   } catch (err) {
-    console.error('Error updating profile:', err);
+    logger.error('Error updating profile:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

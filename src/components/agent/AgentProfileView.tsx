@@ -558,8 +558,8 @@ export default function AgentProfileView({
                       await api.deleteAccount();
                       localStorage.clear();
                       window.location.href = '/';
-                    } catch (err: any) {
-                      toastError(err?.message || 'فشل حذف الحساب');
+                    } catch {
+                      toastError('لا يمكن حذف الحساب الحالي.\nيرجى التواصل مع مدير النظام.');
                       setDeleting(false);
                       setDeleteConfirmOpen(false);
                     }
