@@ -4,8 +4,10 @@ import {HashRouter} from 'react-router-dom';
 import App from './App.tsx';
 import './index.css';
 import { initMonitor } from './lib/monitor.ts';
+import { initFrontendSentry } from './lib/sentry.ts';
 
 initMonitor();
+initFrontendSentry();
 
 // Register service worker for PWA
 if ('serviceWorker' in navigator) {
