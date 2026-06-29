@@ -6,6 +6,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt, { VerifyOptions } from 'jsonwebtoken';
 import crypto from 'crypto';
 import { query } from '../db';
+import { setSentryUser } from '../sentry';
 
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is required');
@@ -64,6 +65,7 @@ export async function authenticateToken(req: AuthRequest, res: Response, next: N
       return res.status(401).json({ error: 'Account is not active' });
     }
     req.user = { id: decoded.id, username: decoded.username, role: decoded.role };
+    setSentryUser(req.user);
     next();
   } catch {
     return res.status(401).json({ error: 'Invalid or expired token' });

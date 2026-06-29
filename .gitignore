@@ -23,6 +23,7 @@ coverage/
 server/api_test_results.txt
 server/server.err
 server/backups/
+backups/
 .firebase/*.cache
 
 # AI-generated audit & secret artifacts (remove from version control)

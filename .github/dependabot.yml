@@ -1,0 +1,80 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: sunday
+      time: "04:00"
+      timezone: Asia/Aden
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+      - npm
+    commit-message:
+      prefix: chore
+      prefix-development: chore
+      include: scope
+    reviewers:
+      - ahmedabdos424-cyber
+    groups:
+      react:
+        patterns:
+          - "react*"
+          - "@types/react*"
+      vite:
+        patterns:
+          - "vite*"
+          - "@vitejs/*"
+      testing:
+        patterns:
+          - "@testing-library/*"
+          - "vitest"
+          - "jsdom"
+      typescript:
+        patterns:
+          - "typescript"
+          - "@types/*"
+
+  - package-ecosystem: npm
+    directory: /server
+    schedule:
+      interval: weekly
+      day: sunday
+      time: "04:00"
+      timezone: Asia/Aden
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+      - npm
+    commit-message:
+      prefix: chore
+      prefix-development: chore
+      include: scope
+    groups:
+      express:
+        patterns:
+          - "express*"
+          - "@types/express*"
+      firebase:
+        patterns:
+          - "firebase*"
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly
+    labels:
+      - dependencies
+      - docker
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: sunday
+      time: "04:00"
+      timezone: Asia/Aden
+    labels:
+      - dependencies
+      - github-actions

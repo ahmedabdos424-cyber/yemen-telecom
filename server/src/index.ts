@@ -9,6 +9,7 @@ import dotenv from 'dotenv';
 import { query } from './db';
 import { cacheGet, cacheSet, cacheStats } from './cache';
 import { authenticateToken, requireRole } from './middleware/auth';
+import { initSentry, Sentry } from './sentry';
 import authRoutes from './routes/auth';
 import simsRoutes from './routes/sims';
 import agentsRoutes from './routes/agents';
@@ -23,7 +24,7 @@ import customersRoutes from './routes/customers';
 import distributionsRoutes from './routes/distributions';
 import reportsRoutes from './routes/reports';
 
-import { logger } from './logger';
+import { logger, setLogContext, clearLogContext } from './logger';
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 // Environment validation — fail fast on missing secrets
@@ -40,6 +41,8 @@ if (envMode === 'development') {
 }
 logger.info(`[ENV] NODE_ENV=${envMode}`);
 
+initSentry();
+
 const app = express();
 const PORT = parseInt(process.env.API_PORT || '4000');
 const START_TIME = Date.now();
@@ -48,8 +51,17 @@ let requestCount = 0;
 // Trust proxy for rate limiter behind Render's reverse proxy
 app.set('trust proxy', 1);
 
-// Request counter middleware for metrics
-app.use((_req, _res, next) => { requestCount++; next(); });
+// Request counter and correlation middleware
+app.use((req, res, next) => {
+  requestCount++;
+  const correlationId = (req.headers['x-correlation-id'] as string) || crypto.randomUUID();
+  req.headers['x-correlation-id'] = correlationId;
+  setLogContext({ correlationId, path: req.path, method: req.method });
+  res.on('finish', () => {
+    clearLogContext();
+  });
+  next();
+});
 
 const CSRF_SECRET = process.env.CSRF_SECRET!;
 
@@ -279,7 +291,13 @@ app.get('/api/stats', requireRole('manager'), async (_req, res) => {
         (SELECT COUNT(*) FROM agents) AS total_agents,
         (SELECT COUNT(*) FROM sellers) AS total_sellers,
         (SELECT COUNT(*) FROM sims WHERE status IN ('available','sold','reserved')) AS active_sims,
-        (SELECT COALESCE(SUM(sales_30_days) / 4, 0) FROM sellers) AS sales_weekly,
+        (SELECT COUNT(*) FROM sims WHERE created_at > NOW() - INTERVAL '30 days') AS sims_added_30d,
+        (SELECT COUNT(*) FROM sims WHERE created_at BETWEEN NOW() - INTERVAL '60 days' AND NOW() - INTERVAL '30 days') AS sims_added_prev_30d,
+        (SELECT COUNT(*) FROM operations WHERE type='activate' AND created_at > NOW() - INTERVAL '30 days') AS activations_30d,
+        (SELECT COUNT(*) FROM operations WHERE type='activate' AND created_at BETWEEN NOW() - INTERVAL '60 days' AND NOW() - INTERVAL '30 days') AS activations_prev_30d,
+        (SELECT COUNT(*) FROM operations WHERE type='activate' AND created_at > NOW() - INTERVAL '7 days') AS sales_weekly_actual,
+        (SELECT COUNT(*) FROM agents WHERE created_at > NOW() - INTERVAL '30 days') AS agents_added_30d,
+        (SELECT COUNT(*) FROM sellers WHERE created_at > NOW() - INTERVAL '30 days') AS sellers_added_30d,
         (SELECT COALESCE((SUM(sales_30_days) - SUM(total_sales)) * 100.0 / NULLIF(SUM(total_sales), 0), 0) FROM sellers) AS sales_growth
     `);
 
@@ -303,18 +321,43 @@ app.get('/api/stats', requireRole('manager'), async (_req, res) => {
       };
     });
 
+    const simsAdded30d = parseInt(s.sims_added_30d);
+    const simsAddedPrev30d = parseInt(s.sims_added_prev_30d);
+    const activations30d = parseInt(s.activations_30d);
+    const activationsPrev30d = parseInt(s.activations_prev_30d);
+    const agentsAdded30d = parseInt(s.agents_added_30d);
+    const sellersAdded30d = parseInt(s.sellers_added_30d);
+    const soldSims = parseInt(s.sold_sims);
+    const activeSellers = parseInt(s.active_sellers);
+    const availableStock = parseInt(s.available_stock);
+    const totalAgents = parseInt(s.total_agents);
+    const totalSellers = parseInt(s.total_sellers);
+    const activeSims = parseInt(s.active_sims);
+
+    const computeGrowth = (current: number, previous: number): number =>
+      previous > 0 ? Math.round(((current - previous) / previous) * 100) : 0;
+
     const data = {
-      sales_weekly: Math.round(parseFloat(s.sales_weekly)),
+      sales_weekly: Math.round(parseFloat(s.sales_weekly_actual)),
       sales_growth: Math.round(parseFloat(s.sales_growth) * 10) / 10,
-      active_sellers: parseInt(s.active_sellers),
-      available_stock: parseInt(s.available_stock),
+      active_sellers: activeSellers,
+      available_stock: availableStock,
       total_sims: totalSims,
-      sold_sims: parseInt(s.sold_sims),
-      remaining_sims: totalSims - parseInt(s.sold_sims),
-      active_sims: parseInt(s.active_sims),
-      total_agents: parseInt(s.total_agents),
-      total_sellers: parseInt(s.total_sellers),
+      sold_sims: soldSims,
+      remaining_sims: totalSims - soldSims,
+      active_sims: activeSims,
+      total_agents: totalAgents,
+      total_sellers: totalSellers,
       operators,
+      total_sims_growth: computeGrowth(simsAdded30d, simsAddedPrev30d),
+      sold_sims_growth: computeGrowth(activations30d, activationsPrev30d),
+      active_sims_growth: computeGrowth(activations30d, activationsPrev30d),
+      agent_growth: agentsAdded30d,
+      seller_growth: sellersAdded30d,
+      sims_added_30d: simsAdded30d,
+      activations_30d: activations30d,
+      agents_added_30d: agentsAdded30d,
+      sellers_added_30d: sellersAdded30d,
     };
     cacheSet('stats:overview', data, 300_000);
     res.json(data);
@@ -353,6 +396,11 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
   } as typeof res.json;
   next();
 });
+
+// Sentry error handler (must be before the generic handler)
+if (process.env.SENTRY_DSN) {
+  Sentry.setupExpressErrorHandler(app);
+}
 
 // Global error handler
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -406,7 +454,18 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('unhandledRejection', (reason) => {
   logger.error('[FATAL] Unhandled rejection:', reason);
+  if (process.env.SENTRY_DSN) {
+    Sentry.captureException(reason, { mechanism: { type: 'unhandledRejection' } });
+  }
   if (process.env.NODE_ENV === 'production') {
     process.exit(1);
   }
+});
+
+process.on('uncaughtException', (err) => {
+  logger.error('[FATAL] Uncaught exception:', err);
+  if (process.env.SENTRY_DSN) {
+    Sentry.captureException(err, { mechanism: { type: 'uncaughtException' } });
+  }
+  process.exit(1);
 });
