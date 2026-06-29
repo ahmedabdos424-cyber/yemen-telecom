@@ -1,6 +1,8 @@
 import path from 'path';
 import { Router, Request, Response } from 'express';
 import { query } from '../db';
+import { logger } from '../logger';
+import { cacheStats } from '../cache';
 import { requireRole } from '../middleware/auth';
 import { getPagination } from '../helpers';
 import { validate, updateSettingsSchema } from '../validation';
@@ -35,7 +37,7 @@ router.get('/settings', requireRole('manager'), async (_req: Request, res: Respo
       identityRemindersFrequency: s.identity_reminders_frequency,
     });
   } catch (err) {
-    console.error('Error fetching settings:', err);
+    logger.error('Error fetching settings:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -68,7 +70,7 @@ router.put('/settings', requireRole('manager'), validate(updateSettingsSchema), 
     );
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('Error updating settings:', err);
+    logger.error('Error updating settings:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -91,7 +93,7 @@ router.get('/transactions', requireRole('manager'), async (req: Request, res: Re
       relativeTime: r.relative_time,
     })));
   } catch (err) {
-    console.error('Error fetching transactions:', err);
+    logger.error('Error fetching transactions:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -138,7 +140,7 @@ router.get('/duplicate-identities', requireRole('manager'), async (req: Request,
       };
     }));
   } catch (err) {
-    console.error('Error fetching duplicate identities:', err);
+    logger.error('Error fetching duplicate identities:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -161,7 +163,7 @@ router.get('/audit-logs', requireRole('manager'), async (req: Request, res: Resp
       status: r.status,
     })));
   } catch (err) {
-    console.error('Error fetching audit logs:', err);
+    logger.error('Error fetching audit logs:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -207,7 +209,7 @@ router.post('/system/backup', requireRole('manager'), async (_req: Request, res:
       downloadUrl: result.url,
     });
   } catch (err) {
-    console.error('Error creating backup:', err);
+    logger.error('Error creating backup:', err);
     res.status(500).json({ error: 'Failed to create backup' });
   }
 });
@@ -228,7 +230,7 @@ router.get('/system/backup/download/:filename', requireRole('manager'), async (r
     }
     res.redirect(url);
   } catch (err) {
-    console.error('Error downloading backup:', err);
+    logger.error('Error downloading backup:', err);
     res.status(500).json({ error: 'Failed to download backup' });
   }
 });
@@ -255,7 +257,7 @@ router.post('/system/lockdown', requireRole('manager'), async (_req: Request, re
       message: newStatus ? 'Emergency lockdown activated. All seller accounts suspended.' : 'Lockdown deactivated. All seller accounts restored.',
     });
   } catch (err) {
-    console.error('Error toggling lockdown:', err);
+    logger.error('Error toggling lockdown:', err);
     res.status(500).json({ error: 'Failed to toggle lockdown' });
   }
 });
@@ -265,8 +267,33 @@ router.get('/system/lockdown/status', requireRole('manager'), async (_req: Reque
     const result = await query('SELECT maintenance_mode FROM system_settings WHERE id = 1');
     res.json({ locked: result.rows[0]?.maintenance_mode || false });
   } catch (err) {
-    console.error('Error checking lockdown status:', err);
+    logger.error('Error checking lockdown status:', err);
     res.status(500).json({ error: 'Failed to check lockdown status' });
+  }
+});
+
+// Monitoring and health overview (admin only)
+router.get('/monitoring', requireRole('manager'), async (_req: Request, res: Response) => {
+  try {
+    const dbResult = await query('SELECT 1');
+    const mem = process.memoryUsage();
+    res.json({
+      db: dbResult.rows.length > 0 ? 'connected' : 'disconnected',
+      uptime: Math.floor(process.uptime()),
+      memory: {
+        rss: Math.round(mem.rss / 1024 / 1024) + 'MB',
+        heap: Math.round(mem.heapUsed / 1024 / 1024) + 'MB',
+        heapTotal: Math.round(mem.heapTotal / 1024 / 1024) + 'MB',
+      },
+      node: process.version,
+      platform: process.platform,
+      env: process.env.NODE_ENV || 'development',
+      cache: cacheStats(),
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    logger.error('Error fetching monitoring data:', err);
+    res.status(500).json({ error: 'Failed to fetch monitoring data' });
   }
 });
 

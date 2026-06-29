@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { query } from '../db';
+import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination } from '../helpers';
 import { validate, createOperationSchema } from '../validation';
@@ -36,7 +37,7 @@ router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: R
       status: r.status,
     })));
   } catch (err) {
-    console.error('Error fetching operations:', err);
+    logger.error('Error fetching operations:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -62,7 +63,7 @@ router.post('/', requireRole('manager', 'agent'), validate(createOperationSchema
       status: result.rows[0].status,
     });
   } catch (err) {
-    console.error('Error creating operation:', err);
+    logger.error('Error creating operation:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

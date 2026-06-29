@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { query } from '../db';
+import { logger } from '../logger';
 import { requireRole } from '../middleware/auth';
 import { getPagination, paginatedQuery } from '../helpers';
 import { validate, createSimSchema, updateSimSchema } from '../validation';
@@ -20,7 +21,7 @@ router.get('/', requireRole('manager', 'agent'), async (req: Request, res: Respo
     const result = await query('SELECT * FROM sims ORDER BY id DESC');
     res.json(result.rows);
   } catch (err) {
-    console.error('Error fetching sims:', err);
+    logger.error('Error fetching sims:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -39,7 +40,7 @@ router.post('/', requireRole('manager'), validate(createSimSchema), async (req: 
     if (err.code === '23505') {
       return res.status(409).json({ error: 'ICCID already exists' });
     }
-    console.error('Error creating sim:', err);
+    logger.error('Error creating sim:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -64,7 +65,7 @@ router.put('/:id', requireRole('manager'), validate(updateSimSchema), async (req
     );
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('Error updating sim:', err);
+    logger.error('Error updating sim:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -75,7 +76,7 @@ router.delete('/:id', requireRole('manager'), async (req: Request, res: Response
     await query('DELETE FROM sims WHERE id = $1', [id]);
     res.json({ success: true });
   } catch (err) {
-    console.error('Error deleting sim:', err);
+    logger.error('Error deleting sim:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

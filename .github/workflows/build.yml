@@ -16,7 +16,9 @@ jobs:
           node-version: 20
           cache: 'npm'
       - run: npm ci
+      - name: Install server dependencies
+        run: cd server && npm ci
       - run: npm run build
         name: Frontend Build
-      - run: cd server && npm ci && npx tsc --skipLibCheck
+      - run: cd server && npx tsc --skipLibCheck
         name: Server Build

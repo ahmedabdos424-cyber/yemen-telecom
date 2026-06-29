@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import multer from 'multer';
 import { getBucket } from '../firebase-admin';
+import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
 
 const MAGIC_BYTES: Record<string, ((buf: Buffer) => boolean)[]> = {
@@ -66,7 +67,7 @@ router.post('/image', requireRole('manager', 'agent'), upload.single('image'), a
     const result = await uploadToFirebase(req.file);
     res.json(result);
   } catch (err) {
-    console.error('Error uploading to Firebase:', err);
+    logger.error('Error uploading to Firebase:', err);
     res.status(500).json({ error: 'Failed to upload image' });
   }
 });
@@ -85,7 +86,7 @@ router.post('/images', requireRole('manager', 'agent'), upload.array('images', 5
     const results = await Promise.all(files.map(uploadToFirebase));
     res.json(results);
   } catch (err) {
-    console.error('Error uploading to Firebase:', err);
+    logger.error('Error uploading to Firebase:', err);
     res.status(500).json({ error: 'Failed to upload images' });
   }
 });

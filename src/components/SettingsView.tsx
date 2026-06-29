@@ -9,6 +9,7 @@ import ConfirmModal from './shared/ConfirmModal';
 import { captureError } from '../lib/monitor.ts';
 import { api } from '../api/client';
 import { Trash2 } from 'lucide-react';
+import { useToast, ToastContainer } from '../hooks/useToast';
 
 interface SettingsViewProps {
   settings: SystemSettings;
@@ -21,6 +22,7 @@ export default function SettingsView({ settings, onUpdateSettings }: SettingsVie
   const [lockdownConfirm, setLockdownConfirm] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const { toasts, dismissToast, toastError } = useToast();
 
   useEffect(() => {
     setLocalThreshold(settings.highRiskDuplicatesThreshold ?? 5);
@@ -578,7 +580,8 @@ export default function SettingsView({ settings, onUpdateSettings }: SettingsVie
                     await api.deleteAccount();
                     localStorage.clear();
                     window.location.href = '/';
-                  } catch (err: any) {
+                  } catch {
+                    toastError('لا يمكن حذف الحساب الحالي.\nيرجى التواصل مع مدير النظام.');
                     setDeleting(false);
                     setDeleteConfirmOpen(false);
                   }
@@ -595,6 +598,7 @@ export default function SettingsView({ settings, onUpdateSettings }: SettingsVie
           </div>
         </div>
       )}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }

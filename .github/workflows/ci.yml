@@ -1,110 +1,145 @@
-name: CI/CD
+name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
     branches: [main]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  NODE_VERSION: '20'
-
 jobs:
-  lint:
-    name: TypeScript & Lint
+  validate:
+    name: Validate (Lint, TypeScript, Build)
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: yemen_telecom_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: 20
           cache: npm
-      - run: npm ci
-      - run: npx tsc --noEmit
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: TypeScript check (frontend)
+        run: npx tsc --noEmit
+
+      - name: TypeScript check (server)
+        working-directory: server
+        run: npx tsc --noEmit --skipLibCheck
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Build server
+        working-directory: server
+        run: npm run build
 
   test:
-    name: Tests
-    needs: lint
+    name: Tests (Frontend + Backend + Security)
+    needs: validate
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: yemen_telecom_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/yemen_telecom_test
+      NODE_ENV: test
+      JWT_SECRET: test-jwt-secret-for-ci-at-least-32-chars-long
+      REFRESH_SECRET: test-refresh-secret-for-ci-at-least-32-chars-long
+      CSRF_SECRET: test-csrf-secret-for-ci-at-least-32-chars-long
+
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-      - run: npm ci
-      - run: npm test
 
-  build:
-    name: Build
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: 20
           cache: npm
-      - run: npm ci
-      - run: npm run build
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist/
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
 
-  audit:
-    name: Security Audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-      - run: npm ci
-      - run: npm audit --audit-level=high
-        continue-on-error: true
+      - name: Install frontend dependencies
+        run: npm ci
 
-  server-lint:
-    name: Server TypeScript
-    runs-on: ubuntu-latest
-    defaults:
-      run:
+      - name: Install server dependencies
         working-directory: server
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: server/package-lock.json
-      - run: npm ci
-      - run: npx tsc --noEmit
+        run: npm ci
 
-  android-build:
-    name: Android Build
-    if: github.ref == 'refs/heads/main'
+      - name: Run all tests
+        run: npx vitest run --reporter=verbose
+        env:
+          CI: true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 7
+
+  lint:
+    name: Lint & Security Audit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: 20
           cache: npm
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - run: npm ci
-      - run: npm run build:android
-      - name: Build APK
-        working-directory: android
-        run: ./gradlew assembleDebug
-      - uses: actions/upload-artifact@v4
-        with:
-          name: android-apk
-          path: android/app/build/outputs/apk/debug/
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: npm audit
+        run: npm audit --audit-level=high || true
+
+      - name: Check for secrets in source
+        run: |
+          ! grep -r -E '(-----BEGIN RSA PRIVATE KEY-----|-----BEGIN OPENSSH PRIVATE KEY-----)' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.json' . 2>/dev/null | grep -v node_modules | grep -v '.github/'

@@ -1,12 +1,11 @@
 services:
   - type: web
     name: yemen-telecom-api
-    env: node
+    env: docker
     region: oregon
     plan: free
-    buildCommand: npm install && npm run build
-    startCommand: npm start
     healthCheckPath: /api/health
+    dockerfilePath: ./Dockerfile
     envVars:
       - key: NODE_ENV
         value: production

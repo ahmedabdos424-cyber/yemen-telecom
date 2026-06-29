@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { query, transaction } from '../db';
+import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination, paginatedQuery } from '../helpers';
 import { validate, createAgentSchema, updateAgentSchema } from '../validation';
@@ -22,7 +23,7 @@ router.get('/', requireRole('manager', 'agent'), async (req: Request, res: Respo
     const result = await query('SELECT * FROM agents ORDER BY id');
     res.json(result.rows);
   } catch (err) {
-    console.error('Error fetching agents:', err);
+    logger.error('Error fetching agents:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -65,7 +66,7 @@ router.post('/', requireRole('manager'), validate(createAgentSchema), async (req
       }
     });
   } catch (err) {
-    console.error('Error creating agent:', err);
+    logger.error('Error creating agent:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -90,7 +91,7 @@ router.put('/:id', requireRole('manager'), validate(updateAgentSchema), async (r
     );
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('Error updating agent:', err);
+    logger.error('Error updating agent:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { query, transaction } from '../db';
+import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination } from '../helpers';
 import { validate, createDistributionSchema, approveDistributionSchema } from '../validation';
@@ -57,7 +58,7 @@ router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: R
     }
     res.json(result.rows);
   } catch (err) {
-    console.error('Error fetching distribution requests:', err);
+    logger.error('Error fetching distribution requests:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -83,7 +84,7 @@ router.post('/', requireRole('agent'), validate(createDistributionSchema), async
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error('Error creating distribution request:', err);
+    logger.error('Error creating distribution request:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -120,7 +121,7 @@ router.put('/:id/approve', requireRole('manager'), validate(approveDistributionS
       const status = err.message.replace('DISTRIBUTION_ALREADY_', '').toLowerCase();
       return res.status(400).json({ error: `Request is already ${status}` });
     }
-    console.error('Error approving distribution request:', err);
+    logger.error('Error approving distribution request:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -130,7 +131,7 @@ router.get('/pending-count', requireRole('manager'), async (_req: AuthRequest, r
     const result = await query("SELECT COUNT(*) FROM distribution_requests WHERE status='pending'");
     res.json({ count: parseInt(result.rows[0].count) });
   } catch (err) {
-    console.error('Error counting pending requests:', err);
+    logger.error('Error counting pending requests:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

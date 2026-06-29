@@ -293,6 +293,16 @@ export const api = {
   deleteAccount: () =>
     request<{ success: boolean }>('/users/account', { method: 'DELETE' }),
 
+  // Reports
+  getDailySales: () =>
+    request<any[]>('/reports/daily-sales'),
+  getAgentPerformance: () =>
+    request<any[]>('/reports/agent-performance'),
+  getOperatorDistribution: () =>
+    request<any>('/reports/operator-distribution'),
+  getSellerPerformance: () =>
+    request<any[]>('/reports/seller-performance'),
+
   // Upload
   uploadFile,
 };

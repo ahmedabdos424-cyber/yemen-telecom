@@ -18,6 +18,7 @@ interface DashboardViewProps {
     total_sellers?: number;
     sales_growth?: number;
     sales_weekly?: number;
+    operators?: Array<{ provider: string; count: number; percentage: number }>;
   };
   alerts: SystemAlert[];
   transactions: Transaction[];
@@ -27,6 +28,15 @@ interface DashboardViewProps {
   onSearch?: (query: string) => void;
   onRefresh?: () => void;
 }
+
+const OPERATOR_META: Record<string, { id: string; color: string; description: string }> = {
+  'Yemen Mobile': { id: 'yemen_mobile', color: 'bg-secondary', description: 'المزود الأكبر في السوق الوطنية' },
+  'Yemen Mobile - يمن موبايل': { id: 'yemen_mobile', color: 'bg-secondary', description: 'المزود الأكبر في السوق الوطنية' },
+  'Sabafon': { id: 'sabafon', color: 'bg-blue-600', description: 'نمو مستمر بقاعدة المشتركين' },
+  'Sabafon - سبأفون': { id: 'sabafon', color: 'bg-blue-600', description: 'نمو مستمر بقاعدة المشتركين' },
+  'YOU': { id: 'you', color: 'bg-amber-400', description: 'شريحة الشباب والبيانات' },
+  'YOU - يو': { id: 'you', color: 'bg-amber-400', description: 'شريحة الشباب والبيانات' },
+};
 
 export default function DashboardView({
   stats,
@@ -48,6 +58,7 @@ export default function DashboardView({
     sales_growth: stats?.sales_growth ?? 0,
     sales_weekly: stats?.sales_weekly ?? 0,
   };
+  const operators = (stats?.operators ?? []) as Array<{ provider: string; count: number; percentage: number }>;
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleSearch = () => {
@@ -263,56 +274,32 @@ export default function DashboardView({
               أداء شركات المزودين والشرائح المفعّلة
             </h2>
             <div className="space-y-6 flex-1 flex flex-col justify-center">
-              {/* Yemen Mobile */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <OperatorLogo provider="yemen_mobile" size="md" />
-                    <div>
-                      <h4 className="font-bold text-xs text-gray-900">Yemen Mobile (يمن موبايل)</h4>
-                      <p className="text-[11px] text-secondary font-bold">المزود الأكبر في السوق الوطنية</p>
+              {operators.length === 0 && (
+                <div className="text-center py-8 text-gray-400 text-xs">
+                  لا توجد بيانات مشغلين متاحة حالياً
+                </div>
+              )}
+              {operators.map((op) => {
+                const meta = OPERATOR_META[op.provider] || OPERATOR_META[Object.keys(OPERATOR_META).find(k => k.startsWith(op.provider)) || ''] || { id: 'yemen_mobile', color: 'bg-gray-500', description: '' };
+                const label = op.provider.includes('Yemen Mobile') ? 'Yemen Mobile (يمن موبايل)' : op.provider.includes('Sabafon') ? 'Sabafon (سبأفون)' : op.provider.includes('YOU') ? 'YOU (يو)' : op.provider;
+                return (
+                  <div key={op.provider} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <OperatorLogo provider={meta.id} size="md" />
+                        <div>
+                          <h4 className="font-bold text-xs text-gray-900">{label}</h4>
+                          <p className={`text-[11px] font-bold ${meta.color === 'bg-secondary' ? 'text-secondary' : meta.color === 'bg-blue-600' ? 'text-blue-600' : 'text-amber-600'}`}>{meta.description}</p>
+                        </div>
+                      </div>
+                      <span className="text-xs font-bold font-mono">{op.count.toLocaleString()} شريحة</span>
+                    </div>
+                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className={`h-full ${meta.color} rounded-full transition-all`} style={{ width: `${Math.max(op.percentage, 2)}%` }}></div>
                     </div>
                   </div>
-                  <span className="text-xs font-bold font-mono">450,200 شريحة</span>
-                </div>
-                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-secondary rounded-full transition-all" style={{ width: '65%' }}></div>
-                </div>
-              </div>
-
-              {/* Sabafon */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <OperatorLogo provider="sabafon" size="md" />
-                    <div>
-                      <h4 className="font-bold text-xs text-gray-900">Sabafon (سبأفون)</h4>
-                      <p className="text-[11px] text-blue-600 font-bold">نمو مستمر بقاعدة المشتركين</p>
-                    </div>
-                  </div>
-                  <span className="text-xs font-bold font-mono">280,150 شريحة</span>
-                </div>
-                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-blue-600 rounded-full transition-all" style={{ width: '42%' }}></div>
-                </div>
-              </div>
-
-              {/* YOU */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <OperatorLogo provider="you" size="md" />
-                    <div>
-                      <h4 className="font-bold text-xs text-gray-900">YOU (يو)</h4>
-                      <p className="text-[11px] text-amber-600 font-bold">شريحة الشباب والبيانات</p>
-                    </div>
-                  </div>
-                  <span className="text-xs font-bold font-mono">120,500 شريحة</span>
-                </div>
-                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-amber-400 rounded-full transition-all" style={{ width: '18%' }}></div>
-                </div>
-              </div>
+                );
+              })}
             </div>
           </div>
         </section>
