@@ -1,4 +1,5 @@
 import { getErrorMessage } from './getErrorMessage';
+import { Sentry } from './sentry';
 
 const SLOW_THRESHOLD_MS = 1000;
 const MAX_LOG_ENTRIES = 200;
@@ -39,6 +40,7 @@ export function captureError(error: unknown, context?: string) {
   } else {
     push('error', `${msg} ${safeMsg}`, { context });
   }
+  try { Sentry.captureException(error, { tags: { context: context || 'unknown' } }); } catch {}
 }
 
 export function captureEvent(name: string, data?: Record<string, unknown>) {
