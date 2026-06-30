@@ -10,6 +10,8 @@ dist/
 *.aab
 *.zip
 *.png
+!src/assets/profile.png
+!src/assets/logos/Yemen_Mobile.png
 firebase-service-account.json
 .playwright-mcp/
 .domdump.txt
