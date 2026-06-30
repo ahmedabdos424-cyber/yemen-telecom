@@ -1,0 +1,75 @@
+node_modules
+server/node_modules
+
+dist
+server/dist
+
+.git
+.github
+
+coverage
+
+android
+
+reports
+qa-reports
+
+backups
+
+*.log
+
+.env
+.env.*
+
+*.bak
+
+.vscode
+
+.idea
+
+# Docker build artifacts
+Dockerfile
+.dockerignore
+render.yaml
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+testsprite_tests
+test-plans
+.vite
+.playwright-mcp
+
+# Android build artifacts
+*.apk
+*.aab
+
+# AI-generated audit artifacts
+AUDIT/
+SECRET_*
+*_AUDIT.md
+*_REPORT.md
+*_PLAN.md
+*_VERIFICATION.md
+*_ANALYSIS.md
+*_CHECKLIST.md
+*_DECISION.md
+*_FINDINGS.md
+*_ISSUES.md
+
+RELEASE_PACKAGE/
+comprehensive-tests.mjs
+run-backend-tests.ps1
+backend-test-results.json
+*.lnk
+
+# Firebase cache
+.firebase/*.cache
+firebase-service-account.json
+
+# Server artifacts
+server/api_test_results.txt
+server/server.err
+server/backups/

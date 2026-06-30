@@ -1,18 +1,18 @@
-FROM node:20-alpine AS frontend-build
+FROM node:22-alpine AS frontend-build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM node:20-alpine AS server-build
+FROM node:22-alpine AS server-build
 WORKDIR /app/server
 COPY server/package*.json ./
 RUN npm ci
 COPY server/ .
-RUN npx tsc --skipLibCheck
+RUN npx tsc
 
-FROM node:20-alpine
+FROM node:22-alpine
 WORKDIR /app
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
