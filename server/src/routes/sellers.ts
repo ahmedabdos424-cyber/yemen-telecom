@@ -123,7 +123,7 @@ router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), 
 
     // Create user account for the seller
     const sellerUsername = (username || phone || `seller_${Date.now()}`).trim().toLowerCase();
-    const sellerPassword = password || crypto.randomBytes(4).toString('hex');
+    const sellerPassword = password || crypto.randomBytes(16).toString('hex');
     const passwordHash = await bcrypt.hash(sellerPassword, 10);
 
     // Look up agent_id if agent_name provided
@@ -276,7 +276,7 @@ router.post('/:id/reset-password', requireRole('manager', 'agent'), async (req: 
     if (!seller.user_id) {
       return res.status(400).json({ error: 'Seller has no linked user account' });
     }
-    const newPassword = crypto.randomBytes(4).toString('hex');
+    const newPassword = crypto.randomBytes(16).toString('hex');
     const passwordHash = await bcrypt.hash(newPassword, 10);
     await query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, seller.user_id]);
     const userRes = await query('SELECT username FROM users WHERE id = $1', [seller.user_id]);
