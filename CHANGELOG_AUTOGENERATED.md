@@ -44,6 +44,7 @@
 - **SSL**: Escalated `DB_SSL_REJECT_UNAUTHORIZED=false` from warn → error in production (`server/src/db.ts`)
 - **Passwords**: Strengthened auto-generated passwords from `randomBytes(4)` (32-bit) → `randomBytes(16)` (128-bit) (`server/src/routes/agents.ts`, `server/src/routes/sellers.ts`)
 - **Rate Limiting**: Added dedicated password-reset rate limiter — 5 per 15 min (`server/src/index.ts`)
+- **CI**: Updated GitHub Actions workflows from Node 20 → Node 22 to match `.nvmrc` and `engine-strict=true` (`.github/workflows/ci.yml`, `.github/workflows/android.yml`)
 
 ### Audit Artifacts (18 documents)
 - Full 14-phase enterprise-grade engineering review
