@@ -58,11 +58,11 @@ router.get('/search', requireRole('manager', 'agent'), async (req: AuthRequest, 
 router.get('/:id', requireRole('manager', 'agent', 'seller'), async (req: AuthRequest, res: Response) => {
   try {
     let sql = 'SELECT * FROM customers WHERE id = $1';
-    if (req.user?.role === 'agent') {
+    if (req.user?.role === 'agent' || req.user?.role === 'seller') {
       sql += ' AND created_by = $2';
     }
     const params: any[] = [req.params.id];
-    if (req.user?.role === 'agent') {
+    if (req.user?.role === 'agent' || req.user?.role === 'seller') {
       params.push(req.user.id);
     }
     const result = await query(sql, params);

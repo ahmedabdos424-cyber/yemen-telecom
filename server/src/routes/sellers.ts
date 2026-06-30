@@ -238,15 +238,21 @@ router.put('/:id/balance', requireRole('manager', 'agent'), validate(updateSelle
     }
     const cur = existing.rows[0];
     const newSales = (cur.sales_30_days || 0) + amount;
-    const result = await query(
-      `UPDATE sellers SET sales_30_days=$1, total_sales=COALESCE(total_sales,0)+$2 WHERE id=$3 RETURNING *`,
-      [newSales, amount, id]
-    );
-    const updated = await query(
-      `SELECT s.*, a.name as agent_name FROM sellers s LEFT JOIN agents a ON s.agent_id = a.id WHERE s.id = $1`,
-      [id]
-    );
-    res.json(mapSeller(updated.rows[0]));
+    const result = await transaction(async (client) => {
+      const lock = await client.query('SELECT sales_30_days, total_sales FROM sellers WHERE id = $1 FOR UPDATE', [id]);
+      const lockedRow = lock.rows[0];
+      const updatedSales = (lockedRow.sales_30_days || 0) + amount;
+      const updateResult = await client.query(
+        `UPDATE sellers SET sales_30_days=$1, total_sales=COALESCE(total_sales,0)+$2 WHERE id=$3 RETURNING *`,
+        [updatedSales, amount, id]
+      );
+      const finalResult = await client.query(
+        `SELECT s.*, a.name as agent_name FROM sellers s LEFT JOIN agents a ON s.agent_id = a.id WHERE s.id = $1`,
+        [id]
+      );
+      return finalResult.rows[0];
+    });
+    res.json(mapSeller(result));
   } catch (err) {
     logger.error('Error updating seller balance:', err);
     res.status(500).json({ error: 'Internal server error' });

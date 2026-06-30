@@ -1,0 +1,703 @@
+<testsuites id="" name="" tests="51" failures="2" skipped="0" errors="8" time="43.196438">
+<testsuite name="qa-comprehensive.spec.cjs" timestamp="2026-06-30T00:41:31.045Z" hostname="chromium" tests="51" failures="2" skipped="0" time="30.058" errors="8">
+<testcase name="Phase 2: Authentication (Production) › GET /api/health returns 200 with db connected" classname="qa-comprehensive.spec.cjs" time="1.042">
+</testcase>
+<testcase name="Phase 2: Authentication (Production) › GET /api/csrf-token returns token and hash" classname="qa-comprehensive.spec.cjs" time="0.395">
+</testcase>
+<testcase name="Phase 2: Authentication (Production) › POST /api/auth/login (empty body) returns 400 validation" classname="qa-comprehensive.spec.cjs" time="0.39">
+</testcase>
+<testcase name="Phase 2: Authentication (Production) › POST /api/auth/login (invalid creds) returns 401" classname="qa-comprehensive.spec.cjs" time="0.541">
+</testcase>
+<testcase name="Phase 2: Authentication (Production) › POST /api/auth/login (valid creds) returns 200" classname="qa-comprehensive.spec.cjs" time="2.033">
+<properties>
+<property name="issue" value="CRITICAL: Login returns 500">
+</property>
+</properties>
+</testcase>
+<testcase name="Phase 2: Authentication (Production) › GET /api/auth/me (no token) returns 401" classname="qa-comprehensive.spec.cjs" time="0.367">
+</testcase>
+<testcase name="Phase 2: Authentication (Production) › Security headers present" classname="qa-comprehensive.spec.cjs" time="1.598">
+</testcase>
+<testcase name="Phase 2: Authentication (Production) › CSP does NOT contain unsafe-inline" classname="qa-comprehensive.spec.cjs" time="1.289">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-2-A-848a2-s-NOT-contain-unsafe-inline-chromium\error-context.md]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-2-A-848a2-s-NOT-contain-unsafe-inline-chromium\trace.zip]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-2-A-848a2-s-NOT-contain-unsafe-inline-chromium-retry1\error-context.md]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-2-A-848a2-s-NOT-contain-unsafe-inline-chromium-retry1\trace.zip]]
+]]>
+</system-out>
+<failure message="expect(received).not.toContain(expected) // indexOf" type="expect.not.toContain">
+<![CDATA[  [chromium] › qa-comprehensive.spec.cjs:122:3 › Phase 2: Authentication (Production) › CSP does NOT contain unsafe-inline 
+
+    Error: expect(received).not.toContain(expected) // indexOf
+
+    Expected substring: not "'unsafe-inline'"
+    Received string:        "default-src 'self';script-src 'self';style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;font-src 'self' https://fonts.gstatic.com;img-src 'self' data: blob:;connect-src 'self';frame-src 'none';object-src 'none';form-action 'self';base-uri 'self';frame-ancestors 'self';script-src-attr 'none';upgrade-insecure-requests"
+
+      131 |         null);
+      132 |     }
+    > 133 |     expect(csp).not.toContain("'unsafe-inline'");
+          |                     ^
+      134 |   });
+      135 | });
+      136 |
+        at C:\Users\Ahmed\Desktop\yemen-telecom\qa-tests\qa-comprehensive.spec.cjs:133:21
+
+    Error Context: ..\test-results\qa-comprehensive-Phase-2-A-848a2-s-NOT-contain-unsafe-inline-chromium\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\test-results\qa-comprehensive-Phase-2-A-848a2-s-NOT-contain-unsafe-inline-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\test-results\qa-comprehensive-Phase-2-A-848a2-s-NOT-contain-unsafe-inline-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: expect(received).not.toContain(expected) // indexOf
+
+    Expected substring: not "'unsafe-inline'"
+    Received string:        "default-src 'self';script-src 'self';style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;font-src 'self' https://fonts.gstatic.com;img-src 'self' data: blob:;connect-src 'self';frame-src 'none';object-src 'none';form-action 'self';base-uri 'self';frame-ancestors 'self';script-src-attr 'none';upgrade-insecure-requests"
+
+      131 |         null);
+      132 |     }
+    > 133 |     expect(csp).not.toContain("'unsafe-inline'");
+          |                     ^
+      134 |   });
+      135 | });
+      136 |
+        at C:\Users\Ahmed\Desktop\yemen-telecom\qa-tests\qa-comprehensive.spec.cjs:133:21
+
+    Error Context: ..\test-results\qa-comprehensive-Phase-2-A-848a2-s-NOT-contain-unsafe-inline-chromium-retry1\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\test-results\qa-comprehensive-Phase-2-A-848a2-s-NOT-contain-unsafe-inline-chromium-retry1\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\test-results\qa-comprehensive-Phase-2-A-848a2-s-NOT-contain-unsafe-inline-chromium-retry1\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+</testcase>
+<testcase name="Phase 6: Security Testing (Production) › CSRF protection blocks POST without token" classname="qa-comprehensive.spec.cjs" time="0.656">
+</testcase>
+<testcase name="Phase 6: Security Testing (Production) › Rate limiting active on login" classname="qa-comprehensive.spec.cjs" time="5.317">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-6-S-d8128-te-limiting-active-on-login-chromium\error-context.md]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-6-S-d8128-te-limiting-active-on-login-chromium\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Phase 6: Security Testing (Production) › SQL injection payloads are rejected" classname="qa-comprehensive.spec.cjs" time="1.674">
+</testcase>
+<testcase name="Phase 6: Security Testing (Production) › Rate limiting returns 429 after threshold" classname="qa-comprehensive.spec.cjs" time="0.363">
+</testcase>
+<testcase name="Phase 6: Security Testing (Production) › Content-Type validation rejects non-JSON" classname="qa-comprehensive.spec.cjs" time="0.938">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-6-S-4022f-validation-rejects-non-JSON-chromium\error-context.md]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-6-S-4022f-validation-rejects-non-JSON-chromium\trace.zip]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-6-S-4022f-validation-rejects-non-JSON-chromium-retry1\error-context.md]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-6-S-4022f-validation-rejects-non-JSON-chromium-retry1\trace.zip]]
+]]>
+</system-out>
+<failure message="expect(received).toBe(expected) // Object.is equality" type="expect.toBe">
+<![CDATA[  [chromium] › qa-comprehensive.spec.cjs:191:3 › Phase 6: Security Testing (Production) › Content-Type validation rejects non-JSON 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 400
+    Received: 429
+
+      196 |     });
+      197 |     // Express json middleware won't parse this, so body will be empty → 400 validation
+    > 198 |     expect(r.status).toBe(400);
+          |                      ^
+      199 |   });
+      200 | });
+      201 |
+        at C:\Users\Ahmed\Desktop\yemen-telecom\qa-tests\qa-comprehensive.spec.cjs:198:22
+
+    Error Context: ..\test-results\qa-comprehensive-Phase-6-S-4022f-validation-rejects-non-JSON-chromium\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\test-results\qa-comprehensive-Phase-6-S-4022f-validation-rejects-non-JSON-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\test-results\qa-comprehensive-Phase-6-S-4022f-validation-rejects-non-JSON-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 400
+    Received: 429
+
+      196 |     });
+      197 |     // Express json middleware won't parse this, so body will be empty → 400 validation
+    > 198 |     expect(r.status).toBe(400);
+          |                      ^
+      199 |   });
+      200 | });
+      201 |
+        at C:\Users\Ahmed\Desktop\yemen-telecom\qa-tests\qa-comprehensive.spec.cjs:198:22
+
+    Error Context: ..\test-results\qa-comprehensive-Phase-6-S-4022f-validation-rejects-non-JSON-chromium-retry1\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\test-results\qa-comprehensive-Phase-6-S-4022f-validation-rejects-non-JSON-chromium-retry1\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\test-results\qa-comprehensive-Phase-6-S-4022f-validation-rejects-non-JSON-chromium-retry1\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+</testcase>
+<testcase name="Phase 5: API Endpoint Testing › GET /api/health returns 200" classname="qa-comprehensive.spec.cjs" time="0.75">
+</testcase>
+<testcase name="Phase 5: API Endpoint Testing › GET /api/csrf-token returns 200" classname="qa-comprehensive.spec.cjs" time="0.367">
+</testcase>
+<testcase name="Phase 5: API Endpoint Testing › GET /api/auth/me returns 401" classname="qa-comprehensive.spec.cjs" time="0.369">
+</testcase>
+<testcase name="Phase 5: API Endpoint Testing › GET /api/routes returns 401" classname="qa-comprehensive.spec.cjs" time="0.358">
+</testcase>
+<testcase name="Phase 5: API Endpoint Testing › GET /api/cache-stats returns 401" classname="qa-comprehensive.spec.cjs" time="0.362">
+</testcase>
+<testcase name="Phase 5: API Endpoint Testing › GET /api/sims requires authentication" classname="qa-comprehensive.spec.cjs" time="0.361">
+</testcase>
+<testcase name="Phase 5: API Endpoint Testing › GET /api/agents requires authentication" classname="qa-comprehensive.spec.cjs" time="0.362">
+</testcase>
+<testcase name="Phase 5: API Endpoint Testing › GET /api/sellers requires authentication" classname="qa-comprehensive.spec.cjs" time="0.595">
+</testcase>
+<testcase name="Phase 5: API Endpoint Testing › GET /api/customers requires authentication" classname="qa-comprehensive.spec.cjs" time="0.361">
+</testcase>
+<testcase name="Phase 5: API Endpoint Testing › GET /api/inventories requires authentication" classname="qa-comprehensive.spec.cjs" time="0.363">
+</testcase>
+<testcase name="Phase 5: API Endpoint Testing › GET /api/distributions requires authentication" classname="qa-comprehensive.spec.cjs" time="0.36">
+</testcase>
+<testcase name="Phase 5: API Endpoint Testing › GET /api/alerts requires authentication" classname="qa-comprehensive.spec.cjs" time="0.364">
+</testcase>
+<testcase name="Phase 5: API Endpoint Testing › GET /api/admin/settings requires authentication" classname="qa-comprehensive.spec.cjs" time="0.362">
+</testcase>
+<testcase name="Phase 5: API Endpoint Testing › GET /api/admin/transactions requires authentication" classname="qa-comprehensive.spec.cjs" time="0.362">
+</testcase>
+<testcase name="Phase 5: API Endpoint Testing › GET /api/admin/audit-logs requires authentication" classname="qa-comprehensive.spec.cjs" time="0.365">
+</testcase>
+<testcase name="Phase 5: API Endpoint Testing › GET /api/reports/daily-sales requires authentication" classname="qa-comprehensive.spec.cjs" time="0.36">
+</testcase>
+<testcase name="Phase 5: API Endpoint Testing › GET /api/stats requires authentication" classname="qa-comprehensive.spec.cjs" time="0.362">
+</testcase>
+<testcase name="Phase 5: API Endpoint Testing › GET /api/operations requires authentication" classname="qa-comprehensive.spec.cjs" time="0.358">
+</testcase>
+<testcase name="Phase 5: API Endpoint Testing › GET /api/distributions/pending-count requires authentication" classname="qa-comprehensive.spec.cjs" time="0.359">
+</testcase>
+<testcase name="Phase 5: API Endpoint Testing › GET /api/admin/system/lockdown/status requires authentication" classname="qa-comprehensive.spec.cjs" time="0.369">
+</testcase>
+<testcase name="Phase 5: API Endpoint Testing › GET /api/admin/monitoring requires authentication" classname="qa-comprehensive.spec.cjs" time="0.365">
+</testcase>
+<testcase name="Phase 7: UI Testing (Local Preview) › Home page loads in RTL Arabic" classname="qa-comprehensive.spec.cjs" time="0.002">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-7-U-6b05f-me-page-loads-in-RTL-Arabic-chromium\error-context.md]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-7-U-6b05f-me-page-loads-in-RTL-Arabic-chromium\trace.zip]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-7-U-6b05f-me-page-loads-in-RTL-Arabic-chromium-retry1\error-context.md]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-7-U-6b05f-me-page-loads-in-RTL-Arabic-chromium-retry1\trace.zip]]
+]]>
+</system-out>
+<error message="browserType.launch: Executable doesn&apos;t exist at C:\Users\Ahmed\AppData\Local\ms-playwright\chromium_headless_shell-1228\chrome-headless-shell-win64\chrome-headless-shell.exe" type="Error">
+<![CDATA[  [chromium] › qa-comprehensive.spec.cjs:254:3 › Phase 7: UI Testing (Local Preview) › Home page loads in RTL Arabic 
+
+    Error: browserType.launch: Executable doesn't exist at C:\Users\Ahmed\AppData\Local\ms-playwright\chromium_headless_shell-1228\chrome-headless-shell-win64\chrome-headless-shell.exe
+    ╔════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright was just installed or updated.       ║
+    ║ Please run the following command to download new browsers: ║
+    ║                                                            ║
+    ║     npx playwright install                                 ║
+    ║                                                            ║
+    ║ <3 Playwright Team                                         ║
+    ╚════════════════════════════════════════════════════════════╝
+
+    Error Context: ..\test-results\qa-comprehensive-Phase-7-U-6b05f-me-page-loads-in-RTL-Arabic-chromium\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\test-results\qa-comprehensive-Phase-7-U-6b05f-me-page-loads-in-RTL-Arabic-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\test-results\qa-comprehensive-Phase-7-U-6b05f-me-page-loads-in-RTL-Arabic-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: browserType.launch: Executable doesn't exist at C:\Users\Ahmed\AppData\Local\ms-playwright\chromium_headless_shell-1228\chrome-headless-shell-win64\chrome-headless-shell.exe
+    ╔════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright was just installed or updated.       ║
+    ║ Please run the following command to download new browsers: ║
+    ║                                                            ║
+    ║     npx playwright install                                 ║
+    ║                                                            ║
+    ║ <3 Playwright Team                                         ║
+    ╚════════════════════════════════════════════════════════════╝
+
+    Error Context: ..\test-results\qa-comprehensive-Phase-7-U-6b05f-me-page-loads-in-RTL-Arabic-chromium-retry1\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\test-results\qa-comprehensive-Phase-7-U-6b05f-me-page-loads-in-RTL-Arabic-chromium-retry1\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\test-results\qa-comprehensive-Phase-7-U-6b05f-me-page-loads-in-RTL-Arabic-chromium-retry1\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</error>
+</testcase>
+<testcase name="Phase 7: UI Testing (Local Preview) › SPA renders and mounts React app" classname="qa-comprehensive.spec.cjs" time="0.004">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-7-U-ede05-enders-and-mounts-React-app-chromium\error-context.md]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-7-U-ede05-enders-and-mounts-React-app-chromium\trace.zip]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-7-U-ede05-enders-and-mounts-React-app-chromium-retry1\error-context.md]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-7-U-ede05-enders-and-mounts-React-app-chromium-retry1\trace.zip]]
+]]>
+</system-out>
+<error message="browserType.launch: Executable doesn&apos;t exist at C:\Users\Ahmed\AppData\Local\ms-playwright\chromium_headless_shell-1228\chrome-headless-shell-win64\chrome-headless-shell.exe" type="Error">
+<![CDATA[  [chromium] › qa-comprehensive.spec.cjs:265:3 › Phase 7: UI Testing (Local Preview) › SPA renders and mounts React app 
+
+    Error: browserType.launch: Executable doesn't exist at C:\Users\Ahmed\AppData\Local\ms-playwright\chromium_headless_shell-1228\chrome-headless-shell-win64\chrome-headless-shell.exe
+    ╔════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright was just installed or updated.       ║
+    ║ Please run the following command to download new browsers: ║
+    ║                                                            ║
+    ║     npx playwright install                                 ║
+    ║                                                            ║
+    ║ <3 Playwright Team                                         ║
+    ╚════════════════════════════════════════════════════════════╝
+
+    Error Context: ..\test-results\qa-comprehensive-Phase-7-U-ede05-enders-and-mounts-React-app-chromium\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\test-results\qa-comprehensive-Phase-7-U-ede05-enders-and-mounts-React-app-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\test-results\qa-comprehensive-Phase-7-U-ede05-enders-and-mounts-React-app-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: browserType.launch: Executable doesn't exist at C:\Users\Ahmed\AppData\Local\ms-playwright\chromium_headless_shell-1228\chrome-headless-shell-win64\chrome-headless-shell.exe
+    ╔════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright was just installed or updated.       ║
+    ║ Please run the following command to download new browsers: ║
+    ║                                                            ║
+    ║     npx playwright install                                 ║
+    ║                                                            ║
+    ║ <3 Playwright Team                                         ║
+    ╚════════════════════════════════════════════════════════════╝
+
+    Error Context: ..\test-results\qa-comprehensive-Phase-7-U-ede05-enders-and-mounts-React-app-chromium-retry1\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\test-results\qa-comprehensive-Phase-7-U-ede05-enders-and-mounts-React-app-chromium-retry1\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\test-results\qa-comprehensive-Phase-7-U-ede05-enders-and-mounts-React-app-chromium-retry1\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</error>
+</testcase>
+<testcase name="Phase 7: UI Testing (Local Preview) › Light/Dark mode classes present" classname="qa-comprehensive.spec.cjs" time="0.004">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-7-U-d5358-t-Dark-mode-classes-present-chromium\error-context.md]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-7-U-d5358-t-Dark-mode-classes-present-chromium\trace.zip]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-7-U-d5358-t-Dark-mode-classes-present-chromium-retry1\error-context.md]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-7-U-d5358-t-Dark-mode-classes-present-chromium-retry1\trace.zip]]
+]]>
+</system-out>
+<error message="browserType.launch: Executable doesn&apos;t exist at C:\Users\Ahmed\AppData\Local\ms-playwright\chromium_headless_shell-1228\chrome-headless-shell-win64\chrome-headless-shell.exe" type="Error">
+<![CDATA[  [chromium] › qa-comprehensive.spec.cjs:274:3 › Phase 7: UI Testing (Local Preview) › Light/Dark mode classes present 
+
+    Error: browserType.launch: Executable doesn't exist at C:\Users\Ahmed\AppData\Local\ms-playwright\chromium_headless_shell-1228\chrome-headless-shell-win64\chrome-headless-shell.exe
+    ╔════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright was just installed or updated.       ║
+    ║ Please run the following command to download new browsers: ║
+    ║                                                            ║
+    ║     npx playwright install                                 ║
+    ║                                                            ║
+    ║ <3 Playwright Team                                         ║
+    ╚════════════════════════════════════════════════════════════╝
+
+    Error Context: ..\test-results\qa-comprehensive-Phase-7-U-d5358-t-Dark-mode-classes-present-chromium\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\test-results\qa-comprehensive-Phase-7-U-d5358-t-Dark-mode-classes-present-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\test-results\qa-comprehensive-Phase-7-U-d5358-t-Dark-mode-classes-present-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: browserType.launch: Executable doesn't exist at C:\Users\Ahmed\AppData\Local\ms-playwright\chromium_headless_shell-1228\chrome-headless-shell-win64\chrome-headless-shell.exe
+    ╔════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright was just installed or updated.       ║
+    ║ Please run the following command to download new browsers: ║
+    ║                                                            ║
+    ║     npx playwright install                                 ║
+    ║                                                            ║
+    ║ <3 Playwright Team                                         ║
+    ╚════════════════════════════════════════════════════════════╝
+
+    Error Context: ..\test-results\qa-comprehensive-Phase-7-U-d5358-t-Dark-mode-classes-present-chromium-retry1\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\test-results\qa-comprehensive-Phase-7-U-d5358-t-Dark-mode-classes-present-chromium-retry1\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\test-results\qa-comprehensive-Phase-7-U-d5358-t-Dark-mode-classes-present-chromium-retry1\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</error>
+</testcase>
+<testcase name="Phase 7: UI Testing (Local Preview) › Login form is rendered" classname="qa-comprehensive.spec.cjs" time="0.004">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-7-U-fa654-view-Login-form-is-rendered-chromium\error-context.md]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-7-U-fa654-view-Login-form-is-rendered-chromium\trace.zip]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-7-U-fa654-view-Login-form-is-rendered-chromium-retry1\error-context.md]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-7-U-fa654-view-Login-form-is-rendered-chromium-retry1\trace.zip]]
+]]>
+</system-out>
+<error message="browserType.launch: Executable doesn&apos;t exist at C:\Users\Ahmed\AppData\Local\ms-playwright\chromium_headless_shell-1228\chrome-headless-shell-win64\chrome-headless-shell.exe" type="Error">
+<![CDATA[  [chromium] › qa-comprehensive.spec.cjs:281:3 › Phase 7: UI Testing (Local Preview) › Login form is rendered 
+
+    Error: browserType.launch: Executable doesn't exist at C:\Users\Ahmed\AppData\Local\ms-playwright\chromium_headless_shell-1228\chrome-headless-shell-win64\chrome-headless-shell.exe
+    ╔════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright was just installed or updated.       ║
+    ║ Please run the following command to download new browsers: ║
+    ║                                                            ║
+    ║     npx playwright install                                 ║
+    ║                                                            ║
+    ║ <3 Playwright Team                                         ║
+    ╚════════════════════════════════════════════════════════════╝
+
+    Error Context: ..\test-results\qa-comprehensive-Phase-7-U-fa654-view-Login-form-is-rendered-chromium\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\test-results\qa-comprehensive-Phase-7-U-fa654-view-Login-form-is-rendered-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\test-results\qa-comprehensive-Phase-7-U-fa654-view-Login-form-is-rendered-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: browserType.launch: Executable doesn't exist at C:\Users\Ahmed\AppData\Local\ms-playwright\chromium_headless_shell-1228\chrome-headless-shell-win64\chrome-headless-shell.exe
+    ╔════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright was just installed or updated.       ║
+    ║ Please run the following command to download new browsers: ║
+    ║                                                            ║
+    ║     npx playwright install                                 ║
+    ║                                                            ║
+    ║ <3 Playwright Team                                         ║
+    ╚════════════════════════════════════════════════════════════╝
+
+    Error Context: ..\test-results\qa-comprehensive-Phase-7-U-fa654-view-Login-form-is-rendered-chromium-retry1\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\test-results\qa-comprehensive-Phase-7-U-fa654-view-Login-form-is-rendered-chromium-retry1\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\test-results\qa-comprehensive-Phase-7-U-fa654-view-Login-form-is-rendered-chromium-retry1\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</error>
+</testcase>
+<testcase name="Phase 8: Accessibility (Local Preview) › HTML has lang and dir attributes for screen readers" classname="qa-comprehensive.spec.cjs" time="0.004">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-8-A-fbf3b-tributes-for-screen-readers-chromium\error-context.md]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-8-A-fbf3b-tributes-for-screen-readers-chromium\trace.zip]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-8-A-fbf3b-tributes-for-screen-readers-chromium-retry1\error-context.md]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-8-A-fbf3b-tributes-for-screen-readers-chromium-retry1\trace.zip]]
+]]>
+</system-out>
+<error message="browserType.launch: Executable doesn&apos;t exist at C:\Users\Ahmed\AppData\Local\ms-playwright\chromium_headless_shell-1228\chrome-headless-shell-win64\chrome-headless-shell.exe" type="Error">
+<![CDATA[  [chromium] › qa-comprehensive.spec.cjs:295:3 › Phase 8: Accessibility (Local Preview) › HTML has lang and dir attributes for screen readers 
+
+    Error: browserType.launch: Executable doesn't exist at C:\Users\Ahmed\AppData\Local\ms-playwright\chromium_headless_shell-1228\chrome-headless-shell-win64\chrome-headless-shell.exe
+    ╔════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright was just installed or updated.       ║
+    ║ Please run the following command to download new browsers: ║
+    ║                                                            ║
+    ║     npx playwright install                                 ║
+    ║                                                            ║
+    ║ <3 Playwright Team                                         ║
+    ╚════════════════════════════════════════════════════════════╝
+
+    Error Context: ..\test-results\qa-comprehensive-Phase-8-A-fbf3b-tributes-for-screen-readers-chromium\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\test-results\qa-comprehensive-Phase-8-A-fbf3b-tributes-for-screen-readers-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\test-results\qa-comprehensive-Phase-8-A-fbf3b-tributes-for-screen-readers-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: browserType.launch: Executable doesn't exist at C:\Users\Ahmed\AppData\Local\ms-playwright\chromium_headless_shell-1228\chrome-headless-shell-win64\chrome-headless-shell.exe
+    ╔════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright was just installed or updated.       ║
+    ║ Please run the following command to download new browsers: ║
+    ║                                                            ║
+    ║     npx playwright install                                 ║
+    ║                                                            ║
+    ║ <3 Playwright Team                                         ║
+    ╚════════════════════════════════════════════════════════════╝
+
+    Error Context: ..\test-results\qa-comprehensive-Phase-8-A-fbf3b-tributes-for-screen-readers-chromium-retry1\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\test-results\qa-comprehensive-Phase-8-A-fbf3b-tributes-for-screen-readers-chromium-retry1\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\test-results\qa-comprehensive-Phase-8-A-fbf3b-tributes-for-screen-readers-chromium-retry1\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</error>
+</testcase>
+<testcase name="Phase 8: Accessibility (Local Preview) › Meta viewport allows accessibility zoom" classname="qa-comprehensive.spec.cjs" time="0.004">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-8-A-e3c30-t-allows-accessibility-zoom-chromium\error-context.md]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-8-A-e3c30-t-allows-accessibility-zoom-chromium\trace.zip]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-8-A-e3c30-t-allows-accessibility-zoom-chromium-retry1\error-context.md]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-8-A-e3c30-t-allows-accessibility-zoom-chromium-retry1\trace.zip]]
+]]>
+</system-out>
+<error message="browserType.launch: Executable doesn&apos;t exist at C:\Users\Ahmed\AppData\Local\ms-playwright\chromium_headless_shell-1228\chrome-headless-shell-win64\chrome-headless-shell.exe" type="Error">
+<![CDATA[  [chromium] › qa-comprehensive.spec.cjs:303:3 › Phase 8: Accessibility (Local Preview) › Meta viewport allows accessibility zoom 
+
+    Error: browserType.launch: Executable doesn't exist at C:\Users\Ahmed\AppData\Local\ms-playwright\chromium_headless_shell-1228\chrome-headless-shell-win64\chrome-headless-shell.exe
+    ╔════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright was just installed or updated.       ║
+    ║ Please run the following command to download new browsers: ║
+    ║                                                            ║
+    ║     npx playwright install                                 ║
+    ║                                                            ║
+    ║ <3 Playwright Team                                         ║
+    ╚════════════════════════════════════════════════════════════╝
+
+    Error Context: ..\test-results\qa-comprehensive-Phase-8-A-e3c30-t-allows-accessibility-zoom-chromium\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\test-results\qa-comprehensive-Phase-8-A-e3c30-t-allows-accessibility-zoom-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\test-results\qa-comprehensive-Phase-8-A-e3c30-t-allows-accessibility-zoom-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: browserType.launch: Executable doesn't exist at C:\Users\Ahmed\AppData\Local\ms-playwright\chromium_headless_shell-1228\chrome-headless-shell-win64\chrome-headless-shell.exe
+    ╔════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright was just installed or updated.       ║
+    ║ Please run the following command to download new browsers: ║
+    ║                                                            ║
+    ║     npx playwright install                                 ║
+    ║                                                            ║
+    ║ <3 Playwright Team                                         ║
+    ╚════════════════════════════════════════════════════════════╝
+
+    Error Context: ..\test-results\qa-comprehensive-Phase-8-A-e3c30-t-allows-accessibility-zoom-chromium-retry1\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\test-results\qa-comprehensive-Phase-8-A-e3c30-t-allows-accessibility-zoom-chromium-retry1\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\test-results\qa-comprehensive-Phase-8-A-e3c30-t-allows-accessibility-zoom-chromium-retry1\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</error>
+</testcase>
+<testcase name="Phase 8: Accessibility (Local Preview) › Root element present for React to mount" classname="qa-comprehensive.spec.cjs" time="0.004">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-8-A-1831a--present-for-React-to-mount-chromium\error-context.md]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-8-A-1831a--present-for-React-to-mount-chromium\trace.zip]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-8-A-1831a--present-for-React-to-mount-chromium-retry1\error-context.md]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-8-A-1831a--present-for-React-to-mount-chromium-retry1\trace.zip]]
+]]>
+</system-out>
+<error message="browserType.launch: Executable doesn&apos;t exist at C:\Users\Ahmed\AppData\Local\ms-playwright\chromium_headless_shell-1228\chrome-headless-shell-win64\chrome-headless-shell.exe" type="Error">
+<![CDATA[  [chromium] › qa-comprehensive.spec.cjs:309:3 › Phase 8: Accessibility (Local Preview) › Root element present for React to mount 
+
+    Error: browserType.launch: Executable doesn't exist at C:\Users\Ahmed\AppData\Local\ms-playwright\chromium_headless_shell-1228\chrome-headless-shell-win64\chrome-headless-shell.exe
+    ╔════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright was just installed or updated.       ║
+    ║ Please run the following command to download new browsers: ║
+    ║                                                            ║
+    ║     npx playwright install                                 ║
+    ║                                                            ║
+    ║ <3 Playwright Team                                         ║
+    ╚════════════════════════════════════════════════════════════╝
+
+    Error Context: ..\test-results\qa-comprehensive-Phase-8-A-1831a--present-for-React-to-mount-chromium\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\test-results\qa-comprehensive-Phase-8-A-1831a--present-for-React-to-mount-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\test-results\qa-comprehensive-Phase-8-A-1831a--present-for-React-to-mount-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: browserType.launch: Executable doesn't exist at C:\Users\Ahmed\AppData\Local\ms-playwright\chromium_headless_shell-1228\chrome-headless-shell-win64\chrome-headless-shell.exe
+    ╔════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright was just installed or updated.       ║
+    ║ Please run the following command to download new browsers: ║
+    ║                                                            ║
+    ║     npx playwright install                                 ║
+    ║                                                            ║
+    ║ <3 Playwright Team                                         ║
+    ╚════════════════════════════════════════════════════════════╝
+
+    Error Context: ..\test-results\qa-comprehensive-Phase-8-A-1831a--present-for-React-to-mount-chromium-retry1\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\test-results\qa-comprehensive-Phase-8-A-1831a--present-for-React-to-mount-chromium-retry1\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\test-results\qa-comprehensive-Phase-8-A-1831a--present-for-React-to-mount-chromium-retry1\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</error>
+</testcase>
+<testcase name="Phase 9: Performance › Production API response times are acceptable" classname="qa-comprehensive.spec.cjs" time="1.325">
+</testcase>
+<testcase name="Phase 9: Performance › Bundle assets exist and have reasonable sizes" classname="qa-comprehensive.spec.cjs" time="0.017">
+</testcase>
+<testcase name="Phase 13: Smoke Test › Health endpoint smoke test" classname="qa-comprehensive.spec.cjs" time="0.545">
+</testcase>
+<testcase name="Phase 13: Smoke Test › CSRF endpoint smoke test" classname="qa-comprehensive.spec.cjs" time="0.361">
+</testcase>
+<testcase name="Phase 13: Smoke Test › Auth/me without token smoke test" classname="qa-comprehensive.spec.cjs" time="0.369">
+</testcase>
+<testcase name="Phase 13: Smoke Test › Static assets accessible locally" classname="qa-comprehensive.spec.cjs" time="0.003">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-13--2d8a9-c-assets-accessible-locally-chromium\error-context.md]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-13--2d8a9-c-assets-accessible-locally-chromium\trace.zip]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-13--2d8a9-c-assets-accessible-locally-chromium-retry1\error-context.md]]
+
+[[ATTACHMENT|..\test-results\qa-comprehensive-Phase-13--2d8a9-c-assets-accessible-locally-chromium-retry1\trace.zip]]
+]]>
+</system-out>
+<error message="browserType.launch: Executable doesn&apos;t exist at C:\Users\Ahmed\AppData\Local\ms-playwright\chromium_headless_shell-1228\chrome-headless-shell-win64\chrome-headless-shell.exe" type="Error">
+<![CDATA[  [chromium] › qa-comprehensive.spec.cjs:364:3 › Phase 13: Smoke Test › Static assets accessible locally 
+
+    Error: browserType.launch: Executable doesn't exist at C:\Users\Ahmed\AppData\Local\ms-playwright\chromium_headless_shell-1228\chrome-headless-shell-win64\chrome-headless-shell.exe
+    ╔════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright was just installed or updated.       ║
+    ║ Please run the following command to download new browsers: ║
+    ║                                                            ║
+    ║     npx playwright install                                 ║
+    ║                                                            ║
+    ║ <3 Playwright Team                                         ║
+    ╚════════════════════════════════════════════════════════════╝
+
+    Error Context: ..\test-results\qa-comprehensive-Phase-13--2d8a9-c-assets-accessible-locally-chromium\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\test-results\qa-comprehensive-Phase-13--2d8a9-c-assets-accessible-locally-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\test-results\qa-comprehensive-Phase-13--2d8a9-c-assets-accessible-locally-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: browserType.launch: Executable doesn't exist at C:\Users\Ahmed\AppData\Local\ms-playwright\chromium_headless_shell-1228\chrome-headless-shell-win64\chrome-headless-shell.exe
+    ╔════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright was just installed or updated.       ║
+    ║ Please run the following command to download new browsers: ║
+    ║                                                            ║
+    ║     npx playwright install                                 ║
+    ║                                                            ║
+    ║ <3 Playwright Team                                         ║
+    ╚════════════════════════════════════════════════════════════╝
+
+    Error Context: ..\test-results\qa-comprehensive-Phase-13--2d8a9-c-assets-accessible-locally-chromium-retry1\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\test-results\qa-comprehensive-Phase-13--2d8a9-c-assets-accessible-locally-chromium-retry1\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\test-results\qa-comprehensive-Phase-13--2d8a9-c-assets-accessible-locally-chromium-retry1\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</error>
+</testcase>
+<testcase name="Phase 14: Regression › Public API endpoints maintain status codes" classname="qa-comprehensive.spec.cjs" time="1.117">
+</testcase>
+<testcase name="Phase 14: Regression › Error handling returns JSON consistently" classname="qa-comprehensive.spec.cjs" time="0.369">
+</testcase>
+<testcase name="Phase 14: Regression › Security headers are stable" classname="qa-comprehensive.spec.cjs" time="0.545">
+</testcase>
+<testcase name="Phase 14: Regression › Health endpoint structure is stable" classname="qa-comprehensive.spec.cjs" time="0.544">
+</testcase>
+</testsuite>
+</testsuites>

@@ -9,12 +9,12 @@
       "DOM",
       "DOM.Iterable"
     ],
-    "skipLibCheck": true,
     "moduleResolution": "bundler",
     "isolatedModules": true,
     "moduleDetection": "force",
     "allowJs": true,
     "jsx": "react-jsx",
+    "types": ["node"],
     "paths": {
       "@/*": [
         "./src/*"

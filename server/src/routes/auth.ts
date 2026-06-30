@@ -5,11 +5,10 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
 import { logger } from '../logger';
 import { query } from '../db';
 import { hashToken, isTokenBlacklisted, TokenPayload } from '../middleware/auth';
-import { validate, loginSchema, refreshTokenSchema } from '../validation';
+import { validate, loginSchema } from '../validation';
 
 const router = Router();
 if (!process.env.JWT_SECRET || !process.env.REFRESH_SECRET) {
@@ -46,6 +45,8 @@ router.post('/login', validate(loginSchema), async (req: Request, res: Response)
     const payload = { id: user.id, username: user.username, role: user.role };
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h', issuer: 'yemen-telecom', algorithm: 'HS256' });
     const refreshToken = jwt.sign(payload, REFRESH_SECRET, { expiresIn: '7d', issuer: 'yemen-telecom', algorithm: 'HS256' });
+    res.cookie('token', token, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 3600 * 1000, path: '/' });
+    res.cookie('refreshToken', refreshToken, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 7 * 24 * 3600 * 1000, path: '/api/auth' });
     res.json({
       token,
       refreshToken,
@@ -72,8 +73,11 @@ router.post('/login', validate(loginSchema), async (req: Request, res: Response)
   }
 });
 
-router.post('/refresh', validate(refreshTokenSchema), async (req: Request, res: Response) => {
-  const { refreshToken } = req.body;
+router.post('/refresh', async (req: Request, res: Response) => {
+  const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
+  if (!refreshToken) {
+    return res.status(400).json({ error: 'Refresh token is required' });
+  }
   try {
     const blacklisted = await isTokenBlacklisted(refreshToken);
     if (blacklisted) {
@@ -94,6 +98,8 @@ router.post('/refresh', validate(refreshTokenSchema), async (req: Request, res: 
     const payload = { id: decoded.id, username: decoded.username, role: decoded.role };
     const newToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h', issuer: 'yemen-telecom', algorithm: 'HS256' });
     const newRefreshToken = jwt.sign(payload, REFRESH_SECRET, { expiresIn: '7d', issuer: 'yemen-telecom', algorithm: 'HS256' });
+    res.cookie('token', newToken, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 3600 * 1000, path: '/' });
+    res.cookie('refreshToken', newRefreshToken, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 7 * 24 * 3600 * 1000, path: '/api/auth' });
     res.json({ token: newToken, refreshToken: newRefreshToken });
   } catch (err: any) {
     if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
@@ -105,12 +111,14 @@ router.post('/refresh', validate(refreshTokenSchema), async (req: Request, res: 
 });
 
 router.post('/logout', async (req: Request, res: Response) => {
+  const cookieToken = req.cookies?.token;
   const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith('Bearer ')) {
+  const headerToken = auth?.startsWith('Bearer ') ? auth.split(' ')[1] : null;
+  const token = cookieToken || headerToken;
+  if (!token) {
     return res.status(401).json({ error: 'No token provided' });
   }
   try {
-    const token = auth.split(' ')[1];
     const decoded = jwt.verify(token, JWT_SECRET, { issuer: 'yemen-telecom', algorithms: ['HS256'] }) as TokenPayload;
     if (decoded.exp) {
       const expiresAt = new Date(decoded.exp * 1000).toISOString();
@@ -119,7 +127,8 @@ router.post('/logout', async (req: Request, res: Response) => {
         [hashToken(token), expiresAt, decoded.id]
       );
     }
-    const refreshTokenHeader = req.headers['x-refresh-token'] as string;
+    const cookieRefreshToken = req.cookies?.refreshToken;
+    const refreshTokenHeader = cookieRefreshToken || (req.headers['x-refresh-token'] as string);
     if (refreshTokenHeader) {
       try {
         const rtDecoded = jwt.verify(refreshTokenHeader, REFRESH_SECRET, { algorithms: ['HS256'] }) as TokenPayload;
@@ -132,6 +141,8 @@ router.post('/logout', async (req: Request, res: Response) => {
         }
       } catch { /* refresh token already expired — ignore */ }
     }
+    res.clearCookie('token', { path: '/', httpOnly: true, secure: true, sameSite: 'strict' });
+    res.clearCookie('refreshToken', { path: '/api/auth', httpOnly: true, secure: true, sameSite: 'strict' });
     res.json({ message: 'Logged out successfully' });
   } catch (err: any) {
     if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
@@ -147,12 +158,14 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 router.get('/me', async (req: Request, res: Response) => {
+  const cookieToken = req.cookies?.token;
   const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith('Bearer ')) {
+  const headerToken = auth?.startsWith('Bearer ') ? auth.split(' ')[1] : null;
+  const token = cookieToken || headerToken;
+  if (!token) {
     return res.status(401).json({ error: 'No token provided' });
   }
   try {
-    const token = auth.split(' ')[1];
     const decoded = jwt.verify(token, JWT_SECRET, { issuer: 'yemen-telecom', algorithms: ['HS256'] }) as TokenPayload;
     const blacklisted = await isTokenBlacklisted(token);
     if (blacklisted) {

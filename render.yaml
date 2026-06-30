@@ -4,6 +4,7 @@ services:
     env: docker
     region: oregon
     plan: free
+    autoDeploy: false
     healthCheckPath: /api/health
     dockerfilePath: ./Dockerfile
     envVars:

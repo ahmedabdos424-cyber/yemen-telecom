@@ -1,7 +1,9 @@
 import path from 'path';
+import fs from 'fs';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { compression } from './compression';
 import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
@@ -50,6 +52,7 @@ let requestCount = 0;
 
 // Trust proxy for rate limiter behind Render's reverse proxy
 app.set('trust proxy', 1);
+app.use(cookieParser());
 
 // Request counter and correlation middleware
 app.use((req, res, next) => {
@@ -65,29 +68,31 @@ app.use((req, res, next) => {
 
 const CSRF_SECRET = process.env.CSRF_SECRET!;
 
-// Security middleware
+// Security middleware — CSP is set manually below for per-request nonce support
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      // script-src 'unsafe-inline' removed — Vite production build outputs
-      // external module scripts only. No inline scripts in production.
-      // style-src 'unsafe-inline' still required for inline <style> block
-      // in index.html, React inline styles, and motion animation library.
-      // Future: implement nonce-based CSP via Vite plugin.
-      scriptSrc: ["'self'"],
-      // Inline styles required for dynamic Tailwind classes in React components
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "blob:"],
-      connectSrc: ["'self'"],
-      frameSrc: ["'none'"],
-      objectSrc: ["'none'"],
-      formAction: ["'self'"],
-    },
-  },
+  contentSecurityPolicy: false,
 }));
+
+// Nonce-based CSP middleware — per-request nonce replaces 'unsafe-inline'
+app.use((req, res, next) => {
+  const nonce = crypto.randomBytes(16).toString('base64');
+  res.locals.cspNonce = nonce;
+  const csp = [
+    `default-src 'self'`,
+    `base-uri 'self'`,
+    `script-src 'self' 'nonce-${nonce}'`,
+    `style-src 'self' 'nonce-${nonce}' https://fonts.googleapis.com`,
+    `font-src 'self' https://fonts.gstatic.com`,
+    `img-src 'self' data: blob:`,
+    `connect-src 'self'`,
+    `frame-src 'none'`,
+    `object-src 'none'`,
+    `form-action 'self'`,
+  ].join('; ');
+  res.setHeader('Content-Security-Policy', csp);
+  next();
+});
 const isDev = process.env.NODE_ENV !== 'production';
 const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,https://yemen-telecom-1699.web.app')
   .split(',')
@@ -115,6 +120,45 @@ app.use(cors({
 app.use(compression());
 app.use(express.json({ limit: '1mb' }));
 app.use('/uploads', express.static('uploads', { maxAge: '1d', etag: true }));
+
+// Serve static assets with long cache
+app.use('/assets', express.static('dist/assets', { maxAge: '1y', immutable: true, etag: true }));
+
+// Cache index.html in memory — read once at startup
+let cachedIndexHtml: string | null = null;
+const distIndex = path.join(process.cwd(), 'dist', 'index.html');
+try {
+  cachedIndexHtml = fs.readFileSync(distIndex, 'utf-8');
+} catch {
+  logger.warn('[INIT] dist/index.html not found at startup — will serve on first request');
+}
+
+// Serve index.html with CSP nonce injection for SPA root (must be before general static)
+app.get('/', (req, res) => {
+  let html: string;
+  if (cachedIndexHtml) {
+    html = cachedIndexHtml;
+  } else {
+    try {
+      html = fs.readFileSync(distIndex, 'utf-8');
+      cachedIndexHtml = html;
+    } catch {
+      return res.status(404).send('index.html not found');
+    }
+  }
+  const nonce = res.locals.cspNonce;
+  if (!nonce) {
+    res.type('html').send(html);
+    return;
+  }
+  // Inject nonce into inline style block
+  html = html.replace('<style>', `<style nonce="${nonce}">`);
+  // Inject document.createElement patch before </head> for dynamic styles
+  const patch = `<script nonce="${nonce}">(function(){var n="${nonce}";var c=document.createElement.bind(document);document.createElement=function(t,a){var e=c(t,a);if(t.toLowerCase()==='style')e.setAttribute('nonce',n);return e;}})();<\/script>`;
+  html = html.replace('</head>', patch + '</head>');
+  res.type('html').send(html);
+});
+// Serve remaining static files (manifest, icons, etc.) — GET / is already handled above
 app.use(express.static('dist', { maxAge: '1y', immutable: true, etag: true }));
 
 // CSRF token generation endpoint (must be after CORS middleware)

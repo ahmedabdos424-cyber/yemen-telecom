@@ -27,19 +27,23 @@ let tokensLoadPromise: Promise<void> | null = null;
 
 export function setToken(token: string | null) {
   authToken = token;
-  if (token) {
-    tokenStorage.setAuthToken(token);
-  } else {
-    tokenStorage.removeAuthToken();
+  if (isCapacitor) {
+    if (token) {
+      tokenStorage.setAuthToken(token);
+    } else {
+      tokenStorage.removeAuthToken();
+    }
   }
 }
 
 export function setRefreshToken(token: string | null) {
   refreshToken = token;
-  if (token) {
-    tokenStorage.setRefreshToken(token);
-  } else {
-    tokenStorage.removeRefreshToken();
+  if (isCapacitor) {
+    if (token) {
+      tokenStorage.setRefreshToken(token);
+    } else {
+      tokenStorage.removeRefreshToken();
+    }
   }
 }
 
@@ -49,6 +53,9 @@ export function clearTokens() {
 }
 
 export async function loadTokens(): Promise<{ authToken: string | null; refreshToken: string | null }> {
+  if (!isCapacitor) {
+    return { authToken: null, refreshToken: null };
+  }
   if (!tokensLoaded) {
     if (!tokensLoadPromise) {
       tokensLoadPromise = (async () => {
@@ -81,6 +88,20 @@ export async function fetchCsrfToken(): Promise<void> {
 }
 
 async function refreshAccessToken(): Promise<string | null> {
+  if (!isCapacitor) {
+    try {
+      const res = await fetchWithTimeout(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.token;
+    } catch {
+      return null;
+    }
+  }
   await loadTokens();
   if (!refreshToken) return null;
   try {
@@ -110,7 +131,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> || {}),
   };
-  if (authToken) {
+  if (authToken && isCapacitor) {
     headers['Authorization'] = `Bearer ${authToken}`;
   }
   const isLogout = path === '/auth/logout';
@@ -118,10 +139,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers['X-CSRF-Token'] = csrfToken;
     headers['X-CSRF-Hash'] = csrfHash;
   }
-  if (refreshToken && isLogout) {
+  if (refreshToken && isCapacitor && isLogout) {
     headers['X-Refresh-Token'] = refreshToken;
   }
-  const res = await fetchWithTimeout(`${API_BASE}${path}`, { ...options, headers });
+  const res = await fetchWithTimeout(`${API_BASE}${path}`, { ...options, headers, credentials: 'include' });
   if (res.status === 403 && !path.startsWith('/auth/') && path !== '/csrf-token') {
     const errBody = await res.json().catch(() => ({}));
     if (errBody.error && (errBody.error.includes('CSRF'))) {
@@ -177,14 +198,14 @@ async function uploadFile(file: File | Blob, fieldName = 'image'): Promise<{ url
   const form = new FormData();
   form.append(fieldName, file);
   const headers: Record<string, string> = {};
-  if (authToken) {
+  if (authToken && isCapacitor) {
     headers['Authorization'] = `Bearer ${authToken}`;
   }
   if (csrfToken && csrfHash) {
     headers['X-CSRF-Token'] = csrfToken;
     headers['X-CSRF-Hash'] = csrfHash;
   }
-  const res = await fetchWithTimeout(`${API_BASE}/upload/image`, { method: 'POST', headers, body: form });
+  const res = await fetchWithTimeout(`${API_BASE}/upload/image`, { method: 'POST', headers, body: form, credentials: 'include' });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || `HTTP ${res.status}`);

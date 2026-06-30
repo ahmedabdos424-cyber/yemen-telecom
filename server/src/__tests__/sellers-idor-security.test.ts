@@ -2,10 +2,16 @@ import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vites
 import express, { NextFunction, Response } from 'express';
 import http from 'http';
 
-vi.mock('../db', () => ({
-  query: vi.fn(),
-  transaction: vi.fn((cb: any) => cb({ query: vi.fn() })),
-}));
+vi.mock('../db', () => {
+  const query = vi.fn();
+  return {
+    query,
+    transaction: vi.fn((cb: any) => {
+      const mockClient = { query };
+      return Promise.resolve(cb(mockClient));
+    }),
+  };
+});
 
 import { query } from '../db';
 import sellerRoutes from '../routes/sellers';
@@ -85,7 +91,13 @@ describe('P0-01 IDOR Security Regression Tests', () => {
 
   const setupMockQuery = () => {
     (query as any).mockImplementation((sql: string, params: any[]) => {
-      if (sql.includes('SELECT * FROM sellers WHERE id')) {
+      if (sql.includes('FOR UPDATE')) {
+        const id = Number(params[0]);
+        if (id === 1) return Promise.resolve({ rows: [{ sales_30_days: 30, total_sales: 100 }] });
+        if (id === 2) return Promise.resolve({ rows: [{ sales_30_days: 20, total_sales: 80 }] });
+        return Promise.resolve({ rows: [{ sales_30_days: 0, total_sales: 0 }] });
+      }
+      if (sql.includes('FROM sellers WHERE id')) {
         const id = Number(params[0]);
         if (id === 1) return Promise.resolve({ rows: [sellerA] });
         if (id === 2) return Promise.resolve({ rows: [sellerB] });
