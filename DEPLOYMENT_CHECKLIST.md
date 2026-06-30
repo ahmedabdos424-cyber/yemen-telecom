@@ -1,88 +1,52 @@
-# Deployment Checklist
+# Deployment Checklist — Yemen Telecom
 
 ## Pre-Deployment
 
-### Environment Variables — Render Dashboard
-- [ ] NODE_ENV = `production`
-- [ ] API_PORT = `4000`
-- [ ] DB_HOST — Supabase host
-- [ ] DB_PORT = `5432`
-- [ ] DB_USER — Supabase user
-- [ ] DB_PASSWORD — Supabase password
-- [ ] DB_NAME = `postgres`
-- [ ] JWT_SECRET — 64-char hex (`crypto.randomBytes(32).toString('hex')`)
-- [ ] REFRESH_SECRET — 64-char hex (different from JWT_SECRET)
-- [ ] CSRF_SECRET — 64-char hex (different from both)
-- [ ] CORS_ORIGIN — Comma-separated allowed origins incl. Firebase host
-- [ ] FIREBASE_PROJECT_ID
-- [ ] FIREBASE_PRIVATE_KEY — Full private key with `\n` for newlines
-- [ ] FIREBASE_CLIENT_EMAIL
-- [ ] FIREBASE_STORAGE_BUCKET
-- [ ] FIREBASE_PRIVATE_KEY_ID
-- [ ] FIREBASE_CLIENT_ID
-- [ ] FIREBASE_CLIENT_CERT_URL
-- [ ] BACKUP_S3_ENDPOINT — S3-compatible endpoint
-- [ ] BACKUP_S3_REGION — e.g. `us-east-1`
-- [ ] BACKUP_S3_ACCESS_KEY_ID
-- [ ] BACKUP_S3_SECRET_ACCESS_KEY
-- [ ] BACKUP_S3_BUCKET
+### Secrets (Render Dashboard)
+- [ ] Generate new `JWT_SECRET` (64 hex chars: `openssl rand -hex 32`)
+- [ ] Generate new `REFRESH_SECRET` (64 hex chars)
+- [ ] Generate new `CSRF_SECRET` (64 hex chars)
+- [ ] Generate new `DB_PASSWORD` (Supabase dashboard)
+- [ ] Generate new Firebase service account key (GCP Console → IAM → Service Accounts)
+- [ ] Generate new `BACKUP_S3_*` credentials
+- [ ] Update ALL secrets in Render dashboard
+- [ ] Set `DB_SSL_REJECT_UNAUTHORIZED=true`
+- [ ] Verify old secrets still work for 24h rollback window
 
-### Android Release Build
-- [ ] `google-services.json` placed at `android/app/google-services.json`
-- [ ] `KEYSTORE_PASSWORD` env var set in CI/GitHub Secrets
-- [ ] `KEYSTORE_ALIAS` env var set
-- [ ] `KEY_PASSWORD` env var set
-- [ ] Release keystore accessible (NOT in repo — use secure vault)
-- [ ] versionCode and versionName updated in `android/app/build.gradle`
-- [ ] Run `npm run build:android` and verify APK/AAB builds
+### Database
+- [ ] Run all pending migrations on production DB
+- [ ] Verify migration 004: no duplicate agent phones
+- [ ] Verify migration 008: no duplicate ID numbers/emails
+- [ ] Create DOWN scripts for all 10 migrations
+- [ ] Create CONCURRENTLY indexes for production (avoid locking)
 
-### Firebase
-- [ ] Firebase project `yemen-telecom-1699` exists
-- [ ] Firebase Admin SDK service account has Storage admin role
-- [ ] Firebase Storage bucket created and accessible
-- [ ] Firebase Authentication enabled (if using phone auth)
+### Application
+- [ ] Verify `NODE_ENV=production` set in Render dashboard
+- [ ] Verify `CORS_ORIGIN` points to production domain
+- [ ] Verify `PORT=4000` matches Dockerfile EXPOSE
+- [ ] Build Docker image locally and test
+- [ ] Run full test suite: `npm test`
+- [ ] Run frontend build: `npm run build`
+- [ ] Run server build: `cd server && npx tsc`
 
-### Supabase
-- [ ] Database migrations up to date (run `npx tsx server/src/init-db.ts`)
-- [ ] Supabase PITR (Point-in-Time Recovery) enabled (Pro plan)
-- [ ] Database password rotated from default
+### Docker
+- [ ] Build: `docker build -t yemen-telecom .`
+- [ ] Run: `docker run -p 4000:4000 yemen-telecom`
+- [ ] Verify health: `curl http://localhost:4000/api/health`
+- [ ] Verify non-root: `docker run --user=appuser yemen-telecom whoami`
 
-## Deployment Steps
+## Deployment
 
-1. **Commit and push to main branch**
-   - `git add render.yaml` (ensure deployment config is tracked)
-   - `git commit -m "chore: update deployment config"`
-   - `git push origin main`
+### GitHub
+- [ ] Commit all changes to `main` branch
+- [ ] Verify CI passes (all 293 tests)
+- [ ] Run `git log --oneline --all --graph` to verify branch state
+- [ ] Push to `origin/main`
+- [ ] Monitor CI pipeline completion
 
-2. **Render auto-deploy** (if enabled) or manual deploy
-   - Go to Render Dashboard → yemen-telecom-api → Manual Deploy → Deploy latest commit
-   - Monitor build logs for errors
-
-3. **Verify health endpoint**
-   - `curl https://yemen-telecom-api.onrender.com/api/health`
-   - Expected: `{ "status": "ok", "environment": "production", ... }`
-
-4. **Verify login**
-   - `curl -X POST https://yemen-telecom-api.onrender.com/api/auth/login -H 'Content-Type: application/json' -d '{"username":"manager","password":"<SEED_PASSWORD_MANAGER>"}'`
-   - Expected: 200 with JWT token
-
-5. **Verify image upload**
-   - Login first to get token
-   - `curl -X POST https://yemen-telecom-api.onrender.com/api/upload/image -H 'Authorization: Bearer <TOKEN>' -F 'image=@test.jpg'`
-   - Expected: 200 with Firebase Storage URL
-
-6. **Verify backup**
-   - Login as manager
-   - `curl -X POST https://yemen-telecom-api.onrender.com/api/admin/system/backup -H 'Authorization: Bearer <TOKEN>'`
-   - Expected: 200 with S3 download URL
-
-## Post-Deployment
-
-- [ ] Verify uptime monitoring alerts configured
-- [ ] Run `npm test` — all tests pass
-- [ ] Smoke test all CRUD operations via frontend
-- [ ] Verify CSP headers: `curl -I https://yemen-telecom-api.onrender.com/ | grep content-security-policy`
-- [ ] Verify CSRF token endpoint works: `curl https://yemen-telecom-api.onrender.com/api/csrf-token`
-- [ ] Verify rate limiting: rapid requests to `/api/auth/login` return 429
-- [ ] Remove local `server/.env` file (secrets are in Render Dashboard now)
-- [ ] Confirm `render.yaml` is committed and pushed
+### Render
+- [ ] Deploy via Render dashboard or webhook
+- [ ] Monitor build logs for errors
+- [ ] Verify health endpoint returns 200
+- [ ] Verify database connection (health check includes DB status)
+- [ ] Test login flow with test credentials

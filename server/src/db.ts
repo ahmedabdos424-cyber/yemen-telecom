@@ -41,7 +41,7 @@ if (process.env.DB_FAMILY) {
   (poolConfig as any).family = parseInt(process.env.DB_FAMILY, 10);
 }
 if (process.env.NODE_ENV === 'production' && !isLocal && !rejectUnauthorized) {
-  logger.warn('[DB] SSL certificate validation is disabled (DB_SSL_REJECT_UNAUTHORIZED=false). Enable it in production for security.');
+  logger.error('[DB] SSL certificate validation is disabled (DB_SSL_REJECT_UNAUTHORIZED=false). Set it to true in production.');
 }
 export const pool = new Pool(poolConfig);
 

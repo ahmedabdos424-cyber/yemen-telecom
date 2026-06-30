@@ -38,7 +38,7 @@ router.post('/', requireRole('manager'), validate(createAgentSchema), async (req
       return res.status(409).json({ error: 'Username is already registered by another account' });
     }
 
-    const agentPassword = password || crypto.randomBytes(4).toString('hex');
+    const agentPassword = password || crypto.randomBytes(16).toString('hex');
     const passwordHash = await bcrypt.hash(agentPassword, 10);
 
     const { userId, agent } = await transaction(async (client) => {

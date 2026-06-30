@@ -202,6 +202,19 @@ const refreshLimiter = rateLimit({
 });
 app.use('/api/auth/refresh', refreshLimiter);
 
+// Rate limiting on password reset endpoint
+const passwordResetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: 'Too many password reset attempts, please try again later' },
+});
+app.use('/api/sellers', (req, res, next) => {
+  if (req.method === 'POST' && req.path.endsWith('/reset-password')) {
+    return passwordResetLimiter(req, res, next);
+  }
+  next();
+});
+
 // Stricter rate limiter for write endpoints (mutations)
 const writeLimiter = rateLimit({
   windowMs: 60 * 1000,

@@ -77,4 +77,4 @@ run-backend-tests.ps1
 backend-test-results.json
 *.lnk
 
-testsprite_tests\tmp\config.json
+testsprite_tests/tmp/config.json
