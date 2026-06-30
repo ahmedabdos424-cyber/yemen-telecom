@@ -23,7 +23,7 @@ jobs:
           npm run build 2>&1 | tee /tmp/frontend-build.log
           echo "=== SERVER BUILD ==="
           cd server && npm ci 2>&1 | tee /tmp/server-npm-ci.log
-          cd /app/server && npx tsc --noEmit --skipLibCheck 2>&1 | tee /tmp/tsc.log
+          cd server && npx tsc --noEmit --skipLibCheck 2>&1 | tee /tmp/tsc.log
 
       - name: Build Docker image
         run: |
