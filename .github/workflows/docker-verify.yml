@@ -10,50 +10,37 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Verify host info
         run: |
           echo "=== HOST INFO ==="
           uname -a
-          node --version || true
-          npm --version || true
           docker --version
+          node --version
+          npm --version
 
       - name: Build Docker image
-        run: |
-          echo "=== BUILDING DOCKER IMAGE ==="
-          docker build -t yemen-telecom:test . 2>&1 | tee docker-build.log
-          echo "=== BUILD EXIT CODE: $? ==="
+        run: docker build -t yemen-telecom:test . 2>&1
 
       - name: Verify npm ci on Linux
         run: |
-          echo "=== NPM CI VERIFICATION (inside container) ==="
-          docker run --rm yemen-telecom:test sh -c "
-            echo '--- Node version ---' &&
-            node --version &&
-            echo '--- npm version ---' &&
-            npm --version &&
-            echo '--- npx tsc check ---' &&
-            cd /app/server && npx tsc --noEmit --skipLibCheck 2>&1 || true &&
-            echo '--- No EBADPLATFORM ---' &&
-            echo 'DONE'
-          " 2>&1 | tee npm-ci-verify.log
+          echo "=== NPM CI ==="
+          npm ci 2>&1
+          echo "=== FRONTEND BUILD ==="
+          npm run build 2>&1
+          echo "=== SERVER BUILD ==="
+          cd server && npm ci 2>&1
+          npx tsc --noEmit --skipLibCheck 2>&1
 
-      - name: Start container and test health
+      - name: Start container and test
         run: |
-          echo "=== STARTING CONTAINER ==="
-          docker run -d \
-            --name yt-test \
-            -p 4000:4000 \
+          docker run -d --name yt-test -p 4000:4000 \
             -e NODE_ENV=production \
             -e API_PORT=4000 \
             -e DB_HOST=dpg-cv5rc8q4d50c73d4krp0-a.oregon-postgres.render.com \
             -e DB_PORT=5432 \
-            -e DB_USER=yemen_telecom_user \
+            -e DB_USER=dummy \
             -e DB_PASSWORD=dummy \
-            -e DB_NAME=yemen_telecom \
+            -e DB_NAME=dummy \
             -e DB_SSL_REJECT_UNAUTHORIZED=false \
             -e DB_FAMILY=4 \
             -e DB_MAX_CONNECTIONS=5 \
@@ -67,62 +54,18 @@ jobs:
             -e FIREBASE_CLIENT_EMAIL=test@test.com \
             -e FIREBASE_STORAGE_BUCKET=test.appspot.com \
             yemen-telecom:test
-          echo "Container started, waiting 8s for boot..."
           sleep 8
-          docker logs yt-test 2>&1 | head -80
-
-      - name: Verify API health
-        run: |
+          echo "=== CONTAINER LOGS ==="
+          docker logs yt-test 2>&1 || true
           echo "=== HEALTH CHECK ==="
           curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost:4000/api/health || echo "Health check failed"
-          echo "=== FULL RESPONSE ==="
           curl -s http://localhost:4000/api/health || echo "(empty)"
-          echo ""
-
-      - name: Verify frontend serves
-        run: |
-          echo "=== FRONTEND CHECK ==="
+          echo "=== FRONTEND ==="
           curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost:4000/ || echo "Frontend check failed"
-          echo "=== HTML TITLE ==="
-          curl -s http://localhost:4000/ | grep -o '<title>[^<]*</title>' || echo "(no title tag)"
-
-      - name: Verify no EBADPLATFORM in build
-        run: |
-          echo "=== BUILD LOG ERROR CHECK ==="
-          if grep -qi "EBADPLATFORM\|EBADENGINE\|ERR!\|error" docker-build.log 2>/dev/null; then
-            echo "❌ ERRORS FOUND IN BUILD LOG:"
-            grep -i "EBADPLATFORM\|EBADENGINE\|ERR!\|error" docker-build.log
-            exit 1
-          else
-            echo "✅ No EBADPLATFORM or EBADENGINE errors"
-          fi
-
-      - name: Verify TypeScript compilation
-        run: |
-          echo "=== TS CONFIG CHECK ==="
-          docker run --rm yemen-telecom:test sh -c "
-            ls /app/server/dist/ 2>/dev/null && echo '✅ dist/ exists' || echo '❌ dist/ missing'
-          "
-
-      - name: Container logs
-        if: always()
-        run: |
-          echo "=== FULL LOGS ==="
-          docker logs yt-test 2>&1 | tail -50 || true
+          curl -s http://localhost:4000/ | grep -o '<title>[^<]*</title>' || echo "(no title)"
 
       - name: Cleanup
         if: always()
         run: |
           docker stop yt-test 2>/dev/null || true
           docker rm yt-test 2>/dev/null || true
-          docker image rm yemen-telecom:test 2>/dev/null || true
-
-      - name: Verify npm ci on Linux host
-        run: |
-          echo "=== NPM CI ON UBUNTU HOST ==="
-          npm ci 2>&1 | tail -20
-          echo "=== NPM CI EXIT: $? ==="
-          echo "=== FRONTEND BUILD ==="
-          npm run build 2>&1 | tail -10
-          echo "=== SERVER BUILD ==="
-          cd server && npm ci 2>&1 | tail -10 && npx tsc --noEmit --skipLibCheck 2>&1
