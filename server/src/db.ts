@@ -25,8 +25,8 @@ const rejectUnauthorized = process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false';
 const poolConfig: PoolConfig = {
   host: dbHost,
   port: parseInt(process.env.DB_PORT || '5432', 10),
-  user: safeEnv('DB_USER') || process.env.DB_USER || 'postgres',
-  password: safeEnv('DB_PASSWORD') || process.env.DB_PASSWORD || 'postgres',
+  user: safeEnv('DB_USER'),
+  password: safeEnv('DB_PASSWORD'),
   database: process.env.DB_NAME || 'postgres',
   ssl: isLocal
     ? false

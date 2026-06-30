@@ -46,11 +46,13 @@ export function requireRole(...roles: string[]) {
 }
 
 export async function authenticateToken(req: AuthRequest, res: Response, next: NextFunction) {
+  const cookieToken = req.cookies?.token;
   const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith('Bearer ')) {
+  const headerToken = auth?.startsWith('Bearer ') ? auth.split(' ')[1] : null;
+  const token = cookieToken || headerToken;
+  if (!token) {
     return res.status(401).json({ error: 'No token provided' });
   }
-  const token = auth.split(' ')[1];
   try {
     const decoded = jwt.verify(token, JWT_SECRET, {
       issuer: 'yemen-telecom',

@@ -1,68 +1,68 @@
-# Security Audit — yemen-telecom
+# SECURITY AUDIT — Yemen Telecom
 
-## Authentication
-| Control | Status | Source |
-|---------|--------|--------|
-| JWT with algorithm whitelist (HS256) | ✅ | auth.ts:121, middleware/auth.ts:56 |
-| Issuer validation | ✅ | auth.ts, middleware/auth.ts:55 |
-| Refresh token rotation | ✅ | auth.ts:80-84 (blacklist old, issue new) |
-| Token blacklist on logout | ✅ | auth.ts:113-116 |
-| Token reuse detection | ✅ | middleware/auth.ts:58-61 |
-| bcrypt password hashing (cost 10) | ✅ | auth.ts:63,119 |
-| Login status check (active/inactive) | ✅ | auth.ts:38-40,86-88 |
-| Password complexity (8+ chars, 3/4 rules) | ✅ | validation.ts:41-45 |
+## Critical
 
-## Network Security
-| Control | Status | Source |
-|---------|--------|--------|
-| Helmet (15 HTTP headers) | ✅ | index.ts:54 |
-| CSP (unsafe-eval removed) | ✅ | index.ts:57 |
-| CORS (origin validated) | ✅ | index.ts:22-31 |
-| Rate limiting (4 tiers) | ✅ | index.ts:39-49 |
-| CSRF (timingSafeEqual) | ✅ | index.ts:110-113 |
+### SEC-001: DB_SSL_REJECT_UNAUTHORIZED=false in Production .env
+- **File:** `server/.env`
+- **Evidence:** `DB_SSL_REJECT_UNAUTHORIZED=false`
+- **Root Cause:** Disables TLS certificate validation for Supabase connection
+- **Risk:** Man-in-the-middle attack on all database traffic
+- **Fix:** Set to `true` and ensure proper CA cert
 
-## Data Security
-| Control | Status | Source |
-|---------|--------|--------|
-| Parameterized SQL (all queries) | ✅ | All route files |
-| Transaction support | ✅ | db.ts:43 |
-| Upload validation (magic bytes) | ✅ | upload.ts:6-19 |
-| XSS prevention (Zod HTML stripping) | ✅ | validation.ts |
-| No hardcoded passwords in schema | ✅ | schema.sql, seed.ts |
-| Seed guard in production | ✅ | seed.ts:12-15 |
-| Per-user seed passwords via env vars | ✅ | seed.ts:19-38 |
+### SEC-002: Hardcoded DB Credential Fallbacks
+- **File:** `server/src/db.ts:34-35`
+- **Evidence:** `safeEnv('DB_USER') || process.env.DB_USER || 'postgres'`
+- **Risk:** Falls back to 'postgres' if env vars unset
+- **Fix:** Remove default fallbacks; fail if not set
 
-## Authorization
-| Control | Status | Source |
-|---------|--------|--------|
-| Role-based access (manager/agent/seller) | ✅ | requireRole() middleware |
-| Ownership checks on seller mutations | ✅ | sellers.ts:195,232,262,296 |
-| Report scoping (agent → own sellers) | ✅ | reports.ts:67-77 |
-| Operation scoping (agent → own sellers) | ✅ | operations.ts:17-19 |
-| Maintenance mode (blocks mutations) | ✅ | index.ts:170-180 |
+### SEC-003: Production Secrets in Git History
+- **File:** `backups/config-20260629-001148/server.env`, `backups/config-20260629-001148/root.env`
+- **Evidence:** Firebase RSA private key, DB password, JWT_SECRET, REFRESH_SECRET, CSRF_SECRET
+- **Risk:** Anyone with repo access has production credentials
+- **Fix:** `git filter-branch` to purge; rotate all secrets
 
-## Secrets Hygiene
-| Control | Status |
-|---------|--------|
-| .env files in .gitignore | ✅ |
-| render.yaml uses sync:false for secrets | ✅ |
-| No committed credentials in source | ✅ |
-| release.keystore in .gitignore | ✅ |
+### SEC-004: CSP Missing base-uri
+- **File:** `server/src/index.ts` CSP config
+- **Evidence:** No `base-uri` directive in Content-Security-Policy
+- **Risk:** Open redirect via injected `<base>` tags
+- **Fix:** Add `base-uri 'self'`
 
-## Android Security
-| Control | Status |
-|---------|--------|
-| App ID: com.yemen.telecom | ✅ |
-| ProGuard R8 enabled | ✅ |
-| Signing via env vars | ✅ |
-| google-services.json | ❌ MISSING |
-| release.keystore in VCS | ⚠️ Present |
+## High
 
-## Remaining Issues
-| Issue | Severity | Location | Impact |
-|-------|----------|----------|--------|
-| Math.random() for upload filenames | LOW | upload.ts:35 | Predictable filename |
-| Static /uploads public (no auth) | LOW | index.ts:94 | Deliberate (avatars) |
-| CSP unsafe-inline retained | LOW | index.ts:57 | Vite requirement |
-| Token cleanup unscheduled | LOW | db.ts:67-72 | Unbounded blacklist table |
-| google-services.json missing | MEDIUM | android/app/ | No Firebase push/phone auth |
+### SEC-005: fs.readFileSync on Every GET /
+- **File:** `server/src/index.ts:123-135`
+- **Evidence:** Reads `dist/index.html` from disk on every request
+- **Risk:** 1-5ms I/O per request, no cache
+- **Fix:** Cache in memory after first read
+
+### SEC-006: Log Files Present in Git
+- **File:** `server/srv.log`, `server/stderr.log`, `server/server-term.log`
+- **Evidence:** Server log files not in .gitignore
+- **Risk:** Accidental exposure of request data
+- **Fix:** Add to .gitignore; use git rm --cached
+
+### SEC-007: No .nvmrc / Node Version Mismatch
+- **Evidence:** Docker uses node:22-alpine, CI uses 20
+- **Risk:** Behavioral differences between environments
+- **Fix:** Add .nvmrc with node 20; align Docker
+
+### SEC-008: Unnecessary require() in try-catch
+- **File:** `server/src/index.ts:319`
+- **Evidence:** `const fs = require('fs');` inside try-catch at top-level
+- **Risk:** fs is already imported via ES module import
+- **Fix:** Remove duplicate require
+
+## Medium
+
+### SEC-009: No Upload Rate Limiting
+- **File:** `server/src/routes/upload.ts`
+- **Evidence:** No rate limiter on file upload endpoint
+- **Risk:** DoS via large file uploads
+
+### SEC-010: Zod Schema Duplication (camelCase/snake_case)
+- **File:** `server/src/validation.ts`
+- **Evidence:** Both `store_name` and `storeName`, `id_number` and `idNumber` accepted
+- **Risk:** Increased attack surface
+- **Fix:** Normalize on input
+
+## Security Score: 74/100

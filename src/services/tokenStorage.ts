@@ -1,19 +1,3 @@
-/**
- * Token Storage Abstraction
- *
- * Provides a unified interface for token storage across platforms.
- * - localStorage: Default for browser/web
- * - Capacitor Preferences: Encrypted storage for native Android
- *
- * Auto-detects platform and uses appropriate storage.
- * Backward compatible with existing localStorage-based tokens.
- *
- * TODO: Migrate to httpOnly cookies (server-set) to prevent XSS token theft.
- *       localStorage tokens are accessible to any JS running on the page.
- *       This requires: 1) Server-side cookie setting on login/refresh,
- *       2) CSRF token in response body, 3) No JS access to cookie.
- */
-
 const STORAGE_KEYS = {
   AUTH_TOKEN: 'auth_token',
   REFRESH_TOKEN: 'refresh_token',
@@ -23,7 +7,6 @@ let isCapacitor = false;
 try {
   isCapacitor = !!(window as unknown as { Capacitor?: { isNative?: boolean } }).Capacitor?.isNative;
 } catch {
-  // Not in a browser/Capacitor environment
 }
 
 async function getCapacitorStorage(): Promise<{
@@ -32,7 +15,6 @@ async function getCapacitorStorage(): Promise<{
   remove: (key: string) => Promise<void>;
 }> {
   try {
-    // @ts-ignore - dynamically imported only on Capacitor native; falls back to localStorage if unavailable
     const { Preferences } = await import('@capacitor/preferences');
     return {
       get: async (key: string) => {
@@ -47,7 +29,6 @@ async function getCapacitorStorage(): Promise<{
       },
     };
   } catch {
-    // Capacitor Preferences not available, fall back to localStorage
     return getLocalStorageAdapter();
   }
 }
@@ -64,9 +45,17 @@ let storageAdapter: ReturnType<typeof getLocalStorageAdapter> | null = null;
 
 async function getStorage() {
   if (!storageAdapter) {
-    storageAdapter = isCapacitor ? await getCapacitorStorage() : getLocalStorageAdapter();
+    storageAdapter = isCapacitor ? await getCapacitorStorage() : getNoopAdapter();
   }
   return storageAdapter;
+}
+
+function getNoopAdapter() {
+  return {
+    get: async () => null,
+    set: async () => {},
+    remove: async () => {},
+  };
 }
 
 export const tokenStorage = {
@@ -106,12 +95,11 @@ export const tokenStorage = {
     await storage.remove(STORAGE_KEYS.REFRESH_TOKEN);
   },
 
-  /** Sync getter for backward compatibility with existing code */
   getAuthTokenSync(): string | null {
-    return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    return isCapacitor ? localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN) : null;
   },
 
   getRefreshTokenSync(): string | null {
-    return localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+    return isCapacitor ? localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN) : null;
   },
 };

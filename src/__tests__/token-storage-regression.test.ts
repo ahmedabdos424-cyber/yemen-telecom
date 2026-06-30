@@ -2,16 +2,12 @@
  * @vitest-environment jsdom
  *
  * P0-03 Regression tests: token storage abstraction.
- * Tests that tokens are read/written through tokenStorage,
- * not directly from localStorage.
- *
- * NOTE: jsdom without --localstorage-file disables localStorage.
- * We mock it at module level before any tests run.
+ * For web (non-Capacitor), tokenStorage uses a noop adapter.
+ * Tokens are stored in httpOnly cookies, not accessible via JS.
  */
 
 import { describe, it, expect, beforeEach, vi, beforeAll } from 'vitest';
 
-// Mock localStorage for jsdom environment
 const store: Record<string, string> = {};
 const mockLocalStorage = {
   getItem: (key: string) => store[key] ?? null,
@@ -35,17 +31,17 @@ describe('P0-03 Token Storage Abstraction', () => {
     localStorage.clear();
   });
 
-  describe('Web startup (localStorage backend)', () => {
-    it('should read auth_token from localStorage via getAuthToken', async () => {
+  describe('Web startup (noop adapter — httpOnly cookies)', () => {
+    it('should return null from getAuthToken (web uses httpOnly cookies)', async () => {
       localStorage.setItem('auth_token', 'test-web-token');
       const token = await tokenStorage.getAuthToken();
-      expect(token).toBe('test-web-token');
+      expect(token).toBeNull();
     });
 
-    it('should read refresh_token from localStorage via getRefreshToken', async () => {
+    it('should return null from getRefreshToken (web uses httpOnly cookies)', async () => {
       localStorage.setItem('refresh_token', 'test-refresh');
       const token = await tokenStorage.getRefreshToken();
-      expect(token).toBe('test-refresh');
+      expect(token).toBeNull();
     });
 
     it('should return null when no auth_token exists', async () => {
@@ -59,34 +55,34 @@ describe('P0-03 Token Storage Abstraction', () => {
     });
   });
 
-  describe('Token write -> read round-trip', () => {
-    it('should persist auth_token via setAuthToken and read back', async () => {
+  describe('Token write -> read round-trip (web = noop)', () => {
+    it('should return null after setAuthToken (web does not persist)', async () => {
       await tokenStorage.setAuthToken('roundtrip-auth');
       const stored = await tokenStorage.getAuthToken();
-      expect(stored).toBe('roundtrip-auth');
+      expect(stored).toBeNull();
     });
 
-    it('should persist refresh_token via setRefreshToken and read back', async () => {
+    it('should return null after setRefreshToken (web does not persist)', async () => {
       await tokenStorage.setRefreshToken('roundtrip-refresh');
       const stored = await tokenStorage.getRefreshToken();
-      expect(stored).toBe('roundtrip-refresh');
+      expect(stored).toBeNull();
     });
 
-    it('should remove auth_token via removeAuthToken', async () => {
+    it('should noop removeAuthToken', async () => {
       await tokenStorage.setAuthToken('to-remove');
       await tokenStorage.removeAuthToken();
       const stored = await tokenStorage.getAuthToken();
       expect(stored).toBeNull();
     });
 
-    it('should remove refresh_token via removeRefreshToken', async () => {
+    it('should noop removeRefreshToken', async () => {
       await tokenStorage.setRefreshToken('to-remove');
       await tokenStorage.removeRefreshToken();
       const stored = await tokenStorage.getRefreshToken();
       expect(stored).toBeNull();
     });
 
-    it('should clear all tokens via clearAll', async () => {
+    it('should noop clearAll', async () => {
       await tokenStorage.setAuthToken('auth-val');
       await tokenStorage.setRefreshToken('refresh-val');
       await tokenStorage.clearAll();
@@ -96,15 +92,12 @@ describe('P0-03 Token Storage Abstraction', () => {
   });
 
   describe('loadTokens() from client.ts', () => {
-    // loadTokens caches after first call (tokensLoaded flag).
-    // Only the first test in this block accesses fresh localStorage values.
-
-    it('should load auth_token and refresh_token from localStorage on first call', async () => {
+    it('should return null tokens for web (httpOnly cookies)', async () => {
       localStorage.setItem('auth_token', 'load-auth-test');
       localStorage.setItem('refresh_token', 'load-refresh-test');
       const result = await loadTokens();
-      expect(result.authToken).toBe('load-auth-test');
-      expect(result.refreshToken).toBe('load-refresh-test');
+      expect(result.authToken).toBeNull();
+      expect(result.refreshToken).toBeNull();
     });
   });
 
@@ -132,42 +125,45 @@ describe('P0-03 Token Storage Abstraction', () => {
       clearTokens();
     });
 
-    it('setToken should update in-memory and persist to storage', async () => {
+    it('setToken should update in-memory but NOT persist to localStorage', async () => {
       setToken('write-auth');
       const stored = await tokenStorage.getAuthToken();
-      expect(stored).toBe('write-auth');
+      expect(stored).toBeNull();
+      const mem = getLoadedTokens();
+      expect(mem.authToken).toBe('write-auth');
     });
 
-    it('setRefreshToken should update in-memory and persist to storage', async () => {
+    it('setRefreshToken should update in-memory but NOT persist to localStorage', async () => {
       setRefreshToken('write-refresh');
       const stored = await tokenStorage.getRefreshToken();
-      expect(stored).toBe('write-refresh');
+      expect(stored).toBeNull();
+      const mem = getLoadedTokens();
+      expect(mem.refreshToken).toBe('write-refresh');
     });
 
-    it('clearTokens should remove both from storage', async () => {
+    it('clearTokens should clear in-memory', async () => {
       setToken('clear-auth');
       setRefreshToken('clear-refresh');
       clearTokens();
-      const authStored = await tokenStorage.getAuthToken();
-      const refStored = await tokenStorage.getRefreshToken();
-      expect(authStored).toBeNull();
-      expect(refStored).toBeNull();
+      const mem = getLoadedTokens();
+      expect(mem.authToken).toBeNull();
+      expect(mem.refreshToken).toBeNull();
     });
   });
 
-  describe('Session restore simulation', () => {
+  describe('Session restore simulation (web = noop)', () => {
     beforeEach(() => {
       clearTokens();
       localStorage.clear();
     });
 
-    it('should restore both tokens after simulated previous login', async () => {
+    it('should not restore tokens from a previous session (httpOnly cookies)', async () => {
       await tokenStorage.setAuthToken('session-auth');
       await tokenStorage.setRefreshToken('session-refresh');
       const authToken = await tokenStorage.getAuthToken();
       const refreshToken = await tokenStorage.getRefreshToken();
-      expect(authToken).toBe('session-auth');
-      expect(refreshToken).toBe('session-refresh');
+      expect(authToken).toBeNull();
+      expect(refreshToken).toBeNull();
     });
 
     it('should detect no session when no tokens exist', async () => {
@@ -177,13 +173,14 @@ describe('P0-03 Token Storage Abstraction', () => {
   });
 
   describe('Logout flow', () => {
-    it('should clear all tokens with clearAll matching logout behavior', async () => {
-      await tokenStorage.setAuthToken('logout-auth');
-      await tokenStorage.setRefreshToken('logout-refresh');
+    it('should clear in-memory tokens with clearAll', async () => {
+      setToken('logout-auth');
+      setRefreshToken('logout-refresh');
       localStorage.setItem('tele_role', 'agent');
-      await tokenStorage.clearAll();
-      expect(await tokenStorage.getAuthToken()).toBeNull();
-      expect(await tokenStorage.getRefreshToken()).toBeNull();
+      clearTokens();
+      const mem = getLoadedTokens();
+      expect(mem.authToken).toBeNull();
+      expect(mem.refreshToken).toBeNull();
       expect(localStorage.getItem('tele_role')).toBe('agent');
     });
   });
