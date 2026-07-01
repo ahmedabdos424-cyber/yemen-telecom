@@ -1,14 +1,13 @@
 FROM node:22-alpine AS frontend-build
 WORKDIR /app
-ENV NODE_ENV=production
 COPY package*.json ./
 RUN npm ci && npm cache clean --force
 COPY . .
+ENV NODE_ENV=production
 RUN npm run build
 
 FROM node:22-alpine AS server-build
 WORKDIR /app/server
-ENV NODE_ENV=production
 COPY server/package*.json ./
 RUN npm ci && npm cache clean --force
 COPY server/ .
