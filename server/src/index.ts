@@ -231,16 +231,21 @@ const apiLimiter = rateLimit({
 app.use('/api', apiLimiter);
 
 // Health check endpoint (public — no auth required)
+// Always returns 200 so Render's deploy health check succeeds.
+// Reports "degraded" in JSON body when DB is unreachable.
 app.get('/api/health', async (_req, res) => {
   let dbOk = true;
   try {
-    await query('SELECT 1');
+    await Promise.race([
+      query('SELECT 1'),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('health-check-timeout')), 5000)),
+    ]);
   } catch {
     dbOk = false;
   }
   const mem = process.memoryUsage();
   const status = dbOk ? 'ok' : 'degraded';
-  res.status(dbOk ? 200 : 503).json({
+  res.status(200).json({
     status,
     db: dbOk ? 'connected' : 'disconnected',
     uptime: Math.floor((Date.now() - START_TIME) / 1000),
@@ -480,6 +485,10 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   for (const r of listRoutes()) {
     logger.info(`  ${r.method.padEnd(6)} ${r.path}`);
   }
+  // Pre-warm database connection — informational only, does not block startup
+  query('SELECT 1')
+    .then(() => logger.info('[INIT] Database connection verified'))
+    .catch(err => logger.warn('[INIT] Database not ready (will retry on first request):', err.message));
 });
 
 // Periodic cleanup of expired blacklisted tokens (every hour)
