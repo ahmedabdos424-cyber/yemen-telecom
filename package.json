@@ -71,7 +71,7 @@
     "vitest": "4.1.9"
   },
   "optionalDependencies": {
-    "@rollup/rollup-win32-x64-msvc": "^4.34.9"
+    "@rollup/rollup-win32-x64-msvc": "^4.62.2"
   },
   "allowScripts": {
     "@firebase/util@1.15.1": true,
