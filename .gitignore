@@ -6,6 +6,8 @@ dist/
 .env.*
 !.env.example
 .DS_Store
+Thumbs.db
+Desktop.ini
 *.apk
 *.aab
 *.zip
@@ -15,7 +17,6 @@ dist/
 firebase-service-account.json
 .playwright-mcp/
 .domdump.txt
-android/app/release.keystore
 android/key.properties
 *.keystore
 *.keystore.bak
@@ -68,13 +69,29 @@ PROJECT_*
 ANDROID_*
 OPERATIONS_*
 PRODUCTION_*
+CERTIFICATION_*.md
+DEPLOYMENT_*.md
+GITHUB_RELEASE_*.md
+PHASE*.md
+PRIVACY_*.md
+RC1_*.md
+ROOT_CAUSE_*.md
+DOCKER_*.md
+RUNTIME_*.md
+IMPLEMENTATION_*.md
 
 RELEASE_PACKAGE/
 test-plans/
 testsprite_tests/
+.testsprite/
 comprehensive-tests.mjs
 run-backend-tests.ps1
 backend-test-results.json
 *.lnk
+*.swp
+*.swo
+*~
+*.tmp
+.eslintcache
 
 testsprite_tests/tmp/config.json
