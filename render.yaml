@@ -41,7 +41,7 @@ services:
       - key: CSRF_SECRET
         sync: false
       - key: CORS_ORIGIN
-        value: "https://yemen-telecom-1699.web.app,https://yemen-telecom.onrender.com"
+        value: "https://yemen-telecom-1699.web.app,https://yemen-telecom.onrender.com,https://yementelecom1.netlify.app"
       # Firebase Admin (required for image uploads)
       - key: FIREBASE_PROJECT_ID
         sync: false

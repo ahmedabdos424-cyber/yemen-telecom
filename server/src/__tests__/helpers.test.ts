@@ -44,10 +44,10 @@ describe('Pagination Helpers', () => {
   });
 
   describe('getDefaultLimit', () => {
-    it('returns 1000 by default', () => {
+    it('returns 200 by default', () => {
       const orig = process.env.DEFAULT_PAGE_LIMIT;
       delete process.env.DEFAULT_PAGE_LIMIT;
-      expect(getDefaultLimit()).toBe(1000);
+      expect(getDefaultLimit()).toBe(200);
       if (orig !== undefined) process.env.DEFAULT_PAGE_LIMIT = orig;
     });
 

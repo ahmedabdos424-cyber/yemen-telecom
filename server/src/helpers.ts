@@ -9,9 +9,9 @@ export function getPagination(req: Request) {
 }
 
 export function getDefaultLimit(): number {
-  const val = parseInt(process.env.DEFAULT_PAGE_LIMIT || '1000', 10);
+  const val = parseInt(process.env.DEFAULT_PAGE_LIMIT || '200', 10);
   const max = getMaxLimit();
-  return Math.min(Math.max(1, isNaN(val) ? 1000 : val), max);
+  return Math.min(Math.max(1, isNaN(val) ? 200 : val), max);
 }
 
 export function getMaxLimit(): number {
