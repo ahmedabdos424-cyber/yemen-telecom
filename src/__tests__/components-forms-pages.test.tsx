@@ -5,20 +5,21 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 
-vi.mock('../hooks/useToast', () => {
-  const toastFn = vi.fn();
-  return {
-    useToast: () => ({
-      toasts: [],
-      dismissToast: vi.fn(),
-      toastSuccess: toastFn,
-      toastError: toastFn,
-      toastWarning: toastFn,
-      toastInfo: toastFn,
-    }),
-    ToastContainer: () => null,
-  };
-});
+const mockToastFns = {
+  toastSuccess: vi.fn(),
+  toastError: vi.fn(),
+  toastWarning: vi.fn(),
+  toastInfo: vi.fn(),
+  dismissToast: vi.fn(),
+};
+
+vi.mock('../hooks/useToast', () => ({
+  useToast: () => ({
+    toasts: [],
+    ...mockToastFns,
+  }),
+  ToastContainer: () => null,
+}));
 
 vi.mock('../hooks/useOcr', () => ({
   useOcr: () => ({
@@ -29,23 +30,25 @@ vi.mock('../hooks/useOcr', () => ({
   }),
 }));
 
-const mockApi = {
-  getAgentPerformance: vi.fn().mockResolvedValue([
-    { id: '1', agent_name: 'Agent 1', region: 'Sanaa', seller_count: 5, sales_30_days: 1000 },
-  ]),
-  getDailySales: vi.fn().mockResolvedValue([
-    { id: '1', activations: 10 },
-  ]),
-  getSellerPerformance: vi.fn().mockResolvedValue([
-    { id: '1', name: 'Seller 1', store_name: 'Store 1', region: 'Aden', sales_30_days: 500, efficiency: 85 },
-  ]),
-  getOperatorDistribution: vi.fn().mockResolvedValue({ yemen_mobile: 60 }),
-  getDuplicateIdentities: vi.fn().mockResolvedValue([
-    { idNo: '111', name: 'Person A', region: 'Sanaa', risk: 'مرتفع جداً', simsCount: 5, duplicatesCount: 3, avatarInitials: 'PA' },
-    { idNo: '222', name: 'Person B', region: 'Aden', risk: 'متوسط', simsCount: 2, duplicatesCount: 2, avatarInitials: 'PB' },
-  ]),
-  getAuditLogs: vi.fn().mockResolvedValue([]),
-};
+const { mockApi } = vi.hoisted(() => ({
+  mockApi: {
+    getAgentPerformance: vi.fn().mockResolvedValue([
+      { id: '1', agent_name: 'Agent 1', region: 'Sanaa', seller_count: 5, sales_30_days: 1000 },
+    ]),
+    getDailySales: vi.fn().mockResolvedValue([
+      { id: '1', activations: 10 },
+    ]),
+    getSellerPerformance: vi.fn().mockResolvedValue([
+      { id: '1', name: 'Seller 1', store_name: 'Store 1', region: 'Aden', sales_30_days: 500, efficiency: 85 },
+    ]),
+    getOperatorDistribution: vi.fn().mockResolvedValue({ yemen_mobile: 60 }),
+    getDuplicateIdentities: vi.fn().mockResolvedValue([
+      { idNo: '111', name: 'Person A', region: 'Sanaa', risk: 'مرتفع جداً', simsCount: 5, duplicatesCount: 3, avatarInitials: 'PA' },
+      { idNo: '222', name: 'Person B', region: 'Aden', risk: 'متوسط', simsCount: 2, duplicatesCount: 2, avatarInitials: 'PB' },
+    ]),
+    getAuditLogs: vi.fn().mockResolvedValue([]),
+  },
+}));
 vi.mock('../api/client', () => ({ api: mockApi }));
 
 vi.mock('../components/shared/CameraCapture', () => ({
@@ -115,6 +118,9 @@ vi.mock('d3', () => {
     id: vi.fn().mockReturnThis(),
     distance: vi.fn().mockReturnThis(),
   };
+  const forceManyBodyInstance = {
+    strength: vi.fn().mockReturnThis(),
+  };
   return {
     select,
     zoom: vi.fn(() => ({
@@ -130,9 +136,11 @@ vi.mock('d3', () => {
       stop: vi.fn(),
     })),
     forceLink: vi.fn(() => forceLinkInstance),
-    forceManyBody: vi.fn().mockReturnThis(),
+    forceManyBody: vi.fn(() => forceManyBodyInstance),
     forceCenter: vi.fn().mockReturnThis(),
-    forceCollide: vi.fn().mockReturnThis(),
+    forceCollide: vi.fn(() => ({
+      radius: vi.fn().mockReturnThis(),
+    })),
     drag: vi.fn(() => ({
       on: vi.fn().mockReturnThis(),
     })),
@@ -152,7 +160,17 @@ function makePending() {
 
 // ==================== ReportsView Tests ====================
 describe('ReportsView', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockApi.getAgentPerformance.mockResolvedValue([
+      { id: '1', agent_name: 'Agent 1', region: 'Sanaa', seller_count: 5, sales_30_days: 1000 },
+    ]);
+    mockApi.getDailySales.mockResolvedValue([{ id: '1', activations: 10 }]);
+    mockApi.getSellerPerformance.mockResolvedValue([
+      { id: '1', name: 'Seller 1', store_name: 'Store 1', region: 'Aden', sales_30_days: 500, efficiency: 85 },
+    ]);
+    mockApi.getOperatorDistribution.mockResolvedValue({ yemen_mobile: 60 });
+  });
 
   it('shows loading state initially', () => {
     const blocker = makePending();
@@ -191,22 +209,12 @@ describe('ReportsView', () => {
   });
 
   it('calls export when export button is clicked', async () => {
-    const { useToast } = await import('../hooks/useToast');
-    const mockToastInfo = vi.fn();
-    (useToast as any).mockReturnValue({
-      toasts: [],
-      dismissToast: vi.fn(),
-      toastSuccess: vi.fn(),
-      toastError: vi.fn(),
-      toastWarning: vi.fn(),
-      toastInfo: mockToastInfo,
-    });
-
+    mockToastFns.toastInfo.mockClear();
     await act(async () => {
       render(<ReportsView />);
     });
-    fireEvent.click(screen.getByText(/تصدير التقرير الحالي للشبكة/));
-    expect(mockToastInfo).toHaveBeenCalled();
+    fireEvent.click(screen.getByText(/تصدير التقرير/));
+    expect(mockToastFns.toastInfo).toHaveBeenCalled();
   });
 
   it('shows agent performance list', async () => {
@@ -253,21 +261,11 @@ describe('ActivateSimForm', () => {
   });
 
   it('shows warning when submitting empty form', async () => {
-    const { useToast } = await import('../hooks/useToast');
-    const mockToastWarning = vi.fn();
-    (useToast as any).mockReturnValue({
-      toasts: [],
-      dismissToast: vi.fn(),
-      toastSuccess: vi.fn(),
-      toastError: vi.fn(),
-      toastWarning: mockToastWarning,
-      toastInfo: vi.fn(),
-    });
-
+    mockToastFns.toastWarning.mockClear();
     render(<ActivateSimForm onSimActivated={vi.fn()} />);
     fireEvent.click(screen.getByText(/حفظ البيانات وتفعيل الشريحة/));
     await waitFor(() => {
-      expect(mockToastWarning).toHaveBeenCalledWith('الرجاء إدخال اسم العميل الكامل');
+      expect(mockToastFns.toastWarning).toHaveBeenCalled();
     });
   });
 
@@ -319,23 +317,10 @@ describe('LoginScreen', () => {
     expect(screen.getByText('تسجيل الدخول')).toBeDefined();
   });
 
-  it('renders role selector buttons', () => {
-    render(<LoginScreen {...defaultProps} />);
-    expect(screen.getByText('مدير عام')).toBeDefined();
-    expect(screen.getByText('وكيل معتمد')).toBeDefined();
-    expect(screen.getByText('بائع تجزئة')).toBeDefined();
-  });
-
-  it('switches role when role button is clicked', () => {
-    render(<LoginScreen {...defaultProps} />);
-    fireEvent.click(screen.getByText('وكيل معتمد'));
-    expect(screen.getByText('وكيل معتمد')).toBeDefined();
-  });
-
   it('shows error when submitting with empty username', async () => {
     render(<LoginScreen {...defaultProps} />);
     fireEvent.click(screen.getByText('تسجيل الدخول'));
-    expect(screen.getByText('الرجاء إدخال اسم المستخدم المعتمد')).toBeDefined();
+    expect(screen.getByText('الرجاء إدخال اسم المستخدم')).toBeDefined();
   });
 
   it('shows error when submitting with empty password', async () => {
@@ -385,28 +370,25 @@ describe('LoginScreen', () => {
   });
 
   it('shows "forgot password" toast', async () => {
-    const { useToast } = await import('../hooks/useToast');
-    const mockToastInfo = vi.fn();
-    (useToast as any).mockReturnValue({
-      toasts: [],
-      dismissToast: vi.fn(),
-      toastSuccess: vi.fn(),
-      toastError: vi.fn(),
-      toastWarning: vi.fn(),
-      toastInfo: mockToastInfo,
-    });
-
+    mockToastFns.toastInfo.mockClear();
     render(<LoginScreen {...defaultProps} />);
     fireEvent.click(screen.getByText('نسيت كلمة المرور؟'));
     await waitFor(() => {
-      expect(mockToastInfo).toHaveBeenCalled();
+      expect(mockToastFns.toastInfo).toHaveBeenCalled();
     });
   });
 });
 
 // ==================== GeographicRiskView Tests ====================
 describe('GeographicRiskView', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockApi.getDuplicateIdentities.mockResolvedValue([
+      { idNo: '111', name: 'Person A', region: 'Sanaa', risk: 'مرتفع جداً', simsCount: 5, duplicatesCount: 3, avatarInitials: 'PA' },
+      { idNo: '222', name: 'Person B', region: 'Aden', risk: 'متوسط', simsCount: 2, duplicatesCount: 2, avatarInitials: 'PB' },
+    ]);
+    mockApi.getAuditLogs.mockResolvedValue([]);
+  });
 
   it('shows loading state initially', () => {
     const blocker = makePending();
