@@ -1153,7 +1153,7 @@ function setupAdminMocks() {
 
 describe('Admin Routes', () => {
   let router: any;
-  beforeEach(async () => { setupAdminMocks(); router = (await import('../admin')).default; });
+  beforeEach(async () => { setupAdminMocks(); router = (await import('../routes/admin')).default; });
 
   describe('GET /settings', () => {
     it('returns settings', async () => {
@@ -1307,7 +1307,7 @@ function setupUserMocks() {
 
 describe('Users Routes', () => {
   let router: any;
-  beforeEach(async () => { setupUserMocks(); router = (await import('../users')).default; });
+  beforeEach(async () => { setupUserMocks(); router = (await import('../routes/users')).default; });
 
   describe('PUT /password', () => {
     it('updates password successfully', async () => {
@@ -1396,7 +1396,7 @@ function setupCustomerMocks() {
 
 describe('Customers Routes', () => {
   let router: any;
-  beforeEach(async () => { setupCustomerMocks(); router = (await import('../customers')).default; });
+  beforeEach(async () => { setupCustomerMocks(); router = (await import('../routes/customers')).default; });
 
   describe('GET /', () => {
     it('returns all customers for manager', async () => {
@@ -1522,7 +1522,7 @@ function setupDistributionMocks() {
 
 describe('Distributions Routes', () => {
   let router: any;
-  beforeEach(async () => { setupDistributionMocks(); router = (await import('../distributions')).default; });
+  beforeEach(async () => { setupDistributionMocks(); router = (await import('../routes/distributions')).default; });
 
   describe('GET /', () => {
     it('returns all distributions for manager', async () => {
@@ -1674,7 +1674,7 @@ function setupReportMocks() {
 
 describe('Reports Routes', () => {
   let router: any;
-  beforeEach(async () => { setupReportMocks(); router = (await import('../reports')).default; });
+  beforeEach(async () => { setupReportMocks(); router = (await import('../routes/reports')).default; });
 
   describe('GET /daily-sales', () => {
     it('returns daily sales', async () => {
@@ -1779,7 +1779,7 @@ describe('Upload Routes', () => {
         }),
       }),
     }));
-    const mod = await import('../upload');
+     const mod = await import('../routes/upload');
     router = mod.default;
   });
 
