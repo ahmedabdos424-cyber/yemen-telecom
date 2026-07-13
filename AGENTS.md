@@ -56,7 +56,9 @@ npm run build:android      # Frontend + capacitor copy
 
 ## Critical Quirks
 
-- **Backend process lifecycle**: `npm run server` via bash tool gets killed by `ChildProcess.kill` on tool-end. Use `Start-Process -WindowStyle Hidden -FilePath "powershell" -ArgumentList "cd <root>; `$env:NODE_OPTIONS='--max-old-space-size=512'; npx tsx server/src/index.ts"` to keep it alive through Playwright runs.
+- **Two TypeScript configs**: Frontend (`tsconfig.json`) targets ESNext/bundler/moduleResolution. Server (`server/tsconfig.json`) targets ES2020/commonjs/node. They are independent — running `tsc` from root only checks frontend.
+- **`npm run lint` is `tsc --noEmit`**, not ESLint. ESLint config exists but is minimal (bans `Math.random()` in server code).
+- **Backend process lifecycle**: `npm run server` via bash tool gets killed by `ChildProcess.kill` on tool-end. Use `Start-Process -WindowStyle Hidden -FilePath "powershell" -ArgumentList "cd <root>; $env:NODE_OPTIONS='--max-old-space-size=512'; npx tsx server/src/index.ts"` to keep it alive through Playwright runs.
 - **Rate limiter ordering** (`server/src/index.ts`): All `app.use('/api/...', someLimiter)` calls must come BEFORE the route `app.use('/api/...', routes)` declarations or they never fire. This has been a repeated gotcha.
 - **CORS**: `isDev` only activates when `NODE_ENV === 'development'` (exact string). Falls back to `CORS_ORIGIN` env var or localhost:3000 + web.app. Origin check is permissive to Capacitor `capacitor://` and `https://localhost`.
 - **Migrations**: Auto-applied from `server/migrations/` on startup. Sorted by filename. Failed migrations log and retry (not silently marked done). All migrations must have `BEGIN;`/`COMMIT;` wrapping. No rollback scripts exist.
@@ -68,7 +70,7 @@ npm run build:android      # Frontend + capacitor copy
 ## Testing
 
 - **Vitest**: Config in root `vitest.config.ts`. Runs both frontend (`src/__tests__/`) and backend (`server/src/__tests__/`) tests. No special setup needed.
-- **Playwright E2E**: Config in `playwright.config.ts`. Single spec: `qa-tests/e2e-final-certification.spec.cjs` — 60 tests across 12 sections (health, auth, CRUD, responsive, RTL, error handling, etc.). Manager login test uses `manager` / `Admin@123`. Expects frontend on :3000 and backend on :4000.
+- **Playwright E2E**: Config in `playwright.config.cjs`. Single spec: `qa-tests/e2e-final-certification.spec.cjs` — 60 tests across 12 sections (health, auth, CRUD, responsive, RTL, error handling, etc.). Manager login test uses `manager` / `Admin@123`. Expects frontend on :3000 and backend on :4000.
 - **Both layers expect `NODE_ENV=production` or unset for correct CORS behavior.** Set explicitly when starting for E2E.
 
 ## Security Patterns (don't break these)
@@ -96,7 +98,7 @@ npm run build:android      # Frontend + capacitor copy
 
 - **Render**: `yemen-telecom-api` web service (Docker, oregon, free plan). Health check: `/api/health`. Auto-deploy disabled. Secret env vars synced via Dashboard (not in repo).
 - **Docker**: Multi-stage (node:22-alpine). `ENV NODE_ENV=production`. Non-root `appuser`. `HEALTHCHECK` with wget. Production deps only (dev pruned after build).
-- **CI/CD**: 5 workflows — CI (lint+test), Deploy, Android (APK+AAB), Docker verify, CodeQL. No Gradle cache in Android CI.
+- **CI/CD**: 6 workflows — CI (lint+test+load-test+e2e+testsprite), Deploy, Android (APK+AAB), Docker verify, CodeQL, TestSprite.
 
 ## Existing Render Ops Checklist
 

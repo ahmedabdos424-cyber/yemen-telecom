@@ -142,7 +142,7 @@ const isDev = process.env.NODE_ENV === 'development';
 if (isDev) {
   logger.warn('[CORS] Development mode — permissive CORS enabled');
 }
-const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,https://yemen-telecom-1699.web.app')
+const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,https://yemen-telecom-1699.web.app,https://yementelecom1.netlify.app')
   .split(',')
   .map((o) => o.trim())
   .filter(Boolean);
