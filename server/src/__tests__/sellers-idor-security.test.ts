@@ -93,11 +93,11 @@ describe('P0-01 IDOR Security Regression Tests', () => {
     (query as any).mockImplementation((sql: string, params: any[]) => {
       if (sql.includes('FOR UPDATE')) {
         const id = Number(params[0]);
-        if (id === 1) return Promise.resolve({ rows: [{ sales_30_days: 30, total_sales: 100 }] });
-        if (id === 2) return Promise.resolve({ rows: [{ sales_30_days: 20, total_sales: 80 }] });
-        return Promise.resolve({ rows: [{ sales_30_days: 0, total_sales: 0 }] });
+        if (id === 1) return Promise.resolve({ rows: [sellerA] });
+        if (id === 2) return Promise.resolve({ rows: [sellerB] });
+        return Promise.resolve({ rows: [] });
       }
-      if (sql.includes('FROM sellers WHERE id')) {
+      if (sql.includes('FROM sellers WHERE id') && !sql.includes('FOR UPDATE')) {
         const id = Number(params[0]);
         if (id === 1) return Promise.resolve({ rows: [sellerA] });
         if (id === 2) return Promise.resolve({ rows: [sellerB] });

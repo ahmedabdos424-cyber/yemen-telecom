@@ -4,13 +4,20 @@ import crypto from 'crypto';
 import { query, transaction } from '../db';
 import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
-import { getPagination, paginatedQuery } from '../helpers';
+import { getPagination, paginatedQuery, getDefaultLimit } from '../helpers';
 import { validate, createAgentSchema, updateAgentSchema } from '../validation';
 
 const router = Router();
 
-router.get('/', requireRole('manager', 'agent'), async (req: Request, res: Response) => {
+router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
   try {
+    if (req.user?.role === 'agent') {
+      const result = await query(
+        'SELECT a.* FROM agents a WHERE a.user_id = $1 ORDER BY id',
+        [req.user.id]
+      );
+      return res.json(result.rows);
+    }
     const { page, limit, offset } = getPagination(req);
     if (req.query.page || req.query.limit) {
       const result = await paginatedQuery<any>(
@@ -20,10 +27,24 @@ router.get('/', requireRole('manager', 'agent'), async (req: Request, res: Respo
       );
       return res.json(result);
     }
-    const result = await query('SELECT * FROM agents ORDER BY id');
+    const result = await query(`SELECT * FROM agents ORDER BY id LIMIT ${getDefaultLimit()}`);
     res.json(result.rows);
   } catch (err) {
     logger.error('Error fetching agents:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/:id', requireRole('manager'), async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const result = await query('SELECT * FROM agents WHERE id = $1', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Agent not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    logger.error('Error fetching agent:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -92,6 +113,27 @@ router.put('/:id', requireRole('manager'), validate(updateAgentSchema), async (r
     res.json(result.rows[0]);
   } catch (err) {
     logger.error('Error updating agent:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.delete('/:id', requireRole('manager'), async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const existing = await query('SELECT * FROM agents WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Agent not found' });
+    }
+    const agent = existing.rows[0];
+    await transaction(async (client) => {
+      if (agent.user_id) {
+        await client.query('UPDATE users SET status = $1 WHERE id = $2', ['inactive', agent.user_id]);
+      }
+      await client.query('UPDATE agents SET status = $1 WHERE id = $2', ['inactive', id]);
+    });
+    res.json({ message: 'Agent deleted successfully' });
+  } catch (err) {
+    logger.error('Error deleting agent:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

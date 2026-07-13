@@ -1,15 +1,43 @@
 import { Router, Request, Response } from 'express';
 import { query } from '../db';
 import { logger } from '../logger';
-import { requireRole } from '../middleware/auth';
-import { getPagination, paginatedQuery } from '../helpers';
+import { requireRole, AuthRequest } from '../middleware/auth';
+import { getPagination, paginatedQuery, getDefaultLimit } from '../helpers';
 import { validate, createSimSchema, updateSimSchema } from '../validation';
 
 const router = Router();
 
-router.get('/', requireRole('manager', 'agent'), async (req: Request, res: Response) => {
+router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
   try {
     const { page, limit, offset } = getPagination(req);
+    if (req.user?.role === 'agent') {
+      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
+      if (agentRes.rows.length === 0) {
+        return res.json([]);
+      }
+      const agentId = agentRes.rows[0].id;
+      if (req.query.page || req.query.limit) {
+        const result = await paginatedQuery<any>(
+          `SELECT s.* FROM sims s
+           LEFT JOIN sellers sel ON s.assigned_to = sel.id
+           WHERE sel.agent_id = $1 OR s.assigned_to IS NULL
+           ORDER BY s.id DESC`,
+          `SELECT COUNT(*) FROM sims s
+           LEFT JOIN sellers sel ON s.assigned_to = sel.id
+           WHERE sel.agent_id = $1 OR s.assigned_to IS NULL`,
+          [agentId], page, limit, offset
+        );
+        return res.json(result);
+      }
+      const result = await query(
+        `SELECT s.* FROM sims s
+         LEFT JOIN sellers sel ON s.assigned_to = sel.id
+         WHERE sel.agent_id = $1 OR s.assigned_to IS NULL
+         ORDER BY s.id DESC LIMIT ${getDefaultLimit()}`,
+        [agentId]
+      );
+      return res.json(result.rows);
+    }
     if (req.query.page || req.query.limit) {
       const result = await paginatedQuery<any>(
         'SELECT * FROM sims ORDER BY id DESC',
@@ -18,10 +46,41 @@ router.get('/', requireRole('manager', 'agent'), async (req: Request, res: Respo
       );
       return res.json(result);
     }
-    const result = await query('SELECT * FROM sims ORDER BY id DESC');
+    const result = await query(`SELECT * FROM sims ORDER BY id DESC LIMIT ${getDefaultLimit()}`);
     res.json(result.rows);
   } catch (err) {
     logger.error('Error fetching sims:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    if (req.user?.role === 'agent') {
+      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
+      if (agentRes.rows.length === 0) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      const agentId = agentRes.rows[0].id;
+      const result = await query(
+        `SELECT s.* FROM sims s
+         LEFT JOIN sellers sel ON s.assigned_to = sel.id
+         WHERE s.id = $1 AND (sel.agent_id = $2 OR s.assigned_to IS NULL)`,
+        [id, agentId]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'SIM not found' });
+      }
+      return res.json(result.rows[0]);
+    }
+    const result = await query('SELECT * FROM sims WHERE id = $1', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'SIM not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    logger.error('Error fetching sim:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

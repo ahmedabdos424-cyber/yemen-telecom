@@ -1,6 +1,8 @@
 -- P1-05: Add updated_at to 9 tables
 -- Adds updated_at TIMESTAMP column and auto-update trigger
 
+BEGIN;
+
 -- Create the trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -68,3 +70,5 @@ CREATE TRIGGER trg_customers_updated_at
 CREATE TRIGGER trg_distribution_requests_updated_at
     BEFORE UPDATE ON distribution_requests
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+COMMIT;

@@ -1,3 +1,5 @@
+BEGIN;
+
 -- P1-04: Add TIMESTAMP columns alongside existing VARCHAR date columns
 -- Keeps VARCHAR columns for backward compatibility, adds proper types for querying
 
@@ -55,3 +57,5 @@ WHERE date ~ '^\d{4}/\d{2}/\d{2}$';
 --    Relative Arabic time, no fallback available
 -- =============================================
 ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS created_timestamp TIMESTAMP;
+
+COMMIT;

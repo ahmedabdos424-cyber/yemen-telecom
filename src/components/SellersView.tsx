@@ -41,10 +41,10 @@ const EMPTY_SELLER: Seller = {
 };
 
 function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, loading, error, onRetry }: SellersViewProps) {
-  const [selectedSellerId, setSelectedSellerId] = useState<string>('SLR-99021');
+  const [selectedSellerId, setSelectedSellerId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'inventory' | 'customers' | 'transactions'>('inventory');
   const [showAddBalanceModal, setShowAddBalanceModal] = useState(false);
-  const [balanceAmount, setBalanceAmount] = useState<number>(5000);
+  const [balanceAmount, setBalanceAmount] = useState<number>(0);
 
   // Camera capture with preview for invoice photo
   const [showCam, setShowCam] = useState(false);
@@ -103,9 +103,8 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
 
   const selectedSeller = sellers.find((s) => s.id === selectedSellerId) || sellers[0] || EMPTY_SELLER;
 
-  // Specific SIM items assigned to the selected seller (Ahmed has some specific keys in the mock data, or we filter sims currently owned by him)
   const sellerSIMs = useMemo(() => sims.filter(
-    (sim) => (sim.owner ?? '').includes(selectedSeller.name) || (selectedSeller.id === 'SLR-99021' && sim.id !== '1' && sim.id !== '2' && sim.id !== '3')
+    (sim) => (sim.owner ?? '').includes(selectedSeller.name)
   ), [sims, selectedSeller]);
 
   const toggleSellerStatus = useCallback((id: string, currentStatus: 'active' | 'inactive' | 'suspended' | 'low_stock') => {

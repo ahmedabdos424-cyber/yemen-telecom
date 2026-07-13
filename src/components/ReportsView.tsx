@@ -12,7 +12,7 @@ export default function ReportsView() {
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
   const [operator, setOperator] = useState('الكل');
   const [region, setRegion] = useState('كافة المناطق');
-  const [reportDate, setReportDate] = useState('2023-11-20');
+  const [reportDate, setReportDate] = useState(new Date().toISOString().slice(0,10));
 
   const [agentPerformance, setAgentPerformance] = useState<any[]>([]);
   const [dailySales, setDailySales] = useState<any[]>([]);
@@ -110,7 +110,7 @@ export default function ReportsView() {
              <div className="p-2 bg-red-50 text-secondary rounded-lg border border-red-100">
                <span className="material-symbols-outlined text-[20px]">trending_up</span>
              </div>
-             <span className="text-[11px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">+12.4%</span>
+             <span className="text-[11px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">{totalSales > 0 ? `${((agentPerformance.filter((a: any) => Number(a.sales_30_days) > 0).length / Math.max(agentPerformance.length, 1)) * 100).toFixed(1)}%` : '—'}</span>
            </div>
            <p className="text-gray-400 text-[11px] font-bold">إجمالي المبيعات المحقّقة (شهري)</p>
            <p className="text-2xl font-bold text-gray-900 mt-1 font-mono">
@@ -232,32 +232,10 @@ export default function ReportsView() {
 
       {/* Downloads list archive */}
       <h3 className="font-bold text-sm text-gray-900 mb-3 px-1">سجلات التصدير والتحميل السابقة</h3>
-      <div className="space-y-3">
-        {[
-          { id: '1', title: 'ملخص مبيعات تعز الموزعة', file: 'PDF', date: '2023-11-20', maker: '—' },
-          { id: '2', title: 'جرد المستودع الرئيسي بالعقدة', file: 'XLS', date: '2023-11-20', maker: 'سارة خليل' },
-          { id: '3', title: 'تقرير التدقيق الجغرافي السنوي', file: 'PDF', date: '2023-11-18', maker: 'نظام المراقبة' }
-        ].map((dl) => (
-          <div key={dl.id} className="card flex items-center justify-between">
-            <div className="flex items-center gap-3.5">
-              <div className={`w-10 h-10 rounded-full font-bold text-[11px] flex items-center justify-center shrink-0 ${
-                dl.file === 'PDF' ? 'bg-red-50 text-secondary' : 'bg-green-50 text-green-700'
-              }`}>
-                {dl.file}
-              </div>
-              <div>
-                <p className="text-xs font-bold text-gray-900">{dl.title}</p>
-                <p className="text-[11px] text-gray-505 mt-1 font-mono">{dl.date} • المعدّ: {dl.maker}</p>
-              </div>
-            </div>
-            <button
-              onClick={() => toastInfo(`جاري تنزيل ملف ${dl.title} بصيغة .${dl.file.toLowerCase()}`)}
-              className="btn-icon text-gray-700 hover:text-secondary hover:bg-gray-50"
-            >
-              <span className="material-symbols-outlined text-xl">download</span>
-            </button>
-          </div>
-        ))}
+      <div className="p-6 bg-white border border-gray-200 rounded-xl text-center text-gray-500 text-xs">
+        <span className="material-symbols-outlined text-gray-300 text-3xl block mb-2">folder_off</span>
+        <p className="font-bold">لا توجد سجلات تصدير سابقة</p>
+        <p className="text-gray-400 mt-1">التقارير التي سيتم تصديرها ستظهر هنا.</p>
       </div>
 
       {/* Drawer Filter popup style */}

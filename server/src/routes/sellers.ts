@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import { query, transaction } from '../db';
 import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
-import { getPagination } from '../helpers';
+import { getPagination, getDefaultLimit } from '../helpers';
 import { validate, createSellerSchema, updateSellerSchema, updateSellerBalanceSchema } from '../validation';
 
 const router = Router();
@@ -32,7 +32,7 @@ const mapSeller = (row: any) => ({
   agent_name: row.agent_name || ''
 });
 
-router.get('/', async (req: AuthRequest, res: Response) => {
+router.get('/', requireRole('manager', 'agent', 'seller'), async (req: AuthRequest, res: Response) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
@@ -54,7 +54,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
           `SELECT s.*, a.name as agent_name 
            FROM sellers s 
            LEFT JOIN agents a ON s.agent_id = a.id 
-           ORDER BY s.id DESC`
+            ORDER BY s.id DESC LIMIT ${getDefaultLimit()}`
         );
       }
     } else if (req.user.role === 'agent') {
@@ -78,7 +78,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
            FROM sellers s 
            LEFT JOIN agents a ON s.agent_id = a.id 
            WHERE s.agent_id = $1 
-           ORDER BY s.id DESC`,
+           ORDER BY s.id DESC LIMIT ${getDefaultLimit()}`,
           [agentId]
         );
       }
@@ -98,7 +98,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
            FROM sellers s 
            LEFT JOIN agents a ON s.agent_id = a.id 
            WHERE s.user_id = $1 
-           ORDER BY s.id DESC`,
+           ORDER BY s.id DESC LIMIT ${getDefaultLimit()}`,
           [req.user.id]
         );
       }
@@ -110,7 +110,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), async (req: Request, res: Response) => {
+router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), async (req: AuthRequest, res: Response) => {
   const {
     name, store_name, id_number, phone, region, region_code, status,
     username, password, agent_name
@@ -126,16 +126,21 @@ router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), 
     const sellerPassword = password || crypto.randomBytes(16).toString('hex');
     const passwordHash = await bcrypt.hash(sellerPassword, 10);
 
-    // Look up agent_id if agent_name provided
     let agentId: number | null = null;
-    if (agent_name) {
+    const authReq = req as AuthRequest;
+    if (authReq.user?.role === 'agent') {
+      const myAgent = await query('SELECT id FROM agents WHERE user_id = $1', [authReq.user.id]);
+      if (myAgent.rows.length > 0) {
+        agentId = myAgent.rows[0].id;
+      }
+    } else if (agent_name) {
       const agentRes = await query('SELECT id FROM agents WHERE name = $1', [agent_name]);
       if (agentRes.rows.length > 0) {
         agentId = agentRes.rows[0].id;
       }
     }
 
-    const sid = req.body.seller_id || req.body.sellerId || `SLR-${String(Math.floor(10000 + Math.random() * 90000))}`;
+    const sid = req.body.seller_id || req.body.sellerId || `SLR-${String(crypto.randomInt(10000, 99999))}`;
     const now = new Date().toISOString().split('T')[0].replace(/-/g, '/');
 
     // Execute all DB writes inside a transaction
@@ -189,34 +194,38 @@ router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), 
 router.put('/:id', requireRole('manager', 'agent'), validate(updateSellerSchema), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
-    const existing = await query('SELECT * FROM sellers WHERE id = $1', [id]);
-    if (existing.rows.length === 0) {
-      return res.status(404).json({ error: 'Seller not found' });
-    }
-    if (req.user?.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      if (agentRes.rows.length === 0 || agentRes.rows[0].id !== existing.rows[0].agent_id) {
-        return res.status(403).json({ error: 'Access denied: this seller does not belong to your agency' });
+    const result = await transaction(async (client) => {
+      const lock = await client.query('SELECT * FROM sellers WHERE id = $1 FOR UPDATE', [id]);
+      if (lock.rows.length === 0) {
+        throw Object.assign(new Error('Seller not found'), { statusCode: 404 });
       }
-    }
-    const cur = existing.rows[0];
-    const name = req.body.name ?? cur.name;
-    const store_name = req.body.store_name ?? req.body.storeName ?? cur.store_name;
-    const id_number = req.body.id_number ?? req.body.idNumber ?? cur.id_number;
-    const phone = req.body.phone ?? cur.phone;
-    const region = req.body.region ?? cur.region;
-    const region_code = req.body.region_code ?? req.body.regionCode ?? cur.region_code;
-    const status = req.body.status ?? cur.status;
-    const result = await query(
-      `UPDATE sellers SET name=$1, store_name=$2, id_number=$3, phone=$4, region=$5, region_code=$6, status=$7 WHERE id=$8 RETURNING *`,
-      [name, store_name, id_number, phone, region, region_code, status, id]
-    );
-    const updated = await query(
-      `SELECT s.*, a.name as agent_name FROM sellers s LEFT JOIN agents a ON s.agent_id = a.id WHERE s.id = $1`,
-      [id]
-    );
-    res.json(mapSeller(updated.rows[0]));
-  } catch (err) {
+      if (req.user?.role === 'agent') {
+        const agentRes = await client.query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
+        if (agentRes.rows.length === 0 || agentRes.rows[0].id !== lock.rows[0].agent_id) {
+          throw Object.assign(new Error('Access denied: this seller does not belong to your agency'), { statusCode: 403 });
+        }
+      }
+      const cur = lock.rows[0];
+      const name = req.body.name ?? cur.name;
+      const store_name = req.body.store_name ?? req.body.storeName ?? cur.store_name;
+      const id_number = req.body.id_number ?? req.body.idNumber ?? cur.id_number;
+      const phone = req.body.phone ?? cur.phone;
+      const region = req.body.region ?? cur.region;
+      const region_code = req.body.region_code ?? req.body.regionCode ?? cur.region_code;
+      const status = req.body.status ?? cur.status;
+      await client.query(
+        `UPDATE sellers SET name=$1, store_name=$2, id_number=$3, phone=$4, region=$5, region_code=$6, status=$7 WHERE id=$8`,
+        [name, store_name, id_number, phone, region, region_code, status, id]
+      );
+      const updated = await client.query(
+        `SELECT s.*, a.name as agent_name FROM sellers s LEFT JOIN agents a ON s.agent_id = a.id WHERE s.id = $1`,
+        [id]
+      );
+      return mapSeller(updated.rows[0]);
+    });
+    res.json(result);
+  } catch (err: any) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
     logger.error('Error updating seller:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -226,23 +235,20 @@ router.put('/:id/balance', requireRole('manager', 'agent'), validate(updateSelle
   const { id } = req.params;
   const { amount } = req.body;
   try {
-    const existing = await query('SELECT * FROM sellers WHERE id = $1', [id]);
-    if (existing.rows.length === 0) {
-      return res.status(404).json({ error: 'Seller not found' });
-    }
-    if (req.user?.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      if (agentRes.rows.length === 0 || agentRes.rows[0].id !== existing.rows[0].agent_id) {
-        return res.status(403).json({ error: 'Access denied: this seller does not belong to your agency' });
-      }
-    }
-    const cur = existing.rows[0];
-    const newSales = (cur.sales_30_days || 0) + amount;
     const result = await transaction(async (client) => {
-      const lock = await client.query('SELECT sales_30_days, total_sales FROM sellers WHERE id = $1 FOR UPDATE', [id]);
+      const lock = await client.query('SELECT * FROM sellers WHERE id = $1 FOR UPDATE', [id]);
+      if (lock.rows.length === 0) {
+        throw Object.assign(new Error('Seller not found'), { statusCode: 404 });
+      }
+      if (req.user?.role === 'agent') {
+        const agentRes = await client.query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
+        if (agentRes.rows.length === 0 || agentRes.rows[0].id !== lock.rows[0].agent_id) {
+          throw Object.assign(new Error('Access denied: this seller does not belong to your agency'), { statusCode: 403 });
+        }
+      }
       const lockedRow = lock.rows[0];
       const updatedSales = (lockedRow.sales_30_days || 0) + amount;
-      const updateResult = await client.query(
+      await client.query(
         `UPDATE sellers SET sales_30_days=$1, total_sales=COALESCE(total_sales,0)+$2 WHERE id=$3 RETURNING *`,
         [updatedSales, amount, id]
       );
@@ -250,10 +256,11 @@ router.put('/:id/balance', requireRole('manager', 'agent'), validate(updateSelle
         `SELECT s.*, a.name as agent_name FROM sellers s LEFT JOIN agents a ON s.agent_id = a.id WHERE s.id = $1`,
         [id]
       );
-      return finalResult.rows[0];
+      return mapSeller(finalResult.rows[0]);
     });
-    res.json(mapSeller(result));
-  } catch (err) {
+    res.json(result);
+  } catch (err: any) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
     logger.error('Error updating seller balance:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -262,32 +269,34 @@ router.put('/:id/balance', requireRole('manager', 'agent'), validate(updateSelle
 router.post('/:id/reset-password', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
-    const sellerRes = await query('SELECT * FROM sellers WHERE id = $1', [id]);
-    if (sellerRes.rows.length === 0) {
-      return res.status(404).json({ error: 'Seller not found' });
-    }
-    if (req.user?.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      if (agentRes.rows.length === 0 || agentRes.rows[0].id !== sellerRes.rows[0].agent_id) {
-        return res.status(403).json({ error: 'Access denied: this seller does not belong to your agency' });
+    await transaction(async (client) => {
+      const lock = await client.query('SELECT * FROM sellers WHERE id = $1 FOR UPDATE', [id]);
+      if (lock.rows.length === 0) {
+        throw Object.assign(new Error('Seller not found'), { statusCode: 404 });
       }
-    }
-    const seller = sellerRes.rows[0];
-    if (!seller.user_id) {
-      return res.status(400).json({ error: 'Seller has no linked user account' });
-    }
-    const newPassword = crypto.randomBytes(16).toString('hex');
-    const passwordHash = await bcrypt.hash(newPassword, 10);
-    await query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, seller.user_id]);
-    const userRes = await query('SELECT username FROM users WHERE id = $1', [seller.user_id]);
-    res.json({
-      message: `Password reset successfully for ${seller.name}`,
-      credentials: {
-        username: userRes.rows[0].username,
-        password: newPassword,
-      },
+      if (req.user?.role === 'agent') {
+        const agentRes = await client.query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
+        if (agentRes.rows.length === 0 || agentRes.rows[0].id !== lock.rows[0].agent_id) {
+          throw Object.assign(new Error('Access denied: this seller does not belong to your agency'), { statusCode: 403 });
+        }
+      }
+      const seller = lock.rows[0];
+      if (!seller.user_id) {
+        throw Object.assign(new Error('Seller has no linked user account'), { statusCode: 400 });
+      }
+      const newPassword = crypto.randomBytes(16).toString('hex');
+      const passwordHash = await bcrypt.hash(newPassword, 10);
+      await client.query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, seller.user_id]);
+      const userRes = await client.query('SELECT username FROM users WHERE id = $1', [seller.user_id]);
+      return { username: userRes.rows[0].username, password: newPassword, name: seller.name };
+    }).then((result) => {
+      res.json({
+        message: `Password reset successfully for ${result.name}`,
+        credentials: { username: result.username, password: result.password },
+      });
     });
-  } catch (err) {
+  } catch (err: any) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
     logger.error('Error resetting seller password:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -296,25 +305,28 @@ router.post('/:id/reset-password', requireRole('manager', 'agent'), async (req: 
 router.delete('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
-    const existing = await query('SELECT * FROM sellers WHERE id = $1', [id]);
-    if (existing.rows.length === 0) {
-      return res.status(404).json({ error: 'Seller not found' });
-    }
-    if (req.user?.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      if (agentRes.rows.length === 0 || agentRes.rows[0].id !== existing.rows[0].agent_id) {
-        return res.status(403).json({ error: 'Access denied: this seller does not belong to your agency' });
+    await transaction(async (client) => {
+      const lock = await client.query('SELECT * FROM sellers WHERE id = $1 FOR UPDATE', [id]);
+      if (lock.rows.length === 0) {
+        throw Object.assign(new Error('Seller not found'), { statusCode: 404 });
       }
-    }
-    const seller = existing.rows[0];
-    if (seller.user_id) {
-      await query('UPDATE users SET status = $1 WHERE id = $2', ['inactive', seller.user_id]);
-    }
-    await query('UPDATE sims SET assigned_to = NULL, owner = $1 WHERE assigned_to = $2', ['المركز الرئيسي', id]);
-    await query('DELETE FROM distribution_requests WHERE seller_id = $1', [id]);
-    await query('UPDATE sellers SET status = $1 WHERE id = $2', ['deleted', id]);
+      if (req.user?.role === 'agent') {
+        const agentRes = await client.query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
+        if (agentRes.rows.length === 0 || agentRes.rows[0].id !== lock.rows[0].agent_id) {
+          throw Object.assign(new Error('Access denied: this seller does not belong to your agency'), { statusCode: 403 });
+        }
+      }
+      const seller = lock.rows[0];
+      if (seller.user_id) {
+        await client.query('UPDATE users SET status = $1 WHERE id = $2', ['inactive', seller.user_id]);
+      }
+      await client.query('UPDATE sims SET assigned_to = NULL, owner = $1 WHERE assigned_to = $2', ['المركز الرئيسي', id]);
+      await client.query('DELETE FROM distribution_requests WHERE seller_id = $1', [id]);
+      await client.query('UPDATE sellers SET status = $1 WHERE id = $2', ['deleted', id]);
+    });
     res.json({ message: 'Seller deleted successfully' });
-  } catch (err) {
+  } catch (err: any) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
     logger.error('Error deleting seller:', err);
     res.status(500).json({ error: 'Internal server error' });
   }

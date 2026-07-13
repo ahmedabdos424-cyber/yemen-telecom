@@ -1,8 +1,8 @@
 import { Router, Response } from 'express';
-import { query } from '../db';
+import { query, transaction } from '../db';
 import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
-import { getPagination } from '../helpers';
+import { getPagination, getDefaultLimit } from '../helpers';
 import { validate, createCustomerSchema } from '../validation';
 
 const router = Router();
@@ -25,6 +25,8 @@ router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: R
     if (paginate) {
       queryText += ' LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
       params.push(limit, offset);
+    } else {
+      queryText += ` LIMIT ${getDefaultLimit()}`;
     }
     const result = await query(queryText, params);
     res.json(result.rows);
@@ -87,21 +89,27 @@ router.post('/', requireRole('manager', 'agent', 'seller'), validate(createCusto
   const { phone, region } = body;
   const activated_by = body.activated_by || body.activatedBy;
   try {
-    const existing = await query('SELECT id FROM customers WHERE id_number = $1', [id_number]);
-    if (existing.rows.length > 0) {
-      const updated = await query(
-        `UPDATE customers SET sims_count = sims_count + 1, last_activation = NOW(), phone = COALESCE($2, phone), region = COALESCE($3, region) WHERE id = $1 RETURNING *`,
-        [existing.rows[0].id, phone, region]
+    const result = await transaction(async (client) => {
+      const existing = await client.query('SELECT id FROM customers WHERE id_number = $1', [id_number]);
+      if (existing.rows.length > 0) {
+        const updated = await client.query(
+          `UPDATE customers SET sims_count = sims_count + 1, last_activation = NOW(), phone = COALESCE($2, phone), region = COALESCE($3, region) WHERE id = $1 RETURNING *`,
+          [existing.rows[0].id, phone, region]
+        );
+        return updated.rows[0];
+      }
+      const created = await client.query(
+        `INSERT INTO customers (full_name, id_number, phone, region, first_activation, last_activation, activated_by, created_by)
+         VALUES ($1, $2, $3, $4, NOW(), NOW(), $5, $6) RETURNING *`,
+        [full_name, id_number, phone || '', region || '', activated_by || null, req.user?.id]
       );
-      return res.json(updated.rows[0]);
+      return created.rows[0];
+    });
+    res.status(201).json(result);
+  } catch (err: any) {
+    if (err?.code === '23505') {
+      return res.status(409).json({ error: 'Customer already exists' });
     }
-    const result = await query(
-      `INSERT INTO customers (full_name, id_number, phone, region, first_activation, last_activation, activated_by, created_by)
-       VALUES ($1, $2, $3, $4, NOW(), NOW(), $5, $6) RETURNING *`,
-      [full_name, id_number, phone || '', region || '', activated_by || null, req.user?.id]
-    );
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
     logger.error('Error creating customer:', err);
     res.status(500).json({ error: 'Internal server error' });
   }

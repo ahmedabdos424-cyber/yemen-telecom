@@ -48,8 +48,10 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
+    "@tailwindcss/vite": "4.3.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
+    "@testsprite/testsprite-cli": "^0.2.0",
     "@types/bcrypt": "^6.0.0",
     "@types/cors": "^2.8.19",
     "@types/d3": "^7.4.3",
@@ -58,6 +60,7 @@
     "@types/node": "^22.14.0",
     "@types/pg": "^8.20.0",
     "@types/react": "^19.2.17",
+    "@vitejs/plugin-react": "^5.0.4",
     "@vitest/coverage-v8": "4.1.9",
     "esbuild": "^0.25.0",
     "jsdom": "^29.1.1",
@@ -65,8 +68,6 @@
     "tailwindcss": "4.3.1",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
-    "@tailwindcss/vite": "4.3.1",
-    "@vitejs/plugin-react": "^5.0.4",
     "vite": "6.4.3",
     "vitest": "4.1.9"
   },
@@ -81,6 +82,7 @@
     "ngrok@5.0.0-beta.2": true,
     "protobufjs@7.6.4": true,
     "sharp@0.34.5": true,
-    "tesseract.js@7.0.0": true
+    "tesseract.js@7.0.0": true,
+    "@sentry/cli@2.58.6": true
   }
 }

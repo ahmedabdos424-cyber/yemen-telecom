@@ -23,6 +23,8 @@ android/key.properties
 *.jks
 keystore.properties
 coverage/
+test-results/
+playwright-report/
 server/api_test_results.txt
 server/server.err
 server/backups/

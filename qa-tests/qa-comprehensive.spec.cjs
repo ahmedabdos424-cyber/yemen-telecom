@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 
 const LOCAL_URL = 'http://127.0.0.1:4173';
-const PROD_URL = 'https://yemen-telecom-api.onrender.com';
+const PROD_URL = 'https://yemen-telecom.onrender.com';
 const SCREENSHOTS_DIR = path.join(__dirname, '..', 'qa-reports', 'screenshots');
 const ISSUES = [];
 
@@ -87,7 +87,7 @@ test.describe('Phase 2: Authentication (Production)', () => {
     // Note: May fail if user doesn't exist or rate limited. This documents the actual behavior.
     const r = await fetchProd('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ username: 'manager', password: 'Test@123' }),
+      body: JSON.stringify({ username: 'manager', password: 'Admin@123' }),
     });
     // Production bug: this currently returns 500.
     // Document the actual behavior:
@@ -330,6 +330,12 @@ test.describe('Phase 9: Performance', () => {
 
   test('Bundle assets exist and have reasonable sizes', async () => {
     const assetsDir = path.join(__dirname, '..', 'dist', 'assets');
+    if (!fs.existsSync(assetsDir)) {
+      issue('High', 'UI', 'Bundle assets', 'Check dist/assets directory',
+        'Directory should exist', 'dist/assets not found',
+        'Build the frontend first: npm run build', null);
+      return;
+    }
     const files = fs.readdirSync(assetsDir).filter(f => f.endsWith('.js') || f.endsWith('.css'));
     let mainJS = null;
     for (const f of files) {

@@ -315,7 +315,7 @@ describe('Validation — Operation Schema', () => {
 
 describe('Validation — Password Schema', () => {
   it('should accept valid password', () => {
-    const result = updatePasswordSchema.safeParse({ currentPassword: 'old', newPassword: 'newPass123' });
+    const result = updatePasswordSchema.safeParse({ currentPassword: 'old', newPassword: 'NewPass123!' });
     expect(result.success).toBe(true);
   });
 
@@ -325,12 +325,12 @@ describe('Validation — Password Schema', () => {
   });
 
   it('should reject empty current password', () => {
-    const result = updatePasswordSchema.safeParse({ currentPassword: '', newPassword: 'newPass123' });
+    const result = updatePasswordSchema.safeParse({ currentPassword: '', newPassword: 'NewPass123!' });
     expect(result.success).toBe(false);
   });
 
   it('should accept password at exact min length', () => {
-    const result = updatePasswordSchema.safeParse({ currentPassword: 'old', newPassword: 'Abcd1234' });
+    const result = updatePasswordSchema.safeParse({ currentPassword: 'old', newPassword: 'Abcd123!' });
     expect(result.success).toBe(true);
   });
   it('should reject password without uppercase', () => {

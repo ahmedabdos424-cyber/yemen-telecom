@@ -1,0 +1,15 @@
+{
+  "projectId": "ae188b56-e8c8-47ae-98f0-bb0d01f6b385",
+  "type": "frontend",
+  "name": "Settings page allows profile update",
+  "description": "A manager can view and update their profile settings on the settings page.",
+  "priority": "p1",
+  "planSteps": [
+    { "type": "action", "description": "Navigate to the login page and log in as manager" },
+    { "type": "action", "description": "Navigate to the Settings or Profile page" },
+    { "type": "assertion", "description": "Verify the settings page displays the current user profile information" },
+    { "type": "action", "description": "Update the display name field with a new value" },
+    { "type": "action", "description": "Click the Save or Update button" },
+    { "type": "assertion", "description": "Verify a success message appears and the updated name is displayed" }
+  ]
+}

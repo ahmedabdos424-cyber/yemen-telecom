@@ -11,7 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const PRODUCTION_URL = 'https://yemen-telecom-api.onrender.com';
+const PRODUCTION_URL = 'https://yemen-telecom.onrender.com';
 const REPORTS_DIR = path.join(__dirname, '..', 'qa-reports');
 
 // Results accumulator
@@ -197,7 +197,7 @@ async function runAuthTests() {
   try {
     const r = await fetch(`${PRODUCTION_URL}/api/auth/login`, {
       method: 'POST',
-      body: JSON.stringify({ username: 'manager', password: 'Test@123' }),
+      body: JSON.stringify({ username: 'manager', password: 'Admin@123' }),
     });
     if (r.status === 200) {
       console.log('  ✓ POST /api/auth/login (valid) — 200 OK');

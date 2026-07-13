@@ -1,0 +1,16 @@
+{
+  "projectId": "ae188b56-e8c8-47ae-98f0-bb0d01f6b385",
+  "type": "frontend",
+  "name": "SIM list search filters results correctly",
+  "description": "When a user types a search query in the SIMs list, only matching SIMs are displayed.",
+  "priority": "p1",
+  "planSteps": [
+    { "type": "action", "description": "Navigate to the login page and log in as manager" },
+    { "type": "action", "description": "Navigate to the SIMs management page" },
+    { "type": "action", "description": "Note the total number of SIMs displayed" },
+    { "type": "action", "description": "Type a partial ICCID or phone number in the search field" },
+    { "type": "assertion", "description": "Verify the list filters to show only SIMs matching the search query" },
+    { "type": "action", "description": "Clear the search field" },
+    { "type": "assertion", "description": "Verify all SIMs are displayed again after clearing the search" }
+  ]
+}

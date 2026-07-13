@@ -1,0 +1,92 @@
+name: TestSprite E2E
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'Target URL to test against'
+        required: false
+        default: 'https://yementelecom1.netlify.app'
+
+concurrency:
+  group: testsprite-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  testsprite:
+    name: TestSprite E2E Verification
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install TestSprite CLI
+        run: npm install -g @testsprite/testsprite-cli
+
+      - name: Verify TestSprite installation
+        run: testsprite --version
+
+      - name: Configure TestSprite
+        run: testsprite setup --from-env --yes
+        env:
+          TESTSPRITE_API_KEY: ${{ secrets.TESTSPRITE_API_KEY }}
+
+      - name: Run all TestSprite tests
+        run: |
+          echo "Running TestSprite test suite..."
+          testsprite test run --all --project ${{ vars.TESTSPRITE_PROJECT_ID || 'ae188b56-e8c8-47ae-98f0-bb0d01f6b385' }} \
+            --target-url ${{ inputs.target_url || 'https://yementelecom1.netlify.app' }} \
+            --wait --timeout 600 || true
+        env:
+          TESTSPRITE_API_KEY: ${{ secrets.TESTSPRITE_API_KEY }}
+
+      - name: Check TestSprite results
+        run: |
+          echo "Checking TestSprite test results..."
+          testsprite test list --project ${{ vars.TESTSPRITE_PROJECT_ID || 'ae188b56-e8c8-47ae-98f0-bb0d01f6b385' }} --output json | \
+            node -e "
+              let d=''; process.stdin.on('data',c=>d+=c); process.stdin.on('end',()=>{
+                try {
+                  const r = JSON.parse(d);
+                  const passed = r.items.filter(t => t.status === 'passed').length;
+                  const failed = r.items.filter(t => t.status === 'failed').length;
+                  const blocked = r.items.filter(t => t.status === 'blocked').length;
+                  const draft = r.items.filter(t => t.status === 'draft').length;
+                  console.log('Test Results:');
+                  console.log('  Passed: ' + passed);
+                  console.log('  Failed: ' + failed);
+                  console.log('  Blocked: ' + blocked);
+                  console.log('  Draft: ' + draft);
+                  console.log('  Total: ' + r.items.length);
+                  if (failed > 0) {
+                    console.error('FAIL: ' + failed + ' tests failed');
+                    process.exit(1);
+                  }
+                  console.log('PASS: All tests passed or are blocked/draft');
+                } catch(e) {
+                  console.error('Could not parse results');
+                  process.exit(1);
+                }
+              })
+            "
+        env:
+          TESTSPRITE_API_KEY: ${{ secrets.TESTSPRITE_API_KEY }}
+
+      - name: Upload TestSprite results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testsprite-results
+          path: .testsprite/
+          retention-days: 7

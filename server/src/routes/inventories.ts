@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { query } from '../db';
+import { query, transaction } from '../db';
 import { logger } from '../logger';
 import { requireRole } from '../middleware/auth';
 import { validate, updateInventoriesSchema } from '../validation';
@@ -24,12 +24,24 @@ router.get('/', requireRole('manager', 'agent'), async (_req: Request, res: Resp
 router.put('/', requireRole('manager'), validate(updateInventoriesSchema), async (req: Request, res: Response) => {
   const updates: Array<{ operator: string; available: number; remaining: number }> = req.body;
   try {
-    for (const inv of updates) {
-      await query(
-        `UPDATE inventories SET available=$1, remaining=$2 WHERE operator=$3`,
-        [inv.available, inv.remaining, inv.operator]
+    await transaction(async (client) => {
+      if (updates.length === 0) return;
+      const valueClauses: string[] = [];
+      const valueParams: any[] = [];
+      updates.forEach((inv, i) => {
+        const base = i * 3;
+        valueClauses.push(`($${base + 1}::int, $${base + 2}::int, $${base + 3}::text)`);
+        valueParams.push(inv.available, inv.remaining, inv.operator);
+      });
+      await client.query(
+        `UPDATE inventories SET
+          available = data.available,
+          remaining = data.remaining
+        FROM (VALUES ${valueClauses.join(', ')}) AS data(available, remaining, operator)
+        WHERE inventories.operator = data.operator`,
+        valueParams
       );
-    }
+    });
     const result = await query('SELECT * FROM inventories ORDER BY id');
     res.json(result.rows.map((r: { operator: string; available: number; remaining: number; period_days: number }) => ({
       operator: r.operator,

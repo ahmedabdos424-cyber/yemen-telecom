@@ -1,10 +1,10 @@
 import path from 'path';
 import { Router, Request, Response } from 'express';
-import { query } from '../db';
+import { query, transaction } from '../db';
 import { logger } from '../logger';
 import { cacheStats } from '../cache';
 import { requireRole } from '../middleware/auth';
-import { getPagination } from '../helpers';
+import { getPagination, getDefaultLimit } from '../helpers';
 import { validate, updateSettingsSchema } from '../validation';
 
 const router = Router();
@@ -43,30 +43,38 @@ router.get('/settings', requireRole('manager'), async (_req: Request, res: Respo
 });
 
 router.put('/settings', requireRole('manager'), validate(updateSettingsSchema), async (req: Request, res: Response) => {
-  const settings = req.body;
+  const body = req.body;
+  const provided = Object.keys(body);
+  const fieldMap: Record<string, string> = {
+    twoFAEnabled: 'two_fa_enabled', email2FAEnabled: 'email_2fa_enabled',
+    trustedDevicesEnabled: 'trusted_devices_enabled', sessionTimeout: 'session_timeout',
+    passwordSpecialRequired: 'password_special_required', passwordExpiry90Days: 'password_expiry_90_days',
+    passwordNoReuse5: 'password_no_reuse_5', maintenanceMode: 'maintenance_mode',
+    language: 'language', emailAlertsEnabled: 'email_alerts_enabled',
+    smsAlertsEnabled: 'sms_alerts_enabled', appNotificationsEnabled: 'app_notifications_enabled',
+    stockShortageThreshold: 'stock_shortage_threshold', inactiveSimsThreshold: 'inactive_sims_threshold',
+    maxFailedLoginsThreshold: 'max_failed_logins_threshold',
+    highRiskDuplicatesThreshold: 'high_risk_duplicates_threshold',
+    identityRemindersEnabled: 'identity_reminders_enabled',
+    identityRemindersFrequency: 'identity_reminders_frequency',
+  };
+  const setClauses: string[] = [];
+  const values: any[] = [];
+  let idx = 1;
+  for (const camel of provided) {
+    const col = fieldMap[camel];
+    if (col) {
+      setClauses.push(`${col}=$${idx++}`);
+      values.push(body[camel]);
+    }
+  }
+  if (setClauses.length === 0) {
+    return res.status(400).json({ error: 'No valid settings fields provided' });
+  }
   try {
     const result = await query(
-      `UPDATE system_settings SET
-        two_fa_enabled=$1, email_2fa_enabled=$2, trusted_devices_enabled=$3,
-        session_timeout=$4, password_special_required=$5, password_expiry_90_days=$6,
-        password_no_reuse_5=$7, maintenance_mode=$8, language=$9,
-        email_alerts_enabled=$10, sms_alerts_enabled=$11, app_notifications_enabled=$12,
-        stock_shortage_threshold=$13, inactive_sims_threshold=$14,
-        max_failed_logins_threshold=$15, high_risk_duplicates_threshold=$16,
-        identity_reminders_enabled=$17, identity_reminders_frequency=$18
-      WHERE id=1 RETURNING *`,
-      [
-        settings.twoFAEnabled ?? true, settings.email2FAEnabled ?? false,
-        settings.trustedDevicesEnabled ?? true, settings.sessionTimeout || '30 دقيقة',
-        settings.passwordSpecialRequired ?? true, settings.passwordExpiry90Days ?? true,
-        settings.passwordNoReuse5 ?? false, settings.maintenanceMode ?? false,
-        settings.language || 'العربية (المملكة العربية السعودية)',
-        settings.emailAlertsEnabled ?? true, settings.smsAlertsEnabled ?? true,
-        settings.appNotificationsEnabled ?? false, settings.stockShortageThreshold ?? 5,
-        settings.inactiveSimsThreshold ?? 90, settings.maxFailedLoginsThreshold ?? 3,
-        settings.highRiskDuplicatesThreshold ?? 5, settings.identityRemindersEnabled ?? true,
-        settings.identityRemindersFrequency || 'weekly',
-      ]
+      `UPDATE system_settings SET ${setClauses.join(', ')} WHERE id=1 RETURNING *`,
+      values
     );
     res.json(result.rows[0]);
   } catch (err) {
@@ -78,11 +86,11 @@ router.put('/settings', requireRole('manager'), validate(updateSettingsSchema), 
 router.get('/transactions', requireRole('manager'), async (req: Request, res: Response) => {
   try {
     const { page, limit, offset } = getPagination(req);
-    const paginate = req.query.page || req.query.limit;
-    const queryText = paginate
-      ? 'SELECT * FROM transactions ORDER BY id LIMIT $1 OFFSET $2'
-      : 'SELECT * FROM transactions ORDER BY id';
-    const params = paginate ? [limit, offset] : [];
+    const hasPagination = !!(req.query.page || req.query.limit);
+    const effectiveLimit = hasPagination ? limit : getDefaultLimit();
+    const effectiveOffset = hasPagination ? offset : 0;
+    const queryText = 'SELECT * FROM transactions ORDER BY id LIMIT $1 OFFSET $2';
+    const params = [effectiveLimit, effectiveOffset];
     const result = await query(queryText, params);
     res.json(result.rows.map((r: { id: string; client_name: string; provider: string; sims_count: number; status: string; relative_time: string }) => ({
       id: r.id,
@@ -101,23 +109,17 @@ router.get('/transactions', requireRole('manager'), async (req: Request, res: Re
 router.get('/duplicate-identities', requireRole('manager'), async (req: Request, res: Response) => {
   try {
     const { page, limit, offset } = getPagination(req);
-    const paginate = req.query.page || req.query.limit;
-    const queryText = paginate
-      ? `SELECT id_number AS id_no, name,
-              COUNT(*) OVER (PARTITION BY id_number) AS duplicates_count,
-              SUM(COALESCE(sims_count, 0)) OVER (PARTITION BY id_number) AS sims_count,
-              region
-       FROM sellers
-       WHERE id_number != ''
-       ORDER BY duplicates_count DESC LIMIT $1 OFFSET $2`
-      : `SELECT id_number AS id_no, name,
-              COUNT(*) OVER (PARTITION BY id_number) AS duplicates_count,
-              SUM(COALESCE(sims_count, 0)) OVER (PARTITION BY id_number) AS sims_count,
-              region
-       FROM sellers
-       WHERE id_number != ''
-       ORDER BY duplicates_count DESC`;
-    const params = paginate ? [limit, offset] : [];
+    const hasPagination = !!(req.query.page || req.query.limit);
+    const effectiveLimit = hasPagination ? limit : getDefaultLimit();
+    const effectiveOffset = hasPagination ? offset : 0;
+    const queryText = `SELECT id_number AS id_no, name,
+             COUNT(*) OVER (PARTITION BY id_number) AS duplicates_count,
+             SUM(COALESCE(sims_count, 0)) OVER (PARTITION BY id_number) AS sims_count,
+             region
+      FROM sellers
+      WHERE id_number != ''
+      ORDER BY duplicates_count DESC LIMIT $1 OFFSET $2`;
+    const params = [effectiveLimit, effectiveOffset];
     const result = await query(queryText, params);
     const seen = new Set<string>();
     const deduped = result.rows.filter((r: any) => {
@@ -148,11 +150,11 @@ router.get('/duplicate-identities', requireRole('manager'), async (req: Request,
 router.get('/audit-logs', requireRole('manager'), async (req: Request, res: Response) => {
   try {
     const { page, limit, offset } = getPagination(req);
-    const paginate = req.query.page || req.query.limit;
-    const queryText = paginate
-      ? 'SELECT * FROM audit_logs ORDER BY id LIMIT $1 OFFSET $2'
-      : 'SELECT * FROM audit_logs ORDER BY id';
-    const params = paginate ? [limit, offset] : [];
+    const hasPagination = !!(req.query.page || req.query.limit);
+    const effectiveLimit = hasPagination ? limit : getDefaultLimit();
+    const effectiveOffset = hasPagination ? offset : 0;
+    const queryText = 'SELECT * FROM audit_logs ORDER BY id LIMIT $1 OFFSET $2';
+    const params = [effectiveLimit, effectiveOffset];
     const result = await query(queryText, params);
     res.json(result.rows.map((r: { log_id: string; type: string; title: string; username: string; time: string; status: string }) => ({
       id: r.log_id,
@@ -173,26 +175,41 @@ router.get('/audit-logs', requireRole('manager'), async (req: Request, res: Resp
 // ========================
 router.post('/system/backup', requireRole('manager'), async (_req: Request, res: Response) => {
   try {
+    const maxRowsPerTable = parseInt(process.env.BACKUP_MAX_ROWS_PER_TABLE || '20000', 10);
     const allowedTables: Record<string, string> = {
-      users: 'SELECT * FROM users ORDER BY id',
-      agents: 'SELECT * FROM agents ORDER BY id',
-      sellers: 'SELECT * FROM sellers ORDER BY id',
-      sims: 'SELECT * FROM sims ORDER BY id',
-      alerts: 'SELECT * FROM alerts ORDER BY id',
-      transactions: 'SELECT * FROM transactions ORDER BY id',
-      operations: 'SELECT * FROM operations ORDER BY id',
-      inventories: 'SELECT * FROM inventories ORDER BY id',
-      audit_logs: 'SELECT * FROM audit_logs ORDER BY id',
-      system_settings: 'SELECT * FROM system_settings ORDER BY id',
-      token_blacklist: 'SELECT * FROM token_blacklist ORDER BY token_hash',
-      duplicate_identities: 'SELECT * FROM duplicate_identities ORDER BY id',
-      customers: 'SELECT * FROM customers ORDER BY id',
-      distribution_requests: 'SELECT * FROM distribution_requests ORDER BY id',
+      users: `SELECT * FROM users ORDER BY id LIMIT ${maxRowsPerTable}`,
+      agents: `SELECT * FROM agents ORDER BY id LIMIT ${maxRowsPerTable}`,
+      sellers: `SELECT * FROM sellers ORDER BY id LIMIT ${maxRowsPerTable}`,
+      sims: `SELECT * FROM sims ORDER BY id LIMIT ${maxRowsPerTable}`,
+      alerts: `SELECT * FROM alerts ORDER BY id LIMIT ${maxRowsPerTable}`,
+      transactions: `SELECT * FROM transactions ORDER BY id LIMIT ${maxRowsPerTable}`,
+      operations: `SELECT * FROM operations ORDER BY id LIMIT ${maxRowsPerTable}`,
+      inventories: `SELECT * FROM inventories ORDER BY id LIMIT ${maxRowsPerTable}`,
+      audit_logs: `SELECT * FROM audit_logs ORDER BY id LIMIT ${maxRowsPerTable}`,
+      system_settings: `SELECT * FROM system_settings ORDER BY id LIMIT ${maxRowsPerTable}`,
+      token_blacklist: `SELECT * FROM token_blacklist ORDER BY token_hash LIMIT ${maxRowsPerTable}`,
+      duplicate_identities: `SELECT * FROM duplicate_identities ORDER BY id LIMIT ${maxRowsPerTable}`,
+      customers: `SELECT * FROM customers ORDER BY id LIMIT ${maxRowsPerTable}`,
+      distribution_requests: `SELECT * FROM distribution_requests ORDER BY id LIMIT ${maxRowsPerTable}`,
     };
     const backup: Record<string, any[]> = {};
+    let totalRecords = 0;
+    let truncatedTables: string[] = [];
     for (const [table, queryText] of Object.entries(allowedTables)) {
       const result = await query(queryText);
       backup[table] = result.rows;
+      totalRecords += result.rows.length;
+      if (result.rows.length >= maxRowsPerTable) {
+        truncatedTables.push(table);
+      }
+    }
+    // Sanitize sensitive data before export
+    if (backup.users) {
+      backup.users = backup.users.map((u: Record<string, unknown>) => {
+        const sanitized = { ...u };
+        delete sanitized.password_hash;
+        return sanitized;
+      });
     }
     const { uploadBackup, isConfigured } = await import('../backup-storage');
     if (!isConfigured()) {
@@ -205,8 +222,9 @@ router.post('/system/backup', requireRole('manager'), async (_req: Request, res:
       size: result.size,
       sizeFormatted: `${(result.size / 1024 / 1024).toFixed(2)} MB`,
       tables: Object.keys(allowedTables).length,
-      records: Object.values(backup).reduce((sum, arr) => sum + arr.length, 0),
+      records: totalRecords,
       downloadUrl: result.url,
+      ...(truncatedTables.length > 0 ? { warning: `Tables truncated to ${maxRowsPerTable} rows: ${truncatedTables.join(', ')}. Set BACKUP_MAX_ROWS_PER_TABLE to increase limit.` } : {}),
     });
   } catch (err) {
     logger.error('Error creating backup:', err);
@@ -242,19 +260,21 @@ router.post('/system/lockdown', requireRole('manager'), async (_req: Request, re
   try {
     const current = await query('SELECT maintenance_mode FROM system_settings WHERE id = 1');
     const isCurrentlyLocked = current.rows[0]?.maintenance_mode || false;
-    await query(
-      `UPDATE system_settings SET maintenance_mode = $1 WHERE id = 1`,
-      [!isCurrentlyLocked]
-    );
-    await query(
-      `UPDATE sellers SET status = $1 WHERE status NOT IN ('deleted')`,
-      [!isCurrentlyLocked ? 'suspended' : 'active']
-    );
-    const newStatus = !isCurrentlyLocked;
+    const newLocked = !isCurrentlyLocked;
+    await transaction(async (client) => {
+      await client.query(
+        `UPDATE system_settings SET maintenance_mode = $1 WHERE id = 1`,
+        [newLocked]
+      );
+      await client.query(
+        `UPDATE sellers SET status = $1 WHERE status NOT IN ('deleted')`,
+        [newLocked ? 'suspended' : 'active']
+      );
+    });
     res.json({
       success: true,
-      locked: newStatus,
-      message: newStatus ? 'Emergency lockdown activated. All seller accounts suspended.' : 'Lockdown deactivated. All seller accounts restored.',
+      locked: newLocked,
+      message: newLocked ? 'Emergency lockdown activated. All seller accounts suspended.' : 'Lockdown deactivated. All seller accounts restored.',
     });
   } catch (err) {
     logger.error('Error toggling lockdown:', err);
@@ -276,17 +296,9 @@ router.get('/system/lockdown/status', requireRole('manager'), async (_req: Reque
 router.get('/monitoring', requireRole('manager'), async (_req: Request, res: Response) => {
   try {
     const dbResult = await query('SELECT 1');
-    const mem = process.memoryUsage();
     res.json({
       db: dbResult.rows.length > 0 ? 'connected' : 'disconnected',
       uptime: Math.floor(process.uptime()),
-      memory: {
-        rss: Math.round(mem.rss / 1024 / 1024) + 'MB',
-        heap: Math.round(mem.heapUsed / 1024 / 1024) + 'MB',
-        heapTotal: Math.round(mem.heapTotal / 1024 / 1024) + 'MB',
-      },
-      node: process.version,
-      platform: process.platform,
       env: process.env.NODE_ENV || 'development',
       cache: cacheStats(),
       timestamp: new Date().toISOString(),

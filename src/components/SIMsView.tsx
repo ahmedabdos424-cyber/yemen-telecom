@@ -274,7 +274,7 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
         <div className="stat-card stat-card-ym">
           <div className="flex justify-between items-start mb-2">
             <OperatorLogo provider="yemen_mobile" size="sm" />
-            <span className="text-[11px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">+12%</span>
+            <span className="text-[11px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">{sims.length > 0 ? `${((stats.available / Math.max(sims.length, 1)) * 100).toFixed(0)}%` : '—'}</span>
           </div>
           <p className="text-gray-400 text-[11px] font-bold">إجمالي الشرائح</p>
           <h4 className="stat-card-value font-mono">{stats.total}</h4>

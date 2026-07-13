@@ -1,0 +1,17 @@
+{
+  "projectId": "ae188b56-e8c8-47ae-98f0-bb0d01f6b385",
+  "type": "frontend",
+  "name": "Seller management create and list operations",
+  "description": "A manager can create a new seller account and see it appear in the sellers list with correct details.",
+  "priority": "p0",
+  "planSteps": [
+    { "type": "action", "description": "Navigate to the login page and log in as manager" },
+    { "type": "action", "description": "Navigate to the Sellers management page" },
+    { "type": "action", "description": "Click the Add Seller or Create button" },
+    { "type": "action", "description": "Enter a name in the seller name field" },
+    { "type": "action", "description": "Enter a valid email address in the email field" },
+    { "type": "action", "description": "Enter a phone number in the phone field" },
+    { "type": "action", "description": "Click the Save or Submit button" },
+    { "type": "assertion", "description": "Verify the seller is created successfully and appears in the sellers list with the entered name and email" }
+  ]
+}

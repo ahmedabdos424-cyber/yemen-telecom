@@ -1,0 +1,11 @@
+OpenCode Windows rebuild execution result
+Timestamp: 2026-07-06T09:45:09.3042781+03:00
+Workspace: C:\Users\Ahmed\Desktop\yemen-telecom
+Node: v24.18.0
+npm: 11.16.0
+Python: Python 3.11.9
+Git: git version 2.54.0.windows.1
+Build status: PASS
+Vitest status: PASS (294/294)
+OpenCode packaging artifacts: MISSING
+Reason: this repository does not contain an Electron/OpenCode desktop package source or outputs
