@@ -1,0 +1,51 @@
+{
+  "projectId": "ae188b56-e8c8-47ae-98f0-bb0d01f6b385",
+  "type": "frontend",
+  "name": "Login with invalid credentials shows error",
+  "description": "Verify wrong credentials show error and stay on login",
+  "planSteps": [
+    {
+      "type": "action",
+      "description": "Navigate to the application",
+      "action": "navigate",
+      "url": "{{TARGET_URL}}"
+    },
+    {
+      "type": "action",
+      "description": "Wait for login screen",
+      "action": "wait",
+      "timeout": 10000
+    },
+    {
+      "type": "action",
+      "description": "Select manager role",
+      "action": "click",
+      "selector": "text=مدير عام"
+    },
+    {
+      "type": "action",
+      "description": "Enter invalid username",
+      "action": "fill",
+      "selector": "input[type='text'], input[name='username']",
+      "value": "wronguser"
+    },
+    {
+      "type": "action",
+      "description": "Enter invalid password",
+      "action": "fill",
+      "selector": "input[type='password']",
+      "value": "WrongPass123!"
+    },
+    {
+      "type": "action",
+      "description": "Click login button",
+      "action": "click",
+      "selector": "button[type='submit']"
+    },
+    {
+      "type": "assertion",
+      "description": "Verify error message is displayed or stays on login screen",
+      "assertion": "page shows error message or login screen is still visible"
+    }
+  ]
+}

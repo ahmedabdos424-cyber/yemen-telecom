@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Agent, ViewType } from '../types';
 import { safeArray, safeString } from '../lib/safe';
 
@@ -91,12 +91,10 @@ function AgentsView({ agents = [], setView, onUpdateAgent }: AgentsViewProps) {
     );
   };
 
-  const stats = {
+  const stats = useMemo(() => ({
     total: agents.length,
     active: agents.filter((a) => a.status === 'active').length,
-    salesToday: '45,200',
-    pending: '12'
-  };
+  }), [agents]);
 
   const toggleAgentStatus = (id: string, currentStatus: 'active' | 'inactive') => {
     const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
@@ -470,7 +468,7 @@ function AgentsView({ agents = [], setView, onUpdateAgent }: AgentsViewProps) {
       </div>
 
       {/* Stats tiles */}
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+      <section className="grid grid-cols-2 gap-3 md:gap-4">
         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-2">
           <span className="material-symbols-outlined text-gray-400 text-2xl">groups</span>
           <div>
@@ -484,22 +482,6 @@ function AgentsView({ agents = [], setView, onUpdateAgent }: AgentsViewProps) {
           <div>
             <p className="text-gray-400 font-bold text-[11px] uppercase">الوكلاء النشطون</p>
             <h4 className="text-lg font-bold text-green-600 font-mono mt-0.5">{stats.active}</h4>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-2">
-          <span className="material-symbols-outlined text-blue-500 text-2xl">trending_up</span>
-          <div>
-            <p className="text-gray-400 font-bold text-[11px] uppercase">المبيعات الإجمالية اليومية</p>
-            <h4 className="text-lg font-bold text-gray-900 font-mono mt-0.5">{stats.salesToday} <span className="text-[11px] font-normal text-gray-500">ر.ي</span></h4>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-2">
-          <span className="material-symbols-outlined text-secondary text-2xl">pending_actions</span>
-          <div>
-            <p className="text-gray-400 font-bold text-[11px] uppercase">طلبات شحن معلقة</p>
-            <h4 className="text-lg font-bold text-secondary font-mono mt-0.5">{stats.pending}</h4>
           </div>
         </div>
       </section>

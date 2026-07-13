@@ -6,6 +6,6 @@
         </trust-anchors>
     </base-config>
     <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="true">yemen-telecom-api.onrender.com</domain>
+        <domain includeSubdomains="true">yemen-telecom.onrender.com</domain>
     </domain-config>
 </network-security-config>

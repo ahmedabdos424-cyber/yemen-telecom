@@ -35,18 +35,36 @@ const poolConfig: PoolConfig = {
         ...(process.env.DB_SSL_CA_CERT ? { ca: process.env.DB_SSL_CA_CERT.replace(/\\\\n/g, '\n') } : {}),
       },
   max: parseInt(process.env.DB_MAX_CONNECTIONS || '10', 10),
+  idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || '30000', 10),
   connectionTimeoutMillis: 15000,
+  statement_timeout: parseInt(process.env.DB_STATEMENT_TIMEOUT || '30000', 10),
 };
 if (process.env.DB_FAMILY) {
   (poolConfig as any).family = parseInt(process.env.DB_FAMILY, 10);
 }
-if (process.env.NODE_ENV === 'production' && !isLocal && !rejectUnauthorized) {
-  logger.error('[DB] SSL certificate validation is disabled (DB_SSL_REJECT_UNAUTHORIZED=false). Set it to true in production.');
+if (process.env.NODE_ENV === 'production' && !isLocal) {
+  if (!rejectUnauthorized) {
+    logger.error('[DB] SSL certificate validation is disabled. Set DB_SSL_REJECT_UNAUTHORIZED=true in production.');
+    logger.error('[DB] Connection will proceed but is vulnerable to MITM attacks.');
+  }
+  if (parseInt(process.env.DB_MAX_CONNECTIONS || '10', 10) < 5) {
+    logger.error('[DB] DB_MAX_CONNECTIONS is too low (< 5). Setting to minimum 5.');
+  }
 }
 export const pool = new Pool(poolConfig);
 
 pool.on('error', (err) => {
   logger.error('[DB] Unexpected error on idle client', err);
+});
+
+pool.on('connect', () => {
+  logger.debug('[DB] New client acquired from pool');
+});
+pool.on('acquire', () => {
+  logger.debug('[DB] Client acquired');
+});
+pool.on('remove', () => {
+  logger.debug('[DB] Client removed from pool');
 });
 
 let slowQueryThreshold = parseInt(process.env.DB_SLOW_QUERY_MS || '500', 10);
@@ -56,7 +74,8 @@ export async function query(text: string, params?: any[]) {
   const res = await pool.query(text, params);
   const duration = Date.now() - start;
   if (duration > slowQueryThreshold) {
-    logger.warn('[DB] Slow query', { text: text.substring(0, 120), duration, rows: res.rowCount });
+    const redacted = text.substring(0, 120).replace(/password[^,)]*/gi, 'password=***');
+    logger.warn('[DB] Slow query', { text: redacted, duration, rows: res.rowCount });
   }
   return res;
 }
@@ -69,7 +88,11 @@ export async function transaction<T>(fn: (client: import('pg').PoolClient) => Pr
     await client.query('COMMIT');
     return result;
   } catch (err) {
-    await client.query('ROLLBACK');
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackErr) {
+      logger.error('[DB] ROLLBACK failed', { error: rollbackErr });
+    }
     throw err;
   } finally {
     client.release();

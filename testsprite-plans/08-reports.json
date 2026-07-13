@@ -1,0 +1,15 @@
+{
+  "projectId": "ae188b56-e8c8-47ae-98f0-bb0d01f6b385",
+  "type": "frontend",
+  "name": "Reports page displays data and export options",
+  "description": "The reports page loads with sales data, date filters, and export options for the manager.",
+  "priority": "p1",
+  "planSteps": [
+    { "type": "action", "description": "Navigate to the login page and log in as manager" },
+    { "type": "action", "description": "Navigate to the Reports page" },
+    { "type": "assertion", "description": "Verify the reports page loads with date range filters visible" },
+    { "type": "assertion", "description": "Verify sales data or summary statistics are displayed in the report area" },
+    { "type": "action", "description": "Change the date range filter to the last 7 days" },
+    { "type": "assertion", "description": "Verify the report data updates to reflect the selected date range" }
+  ]
+}

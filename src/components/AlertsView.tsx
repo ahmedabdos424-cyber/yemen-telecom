@@ -172,7 +172,7 @@ export default function AlertsView({
                       {alert.id === '1'
                         ? `وصلت كمية شرائح SIM المتوفرة إلى أقل من ${settings.stockShortageThreshold ?? 5}% من الحد الأدنى المطلوب. يتطلب إجراء فوري.`
                         : alert.id === '2'
-                        ? `تم رصد محاولة دخول فاشلة متكررة (تخطت عتبة الـ ${settings.maxFailedLoginsThreshold ?? 3} محاولات المعينة) من عنوان IP 192.168.1.1 على حساب مدير العمليات.`
+                        ? `تم رصد محاولة دخول فاشلة متكررة (تخطت عتبة الـ ${settings.maxFailedLoginsThreshold ?? 3} محاولات المعينة) من عنوان IP غير معروف على حساب المستخدم.`
                         : alert.description}
                     </p>
                   </div>
@@ -341,56 +341,6 @@ export default function AlertsView({
               💡 لتعديل هذه القيم أو زيادة الحساسية، يرجى التوجه لـ <span className="font-semibold text-gray-600">صفحة إعدادات النظام</span> وتحديث عتبات الإنذار.
             </p>
           </section>
-
-          {/* Timeline alerts history */}
-          <section className="card">
-             <h3 className="font-headline-md text-xs font-bold text-gray-900 mb-4">سجل التحرّكات والعمليات السابقة</h3>
-            <div className="relative space-y-5 before:absolute before:inset-y-0 before:right-2 before:w-[1.5px] before:bg-gray-100">
-              <div className="relative pr-6">
-                <div className="absolute right-[4px] top-1 w-2.5 h-2.5 rounded-full bg-green-500 ring-4 ring-white"></div>
-                <div className="flex justify-between items-center text-[11px]">
-                  <p className="font-bold text-gray-900">اكتمال عملية تكرار النسخة</p>
-                  <span className="text-gray-400 font-mono">08:00 AM</span>
-                </div>
-                <p className="text-[11px] text-gray-500 mt-1 lines-clamp-1">تم حفظ النسخ السحابي اليومي لقاعدة البيانات بنجاح.</p>
-              </div>
-
-              <div className="relative pr-6">
-                <div className="absolute right-[4px] top-1 w-2.5 h-2.5 rounded-full bg-orange-500 ring-4 ring-white"></div>
-                <div className="flex justify-between items-center text-[11px]">
-                  <p className="font-bold text-gray-900">انخفاض مؤقت في سرعة استجابة السيرفر</p>
-                  <span className="text-gray-400 font-mono">07:45 AM</span>
-                </div>
-                <p className="text-[11px] text-gray-500 mt-1 lines-clamp-1">تأخر معالجة قاعدة البيانات المركزية لمدة (20ms).</p>
-              </div>
-
-              <div className="relative pr-6">
-                <div className="absolute right-[4px] top-1 w-2.5 h-2.5 rounded-full bg-primary ring-4 ring-white"></div>
-                <div className="flex justify-between items-center text-[11px]">
-                  <p className="font-bold text-gray-900">تحديث أمان جدران حماية النظام</p>
-                  <span className="text-gray-300 font-mono">أمس</span>
-                </div>
-                <p className="text-[11px] text-gray-500 mt-1 lines-clamp-1">تمت ترقية جدار العقد بنجاح إلى النسخة V-2.4.0</p>
-              </div>
-            </div>
-          </section>
-
-          {/* System Health performance badge mockup sparkline */}
-          <div className="bg-primary-container text-white rounded-xl p-4 shadow-md">
-            <div className="flex justify-between items-center mb-3">
-              <span className="text-xs text-gray-400 font-semibold">استقرار السيرفرات</span>
-              <span className="text-green-400 font-bold font-mono text-base">99.8%</span>
-            </div>
-            <div className="h-10 flex items-end gap-1.5">
-              <div className="w-full bg-white/10 h-7 rounded-sm"></div>
-              <div className="w-full bg-white/10 h-8 rounded-sm"></div>
-              <div className="w-full bg-white/20 h-10 rounded-sm"></div>
-              <div className="w-full bg-white/15 h-8 rounded-sm"></div>
-              <div className="w-full bg-white/30 h-10 rounded-sm"></div>
-              <div className="w-full bg-white/20 h-9 rounded-sm"></div>
-              <div className="w-full bg-white/10 h-7 rounded-sm"></div>
-            </div>
-          </div>
         </div>
       </div>
     </div>

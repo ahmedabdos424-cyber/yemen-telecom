@@ -1,3 +1,5 @@
+BEGIN;
+
 -- P1-07: Normalize provider/operator casing
 -- Create providers lookup table and normalize existing data
 
@@ -43,3 +45,5 @@ WHERE p.slug = o.operator AND o.provider_id IS NULL;
 UPDATE distribution_requests d SET provider_id = p.id
 FROM providers p
 WHERE p.slug = d.operator AND d.provider_id IS NULL;
+
+COMMIT;

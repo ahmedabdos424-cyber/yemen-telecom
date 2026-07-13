@@ -42,7 +42,8 @@ export const updatePasswordSchema = z.object({
   newPassword: z.string().min(8, 'Password must be at least 8 characters').max(200)
     .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
     .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-    .regex(/[0-9]/, 'Password must contain at least one digit'),
+    .regex(/[0-9]/, 'Password must contain at least one digit')
+    .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character'),
 });
 
 export const updateProfileSchema = z.object({
@@ -83,7 +84,8 @@ export const createAgentSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters').max(200)
     .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
     .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-    .regex(/[0-9]/, 'Password must contain at least one digit').optional(),
+    .regex(/[0-9]/, 'Password must contain at least one digit')
+    .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character').optional(),
 });
 
 export const updateAgentSchema = z.object({
@@ -111,7 +113,8 @@ export const createSellerSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters').max(200)
     .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
     .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-    .regex(/[0-9]/, 'Password must contain at least one digit').optional(),
+    .regex(/[0-9]/, 'Password must contain at least one digit')
+    .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character').optional(),
   agent_name: so(200),
   seller_id: z.string().max(50).optional(),
   sellerId: z.string().max(50).optional(),
@@ -131,7 +134,7 @@ export const updateSellerSchema = z.object({
 });
 
 export const updateSellerBalanceSchema = z.object({
-  amount: z.number().refine(v => !isNaN(v), 'Numeric amount is required'),
+  amount: z.number().refine(v => !isNaN(v), 'Numeric amount is required').refine(v => v > 0, 'Amount must be positive'),
 });
 
 // Operator normalization — accepts both snake_case and Title Case, normalizes to snake_case

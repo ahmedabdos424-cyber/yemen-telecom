@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import { query } from '../db';
 import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
-import { getPagination } from '../helpers';
+import { getPagination, getDefaultLimit } from '../helpers';
 import { validate, createOperationSchema } from '../validation';
 
 const router = Router();
@@ -25,6 +25,8 @@ router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: R
     if (paginate) {
       sql += ' LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
       params.push(limit, offset);
+    } else {
+      sql += ` LIMIT ${getDefaultLimit()}`;
     }
     const result = await query(sql, params);
     res.json(result.rows.map((r: { op_id: string; type: string; target: string; operator: string; date: string; time: string; status: string }) => ({

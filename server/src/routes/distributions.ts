@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import { query, transaction } from '../db';
 import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
-import { getPagination } from '../helpers';
+import { getPagination, getDefaultLimit } from '../helpers';
 import { validate, createDistributionSchema, approveDistributionSchema } from '../validation';
 
 const router = Router();
@@ -28,7 +28,7 @@ router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: R
            FROM distribution_requests dr
            LEFT JOIN agents a ON dr.agent_id = a.id
            LEFT JOIN sellers s ON dr.seller_id = s.id
-           ORDER BY dr.id DESC`
+           ORDER BY dr.id DESC LIMIT ${getDefaultLimit()}`
         );
       }
     } else {
@@ -51,7 +51,7 @@ router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: R
            LEFT JOIN agents a ON dr.agent_id = a.id
            LEFT JOIN sellers s ON dr.seller_id = s.id
            WHERE dr.agent_id = $1
-           ORDER BY dr.id DESC`,
+           ORDER BY dr.id DESC LIMIT ${getDefaultLimit()}`,
           [agentRes.rows[0].id]
         );
       }
@@ -75,6 +75,12 @@ router.post('/', requireRole('agent'), validate(createDistributionSchema), async
     if (seller_name && !sellerId) {
       const s = await query('SELECT id FROM sellers WHERE name = $1', [seller_name]);
       if (s.rows.length > 0) sellerId = s.rows[0].id;
+    }
+    if (sellerId) {
+      const ownerCheck = await query('SELECT id FROM sellers WHERE id = $1 AND agent_id = $2', [sellerId, agentId]);
+      if (ownerCheck.rows.length === 0) {
+        return res.status(403).json({ error: 'Access denied: this seller does not belong to your agency' });
+      }
     }
     const requestId = `DIST-${Date.now()}`;
     const result = await query(
@@ -106,6 +112,10 @@ router.put('/:id/approve', requireRole('manager'), validate(approveDistributionS
         [decision, req.user!.id, notes || null, req.params.id]
       );
       if (decision === 'approved') {
+        const inv = await client.query('SELECT available FROM inventories WHERE operator = $1 FOR UPDATE', [dr.operator]);
+        if (inv.rows.length > 0 && inv.rows[0].available < dr.count) {
+          throw new Error('INSUFFICIENT_INVENTORY');
+        }
         await client.query(
           'UPDATE inventories SET available=GREATEST(available-$1, 0), remaining=remaining+$1 WHERE operator=$2',
           [dr.count, dr.operator]
@@ -120,6 +130,9 @@ router.put('/:id/approve', requireRole('manager'), validate(approveDistributionS
     if (err.message.startsWith('DISTRIBUTION_ALREADY_')) {
       const status = err.message.replace('DISTRIBUTION_ALREADY_', '').toLowerCase();
       return res.status(400).json({ error: `Request is already ${status}` });
+    }
+    if (err.message === 'INSUFFICIENT_INVENTORY') {
+      return res.status(409).json({ error: 'Insufficient inventory to fulfill this request' });
     }
     logger.error('Error approving distribution request:', err);
     res.status(500).json({ error: 'Internal server error' });

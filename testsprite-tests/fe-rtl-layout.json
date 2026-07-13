@@ -1,0 +1,35 @@
+{
+  "projectId": "ae188b56-e8c8-47ae-98f0-bb0d01f6b385",
+  "type": "frontend",
+  "name": "RTL layout renders correctly for Arabic",
+  "description": "Verify RTL direction and Arabic language attributes",
+  "planSteps": [
+    {
+      "type": "action",
+      "description": "Navigate to the application",
+      "action": "navigate",
+      "url": "{{TARGET_URL}}"
+    },
+    {
+      "type": "action",
+      "description": "Wait for page to load",
+      "action": "wait",
+      "timeout": 10000
+    },
+    {
+      "type": "assertion",
+      "description": "Check HTML direction attribute is RTL",
+      "assertion": "html element has dir=rtl"
+    },
+    {
+      "type": "assertion",
+      "description": "Check language attribute is Arabic",
+      "assertion": "html element has lang=ar"
+    },
+    {
+      "type": "assertion",
+      "description": "Verify page title exists",
+      "assertion": "document has a title"
+    }
+  ]
+}

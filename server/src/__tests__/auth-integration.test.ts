@@ -11,9 +11,22 @@ vi.hoisted(() => {
   process.env.CSRF_SECRET = 'p1-20-test-csrf-secret';
 });
 
-vi.mock('../db', () => ({
-  query: vi.fn(),
-}));
+let txInsertCount = 0;
+vi.mock('../db', () => {
+  const query = vi.fn();
+  const transaction = async <T>(fn: (client: any) => Promise<T>): Promise<T> => {
+    const client = {
+      query: vi.fn((sql: string, params?: any[]) => {
+        if (sql.includes('INSERT INTO token_blacklist')) {
+          txInsertCount++;
+        }
+        return query(sql, params);
+      }),
+    };
+    return fn(client);
+  };
+  return { query, transaction };
+});
 
 import { query } from '../db';
 import authRoutes from '../routes/auth';
@@ -105,6 +118,24 @@ describe('P1-20 Auth Integration Tests', () => {
       expect(r.data.user.username).toBe('testuser');
     });
 
+    it('should fall back to a default lockout threshold when system_settings is unavailable', async () => {
+      (query as any).mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('SELECT max_failed_logins_threshold FROM system_settings')) {
+          return Promise.reject(Object.assign(new Error('column "max_failed_logins_threshold" does not exist'), { code: '42703' }));
+        }
+        if (sql.includes('token_blacklist')) return Promise.resolve({ rows: [] });
+        if (sql.includes('SELECT * FROM users WHERE username')) {
+          return Promise.resolve({ rows: [testUser] });
+        }
+        if (sql.includes('UPDATE users SET last_login')) return Promise.resolve({ rows: [] });
+        return Promise.resolve({ rows: [] });
+      });
+
+      const r = await req('POST', '/api/auth/login', { username: 'testuser', password: PASSWORD });
+      expect(r.status).toBe(200);
+      expect(r.data.user.username).toBe('testuser');
+    });
+
     it('should use access token to make authenticated requests', async () => {
       mockUser();
       const r = await req('POST', '/api/auth/login', { username: 'testuser', password: PASSWORD });
@@ -171,13 +202,9 @@ describe('P1-20 Auth Integration Tests', () => {
   });
 
   describe('Logout / token blacklisting', () => {
+    beforeEach(() => { txInsertCount = 0; });
     it('should blacklist token on logout', async () => {
-      let insertCount = 0;
       (query as any).mockImplementation((sql: string) => {
-        if (sql.includes('INSERT INTO token_blacklist')) {
-          insertCount++;
-          return Promise.resolve({ rows: [] });
-        }
         if (sql.includes('token_blacklist')) return Promise.resolve({ rows: [] });
         if (sql.includes('SELECT * FROM users WHERE username')) {
           return Promise.resolve({ rows: [testUser] });
@@ -193,7 +220,7 @@ describe('P1-20 Auth Integration Tests', () => {
         'Authorization': `Bearer ${r.data.token}`,
         'x-refresh-token': r.data.refreshToken,
       });
-      expect(insertCount).toBe(2);
+      expect(txInsertCount).toBe(2);
     });
 
     it('should blacklist old refresh token on refresh', async () => {
@@ -287,7 +314,7 @@ describe('P1-20 Auth Integration Tests', () => {
 
     it('should accept valid password update', async () => {
       const { updatePasswordSchema } = await import('../validation');
-      const result = updatePasswordSchema.safeParse({ currentPassword: PASSWORD, newPassword: 'NewValidPass1' });
+      const result = updatePasswordSchema.safeParse({ currentPassword: PASSWORD, newPassword: 'NewValidPass1!' });
       expect(result.success).toBe(true);
     });
   });

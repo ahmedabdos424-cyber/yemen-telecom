@@ -1,0 +1,15 @@
+{
+  "projectId": "ae188b56-e8c8-47ae-98f0-bb0d01f6b385",
+  "type": "frontend",
+  "name": "Logout clears session and redirects to login",
+  "description": "When a logged-in user clicks logout, their session is cleared and they are redirected to the login page.",
+  "priority": "p0",
+  "planSteps": [
+    { "type": "action", "description": "Navigate to the login page and log in as manager" },
+    { "type": "action", "description": "Verify the dashboard is displayed after login" },
+    { "type": "action", "description": "Click the logout button or menu item" },
+    { "type": "assertion", "description": "Verify the user is redirected to the login page" },
+    { "type": "action", "description": "Try to navigate directly to the dashboard URL" },
+    { "type": "assertion", "description": "Verify the user is redirected back to the login page, confirming the session was cleared" }
+  ]
+}

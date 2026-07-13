@@ -1,0 +1,15 @@
+{
+  "projectId": "ae188b56-e8c8-47ae-98f0-bb0d01f6b385",
+  "type": "frontend",
+  "name": "Dashboard is responsive on mobile viewport",
+  "description": "When viewed on a mobile device (375px width), the dashboard displays a hamburger menu and stacked card layout.",
+  "priority": "p1",
+  "planSteps": [
+    { "type": "action", "description": "Navigate to the login page and log in as manager" },
+    { "type": "action", "description": "Resize the browser viewport to 375px width" },
+    { "type": "assertion", "description": "Verify the navigation collapses into a hamburger menu icon" },
+    { "type": "action", "description": "Click the hamburger menu icon" },
+    { "type": "assertion", "description": "Verify the navigation menu expands showing all navigation links" },
+    { "type": "assertion", "description": "Verify the dashboard statistics cards are stacked vertically" }
+  ]
+}

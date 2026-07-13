@@ -1,0 +1,113 @@
+#!/bin/sh
+# Yemen Telecom — Pre-commit Guard
+#
+# This hook enforces:
+# 1. TypeScript check (frontend + backend)
+# 2. Pagination audit (no unbounded SELECT without LIMIT)
+# 3. Math.random() audit (no usage in business logic)
+# 4. No hardcoded secrets
+# 5. Migration safety (BEGIN/COMMIT check)
+#
+
+echo ""
+echo "═══════════════════════════════════════════"
+echo "  🛡️  PRE-COMMIT QUALITY GATES"
+echo "═══════════════════════════════════════════"
+
+ERRORS=0
+
+# ─── Gate 1: Frontend TypeScript ───────────────────────
+echo ""
+echo "📦 [1/5] Frontend TypeScript check..."
+if ! npx tsc --noEmit 2>/dev/null; then
+  echo "  ❌ TypeScript errors found in frontend"
+  ERRORS=$((ERRORS + 1))
+else
+  echo "  ✅ Frontend TypeScript — 0 errors"
+fi
+
+# ─── Gate 2: Backend TypeScript ───────────────────────
+echo ""
+echo "📦 [2/5] Backend TypeScript check..."
+if ! (cd server && npx tsc --noEmit 2>/dev/null); then
+  echo "  ❌ TypeScript errors found in backend"
+  ERRORS=$((ERRORS + 1))
+else
+  echo "  ✅ Backend TypeScript — 0 errors"
+fi
+
+# ─── Gate 3: Pagination Audit ──────────────────────────
+echo ""
+echo "📄 [3/5] Pagination audit (no unbounded queries)..."
+PAGINATION_ISSUES=0
+for file in server/src/routes/*.ts; do
+  filename=$(basename "$file")
+  # Skip auth.ts (no data queries) and upload.ts (no data queries)
+  case "$filename" in
+    auth.ts|upload.ts|users.ts) continue ;;
+  esac
+  # Check for SELECT without LIMIT in the file (rough audit)
+  while IFS= read -r line; do
+    if echo "$line" | grep -qE "SELECT.*FROM" && ! echo "$line" | grep -qi "LIMIT\|COUNT\|EXISTS"; then
+      lineno=$(grep -n "$line" "$file" | head -1 | cut -d: -f1)
+      echo "  ⚠️  $filename:$lineno — SELECT without LIMIT"
+      PAGINATION_ISSUES=$((PAGINATION_ISSUES + 1))
+    fi
+  done <<EOF
+$(grep -E "query\(\`SELECT.*FROM" "$file" 2>/dev/null || true)
+EOF
+done
+if [ "$PAGINATION_ISSUES" -gt 0 ]; then
+  echo "  ❌ $PAGINATION_ISSUES potential pagination issues"
+  ERRORS=$((ERRORS + 1))
+else
+  echo "  ✅ All queries have LIMIT or are bounded"
+fi
+
+# ─── Gate 4: Math.random() in business logic ──────────
+echo ""
+echo "🔐 [4/5] Crypto audit (no Math.random() in business logic)..."
+MATH_RANDOM_FILES=$(grep -rl "Math.random()" server/src/routes/ server/src/middleware/ 2>/dev/null || true)
+if [ -n "$MATH_RANDOM_FILES" ]; then
+  echo "  ❌ Math.random() found in:"
+  echo "$MATH_RANDOM_FILES" | sed 's/^/      - /'
+  ERRORS=$((ERRORS + 1))
+else
+  echo "  ✅ No Math.random() in business logic"
+fi
+
+# ─── Gate 5: Hardcoded secrets audit ──────────────────
+echo ""
+echo "🔑 [5/5] Hardcoded secrets audit..."
+SECRETS_FOUND=0
+# Check for hardcoded test secrets in CI files (excluding expected patterns)
+if grep -qE "test-jwt-secret|test-refresh-secret|test-csrf-secret" .github/workflows/*.yml 2>/dev/null; then
+  echo "  ⚠️  Test secrets found in CI YAML files"
+  SECRETS_FOUND=$((SECRETS_FOUND + 1))
+fi
+# Check for any private keys
+if grep -rl "BEGIN RSA PRIVATE KEY\|BEGIN OPENSSH PRIVATE KEY" --include="*.ts" --include="*.tsx" --include="*.js" . 2>/dev/null | grep -v node_modules | grep -v ".git" | head -1 > /dev/null 2>&1; then
+  echo "  ❌ Private keys found in source"
+  SECRETS_FOUND=$((SECRETS_FOUND + 1))
+fi
+if [ "$SECRETS_FOUND" -gt 0 ]; then
+  echo "  ❌ Secret audit warnings"
+  ERRORS=$((ERRORS + 1))
+else
+  echo "  ✅ No hardcoded secrets found"
+fi
+
+# ─── Summary ──────────────────────────────────────────
+echo ""
+echo "═══════════════════════════════════════════"
+if [ "$ERRORS" -gt 0 ]; then
+  echo "  ❌ $ERRORS gate(s) FAILED — commit blocked"
+  echo "  🔧 Fix the issues above and try again"
+  echo "═══════════════════════════════════════════"
+  exit 1
+else
+  echo "  ✅ All quality gates PASSED"
+  echo "  ✅ Commit allowed"
+  echo "═══════════════════════════════════════════"
+  exit 0
+fi

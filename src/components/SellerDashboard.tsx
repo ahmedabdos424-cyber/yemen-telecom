@@ -335,11 +335,11 @@ export default function SellerDashboard({
                     </div>
                     <div className="flex justify-between items-center border-b border-slate-900 pb-2">
                       <span className="text-slate-400 font-medium">المنطقة الإقليمية</span>
-                      <span className="text-slate-100 font-bold">{sellerData.region || 'المنطقة الإقليمية العليا، الرياض'}</span>
+                      <span className="text-slate-100 font-bold">{sellerData.region || '—'}</span>
                     </div>
                     <div className="flex justify-between items-center border-b border-slate-900 pb-2">
                       <span className="text-slate-400 font-medium">تاريخ إنشاء الحساب</span>
-                      <span className="text-slate-100 font-sans font-bold">{sellerData.creationDate || '2023/10/12'}</span>
+                      <span className="text-slate-100 font-sans font-bold">{sellerData.creationDate || '—'}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-slate-400 font-medium">حالة الحساب</span>
@@ -405,11 +405,11 @@ export default function SellerDashboard({
                   <div className="bg-slate-950/60 border border-slate-850 rounded-2xl p-4 space-y-2 text-xs">
                     <div className="flex justify-between items-center">
                       <span className="text-slate-400 font-medium">إصدار التطبيق</span>
-                      <span className="text-slate-200 font-mono font-bold bg-slate-900 px-2 py-0.5 rounded border border-slate-800">v2.4.0 (Enterprise Build)</span>
+                      <span className="text-slate-200 font-mono font-bold bg-slate-900 px-2 py-0.5 rounded border border-slate-800">v1.0.0</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-slate-400 font-medium">تاريخ آخر تحديث</span>
-                      <span className="text-slate-200 font-sans font-bold">2026/06/02</span>
+                      <span className="text-slate-200 font-sans font-bold">{new Date().toISOString().slice(0,10).replace(/-/g, '/')}</span>
                     </div>
                   </div>
                 </div>

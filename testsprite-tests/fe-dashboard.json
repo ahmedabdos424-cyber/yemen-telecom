@@ -1,0 +1,50 @@
+{
+  "projectId": "ae188b56-e8c8-47ae-98f0-bb0d01f6b385",
+  "type": "frontend",
+  "name": "Dashboard displays overview statistics",
+  "description": "Verify manager dashboard shows stats cards and navigation",
+  "planSteps": [
+    {
+      "type": "action",
+      "description": "Navigate to the application",
+      "action": "navigate",
+      "url": "{{TARGET_URL}}"
+    },
+    {
+      "type": "action",
+      "description": "Login as manager",
+      "action": "fill",
+      "selector": "input[type='text'], input[name='username']",
+      "value": "manager"
+    },
+    {
+      "type": "action",
+      "description": "Enter password",
+      "action": "fill",
+      "selector": "input[type='password']",
+      "value": "Admin@123"
+    },
+    {
+      "type": "action",
+      "description": "Submit login",
+      "action": "click",
+      "selector": "button[type='submit']"
+    },
+    {
+      "type": "action",
+      "description": "Wait for dashboard to load",
+      "action": "wait",
+      "timeout": 10000
+    },
+    {
+      "type": "assertion",
+      "description": "Verify dashboard statistics are visible",
+      "assertion": "page shows statistics cards or numbers"
+    },
+    {
+      "type": "assertion",
+      "description": "Verify navigation links are present",
+      "assertion": "page has navigation to SIMs, Agents, Sellers"
+    }
+  ]
+}

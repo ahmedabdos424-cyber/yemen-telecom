@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { Router, Response } from 'express';
 import multer from 'multer';
 import { getBucket } from '../firebase-admin';
@@ -33,7 +34,7 @@ const upload = multer({
 
 async function uploadToFirebase(file: Express.Multer.File): Promise<{ url: string; filename: string }> {
   const ext = file.originalname.split('.').pop() || 'jpg';
-  const filename = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`;
+  const filename = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
   const bucket = getBucket();
   const blob = bucket.file(`uploads/${filename}`);
   const blobStream = blob.createWriteStream({
@@ -44,7 +45,7 @@ async function uploadToFirebase(file: Express.Multer.File): Promise<{ url: strin
     blobStream.on('finish', async () => {
       const [url] = await blob.getSignedUrl({
         action: 'read',
-        expires: Date.now() + 3600 * 1000,
+        expires: Date.now() + 365 * 24 * 3600 * 1000,
       });
       resolve({ url, filename });
     });
