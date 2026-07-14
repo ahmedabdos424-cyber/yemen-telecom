@@ -18,6 +18,8 @@ firebase-service-account.json
 .playwright-mcp/
 .domdump.txt
 android/key.properties
+android/app/key.properties
+**/key.properties
 *.keystore
 *.keystore.bak
 *.jks
