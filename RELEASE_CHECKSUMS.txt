@@ -1,13 +1,34 @@
-﻿SHA256 Checksums - Yemen Telecom v1.0.0 (build 3)
-Generated: 2026-07-14 05:02:00 UTC
+﻿SHA256 Checksums - Yemen Telecom v1.0.0 (Build 3)
+Generated: 2026-07-14 (Release-signed build)
 
-app-release.apk  7d3a97b0168de3250bdadbba405fb0bff71ddc75006bb76940536ad87082079a
-app-release.aab  8ee114efacfc7c65c51e164db2f87fb7c0c7ffcd666e4cb7d4cf08b6e4c78f65
+=== APK ===
+File: app-release.apk
+Size: 26443452 bytes (25.2MB)
+SHA256: 3774b623d1d5419616b579da35facd7e2aa7e72a05f51162cffa465dbe85fb04
+SHA1:   03af72bde0efbea712b44b4fd70ee732def26cc2
+MD5:    b831ab6c6f425e93281cc36c860920d1
 
-SHA1:
-app-release.apk  1ba63ff4b6e07110d0903e700324ece243d16124
-app-release.aab  7364a81a440ebc4ca9036a23c24859e350c471ae
+=== AAB ===
+File: app-release.aab
+Size: 27746561 bytes (26.5MB)
+SHA256: 2447f9d1adde6b24271d7b662ec8956476eff982fe15ab40e3287385b722ce5d
+SHA1:   bb6c5922cea1c3691c04b045bf079fd5f0d6f6ca
+MD5:    d3570e9378a13ea5a4060afc0a084c3b
 
-MD5:
-app-release.apk  96b65458cf0b0a9fc2c7608fb40d6947
-app-release.aab  06d1c582d33e7b73ced6dda21db40d61
+=== SIGNING ===
+Certificate DN: CN=Yemen Telecom, OU=Development, O=Yemen Telecom, L=Sana'a, ST=Aden, C=YE
+Key Algorithm: RSA 4096-bit
+Signature Algorithm: SHA384withRSA
+Valid From: 2026-07-14
+Valid To: 2126-06-20 (100 years)
+Signature Scheme: v2 (APK Signature Scheme v2)
+Keystore Type: JKS
+
+=== BUILD INFO ===
+Version Name: 1.0.0
+Version Code: 3
+Min SDK: 24
+Target SDK: 36
+Compile SDK: 36
+Package: com.yemen.telecom
+Signer: CN=Yemen Telecom
