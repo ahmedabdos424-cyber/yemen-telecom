@@ -17,10 +17,14 @@ Desktop.ini
 firebase-service-account.json
 .playwright-mcp/
 .domdump.txt
-android/key.properties
+**/key.properties
 *.keystore
+*.keystore.*
 *.keystore.bak
 *.jks
+*.jks.*
+*.pkcs12
+*.p12
 keystore.properties
 coverage/
 test-results/
@@ -97,3 +101,13 @@ backend-test-results.json
 .eslintcache
 
 testsprite_tests/tmp/config.json
+
+# Release package documentation — intentional deliverables (must NOT be ignored)
+!release/FINAL_RELEASE_CERTIFICATION.md
+!release/SECURITY_NOTES.md
+!release/DEPLOYMENT_GUIDE.md
+!release/GOOGLE_PLAY_CHECKLIST.md
+!release/RELEASE_NOTES.md
+!release/SIGNING_GUIDE.md
+!release/CHECKSUMS.txt
+!release/key.properties.example

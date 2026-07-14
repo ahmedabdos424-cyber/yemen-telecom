@@ -1,8 +1,18 @@
 # Release signing configuration
-# Copy this file to key.properties and fill in the values
-# DO NOT commit key.properties to version control
+# Copy this file to android/key.properties (gitignored — DO NOT commit)
+# OR supply the same values via environment variables in CI:
+#   KEYSTORE_PATH, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
+#
+# The release build FAILS if any of these are missing (no debug fallback).
 
+# File-based (place the keystore at android/app/release.keystore):
 storePassword=YOUR_KEYSTORE_PASSWORD
 keyPassword=YOUR_KEY_PASSWORD
-keyAlias=yemen-telecom-release
+keyAlias=release
 storeFile=release.keystore
+
+# --- OR --- set environment variables (CI):
+# KEYSTORE_PATH=android/app/release.keystore
+# KEYSTORE_PASSWORD=YOUR_KEYSTORE_PASSWORD
+# KEY_ALIAS=release
+# KEY_PASSWORD=YOUR_KEY_PASSWORD
