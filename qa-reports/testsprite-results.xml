@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="testsprite:ae188b56-e8c8-47ae-98f0-bb0d01f6b385" tests="18" failures="13" errors="0" skipped="0" time="0">
+    <testcase classname="ae188b56-e8c8-47ae-98f0-bb0d01f6b385" name="1c6527ce-2580-463e-9ba5-72561a802ea9" time="0">
+      <failure message="failed" type="failed">status: failed
+runId: f52202bf-7eb0-4609-af22-88e144e072c4</failure>
+    </testcase>
+    <testcase classname="ae188b56-e8c8-47ae-98f0-bb0d01f6b385" name="2130e693-2d9b-4e51-b8fc-445a8fb74218" time="0">
+    </testcase>
+    <testcase classname="ae188b56-e8c8-47ae-98f0-bb0d01f6b385" name="27e5a2f3-7f77-4bbf-a864-61a1d2874c04" time="0">
+    </testcase>
+    <testcase classname="ae188b56-e8c8-47ae-98f0-bb0d01f6b385" name="40738928-6fc2-4cf9-8714-03ca820e0724" time="0">
+    </testcase>
+    <testcase classname="ae188b56-e8c8-47ae-98f0-bb0d01f6b385" name="6f8c9497-895e-4211-bfa1-c9e7303148f6" time="0">
+      <failure message="failed" type="failed">status: failed
+runId: a85bb2c8-c61d-402e-942d-b0a57010fd41</failure>
+    </testcase>
+    <testcase classname="ae188b56-e8c8-47ae-98f0-bb0d01f6b385" name="262e72d1-d5bb-41f3-939e-9c7cb4c89415" time="0">
+      <failure message="failed" type="failed">status: failed
+runId: c26c47f0-0e92-44f9-b3d5-a4908d8e0bc5</failure>
+    </testcase>
+    <testcase classname="ae188b56-e8c8-47ae-98f0-bb0d01f6b385" name="c13f1419-4f8a-4344-8ec9-1de51de9f4b1" time="0">
+      <failure message="failed" type="failed">status: failed
+runId: 784ea32c-1480-4d9f-91e8-dba894639410</failure>
+    </testcase>
+    <testcase classname="ae188b56-e8c8-47ae-98f0-bb0d01f6b385" name="f1ce7fbe-9067-45d9-b208-9095dfe1d228" time="0">
+      <failure message="failed" type="failed">status: failed
+runId: 53f7fc7e-0fec-4f24-871c-823b9bd00d50</failure>
+    </testcase>
+    <testcase classname="ae188b56-e8c8-47ae-98f0-bb0d01f6b385" name="96b2b10a-8642-4d6b-99be-d704ad88e5d5" time="0">
+      <failure message="failed" type="failed">status: failed
+runId: 1c6c6c50-2a10-4dbd-8a78-d76c9102c501</failure>
+    </testcase>
+    <testcase classname="ae188b56-e8c8-47ae-98f0-bb0d01f6b385" name="bbd2c5cc-b2df-461e-bfb2-6a7a907367bd" time="0">
+      <failure message="blocked" type="blocked">status: blocked
+runId: 9c4f7265-3971-4a19-ad9e-5de4dea22e8d</failure>
+    </testcase>
+    <testcase classname="ae188b56-e8c8-47ae-98f0-bb0d01f6b385" name="c5e7d3b6-81ef-4876-9032-ab135d6c9423" time="0">
+      <failure message="failed" type="failed">status: failed
+runId: 5b2889e6-19e4-4c71-b5de-89d81d6e62ba</failure>
+    </testcase>
+    <testcase classname="ae188b56-e8c8-47ae-98f0-bb0d01f6b385" name="15323d44-1022-4aca-af36-193e59902b2a" time="0">
+      <failure message="failed" type="failed">status: failed
+runId: 38b74335-b0ed-4505-a3eb-06a1dd7f0779</failure>
+    </testcase>
+    <testcase classname="ae188b56-e8c8-47ae-98f0-bb0d01f6b385" name="2f7725a1-22d5-4c42-8d5a-d57e0ae910cc" time="0">
+      <failure message="failed" type="failed">status: failed
+runId: 5088a9bd-5d55-49bd-86da-9c37055ed630</failure>
+    </testcase>
+    <testcase classname="ae188b56-e8c8-47ae-98f0-bb0d01f6b385" name="51af151b-a78b-4500-9a59-4feef6907e04" time="0">
+    </testcase>
+    <testcase classname="ae188b56-e8c8-47ae-98f0-bb0d01f6b385" name="0a4c6d86-509f-4992-9e60-58d041db79f6" time="0">
+    </testcase>
+    <testcase classname="ae188b56-e8c8-47ae-98f0-bb0d01f6b385" name="7a7576a9-5ed8-4e2f-85c0-2a8b1ffd48d2" time="0">
+      <failure message="failed" type="failed">status: failed
+runId: fccee9b0-1e23-469e-9ea8-52952cde53e5</failure>
+    </testcase>
+    <testcase classname="ae188b56-e8c8-47ae-98f0-bb0d01f6b385" name="ad6baff5-2301-4d2c-90d1-e8d4b39f1b05" time="0">
+      <failure message="failed" type="failed">status: failed
+runId: f2f8dc6a-ce88-4d39-9a1d-864065100061</failure>
+    </testcase>
+    <testcase classname="ae188b56-e8c8-47ae-98f0-bb0d01f6b385" name="aa7df142-02e2-4e7f-91fe-cd1153fbbfe9" time="0">
+      <failure message="blocked" type="blocked">status: blocked
+runId: d2b9df4c-8d05-4919-b640-a4d6d7e83191</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

@@ -1,11 +1,18 @@
 apply plugin: 'com.android.application'
 
+// Load signing properties from key.properties or environment variables
+def keystorePropertiesFile = rootProject.file("key.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "com.yemen.telecom"
     compileSdk = rootProject.ext.compileSdkVersion
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
     }
     defaultConfig {
         applicationId "com.yemen.telecom"
@@ -20,10 +27,11 @@ android {
     }
     signingConfigs {
         release {
-            storeFile file(System.getenv('KEYSTORE_PATH') ?: 'release.keystore')
-            storePassword System.getenv('KEYSTORE_PASSWORD')
-            keyAlias System.getenv('KEYSTORE_ALIAS')
-            keyPassword System.getenv('KEY_PASSWORD')
+            def ksPath = keystoreProperties['storeFile'] ?: System.getenv('KEYSTORE_PATH') ?: 'release.keystore'
+            storeFile file(ksPath)
+            storePassword keystoreProperties['storePassword'] ?: System.getenv('KEYSTORE_PASSWORD') ?: ''
+            keyAlias keystoreProperties['keyAlias'] ?: System.getenv('KEYSTORE_ALIAS') ?: ''
+            keyPassword keystoreProperties['keyPassword'] ?: System.getenv('KEY_PASSWORD') ?: ''
         }
     }
     buildTypes {
@@ -32,16 +40,9 @@ android {
         }
         release {
             minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            def hasSigning = System.getenv('KEYSTORE_PASSWORD') &&
-                System.getenv('KEYSTORE_ALIAS') &&
-                System.getenv('KEY_PASSWORD')
-            if (hasSigning) {
-                signingConfig signingConfigs.release
-            } else {
-                signingConfig signingConfigs.debug
-                logger.warn('Release signing credentials not set; falling back to debug signing for validation.')
-            }
+            signingConfig signingConfigs.release
         }
     }
 }

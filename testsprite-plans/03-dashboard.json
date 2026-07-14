@@ -1,0 +1,19 @@
+{
+  "projectId": "ae188b56-e8c8-47ae-98f0-bb0d01f6b385",
+  "type": "frontend",
+  "name": "Dashboard displays overview statistics and navigation",
+  "description": "After logging in, the dashboard page displays key statistics (total SIMs, agents, sellers) and navigation links to all major sections.",
+  "priority": "p0",
+  "planSteps": [
+    { "type": "action", "description": "Navigate to the login page" },
+    { "type": "action", "description": "Enter 'manager' in the username field" },
+    { "type": "action", "description": "Enter 'Admin@123' in the password field" },
+    { "type": "action", "description": "Click the login button" },
+    { "type": "assertion", "description": "Verify the dashboard page loads with statistics cards showing counts for SIMs, agents, and sellers" },
+    { "type": "action", "description": "Click on the SIMs navigation link" },
+    { "type": "assertion", "description": "Verify the SIMs management page loads" },
+    { "type": "action", "description": "Navigate back to the dashboard" },
+    { "type": "action", "description": "Click on the Agents navigation link" },
+    { "type": "assertion", "description": "Verify the Agents management page loads" }
+  ]
+}

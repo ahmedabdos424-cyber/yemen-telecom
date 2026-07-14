@@ -13,7 +13,7 @@ const isCapacitor = !!(window as unknown as { Capacitor?: { isNative?: boolean }
 const hostname = window.location.hostname;
 const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('10.') || hostname.startsWith('192.168.');
 const API_BASE = isCapacitor || (!import.meta.env.DEV && !isLocal)
-  ? 'https://yemen-telecom-api.onrender.com/api'
+  ? 'https://yemen-telecom.onrender.com/api'
   : '/api';
 
 let authToken: string | null = null;
@@ -87,40 +87,51 @@ export async function fetchCsrfToken(): Promise<void> {
   }
 }
 
+let refreshingPromise: Promise<string | null> | null = null;
+
 async function refreshAccessToken(): Promise<string | null> {
-  if (!isCapacitor) {
+  if (refreshingPromise) return refreshingPromise;
+  refreshingPromise = (async () => {
+    if (!isCapacitor) {
+      try {
+        const res = await fetchWithTimeout(`${API_BASE}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({}),
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data.token;
+      } catch {
+        return null;
+      }
+    }
+    await loadTokens();
+    if (!refreshToken) return null;
     try {
       const res = await fetchWithTimeout(`${API_BASE}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ refreshToken }),
       });
-      if (!res.ok) return null;
+      if (!res.ok) {
+        clearTokens();
+        return null;
+      }
       const data = await res.json();
+      setToken(data.token);
+      setRefreshToken(data.refreshToken);
       return data.token;
     } catch {
-      return null;
-    }
-  }
-  await loadTokens();
-  if (!refreshToken) return null;
-  try {
-    const res = await fetchWithTimeout(`${API_BASE}/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
-    });
-    if (!res.ok) {
       clearTokens();
       return null;
     }
-    const data = await res.json();
-    setToken(data.token);
-    setRefreshToken(data.refreshToken);
-    return data.token;
-  } catch {
-    clearTokens();
-    return null;
+  })();
+  try {
+    return await refreshingPromise;
+  } finally {
+    refreshingPromise = null;
   }
 }
 
@@ -131,7 +142,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> || {}),
   };
-  if (authToken && isCapacitor) {
+  if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`;
   }
   const isLogout = path === '/auth/logout';
@@ -198,7 +209,7 @@ async function uploadFile(file: File | Blob, fieldName = 'image'): Promise<{ url
   const form = new FormData();
   form.append(fieldName, file);
   const headers: Record<string, string> = {};
-  if (authToken && isCapacitor) {
+  if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`;
   }
   if (csrfToken && csrfHash) {

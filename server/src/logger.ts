@@ -57,6 +57,10 @@ export function clearLogContext() {
   currentContext = {};
 }
 
+export function resetLogContext(ctx: LogContext) {
+  currentContext = { ...ctx };
+}
+
 function buildMeta(args: unknown[]): { data?: unknown[]; errorId?: string } {
   const meta: { data?: unknown[]; errorId?: string } = {};
   if (args.length > 0) {

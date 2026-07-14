@@ -8,6 +8,17 @@ export function getPagination(req: Request) {
   return { page, limit, offset };
 }
 
+export function getDefaultLimit(): number {
+  const val = parseInt(process.env.DEFAULT_PAGE_LIMIT || '200', 10);
+  const max = getMaxLimit();
+  return Math.min(Math.max(1, isNaN(val) ? 200 : val), max);
+}
+
+export function getMaxLimit(): number {
+  const val = parseInt(process.env.MAX_PAGE_LIMIT || '5000', 10);
+  return Math.max(1, isNaN(val) ? 5000 : val);
+}
+
 export async function paginatedQuery<T>(
   baseQuery: string,
   countQuery: string,

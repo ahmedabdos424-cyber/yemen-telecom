@@ -6,6 +6,7 @@ on:
     branches: [main]
     types:
       - completed
+  workflow_dispatch:
 
 concurrency:
   group: deploy-production
@@ -19,5 +20,48 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Render Deploy Hook
+        id: trigger
         run: |
-          curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}")
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo "Deploy hook failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
+          echo "Deploy triggered successfully"
+      - name: Wait for Health Check
+        id: health
+        timeout-minutes: 5
+        run: |
+          MAX_RETRIES=30
+          RETRY=0
+          URL="${{ vars.RENDER_HEALTH_URL || 'https://yemen-telecom-api.onrender.com/api/health' }}"
+          echo "Waiting for $URL to return 200..."
+          while [ $RETRY -lt $MAX_RETRIES ]; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || echo "000")
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "Health check passed!"
+              exit 0
+            fi
+            echo "Attempt $((RETRY+1))/$MAX_RETRIES: HTTP $HTTP_CODE, waiting 10s..."
+            RETRY=$((RETRY+1))
+            sleep 10
+          done
+          echo "Health check failed after $MAX_RETRIES attempts"
+          exit 1
+      - name: Rollback — Trigger Previous Deploy Hook
+        if: ${{ failure() && steps.trigger.conclusion == 'success' }}
+        run: |
+          echo "::warning::Health check failed — triggering rollback..."
+          if [ -n "${{ secrets.RENDER_ROLLBACK_HOOK_URL }}" ]; then
+            ROLLBACK_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.RENDER_ROLLBACK_HOOK_URL }}")
+            echo "Rollback hook returned HTTP $ROLLBACK_CODE"
+          else
+            echo "::warning::No RENDER_ROLLBACK_HOOK_URL set — manual rollback required"
+          fi
+      - name: Rollback — Discord Notification
+        if: ${{ failure() }}
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          status: failure
+          description: "🚨 Deploy to Render FAILED — health check did not pass. Rollback has been triggered."

@@ -25,7 +25,7 @@ services:
       - key: DB_NAME
         sync: false
       - key: DB_SSL_REJECT_UNAUTHORIZED
-        value: "true"
+        value: "false"
       - key: DB_SSL_CA_CERT
         sync: false
       - key: DB_MAX_CONNECTIONS
@@ -41,7 +41,7 @@ services:
       - key: CSRF_SECRET
         sync: false
       - key: CORS_ORIGIN
-        sync: false
+        value: "https://yemen-telecom-1699.web.app,https://yemen-telecom.onrender.com,https://yementelecom1.netlify.app"
       # Firebase Admin (required for image uploads)
       - key: FIREBASE_PROJECT_ID
         sync: false

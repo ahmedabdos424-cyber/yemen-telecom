@@ -1,0 +1,14 @@
+{
+  "projectId": "ae188b56-e8c8-47ae-98f0-bb0d01f6b385",
+  "type": "frontend",
+  "name": "RTL layout renders correctly for Arabic interface",
+  "description": "When the interface language is set to Arabic, the layout switches to RTL direction with mirrored navigation and content alignment.",
+  "priority": "p1",
+  "planSteps": [
+    { "type": "action", "description": "Navigate to the login page and log in as manager" },
+    { "type": "action", "description": "Look for a language toggle or set the interface to Arabic" },
+    { "type": "assertion", "description": "Verify the page direction changes to RTL (right-to-left)" },
+    { "type": "assertion", "description": "Verify navigation elements are mirrored to the right side of the page" },
+    { "type": "assertion", "description": "Verify text content is aligned to the right" }
+  ]
+}

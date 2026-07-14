@@ -37,26 +37,9 @@ interface OperationLogItem {
   details: string;
 }
 
-const NODE_OPERATIONS_MAP: Record<string, OperationLogItem[]> = {
-  'region-sanaa': [
-    { id: 'op-s1', action: 'تحديث خوادم محطة تفعيل صنعاء', time: 'الآن', status: 'success', details: 'ربط قاعدة بيانات صنعاء بالأمانة المركزية بنجاح بنسبة ١٠٠٪' },
-    { id: 'op-s2', action: 'تثبيت حظر هويات متلاعبة نشطة', time: 'منذ ساعات', status: 'warning', details: 'تجميد نشاط 14 شريحة مسجلة تحت هويات مشتتة جغرافياً' }
-  ],
-  'region-aden': [
-    { id: 'op-a1', action: 'تقرير نشاطات بائع التجزئة بساحل عدن', time: 'منذ ساعة', status: 'success', details: 'تسجيل 45 شريحة جديدة مع الالتزام بضوابط التحقق المالي المشفر' }
-  ],
-  'region-taiz': [
-    { id: 'op-t1', action: 'إنذار بؤرة تكرار نشط متسارع', time: 'منذ ٢٤ ساعة', status: 'warning', details: 'ارتفاع مؤشر المخاطر بنسبة 15% بمحيط تعز المدينة عبر نقاط مجهولة' }
-  ],
-  'region-mukalla': [
-    { id: 'op-m1', action: 'تدقيق شهادات حماية خوادم الهوية والمطابقة', time: 'أمس', status: 'success', details: 'إعادة تمكين خوادم التشفير ومزامنتها بنسبة تامة' }
-  ],
-  'telecom-backbone': [
-    { id: 'op-b1', action: 'مراقبة خط المزامنة الفيدرالي المستمر', time: 'الآن', status: 'success', details: 'جميع مسارات التحقق بين المدن آمنة والشهادات الرقمية سارية' }
-  ]
-};
+const NODE_OPERATIONS_MAP: Record<string, OperationLogItem[]> = {};
 
-export default function GeographicRiskView() {
+export default function GeographicRiskView({ username: currentUser = 'المستخدم الحالي' }: { username?: string }) {
   const [identities, setIdentities] = useState<any[]>([]);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -136,7 +119,7 @@ export default function GeographicRiskView() {
       id: String(Date.now()),
       type: 'security_alert',
       title: `تصنيف هوية مشبوهة للتحقيق: ${name}`,
-      user: 'مدير عمليات الأمان',
+      user: currentUser,
       time: 'الآن',
       status: 'blocked'
     };
@@ -154,7 +137,7 @@ export default function GeographicRiskView() {
       id: String(Date.now()),
       type: 'security_alert',
       title: `حظر احترازي للهوية رقم ${idNo}`,
-      user: 'مدير العمليات الأمني',
+      user: currentUser,
       time: 'الآن',
       status: 'blocked'
     };
@@ -435,7 +418,7 @@ export default function GeographicRiskView() {
               <h3 className="text-4xl font-bold text-gray-900 leading-none">{summaryStats.riskPct.toFixed(1)}%</h3>
               <div className="flex items-center text-secondary text-xs font-bold pb-1 font-mono">
                 <span className="material-symbols-outlined text-sm">trending_up</span>
-                <span>+12.4%</span>
+                <span>{summaryStats.total > 0 ? `+${summaryStats.highBarPct.toFixed(1)}%` : '—'}</span>
               </div>
             </div>
             <p className="text-[11px] text-gray-500 mt-3 leading-relaxed max-w-[90%]">

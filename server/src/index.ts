@@ -11,6 +11,11 @@ import dotenv from 'dotenv';
 import { query } from './db';
 import { cacheGet, cacheSet, cacheStats } from './cache';
 import { authenticateToken, requireRole } from './middleware/auth';
+import { paginationGuard } from './paginationGuard';
+import { metricsMiddleware, getMetricsSummary, getPrometheusMetrics } from './middleware/metrics';
+import { circuitBreakerMiddleware, getCircuitBreakerStatus } from './middleware/circuit-breaker';
+import { bulkheadMiddleware, getBulkheadStatus } from './middleware/bulkhead';
+import { initOpenTelemetry, initMetrics as initOtelMetrics } from './otel';
 import { initSentry, Sentry } from './sentry';
 import authRoutes from './routes/auth';
 import simsRoutes from './routes/sims';
@@ -25,34 +30,43 @@ import usersRoutes from './routes/users';
 import customersRoutes from './routes/customers';
 import distributionsRoutes from './routes/distributions';
 import reportsRoutes from './routes/reports';
+import featureFlagRoutes from './routes/feature-flags';
+import { maintenanceCheck, refreshMaintenanceMode } from './middleware/maintenance';
 
 import { logger, setLogContext, clearLogContext } from './logger';
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
-// Environment validation — fail fast on missing secrets
+const envMode = process.env.NODE_ENV || 'development';
+
+// Environment validation — log warnings for missing secrets, exit only if critical in production
 const requiredEnv = ['JWT_SECRET', 'REFRESH_SECRET', 'CSRF_SECRET'];
 const missingEnv = requiredEnv.filter(k => !process.env[k]);
 if (missingEnv.length > 0) {
-  logger.error(`FATAL: Missing required environment variables: ${missingEnv.join(', ')}`);
-  process.exit(1);
+  if (envMode === 'production') {
+    logger.error(`FATAL: Missing required environment variables: ${missingEnv.join(', ')}`);
+    logger.error('Server will start but some features may be unavailable');
+  } else {
+    logger.warn(`[ENV] Missing optional environment variables: ${missingEnv.join(', ')}`);
+  }
 }
 
-const envMode = process.env.NODE_ENV || 'development';
 if (envMode === 'development') {
   logger.warn('[ENV] NODE_ENV=development — CORS allows all origins, query logging enabled');
 }
 logger.info(`[ENV] NODE_ENV=${envMode}`);
 
 initSentry();
+initOpenTelemetry();
+initOtelMetrics();
 
 const app = express();
-const PORT = parseInt(process.env.API_PORT || '4000');
+const PORT = parseInt(process.env.PORT || process.env.API_PORT || '4000', 10);
 const START_TIME = Date.now();
 let requestCount = 0;
 
 // Trust proxy for rate limiter behind Render's reverse proxy
 app.set('trust proxy', 1);
-app.use(cookieParser());
+app.use(cookieParser(process.env.CSRF_SECRET));
 
 // Request counter and correlation middleware
 app.use((req, res, next) => {
@@ -63,7 +77,37 @@ app.use((req, res, next) => {
   res.on('finish', () => {
     clearLogContext();
   });
+  res.on('close', () => {
+    clearLogContext();
+  });
   next();
+});
+
+// Root-level health endpoints — always available, no auth, no middleware overhead
+// Used by Render health checks, load balancers, and readiness/liveness probes
+app.get('/health', (_req, res) => {
+  res.status(200).json({ status: 'ok', uptime: Math.floor((Date.now() - START_TIME) / 1000) });
+});
+app.get('/readiness', async (_req, res) => {
+  try {
+    await Promise.race([
+      query('SELECT 1'),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('db-timeout')), 3000)),
+    ]);
+    res.status(200).json({ status: 'ready', db: 'connected' });
+  } catch {
+    res.status(503).json({ status: 'not ready', db: 'disconnected' });
+  }
+});
+app.get('/liveness', (_req, res) => {
+  const mem = process.memoryUsage();
+  const heapUsedMB = Math.round(mem.heapUsed / 1024 / 1024);
+  const isHealthy = heapUsedMB < 400;
+  res.status(isHealthy ? 200 : 503).json({
+    status: isHealthy ? 'alive' : 'memory pressure',
+    heapUsedMB,
+    uptime: Math.floor((Date.now() - START_TIME) / 1000),
+  });
 });
 
 const CSRF_SECRET = process.env.CSRF_SECRET!;
@@ -87,14 +131,18 @@ app.use((req, res, next) => {
     `img-src 'self' data: blob:`,
     `connect-src 'self'`,
     `frame-src 'none'`,
+    `frame-ancestors 'none'`,
     `object-src 'none'`,
     `form-action 'self'`,
   ].join('; ');
   res.setHeader('Content-Security-Policy', csp);
   next();
 });
-const isDev = process.env.NODE_ENV !== 'production';
-const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,https://yemen-telecom-1699.web.app')
+const isDev = process.env.NODE_ENV === 'development';
+if (isDev) {
+  logger.warn('[CORS] Development mode — permissive CORS enabled');
+}
+const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,https://yemen-telecom-1699.web.app,https://yementelecom1.netlify.app')
   .split(',')
   .map((o) => o.trim())
   .filter(Boolean);
@@ -170,7 +218,7 @@ app.get('/api/csrf-token', (req, res) => {
 
 // CSRF validation middleware for state-changing requests
 app.use('/api', (req, res, next) => {
-  if (['POST', 'PUT', 'DELETE'].includes(req.method) && !req.path.startsWith('/auth/login') && !req.path.startsWith('/auth/refresh') && !req.path.startsWith('/csrf-token')) {
+  if (['POST', 'PUT', 'DELETE'].includes(req.method) && !['/auth/login', '/auth/refresh', '/csrf-token'].includes(req.path)) {
     const csrfHeader = req.headers['x-csrf-token'] as string;
     const csrfHash = req.headers['x-csrf-hash'] as string;
     if (!csrfHeader || !csrfHash) {
@@ -208,6 +256,15 @@ const passwordResetLimiter = rateLimit({
   max: 5,
   message: { error: 'Too many password reset attempts, please try again later' },
 });
+
+// Rate limiting on password change endpoint
+const passwordChangeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Too many password change attempts, please try again later' },
+});
+app.use('/api/users/password', passwordChangeLimiter);
+
 app.use('/api/sellers', (req, res, next) => {
   if (req.method === 'POST' && req.path.endsWith('/reset-password')) {
     return passwordResetLimiter(req, res, next);
@@ -222,13 +279,26 @@ const writeLimiter = rateLimit({
   message: { error: 'Too many write requests, please slow down' },
 });
 
-// General rate limiter for all API routes
-const apiLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 100,
-  message: { error: 'Too many requests, please slow down' },
+// Rate limiter for expensive operations (backup, lockdown)
+const adminActionLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  message: { error: 'Too many admin actions, please try again later' },
 });
-app.use('/api', apiLimiter);
+
+// Rate limiter for upload endpoints
+const uploadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: { error: 'Too many upload requests, please slow down' },
+});
+
+// Rate limiter for delete endpoints
+const deleteLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: { error: 'Too many delete requests, please slow down' },
+});
 
 // Health check endpoint (public — no auth required)
 // Always returns 200 so Render's deploy health check succeeds.
@@ -249,10 +319,6 @@ app.get('/api/health', async (_req, res) => {
     status,
     db: dbOk ? 'connected' : 'disconnected',
     uptime: Math.floor((Date.now() - START_TIME) / 1000),
-    requests: requestCount,
-    memory: { rss: Math.round(mem.rss / 1024 / 1024) + 'MB', heap: Math.round(mem.heapUsed / 1024 / 1024) + 'MB' },
-    node: process.version,
-    env: process.env.NODE_ENV || 'development',
     timestamp: new Date().toISOString(),
   });
 });
@@ -277,7 +343,7 @@ app.use('/api', async (req: express.Request, res: express.Response, next: expres
     if (result.rows.length > 0 && result.rows[0].maintenance_mode) {
       return res.status(503).json({ error: 'System is in maintenance mode. Please try again later.' });
     }
-  } catch { }
+  } catch (err) { logger.error('[MAINTENANCE] DB check failed, allowing request', err); }
   next();
 });
 
@@ -322,6 +388,44 @@ function listRoutes(): { method: string; path: string }[] {
   return routes;
 }
 
+// Apply stricter rate limiters to sensitive endpoints (MUST be before route registration)
+app.use('/api/admin/system/backup', adminActionLimiter);
+app.use('/api/admin/system/lockdown', adminActionLimiter);
+app.use('/api/upload', uploadLimiter);
+app.use('/api/sims', (req, res, next) => {
+  if (req.method === 'DELETE') return deleteLimiter(req, res, next);
+  next();
+});
+app.use('/api/sellers', (req, res, next) => {
+  if (req.method === 'DELETE') return deleteLimiter(req, res, next);
+  next();
+});
+app.use('/api/agents', (req, res, next) => {
+  if (req.method === 'DELETE') return deleteLimiter(req, res, next);
+  next();
+});
+
+// Prometheus-style metrics middleware — tracks all API requests
+app.use('/api', metricsMiddleware);
+
+// General rate limiter for all API routes (last limiter — after specific ones so they take priority)
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  message: { error: 'Too many requests, please slow down' },
+});
+// Cache-Control headers for GET API responses
+app.use('/api', (req, res, next) => {
+  if (req.method === 'GET' && !req.path.startsWith('/auth') && !req.path.startsWith('/csrf')) {
+    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+    res.setHeader('Vary', 'Accept-Encoding');
+  }
+  next();
+});
+
+app.use('/api', apiLimiter);
+app.use('/api', paginationGuard);
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/sims', simsRoutes);
@@ -336,6 +440,10 @@ app.use('/api/users', usersRoutes);
 app.use('/api/customers', customersRoutes);
 app.use('/api/distributions', distributionsRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/feature-flags', featureFlagRoutes);
+
+// Maintenance mode check — applied after routes, before API handlers
+app.use('/api', maintenanceCheck);
 
 
 
@@ -429,12 +537,40 @@ app.get('/api/stats', requireRole('manager'), async (_req, res) => {
   }
 });
 
-// Debug route listing and cache stats endpoints (disabled in production)
+// Metrics endpoint (always available to managers in production)
+// Prometheus format: GET /api/metrics
+// JSON format:      GET /api/metrics?format=json
+app.get('/api/metrics', requireRole('manager'), (req, res) => {
+  if (req.query.format === 'json') {
+    res.json(getMetricsSummary());
+  } else {
+    res.set('Content-Type', 'text/plain; version=0.0.4');
+    res.send(getPrometheusMetrics());
+  }
+});
+
+// SRE infrastructure status endpoints
+app.get('/api/sre/circuit-breakers', requireRole('manager'), (_req, res) => {
+  res.json(getCircuitBreakerStatus());
+});
+app.get('/api/sre/bulkheads', requireRole('manager'), (_req, res) => {
+  res.json(getBulkheadStatus());
+});
+app.get('/api/sre/overview', requireRole('manager'), (_req, res) => {
+  res.json({
+    circuitBreakers: getCircuitBreakerStatus(),
+    bulkheads: getBulkheadStatus(),
+    cache: cacheStats(),
+    metrics: getMetricsSummary(),
+  });
+});
+
+// Debug route listing and cache stats (disabled in production)
 if (process.env.NODE_ENV !== 'production') {
-  app.get('/api/routes', (_req, res) => {
+  app.get('/api/routes', requireRole('manager'), (_req, res) => {
     res.json({ routes: listRoutes() });
   });
-  app.get('/api/cache-stats', (_req, res) => {
+  app.get('/api/cache-stats', requireRole('manager'), (_req, res) => {
     res.json(cacheStats());
   });
 }
@@ -479,16 +615,69 @@ try {
   }
 } catch { }
 
+// Support RUN_MIGRATIONS_ONLY for CI pipeline — run migrations then exit
+const runMigrationsOnly = process.env.RUN_MIGRATIONS_ONLY === 'true';
+
 const server = app.listen(PORT, '0.0.0.0', () => {
   logger.info(`[INIT] Server running on http://0.0.0.0:${PORT}`);
+  if (runMigrationsOnly) {
+    logger.info('[INIT] RUN_MIGRATIONS_ONLY mode — exiting after migrations');
+  }
   logger.info(`[INIT] Routes (${listRoutes().length} total):`);
   for (const r of listRoutes()) {
     logger.info(`  ${r.method.padEnd(6)} ${r.path}`);
   }
-  // Pre-warm database connection — informational only, does not block startup
+  // Pre-warm database connection and run pending migrations
   query('SELECT 1')
-    .then(() => logger.info('[INIT] Database connection verified'))
-    .catch(err => logger.warn('[INIT] Database not ready (will retry on first request):', err.message));
+    .then(async () => {
+      logger.info('[INIT] Database connection verified');
+      // Auto-apply pending migrations in production (safe idempotent DDL)
+      try {
+        await query(`CREATE TABLE IF NOT EXISTS schema_migrations (
+          filename VARCHAR(255) PRIMARY KEY,
+          applied_at TIMESTAMP DEFAULT NOW()
+        )`);
+        const migrationsDir = path.join(__dirname, '../migrations');
+        if (fs.existsSync(migrationsDir)) {
+          const files = fs.readdirSync(migrationsDir)
+            .filter(f => f.endsWith('.sql'))
+            .sort();
+          for (const file of files) {
+            const alreadyRan = await query('SELECT 1 FROM schema_migrations WHERE filename = $1', [file]);
+            if (alreadyRan.rows.length > 0) continue;
+            const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf-8');
+            try {
+              await query(sql);
+              await query('INSERT INTO schema_migrations (filename) VALUES ($1)', [file]);
+              logger.info(`[MIGRATION] Applied ${file}`);
+            } catch (err: any) {
+              if (err.code === '42701' || err.code === '42P07' || err.code === '23505') {
+                logger.info(`[MIGRATION] ${file} already applied (column/table exists)`);
+                await query('INSERT INTO schema_migrations (filename) VALUES ($1) ON CONFLICT (filename) DO NOTHING', [file]);
+              } else {
+                logger.warn(`[MIGRATION] ${file} failed: ${err.message} (will retry on next restart)`);
+              }
+            }
+          }
+        }
+      } catch (err: any) {
+        logger.warn('[MIGRATION] Auto-migration check failed:', err.message);
+      }
+      // Refresh maintenance mode flag from database
+      try {
+        await refreshMaintenanceMode();
+        logger.info('[INIT] Maintenance mode flag loaded');
+      } catch {
+        logger.warn('[INIT] Could not load maintenance mode flag');
+      }
+    })
+    .catch(err => logger.warn('[INIT] Database not ready (will retry on first request):', err.message))
+    .finally(() => {
+      if (runMigrationsOnly) {
+        logger.info('[INIT] Migrations complete. Shutting down (RUN_MIGRATIONS_ONLY).');
+        server.close(() => process.exit(0));
+      }
+    });
 });
 
 // Periodic cleanup of expired blacklisted tokens (every hour)

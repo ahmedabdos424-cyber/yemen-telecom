@@ -1,13 +1,8 @@
-# Android Release Signing Configuration
-# Copy this file to key.properties and fill in your actual values.
-# DO NOT commit key.properties to version control.
-#
-# Generate a keystore:
-#   keytool -genkey -v -keystore release.keystore -alias your-alias-name -keyalg RSA -keysize 2048 -validity 10000
-#
-# storeFile path is relative to android/app/
+# Release signing configuration
+# Copy this file to key.properties and fill in the values
+# DO NOT commit key.properties to version control
 
+storePassword=YOUR_KEYSTORE_PASSWORD
+keyPassword=YOUR_KEY_PASSWORD
+keyAlias=yemen-telecom-release
 storeFile=release.keystore
-storePassword=your-keystore-password
-keyAlias=your-key-alias
-keyPassword=your-key-password

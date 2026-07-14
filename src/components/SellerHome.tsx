@@ -36,12 +36,12 @@ export default function SellerHome({ operations = [], onNavigate }: SellerHomePr
               <Smartphone size={16} />
             </span>
             <span className="text-emerald-400 bg-emerald-950/30 text-[9px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-0.5">
-              <TrendingUp size={10} /> +12%
-            </span>
+               <TrendingUp size={10} /> {operations.length > 0 ? `${operations.filter(o => o.status === 'success').length}/${operations.length}` : '—'}
+             </span>
           </div>
           <div className="text-right">
             <h4 className="text-[10px] text-slate-400 font-medium">اجمالي الشرائح المباعة</h4>
-            <p className="stat-card-value text-slate-100">42 <span className="text-[11px] text-slate-500">شريحة</span></p>
+            <p className="stat-card-value text-slate-100">{operations.filter(o => o.type === 'activate').length || 0} <span className="text-[11px] text-slate-500">شريحة</span></p>
           </div>
         </div>
 

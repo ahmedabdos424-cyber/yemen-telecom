@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { query } from '../db';
 import { logger } from '../logger';
 import { requireRole } from '../middleware/auth';
-import { getPagination } from '../helpers';
+import { getPagination, getDefaultLimit } from '../helpers';
 
 const router = Router();
 
@@ -10,11 +10,13 @@ router.get('/', requireRole('manager'), async (req: Request, res: Response) => {
   try {
     const { page, limit, offset } = getPagination(req);
     const paginate = req.query.page || req.query.limit;
-    let sql = 'SELECT * FROM alerts ORDER BY id DESC';
+    let sql: string;
     const params: (string | number)[] = [];
     if (paginate) {
-      sql += ' LIMIT $1 OFFSET $2';
+      sql = 'SELECT * FROM alerts ORDER BY id DESC LIMIT $1 OFFSET $2';
       params.push(limit, offset);
+    } else {
+      sql = `SELECT * FROM alerts ORDER BY id DESC LIMIT ${getDefaultLimit()}`;
     }
     const result = await query(sql, params);
     res.json(result.rows);

@@ -132,7 +132,7 @@ function AuthenticatedApp() {
                     <Route path="/manager/agents" element={<AgentsView agents={mgr.agents} setView={(v) => { mgr.setView(v); navigate(`/manager/${v}`); }} onUpdateAgent={mgr.handleUpdateAgent} />} />
                     <Route path="/manager/sellers" element={<SellersView sellers={mgr.sellers} sims={mgr.sims} onUpdateSeller={mgr.handleUpdateSeller} onAddBalance={mgr.handleAddBalance} loading={mgr.loading} error={mgr.apiError} onRetry={mgr.refreshData} />} />
                     <Route path="/manager/alerts" element={<AlertsView alerts={mgr.alerts} onResolveAlert={mgr.handleResolveAlert} settings={mgr.settings} onUpdateSettings={mgr.setSettings} />} />
-                    <Route path="/manager/duplicate-identities" element={<GeographicRiskView />} />
+                    <Route path="/manager/duplicate-identities" element={<GeographicRiskView username={username} />} />
                     <Route path="/manager/reports" element={<ReportsView />} />
                     <Route path="/manager/settings" element={<SettingsView settings={mgr.settings} onUpdateSettings={mgr.setSettings} />} />
                     <Route path="/manager/add-agent" element={<AddAgentView onAddAgent={mgr.handleAddAgent} setView={(v) => { mgr.setView(v); navigate(`/manager/${v}`); }} />} />

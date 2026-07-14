@@ -9,9 +9,14 @@ vi.hoisted(() => {
   process.env.REFRESH_SECRET = 'p0-02-test-refresh-secret';
 });
 
-vi.mock('../db', () => ({
-  query: vi.fn(),
-}));
+vi.mock('../db', () => {
+  const query = vi.fn();
+  const transaction = async <T>(fn: (client: any) => Promise<T>): Promise<T> => {
+    const client = { query };
+    return fn(client);
+  };
+  return { query, transaction };
+});
 
 import { query } from '../db';
 import authRoutes from '../routes/auth';

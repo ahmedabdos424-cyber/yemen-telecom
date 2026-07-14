@@ -1,0 +1,15 @@
+{
+  "projectId": "ae188b56-e8c8-47ae-98f0-bb0d01f6b385",
+  "type": "frontend",
+  "name": "Manager login with valid credentials succeeds",
+  "description": "When a manager enters valid credentials (manager/Admin@123) on the login page, they are authenticated and redirected to the dashboard.",
+  "priority": "p0",
+  "planSteps": [
+    { "type": "action", "description": "Navigate to the login page at the application URL" },
+    { "type": "action", "description": "Enter 'manager' in the username/email field" },
+    { "type": "action", "description": "Enter 'Admin@123' in the password field" },
+    { "type": "action", "description": "Click the login/submit button" },
+    { "type": "assertion", "description": "Verify the page navigates away from the login page to the dashboard" },
+    { "type": "assertion", "description": "Verify the dashboard displays navigation elements and user information indicating successful authentication" }
+  ]
+}

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, type FormEvent, type MouseEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Role } from '../types';
-import { Shield, User, Lock, Eye, EyeOff, ChevronLeft, Smartphone, Check } from 'lucide-react';
+import { Shield, User, Lock, Eye, EyeOff, Smartphone, Check } from 'lucide-react';
 import { useToast, ToastContainer } from '../hooks/useToast';
 
 interface LoginScreenProps {
@@ -9,30 +9,6 @@ interface LoginScreenProps {
   darkMode: boolean;
   setDarkMode: (dark: boolean) => void;
 }
-
-const roleConfig: Record<Role, { label: string; gradient: string; btnClass: string; accent: string; color: string }> = {
-  manager: {
-    label: 'مدير عام',
-    gradient: 'from-red-600/30 via-transparent to-transparent',
-    btnClass: 'bg-gradient-to-l from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white shadow-red-600/25',
-    accent: 'red',
-    color: 'rgb(220,38,38)'
-  },
-  agent: {
-    label: 'وكيل معتمد',
-    gradient: 'from-blue-600/30 via-transparent to-transparent',
-    btnClass: 'bg-gradient-to-l from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white shadow-blue-600/25',
-    accent: 'blue',
-    color: 'rgb(37,99,235)'
-  },
-  seller: {
-    label: 'بائع تجزئة',
-    gradient: 'from-emerald-600/30 via-transparent to-transparent',
-    btnClass: 'bg-gradient-to-l from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white shadow-emerald-600/25',
-    accent: 'emerald',
-    color: 'rgb(5,150,105)'
-  }
-};
 
 const ACCOUNTS_STORAGE_KEY = 'tele_recent_accounts';
 
@@ -54,7 +30,7 @@ function removeUsername(u: string) {
 }
 
 export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScreenProps) {
-  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
+  const { toasts, dismissToast, toastInfo } = useToast();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -62,7 +38,6 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
   const [fieldError, setFieldError] = useState<'username' | 'password' | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const fieldsFilled = username.trim().length > 0 && password.length > 0;
   const [showRecent, setShowRecent] = useState(false);
   const [recentAccounts, setRecentAccounts] = useState<string[]>(getRecentUsernames());
 
@@ -70,8 +45,6 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
   const usernameRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const abortRef = useRef(false);
-
-  const currentRole = roleConfig['manager'];
 
   useEffect(() => {
     if (recentAccounts.length > 0 && !username) {
@@ -90,7 +63,7 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
     if (isLoading || success) return;
     const clean = username.trim().toLowerCase();
 
-    if (!clean) { setFieldError('username'); setErrorMsg('الرجاء إدخال اسم المستخدم المعتمد'); return; }
+    if (!clean) { setFieldError('username'); setErrorMsg('الرجاء إدخال اسم المستخدم'); return; }
     if (!password) { setFieldError('password'); setErrorMsg('الرجاء إدخال كلمة المرور'); return; }
     setFieldError(null);
     setErrorMsg('');
@@ -136,7 +109,7 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
   const focusClasses = (field: 'username' | 'password') => {
     const disabledCls = 'disabled:opacity-50 disabled:cursor-not-allowed';
     if (darkMode) {
-      return `w-full border ${fieldError === field ? 'border-red-500/60 ring-2 ring-red-500/20' : 'border-white/10 focus:border-white/30'} rounded-2xl py-4 pr-13 pl-4 text-[16px] text-white placeholder:text-white/25 focus:outline-none focus:ring-2 focus:ring-white/15 transition-all duration-300 font-sans text-right bg-white/5 ${disabledCls}`;
+      return `w-full border ${fieldError === field ? 'border-red-500/60 ring-2 ring-red-500/20' : 'border-white/10 focus:border-blue-400/50'} rounded-2xl py-4 pr-13 pl-4 text-[16px] text-white placeholder:text-white/25 focus:outline-none focus:ring-2 focus:ring-blue-400/20 transition-all duration-300 font-sans text-right bg-white/5 ${disabledCls}`;
     }
     return `w-full border ${fieldError === field ? 'border-red-500/60 ring-2 ring-red-500/20' : 'border-gray-200 focus:border-blue-400'} rounded-2xl py-4 pr-13 pl-4 text-[16px] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all duration-300 font-sans text-right bg-white shadow-sm ${disabledCls}`;
   };
@@ -151,36 +124,35 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
       className={`min-h-dvh ${darkMode ? 'bg-[#0a0e1a]' : 'bg-gradient-to-br from-blue-50 via-white to-indigo-50'} flex flex-col relative overflow-hidden font-sans safe-bottom select-none`}
     >
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+
       {/* Ambient gradient orbs */}
-      {darkMode && (
+      {darkMode ? (
         <>
-          <div className="absolute -top-40 -right-40 w-96 h-96 bg-red-600/10 rounded-full blur-[100px] pointer-events-none" />
-          <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-blue-600/8 rounded-full blur-[90px] pointer-events-none" />
-          <div className="absolute top-1/3 left-1/4 w-64 h-64 bg-emerald-600/6 rounded-full blur-[80px] pointer-events-none" />
+          <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-600/10 rounded-full blur-[100px] pointer-events-none" />
+          <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-indigo-600/8 rounded-full blur-[90px] pointer-events-none" />
         </>
-      )}
-      {!darkMode && (
+      ) : (
         <>
           <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-200/30 rounded-full blur-[120px] pointer-events-none" />
           <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-indigo-200/20 rounded-full blur-[100px] pointer-events-none" />
         </>
       )}
 
-      {/* Top accent gradient bar */}
-      <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-l from-red-600 via-red-500 to-red-700" />
+      {/* Top accent bar */}
+      <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-blue-600 via-indigo-500 to-blue-600" />
 
       {/* Status bar spacer */}
       <div className="h-safe-area" />
 
       {/* ===== HEADER ===== */}
-      <div className="relative z-10 flex flex-col items-center pt-6 sm:pt-12 pb-3 sm:pb-6">
+      <div className="relative z-10 flex flex-col items-center pt-8 sm:pt-14 pb-2">
         <motion.div
           initial={{ scale: 0.6, opacity: 0, rotate: -180 }}
           animate={{ scale: 1, opacity: 1, rotate: 0 }}
           transition={{ type: 'spring', stiffness: 120, damping: 12, duration: 1.2 }}
-          className="w-16 h-16 sm:w-20 sm:h-20 rounded-[20px] sm:rounded-[24px] flex items-center justify-center mb-3 overflow-hidden"
+          className="w-18 h-18 sm:w-22 sm:h-22 rounded-[22px] sm:rounded-[28px] flex items-center justify-center mb-4 overflow-hidden"
           style={{
-            boxShadow: darkMode ? '0 20px 60px rgba(220,38,38,0.25)' : '0 10px 40px rgba(37,99,235,0.15)'
+            boxShadow: darkMode ? '0 20px 60px rgba(59,130,246,0.25)' : '0 10px 40px rgba(59,130,246,0.15)'
           }}
         >
           <img
@@ -193,32 +165,25 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15, duration: 0.4 }}
-          className={`text-base sm:text-xl font-bold tracking-wide ${darkMode ? 'text-white/90' : 'text-gray-800'}`}
+          className={`text-xl sm:text-2xl font-bold tracking-wide ${darkMode ? 'text-white/90' : 'text-gray-800'}`}
         >
           يمن تليكوم
         </motion.h1>
-        {username.length > 2 && (
-          <motion.div
-            initial={{ opacity: 0, y: -4, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            className="mt-2 px-3.5 py-1.5 rounded-full text-[10px] font-semibold flex items-center gap-1.5"
-            style={{
-              background: `${currentRole.color}20`,
-              color: currentRole.color,
-              border: `1px solid ${currentRole.color}30`
-            }}
-          >
-            <Shield size={12} />
-            {currentRole.label}
-          </motion.div>
-        )}
+        <motion.p
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25, duration: 0.4 }}
+          className={`text-xs mt-1.5 ${darkMode ? 'text-white/30' : 'text-gray-400'}`}
+        >
+          سجّل دخولك للمتابعة
+        </motion.p>
       </div>
 
       {/* ===== FORM CARD ===== */}
-      <div className="relative z-10 flex-1 flex flex-col px-3 sm:px-4 pb-4 sm:pb-8">
+      <div className="relative z-10 flex-1 flex flex-col px-5 sm:px-6 pb-4 sm:pb-8">
         <div className="relative w-full max-w-sm mx-auto">
           {/* Spinning decorative ring when fields filled */}
-          {fieldsFilled && !isLoading && (
+          {username.length > 0 && password.length > 0 && !isLoading && (
             <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -228,91 +193,91 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
               <div
                 className="w-full h-full rounded-[28px] animate-spin-slow"
                 style={{
-                  background: `conic-gradient(from 0deg, transparent 60%, ${darkMode ? 'rgba(255,255,255,0.15)' : 'rgba(59,130,246,0.3)'}, ${darkMode ? 'rgba(255,100,100,0.25)' : 'rgba(99,102,241,0.3)'}, transparent)`,
+                  background: `conic-gradient(from 0deg, transparent 60%, ${darkMode ? 'rgba(59,130,246,0.2)' : 'rgba(59,130,246,0.25)'}, ${darkMode ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.25)'}, transparent)`,
                   mask: 'radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1px))',
                   WebkitMask: 'radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1px))',
                 }}
               />
             </motion.div>
           )}
+
           <motion.div
             initial={{ y: 30, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.2, type: 'spring', stiffness: 100, damping: 20 }}
-            className={`relative rounded-3xl p-5 sm:p-7 ${darkMode ? 'bg-white/[0.04] backdrop-blur-2xl border border-white/[0.07] shadow-2xl shadow-black/40' : 'bg-white shadow-xl shadow-gray-200/60 border border-gray-100'}`}
+            className={`relative rounded-3xl p-6 sm:p-8 ${darkMode ? 'bg-white/[0.04] backdrop-blur-2xl border border-white/[0.07] shadow-2xl shadow-black/40' : 'bg-white shadow-xl shadow-gray-200/60 border border-gray-100'}`}
             style={{ zIndex: 1 }}
           >
-          <form ref={formRef} onSubmit={handleSubmit} className="space-y-4.5" noValidate>
+            <form ref={formRef} onSubmit={handleSubmit} className="space-y-5" noValidate>
 
-            {/* ===== USERNAME ===== */}
-            <div className="relative" dir="rtl">
-              <label className={labelClasses('username')}>
-                {fieldError === 'username' ? (
-                  <span className="flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block" />
-                    {errorMsg}
+              {/* ===== USERNAME ===== */}
+              <div className="relative" dir="rtl">
+                <label className={labelClasses('username')}>
+                  {fieldError === 'username' ? (
+                    <span className="flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block" />
+                      {errorMsg}
+                    </span>
+                  ) : 'اسم المستخدم'}
+                </label>
+                <div className="relative">
+                  <input
+                    ref={usernameRef}
+                    type="text"
+                    value={username}
+                    onChange={e => { setUsername(e.target.value); setFieldError(null); setErrorMsg(''); }}
+                    onFocus={() => setShowRecent(true)}
+                    onBlur={() => setTimeout(() => setShowRecent(false), 200)}
+                    placeholder="أدخل اسم المستخدم"
+                    autoComplete="username"
+                    inputMode="text"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck="false"
+                    disabled={isLoading || success}
+                    autoFocus
+                    className={focusClasses('username')}
+                  />
+                  <span className={`absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none ${darkMode ? 'text-white/30' : 'text-gray-400'}`}>
+                    <User size={19} />
                   </span>
-                ) : 'اسم المستخدم'}
-              </label>
-              <div className="relative">
-                <input
-                  ref={usernameRef}
-                  type="text"
-                  value={username}
-                  onChange={e => { setUsername(e.target.value); setFieldError(null); setErrorMsg(''); }}
-                  onFocus={() => setShowRecent(true)}
-                  onBlur={() => setTimeout(() => setShowRecent(false), 200)}
-                  placeholder="أدخل اسم المستخدم"
-                  autoComplete="username"
-                  inputMode="text"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck="false"
-                  disabled={isLoading || success}
-                  autoFocus
-                  className={focusClasses('username')}
-                />
-                <span className={`absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none ${darkMode ? 'text-white/30' : 'text-gray-400'}`}>
-                  <User size={19} />
-                </span>
-                {username && (
-                  <button
-                    type="button"
-                    onClick={() => { setUsername(''); setErrorMsg(''); setFieldError(null); passwordRef.current?.focus(); }}
-                    className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors p-1 cursor-pointer ${darkMode ? 'text-white/20 hover:text-white/50' : 'text-gray-300 hover:text-gray-500'}`}
-                    tabIndex={-1}
-                    aria-label="مسح"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-                  </button>
-                )}
-              </div>
+                  {username && (
+                    <button
+                      type="button"
+                      onClick={() => { setUsername(''); setErrorMsg(''); setFieldError(null); passwordRef.current?.focus(); }}
+                      className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors p-1 cursor-pointer ${darkMode ? 'text-white/20 hover:text-white/50' : 'text-gray-300 hover:text-gray-500'}`}
+                      tabIndex={-1}
+                      aria-label="مسح"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                    </button>
+                  )}
+                </div>
 
-              {/* Recent accounts dropdown */}
-              <AnimatePresence>
-                {showRecent && recentAccounts.length > 0 && !username && !isLoading && !success && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -4, scale: 0.97 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -4, scale: 0.97 }}
-                    transition={{ duration: 0.15 }}
-                    className={`absolute z-20 top-full mt-1.5 left-0 right-0 rounded-2xl overflow-hidden shadow-xl ${darkMode ? 'bg-[#151e2e] border border-white/10 shadow-black/40' : 'bg-white border border-gray-200 shadow-gray-200/80'}`}
-                  >
-                    <div className={`flex items-center justify-between px-4 py-2.5 border-b ${darkMode ? 'border-white/5' : 'border-gray-100'}`}>
-                      <span className={`text-[11px] font-medium flex items-center gap-1.5 ${darkMode ? 'text-white/40' : 'text-gray-400'}`}>
-                        <Smartphone size={12} />
-                        حسابات سابقة
-                      </span>
-                    </div>
-                    {recentAccounts.map((u) => {
-                      return (
+                {/* Recent accounts dropdown */}
+                <AnimatePresence>
+                  {showRecent && recentAccounts.length > 0 && !username && !isLoading && !success && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -4, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                      transition={{ duration: 0.15 }}
+                      className={`absolute z-20 top-full mt-1.5 left-0 right-0 rounded-2xl overflow-hidden shadow-xl ${darkMode ? 'bg-[#151e2e] border border-white/10 shadow-black/40' : 'bg-white border border-gray-200 shadow-gray-200/80'}`}
+                    >
+                      <div className={`flex items-center justify-between px-4 py-2.5 border-b ${darkMode ? 'border-white/5' : 'border-gray-100'}`}>
+                        <span className={`text-[11px] font-medium flex items-center gap-1.5 ${darkMode ? 'text-white/40' : 'text-gray-400'}`}>
+                          <Smartphone size={12} />
+                          حسابات سابقة
+                        </span>
+                      </div>
+                      {recentAccounts.map((u) => (
                         <button
                           key={u}
                           type="button"
                           onMouseDown={() => selectRecent(u)}
-                          className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-right cursor-pointer ${darkMode ? 'hover:bg-white/5 active:bg-white/10 border-b border-white/5 last:border-0' : 'hover:bg-gray-50 active:bg-gray-100 border-b border-gray-100 last:border-0'}`}
+                          className={`w-full flex items-center gap-3 px-4 py-3.5 transition-colors text-right cursor-pointer ${darkMode ? 'hover:bg-white/5 active:bg-white/10 border-b border-white/5 last:border-0' : 'hover:bg-gray-50 active:bg-gray-100 border-b border-gray-100 last:border-0'}`}
                         >
-                          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold" style={{ background: `${currentRole.color}20`, color: currentRole.color }}>
+                          <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center text-xs font-bold text-blue-500">
                             {u.charAt(0).toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0">
@@ -327,146 +292,144 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
                             <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
                           </button>
                         </button>
-                      );
-                    })}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* ===== PASSWORD ===== */}
-            <div dir="rtl">
-              <div className="flex items-center justify-between mb-2">
-                <label className={labelClasses('password')}>
-                  {fieldError === 'password' ? (
-                    <span className="flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block" />
-                      {errorMsg}
-                    </span>
-                  ) : 'كلمة المرور'}
-                </label>
-                <button
-                  type="button"
-                  onClick={() => toastInfo('الرجاء مراجعة مدير النظام لإعادة تعيين كلمة المرور.')}
-                  disabled={isLoading || success}
-                  className={`text-[11px] transition-colors cursor-pointer py-1 -my-1 disabled:opacity-40 disabled:cursor-not-allowed ${darkMode ? 'text-white/30 hover:text-white/50' : 'text-gray-400 hover:text-gray-600'}`}
-                >
-                  نسيت كلمة المرور؟
-                </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
-              <div className="relative">
-                <input
-                  ref={passwordRef}
-                  id="login-password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={e => { setPassword(e.target.value); setFieldError(null); setErrorMsg(''); }}
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck="false"
-                  disabled={isLoading || success}
-                  className={focusClasses('password') + ' pl-13 tracking-widest'}
-                />
-                <span className={`absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none ${darkMode ? 'text-white/30' : 'text-gray-400'}`}>
-                  <Lock size={19} />
-                </span>
-                <div className={`absolute left-2 top-1/2 -translate-y-1/2 py-0.5 px-0.5 rounded-xl ${darkMode ? 'bg-black/20' : 'bg-gray-100'}`}>
+
+              {/* ===== PASSWORD ===== */}
+              <div dir="rtl">
+                <div className="flex items-center justify-between mb-2">
+                  <label className={labelClasses('password')}>
+                    {fieldError === 'password' ? (
+                      <span className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block" />
+                        {errorMsg}
+                      </span>
+                    ) : 'كلمة المرور'}
+                  </label>
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
+                    onClick={() => toastInfo('الرجاء مراجعة مدير النظام لإعادة تعيين كلمة المرور.')}
                     disabled={isLoading || success}
-                    className={`transition-colors cursor-pointer p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed ${darkMode ? 'text-white/30 hover:text-white/60 hover:bg-white/5 active:bg-white/10' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200/50 active:bg-gray-200'}`}
-                    aria-label={showPassword ? 'إخفاء' : 'إظهار'}
-                    tabIndex={-1}
+                    className={`text-[11px] transition-colors cursor-pointer py-1 -my-1 disabled:opacity-40 disabled:cursor-not-allowed ${darkMode ? 'text-blue-400/60 hover:text-blue-400' : 'text-blue-500 hover:text-blue-600'}`}
                   >
-                    {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+                    نسيت كلمة المرور؟
                   </button>
                 </div>
-              </div>
-            </div>
-
-            {/* ===== ERROR BANNER ===== */}
-            <AnimatePresence>
-              {errorMsg && !fieldError && (
-                <motion.div
-                  initial={{ opacity: 0, y: -6, height: 0 }}
-                  animate={{ opacity: 1, y: 0, height: 'auto' }}
-                  exit={{ opacity: 0, y: -6, height: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-2xl p-3.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
-                    <p className="text-xs text-red-400 font-medium">{errorMsg}</p>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* ===== SUBMIT BUTTON ===== */}
-            <motion.button
-              type="submit"
-              disabled={isLoading || success}
-              whileTap={{ scale: 0.97 }}
-              animate={success ? { backgroundColor: 'rgb(16, 185, 129)' } : {}}
-              transition={{ duration: 0.25 }}
-              className={`relative w-full py-4 rounded-2xl font-bold text-sm tracking-wide shadow-lg transition-all duration-200 flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-90 disabled:cursor-not-allowed overflow-hidden ${currentRole.btnClass}`}
-            >
-              <AnimatePresence mode="wait" initial={false}>
-                {success ? (
-                  <motion.div
-                    key="success"
-                    initial={{ opacity: 0, scale: 0.7 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.7 }}
-                    transition={{ duration: 0.22 }}
-                    className="flex items-center justify-center gap-2"
-                  >
-                    <motion.div
-                      initial={{ scale: 0, rotate: -90 }}
-                      animate={{ scale: 1, rotate: 0 }}
-                      transition={{ type: 'spring', stiffness: 380, damping: 16, delay: 0.05 }}
-                      className="bg-white/25 rounded-full p-1"
+                <div className="relative">
+                  <input
+                    ref={passwordRef}
+                    id="login-password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={e => { setPassword(e.target.value); setFieldError(null); setErrorMsg(''); }}
+                    placeholder="••••••••"
+                    autoComplete="current-password"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck="false"
+                    disabled={isLoading || success}
+                    className={focusClasses('password') + ' pl-13 tracking-widest'}
+                  />
+                  <span className={`absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none ${darkMode ? 'text-white/30' : 'text-gray-400'}`}>
+                    <Lock size={19} />
+                  </span>
+                  <div className={`absolute left-2 top-1/2 -translate-y-1/2 py-0.5 px-0.5 rounded-xl ${darkMode ? 'bg-black/20' : 'bg-gray-100'}`}>
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      disabled={isLoading || success}
+                      className={`transition-colors cursor-pointer p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed ${darkMode ? 'text-white/30 hover:text-white/60 hover:bg-white/5 active:bg-white/10' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200/50 active:bg-gray-200'}`}
+                      aria-label={showPassword ? 'إخفاء' : 'إظهار'}
+                      tabIndex={-1}
                     >
-                      <Check size={16} strokeWidth={3} />
-                    </motion.div>
-                    <span>تم تسجيل الدخول بنجاح</span>
-                  </motion.div>
-                ) : isLoading ? (
+                      {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* ===== ERROR BANNER ===== */}
+              <AnimatePresence>
+                {errorMsg && !fieldError && (
                   <motion.div
-                    key="loading"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15 }}
-                    className="flex items-center justify-center gap-1.5"
-                    dir="ltr"
+                    initial={{ opacity: 0, y: -6, height: 0 }}
+                    animate={{ opacity: 1, y: 0, height: 'auto' }}
+                    exit={{ opacity: 0, y: -6, height: 0 }}
+                    className="overflow-hidden"
                   >
-                    <span className="w-2 h-2 rounded-full bg-current" style={{ animation: 'dot-pulse 1.2s ease-in-out infinite', animationDelay: '0ms' }} />
-                    <span className="w-2 h-2 rounded-full bg-current" style={{ animation: 'dot-pulse 1.2s ease-in-out infinite', animationDelay: '200ms' }} />
-                    <span className="w-2 h-2 rounded-full bg-current" style={{ animation: 'dot-pulse 1.2s ease-in-out infinite', animationDelay: '400ms' }} />
-                    <span className="mr-2.5 text-xs font-medium opacity-95" dir="rtl">جاري تسجيل الدخول...</span>
+                    <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-2xl p-3.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+                      <p className="text-xs text-red-400 font-medium">{errorMsg}</p>
+                    </div>
                   </motion.div>
-                ) : (
-                  <motion.span
-                    key="idle"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15 }}
-                    className="flex items-center justify-center gap-2.5"
-                  >
-                    <Shield size={18} />
-                    <span>تسجيل الدخول</span>
-                    <ChevronLeft size={16} className="opacity-60" />
-                  </motion.span>
                 )}
               </AnimatePresence>
-            </motion.button>
-          </form>
-        </motion.div>
-        </div>{/* end card wrapper */}
+
+              {/* ===== SUBMIT BUTTON ===== */}
+              <motion.button
+                type="submit"
+                disabled={isLoading || success}
+                whileTap={{ scale: 0.97 }}
+                animate={success ? { backgroundColor: 'rgb(16, 185, 129)' } : {}}
+                transition={{ duration: 0.25 }}
+                className="relative w-full py-4 rounded-2xl font-bold text-sm tracking-wide shadow-lg transition-all duration-200 flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-90 disabled:cursor-not-allowed overflow-hidden bg-gradient-to-l from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-blue-600/25"
+              >
+                <AnimatePresence mode="wait" initial={false}>
+                  {success ? (
+                    <motion.div
+                      key="success"
+                      initial={{ opacity: 0, scale: 0.7 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.7 }}
+                      transition={{ duration: 0.22 }}
+                      className="flex items-center justify-center gap-2"
+                    >
+                      <motion.div
+                        initial={{ scale: 0, rotate: -90 }}
+                        animate={{ scale: 1, rotate: 0 }}
+                        transition={{ type: 'spring', stiffness: 380, damping: 16, delay: 0.05 }}
+                        className="bg-white/25 rounded-full p-1"
+                      >
+                        <Check size={16} strokeWidth={3} />
+                      </motion.div>
+                      <span>تم تسجيل الدخول بنجاح</span>
+                    </motion.div>
+                  ) : isLoading ? (
+                    <motion.div
+                      key="loading"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="flex items-center justify-center gap-1.5"
+                      dir="ltr"
+                    >
+                      <span className="w-2 h-2 rounded-full bg-current" style={{ animation: 'dot-pulse 1.2s ease-in-out infinite', animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 rounded-full bg-current" style={{ animation: 'dot-pulse 1.2s ease-in-out infinite', animationDelay: '200ms' }} />
+                      <span className="w-2 h-2 rounded-full bg-current" style={{ animation: 'dot-pulse 1.2s ease-in-out infinite', animationDelay: '400ms' }} />
+                      <span className="mr-2.5 text-xs font-medium opacity-95" dir="rtl">جاري تسجيل الدخول...</span>
+                    </motion.div>
+                  ) : (
+                    <motion.span
+                      key="idle"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="flex items-center justify-center gap-2.5"
+                    >
+                      <Shield size={18} />
+                      <span>تسجيل الدخول</span>
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </motion.button>
+            </form>
+          </motion.div>
+        </div>
       </div>
 
       {/* ===== FOOTER ===== */}
@@ -474,7 +437,7 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5, duration: 0.5 }}
-        className="relative z-10 flex flex-col items-center pb-4 sm:pb-6 gap-2"
+        className="relative z-10 flex flex-col items-center pb-5 sm:pb-8 gap-2.5"
       >
         <div className={`flex items-center gap-4 ${darkMode ? 'opacity-30' : 'opacity-50'}`}>
           {[
@@ -489,7 +452,7 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
           ))}
         </div>
         <p className={`text-[8px] font-light tracking-wide ${darkMode ? 'text-white/15' : 'text-gray-300'}`}>
-          يمن تليكوم v4.2.0 &copy; {new Date().getFullYear()}
+          يمن تليكوم &copy; {new Date().getFullYear()}
         </p>
         <button
           type="button"
