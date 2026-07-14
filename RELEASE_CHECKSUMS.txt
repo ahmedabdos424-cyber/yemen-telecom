@@ -1,0 +1,13 @@
+﻿SHA256 Checksums - Yemen Telecom v1.0.0 (build 3)
+Generated: 2026-07-14 05:02:00 UTC
+
+app-release.apk  7d3a97b0168de3250bdadbba405fb0bff71ddc75006bb76940536ad87082079a
+app-release.aab  8ee114efacfc7c65c51e164db2f87fb7c0c7ffcd666e4cb7d4cf08b6e4c78f65
+
+SHA1:
+app-release.apk  1ba63ff4b6e07110d0903e700324ece243d16124
+app-release.aab  7364a81a440ebc4ca9036a23c24859e350c471ae
+
+MD5:
+app-release.apk  96b65458cf0b0a9fc2c7608fb40d6947
+app-release.aab  06d1c582d33e7b73ced6dda21db40d61
