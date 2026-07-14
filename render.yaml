@@ -1,10 +1,11 @@
 services:
   - type: web
-    name: yemen-telecom-api
+    name: yemen-telecom
     env: docker
     region: oregon
     plan: free
-    autoDeploy: false
+    branch: main
+    autoDeploy: true
     healthCheckPath: /api/health
     dockerfilePath: ./Dockerfile
     envVars:
