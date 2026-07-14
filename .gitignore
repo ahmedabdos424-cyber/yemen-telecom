@@ -95,5 +95,8 @@ backend-test-results.json
 *~
 *.tmp
 .eslintcache
+test-results/
+playwright-report/
+playwright/.cache/
 
 testsprite_tests/tmp/config.json
