@@ -7,7 +7,7 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'https',
     cleartext: false,
-    allowNavigation: ['yemen-telecom-api.onrender.com', 'yemen-telecom-1699.web.app'],
+    allowNavigation: ['yemen-telecom.onrender.com', 'yemen-telecom-1699.web.app'],
   },
   plugins: {
     CapacitorPreferences: {},
