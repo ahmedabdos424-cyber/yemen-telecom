@@ -12,9 +12,9 @@ function fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Respo
 const isCapacitor = !!(window as unknown as { Capacitor?: { isNative?: boolean } }).Capacitor?.isNative;
 const hostname = window.location.hostname;
 const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('10.') || hostname.startsWith('192.168.');
-const API_BASE = isCapacitor || (!import.meta.env.DEV && !isLocal)
+const API_BASE = isCapacitor
   ? 'https://yemen-telecom.onrender.com/api'
-  : '/api';
+  : (import.meta.env.DEV || isLocal ? '/api' : 'https://yemen-telecom.onrender.com/api');
 
 let authToken: string | null = null;
 let refreshToken: string | null = null;

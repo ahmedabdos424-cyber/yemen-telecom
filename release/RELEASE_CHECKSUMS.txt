@@ -1,23 +1,23 @@
 ﻿Yemen Telecom SIM Management System - Release Checksums
 =======================================================
-Generated : 2026-07-15 03:35:09
+Generated : 2026-07-15 23:54:34
 Build     : v4.2.0 (versionCode 3, versionName 1.0.0)
-Release   : FINAL hardening (CORS fix + Android signing/security hardening)
+Release   : Login fix (APK API base) + remove role labels from login UI
 Signer    : release keystore (4096-bit RSA, SHA384withRSA)
            SHA-256 fingerprint of signing cert:
            10802bfc0ad5893f9d6ac1087ce0016c4d307923fbcce7b7d9743f5572766eab
 
 FILE                          SHA-256 (upper)                          SIZE
-yemen-telecom-release.apk     AD4CCE558FC835862EC0CDA65B9649B8D8159D9D1C1073CF13B72E707FB52C6D  24932164 bytes
-yemen-telecom-release.aab     D06DF171574771BBDFCB8CD672610F11A3B2E0102B585ED57E8DA8114352BA52  25349030 bytes
+yemen-telecom-release.apk     8207295E6FB62D3F014DF9095F551CDEB3EE81122F895A8DC4E24003B14D4EDD  24931792 bytes
+yemen-telecom-release.aab     D4BD1541A668ED7C2DA58D4E11EECCAFA40153B8E2F596C02A96550718329A8C  25348654 bytes
 
 SHA-256:
-AD4CCE558FC835862EC0CDA65B9649B8D8159D9D1C1073CF13B72E707FB52C6D  yemen-telecom-release.apk
-D06DF171574771BBDFCB8CD672610F11A3B2E0102B585ED57E8DA8114352BA52  yemen-telecom-release.aab
+8207295E6FB62D3F014DF9095F551CDEB3EE81122F895A8DC4E24003B14D4EDD  yemen-telecom-release.apk
+D4BD1541A668ED7C2DA58D4E11EECCAFA40153B8E2F596C02A96550718329A8C  yemen-telecom-release.aab
 
 MD5 (legacy/secondary only):
-2736C262AFF88DB485BC02E7E66EB5A9  yemen-telecom-release.apk
-6F2ED5B2FB82F404F02D73BBA89A3E52  yemen-telecom-release.aab
+EAA1EADDD913C97B3CBA722F4D0C450A  yemen-telecom-release.apk
+FAFC806791426D1F26D8065C3020D35B  yemen-telecom-release.aab
 
 VERIFY (PowerShell):
   Get-FileHash yemen-telecom-release.apk -Algorithm SHA256

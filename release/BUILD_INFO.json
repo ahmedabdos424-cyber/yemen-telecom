@@ -18,13 +18,13 @@
                                  "x86",
                                  "x86_64"
                              ],
-                    "apkSha256":  "AD4CCE558FC835862EC0CDA65B9649B8D8159D9D1C1073CF13B72E707FB52C6D",
-                    "sizeAabBytes":  25349030,
+                    "apkSha256":  "8207295E6FB62D3F014DF9095F551CDEB3EE81122F895A8DC4E24003B14D4EDD",
+                    "sizeAabBytes":  25348654,
                     "targetSdk":  36,
                     "apk":  "release/yemen-telecom-release.apk",
                     "aab":  "release/yemen-telecom-release.aab",
-                    "aabSha256":  "D06DF171574771BBDFCB8CD672610F11A3B2E0102B585ED57E8DA8114352BA52",
-                    "sizeApkBytes":  24932164,
+                    "aabSha256":  "D4BD1541A668ED7C2DA58D4E11EECCAFA40153B8E2F596C02A96550718329A8C",
+                    "sizeApkBytes":  24931792,
                     "signing":  "RSA-4096 / SHA384withRSA, alias release",
                     "minSdk":  24
                 },

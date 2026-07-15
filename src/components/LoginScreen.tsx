@@ -10,30 +10,6 @@ interface LoginScreenProps {
   setDarkMode: (dark: boolean) => void;
 }
 
-const roleConfig: Record<Role, { label: string; gradient: string; btnClass: string; accent: string; color: string }> = {
-  manager: {
-    label: 'مدير عام',
-    gradient: 'from-red-600/30 via-transparent to-transparent',
-    btnClass: 'bg-gradient-to-l from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white shadow-red-600/25',
-    accent: 'red',
-    color: 'rgb(220,38,38)'
-  },
-  agent: {
-    label: 'وكيل معتمد',
-    gradient: 'from-blue-600/30 via-transparent to-transparent',
-    btnClass: 'bg-gradient-to-l from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white shadow-blue-600/25',
-    accent: 'blue',
-    color: 'rgb(37,99,235)'
-  },
-  seller: {
-    label: 'بائع تجزئة',
-    gradient: 'from-emerald-600/30 via-transparent to-transparent',
-    btnClass: 'bg-gradient-to-l from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white shadow-emerald-600/25',
-    accent: 'emerald',
-    color: 'rgb(5,150,105)'
-  }
-};
-
 const ACCOUNTS_STORAGE_KEY = 'tele_recent_accounts';
 
 function getRecentUsernames(): string[] {
@@ -70,8 +46,6 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
   const usernameRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const abortRef = useRef(false);
-
-  const currentRole = roleConfig['manager'];
 
   useEffect(() => {
     if (recentAccounts.length > 0 && !username) {
@@ -197,21 +171,6 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
         >
           يمن تليكوم
         </motion.h1>
-        {username.length > 2 && (
-          <motion.div
-            initial={{ opacity: 0, y: -4, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            className="mt-2 px-3.5 py-1.5 rounded-full text-[10px] font-semibold flex items-center gap-1.5"
-            style={{
-              background: `${currentRole.color}20`,
-              color: currentRole.color,
-              border: `1px solid ${currentRole.color}30`
-            }}
-          >
-            <Shield size={12} />
-            {currentRole.label}
-          </motion.div>
-        )}
       </div>
 
       {/* ===== FORM CARD ===== */}
@@ -312,7 +271,7 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
                           onMouseDown={() => selectRecent(u)}
                           className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-right cursor-pointer ${darkMode ? 'hover:bg-white/5 active:bg-white/10 border-b border-white/5 last:border-0' : 'hover:bg-gray-50 active:bg-gray-100 border-b border-gray-100 last:border-0'}`}
                         >
-                          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold" style={{ background: `${currentRole.color}20`, color: currentRole.color }}>
+                           <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold" style={{ background: 'rgba(37,99,235,0.12)', color: 'rgb(37,99,235)' }}>
                             {u.charAt(0).toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0">
@@ -411,7 +370,7 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
               whileTap={{ scale: 0.97 }}
               animate={success ? { backgroundColor: 'rgb(16, 185, 129)' } : {}}
               transition={{ duration: 0.25 }}
-              className={`relative w-full py-4 rounded-2xl font-bold text-sm tracking-wide shadow-lg transition-all duration-200 flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-90 disabled:cursor-not-allowed overflow-hidden ${currentRole.btnClass}`}
+              className={`relative w-full py-4 rounded-2xl font-bold text-sm tracking-wide shadow-lg transition-all duration-200 flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-90 disabled:cursor-not-allowed overflow-hidden bg-gradient-to-l from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white shadow-red-600/25`}
             >
               <AnimatePresence mode="wait" initial={false}>
                 {success ? (
