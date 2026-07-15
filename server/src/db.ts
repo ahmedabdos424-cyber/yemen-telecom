@@ -34,8 +34,13 @@ const poolConfig: PoolConfig = {
         rejectUnauthorized,
         ...(process.env.DB_SSL_CA_CERT ? { ca: process.env.DB_SSL_CA_CERT.replace(/\\n/g, '\n') } : {}),
       },
-  max: parseInt(process.env.DB_MAX_CONNECTIONS || '10', 10),
-  connectionTimeoutMillis: 15000,
+  max: parseInt(process.env.DB_MAX_CONNECTIONS || '30', 10),
+  min: parseInt(process.env.DB_MIN_CONNECTIONS || '0', 10),
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 15000,
+  allowExitOnIdle: true,
 };
 if (process.env.DB_FAMILY) {
   (poolConfig as any).family = parseInt(process.env.DB_FAMILY, 10);
