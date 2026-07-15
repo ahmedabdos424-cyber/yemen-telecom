@@ -89,10 +89,18 @@ export function useAuth() {
         role: userRole,
         commit: () => apply(userRole, result.user.displayName),
       };
-    } catch {
-      return null;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message.toLowerCase() : '';
+      const isAuthError =
+        msg.includes('غير صحيح') ||
+        msg.includes('invalid') ||
+        msg.includes('unauthorized') ||
+        msg.includes('incorrect') ||
+        msg.includes('401') ||
+        msg.includes('credentials');
+      if (isAuthError) return null;
+      throw err instanceof Error ? err : new Error('Login failed');
     }
-    return null;
   };
 
   const handleLogout = useCallback(() => {
