@@ -35,12 +35,12 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             def hasSigning = System.getenv('KEYSTORE_PASSWORD') &&
                 System.getenv('KEYSTORE_ALIAS') &&
-                System.getenv('KEY_PASSWORD')
+                System.getenv('KEY_PASSWORD') &&
+                System.getenv('KEYSTORE_PATH')
             if (hasSigning) {
                 signingConfig signingConfigs.release
             } else {
-                signingConfig signingConfigs.debug
-                logger.warn('Release signing credentials not set; falling back to debug signing for validation.')
+                throw new GradleException('Release signing credentials (KEYSTORE_PATH, KEYSTORE_PASSWORD, KEYSTORE_ALIAS, KEY_PASSWORD) are required for a release build. Refusing to fall back to debug signing.')
             }
         }
     }
