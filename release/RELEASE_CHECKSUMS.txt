@@ -1,23 +1,23 @@
 ﻿Yemen Telecom SIM Management System - Release Checksums
 =======================================================
-Generated : 2026-07-14 22:35:16 UTC+03:00
+Generated : 2026-07-15 03:35:09
 Build     : v4.2.0 (versionCode 3, versionName 1.0.0)
-Release   : FINAL (commit 212eefe) - CORS fix for web SPA
+Release   : FINAL hardening (CORS fix + Android signing/security hardening)
 Signer    : release keystore (4096-bit RSA, SHA384withRSA)
-            SHA-256 fingerprint of signing cert:
-            10802BFCD03586D2FDC053EF58E72CC8F5C780569A1A347D0F75CAC1AA05FA087
+           SHA-256 fingerprint of signing cert:
+           10802bfc0ad5893f9d6ac1087ce0016c4d307923fbcce7b7d9743f5572766eab
 
 FILE                          SHA-256 (upper)                          SIZE
-yemen-telecom-release.apk     A3B8F4CDD3586D2FDC053EF58E72CC8F5C780569A1A347D0F75CAC1AA05FA087  26556994 bytes
-yemen-telecom-release.aab     05E9C49FD27D9405B30F043D7CB9A4BACC4A4ED2B9ECCCFA5AB11E141C26B89E  27780768 bytes
+yemen-telecom-release.apk     AD4CCE558FC835862EC0CDA65B9649B8D8159D9D1C1073CF13B72E707FB52C6D  24932164 bytes
+yemen-telecom-release.aab     D06DF171574771BBDFCB8CD672610F11A3B2E0102B585ED57E8DA8114352BA52  25349030 bytes
 
 SHA-256:
-A3B8F4CDD3586D2FDC053EF58E72CC8F5C780569A1A347D0F75CAC1AA05FA087  yemen-telecom-release.apk
-05E9C49FD27D9405B30F043D7CB9A4BACC4A4ED2B9ECCCFA5AB11E141C26B89E  yemen-telecom-release.aab
+AD4CCE558FC835862EC0CDA65B9649B8D8159D9D1C1073CF13B72E707FB52C6D  yemen-telecom-release.apk
+D06DF171574771BBDFCB8CD672610F11A3B2E0102B585ED57E8DA8114352BA52  yemen-telecom-release.aab
 
 MD5 (legacy/secondary only):
-D1B76A45B493898C4C7B3891D7864037  yemen-telecom-release.apk
-3561E3C861DCCDF954B3EF29B5337423  yemen-telecom-release.aab
+2736C262AFF88DB485BC02E7E66EB5A9  yemen-telecom-release.apk
+6F2ED5B2FB82F404F02D73BBA89A3E52  yemen-telecom-release.aab
 
 VERIFY (PowerShell):
   Get-FileHash yemen-telecom-release.apk -Algorithm SHA256
@@ -25,4 +25,3 @@ VERIFY (PowerShell):
 
 VERIFY (apksigner):
   apksigner verify --verbose release/yemen-telecom-release.apk
-  apksigner verify --verbose release/yemen-telecom-release.aab

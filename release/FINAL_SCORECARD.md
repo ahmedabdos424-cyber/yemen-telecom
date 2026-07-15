@@ -24,8 +24,8 @@ functional after the CORS fix. Complete the listed Play Console metadata items t
 submission.
 
 ## Artifacts
-- `release/yemen-telecom-release.apk` (SHA-256 A3B8F4CD…FA087)
-- `release/yemen-telecom-release.aab` (SHA-256 05E9C49F…B89E)
+- `release/yemen-telecom-release.apk` (SHA-256 AD4CCE55…B52C6D)
+- `release/yemen-telecom-release.aab` (SHA-256 D06DF171…52BA52)
 - `release/RELEASE_CHECKSUMS.txt`, `SIGNING_GUIDE.md`, `DEPLOYMENT_GUIDE.md`,
   `GOOGLE_PLAY_CHECKLIST.md`, `RELEASE_NOTES.md`, `CHANGELOG.md`, `VERSION.txt`, `BUILD_INFO.json`
 - `release/FINAL_RELEASE_CERTIFICATION.md`, `FINAL_GOOGLE_PLAY_CERTIFICATION.md`,

@@ -322,6 +322,14 @@ function listRoutes(): { method: string; path: string }[] {
   return routes;
 }
 
+// Validate numeric :id route parameters to prevent SQL cast errors from non-numeric input
+app.param('id', (req: express.Request, res: express.Response, next: express.NextFunction, id: string) => {
+  if (!/^\d+$/.test(id)) {
+    return res.status(400).json({ error: 'Invalid id parameter' });
+  }
+  next();
+});
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/sims', simsRoutes);
