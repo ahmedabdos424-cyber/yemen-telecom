@@ -1,12 +1,30 @@
 import { tokenStorage } from '../services/tokenStorage.ts';
 import { captureTiming } from '../lib/monitor.ts';
 
-const REQUEST_TIMEOUT_MS = 15000;
+const REQUEST_TIMEOUT_MS = 60000;
 
-function fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timeoutId));
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchWithTimeout(url: string, options: RequestInit = {}, retries = 2): Promise<Response> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } catch (err) {
+      lastErr = err;
+      if (attempt < retries) {
+        await delay(1500 * (attempt + 1));
+        continue;
+      }
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error('Network request failed');
 }
 
 const isCapacitor = !!(window as unknown as { Capacitor?: { isNative?: boolean } }).Capacitor?.isNative;
@@ -15,6 +33,8 @@ const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname
 const API_BASE = isCapacitor
   ? 'https://yemen-telecom.onrender.com/api'
   : (import.meta.env.DEV || isLocal ? '/api' : 'https://yemen-telecom.onrender.com/api');
+
+const CREDENTIALS_MODE: RequestCredentials = isCapacitor ? 'omit' : 'include';
 
 let authToken: string | null = null;
 let refreshToken: string | null = null;
@@ -75,7 +95,7 @@ export function getLoadedTokens(): { authToken: string | null; refreshToken: str
 
 export async function fetchCsrfToken(): Promise<void> {
   try {
-    const res = await fetchWithTimeout(`${API_BASE}/csrf-token`, { credentials: 'include' });
+    const res = await fetchWithTimeout(`${API_BASE}/csrf-token`, { credentials: CREDENTIALS_MODE });
     if (res.ok) {
       const data = await res.json();
       csrfToken = data.token;
@@ -142,7 +162,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (refreshToken && isCapacitor && isLogout) {
     headers['X-Refresh-Token'] = refreshToken;
   }
-  const res = await fetchWithTimeout(`${API_BASE}${path}`, { ...options, headers, credentials: 'include' });
+  const res = await fetchWithTimeout(`${API_BASE}${path}`, { ...options, headers, credentials: CREDENTIALS_MODE });
   if (res.status === 403 && !path.startsWith('/auth/') && path !== '/csrf-token') {
     const errBody = await res.json().catch(() => ({}));
     if (errBody.error && (errBody.error.includes('CSRF'))) {
@@ -205,7 +225,7 @@ async function uploadFile(file: File | Blob, fieldName = 'image'): Promise<{ url
     headers['X-CSRF-Token'] = csrfToken;
     headers['X-CSRF-Hash'] = csrfHash;
   }
-  const res = await fetchWithTimeout(`${API_BASE}/upload/image`, { method: 'POST', headers, body: form, credentials: 'include' });
+  const res = await fetchWithTimeout(`${API_BASE}/upload/image`, { method: 'POST', headers, body: form, credentials: CREDENTIALS_MODE });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || `HTTP ${res.status}`);
