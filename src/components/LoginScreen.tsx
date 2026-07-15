@@ -88,7 +88,7 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
     } catch {
       if (abortRef.current) return;
       setIsLoading(false);
-      setErrorMsg('تعذر الاتصال بالخادم. يرجى المحاولة مرة أخرى');
+      setErrorMsg('تعذر الاتصال بالخادم. قد يكون الخادم في وضع السكون، يرجى الانتظار لحظات وإعادة المحاولة');
       setFieldError('password');
     }
   };
