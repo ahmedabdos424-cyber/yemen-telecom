@@ -38,7 +38,7 @@ This Privacy Policy describes how Yemen Telecom SIM Management System ("we", "ou
 
 ### 4.1 Storage
 - Data is stored on secure PostgreSQL databases (Supabase).
-- Profile images are stored in Firebase Storage.
+- Profile and document images are stored in Supabase Storage.
 - All data is stored on servers with restricted access.
 
 ### 4.2 Security Measures
