@@ -45,6 +45,12 @@ services:
         sync: false
       - key: UPLOAD_DIR
         value: uploads
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: UPLOAD_BUCKET
+        value: uploads
       # External backup storage (S3-compatible)
       - key: BACKUP_S3_ENDPOINT
         sync: false

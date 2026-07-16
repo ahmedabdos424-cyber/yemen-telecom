@@ -1,11 +1,19 @@
 import { Router, Response } from 'express';
 import multer from 'multer';
-import { promises as fs } from 'fs';
-import path from 'path';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
 
-const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR || 'uploads');
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://qxroquilskugfemzmrzp.supabase.co';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
+const UPLOAD_BUCKET = process.env.UPLOAD_BUCKET || 'uploads';
+
+let supabase: SupabaseClient | null = null;
+if (SUPABASE_ANON_KEY) {
+  supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
 
 const MAGIC_BYTES: Record<string, ((buf: Buffer) => boolean)[]> = {
   'image/jpeg': [(buf) => buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF],
@@ -41,12 +49,24 @@ const EXT_BY_MIME: Record<string, string> = {
   'image/webp': 'webp',
 };
 
-async function saveToDisk(file: Express.Multer.File): Promise<{ url: string; filename: string }> {
+async function uploadToSupabase(file: Express.Multer.File): Promise<{ url: string; filename: string }> {
+  if (!supabase) {
+    throw new Error('Supabase storage is not configured (missing SUPABASE_ANON_KEY)');
+  }
   const ext = EXT_BY_MIME[file.mimetype] || 'jpg';
   const filename = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`;
-  await fs.mkdir(UPLOAD_DIR, { recursive: true });
-  await fs.writeFile(path.join(UPLOAD_DIR, filename), file.buffer);
-  return { url: `/uploads/${filename}`, filename };
+  const { error } = await supabase.storage
+    .from(UPLOAD_BUCKET)
+    .upload(filename, file.buffer, {
+      contentType: file.mimetype,
+      upsert: false,
+      cacheControl: '86400',
+    });
+  if (error) {
+    throw error;
+  }
+  const { data } = supabase.storage.from(UPLOAD_BUCKET).getPublicUrl(filename);
+  return { url: data.publicUrl, filename };
 }
 
 function validateFileMagic(file: Express.Multer.File): boolean {
@@ -61,10 +81,10 @@ router.post('/image', requireRole('manager', 'agent'), upload.single('image'), a
     return res.status(400).json({ error: 'Invalid image file — content does not match expected format' });
   }
   try {
-    const result = await saveToDisk(req.file);
+    const result = await uploadToSupabase(req.file);
     res.json(result);
   } catch (err) {
-    logger.error('Error saving upload:', err);
+    logger.error('Error uploading to Supabase Storage:', err);
     res.status(500).json({ error: 'Failed to upload image' });
   }
 });
@@ -80,10 +100,10 @@ router.post('/images', requireRole('manager', 'agent'), upload.array('images', 5
     }
   }
   try {
-    const results = await Promise.all(files.map(saveToDisk));
+    const results = await Promise.all(files.map(uploadToSupabase));
     res.json(results);
   } catch (err) {
-    logger.error('Error saving uploads:', err);
+    logger.error('Error uploading to Supabase Storage:', err);
     res.status(500).json({ error: 'Failed to upload images' });
   }
 });

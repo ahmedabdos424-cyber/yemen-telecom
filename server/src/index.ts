@@ -119,7 +119,7 @@ app.use(cors({
 }));
 app.use(compression());
 app.use(express.json({ limit: '1mb' }));
-app.use('/uploads', express.static('uploads', { maxAge: '1d', etag: true }));
+// Image uploads are stored in Supabase Storage and served from there (see /api/upload).
 
 // Serve static assets with long cache
 app.use('/assets', express.static('dist/assets', { maxAge: '1y', immutable: true, etag: true }));
