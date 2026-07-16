@@ -33,6 +33,9 @@ backups/
 
 # AI-generated audit & secret artifacts (remove from version control)
 AUDIT/
+NEW_ENVIRONMENT_VARIABLES.md
+ENVIRONMENT_VARIABLES*.md
+ENV_*.md
 SECRET_*
 *_AUDIT.md
 *_REPORT.md
