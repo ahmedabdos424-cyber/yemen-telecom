@@ -6,9 +6,6 @@
 -keep class com.yemen.telecom.** { *; }
 -keep class org.apache.cordova.** { *; }
 
-# Firebase
--keep class com.google.firebase.** { *; }
--keep class com.google.android.gms.** { *; }
 -keepattributes Signature
 -keepattributes *Annotation*
 
@@ -31,11 +28,3 @@
 -dontwarn okio.**
 -keep class okhttp3.** { *; }
 -keep class okio.** { *; }
-
-# Firebase Auth plugins (Facebook login, AppCheck KTX — optional deps)
--dontwarn com.facebook.CallbackManager$Factory
--dontwarn com.facebook.CallbackManager
--dontwarn com.facebook.FacebookCallback
--dontwarn com.facebook.login.LoginManager
--dontwarn com.facebook.login.widget.LoginButton
--dontwarn com.google.firebase.ktx.Firebase
