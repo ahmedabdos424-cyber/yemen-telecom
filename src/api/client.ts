@@ -282,10 +282,10 @@ export const api = {
     request<any>('/sellers', { method: 'POST', body: JSON.stringify(data) }),
   updateSeller: (id: number, data: any) =>
     request<any>(`/sellers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  updateSellerBalance: (id: number, amount: number) =>
+  updateSellerBalance: (id: number, amount: number, invoiceImage?: string) =>
     request<any>(`/sellers/${id}/balance`, {
       method: 'PUT',
-      body: JSON.stringify({ amount }),
+      body: JSON.stringify(invoiceImage ? { amount, invoiceImage } : { amount }),
     }),
   deleteSeller: (id: number) =>
     request<any>(`/sellers/${id}`, { method: 'DELETE' }),
@@ -316,6 +316,21 @@ export const api = {
     request<any>('/admin/settings', { method: 'PUT', body: JSON.stringify(data) }),
   getTransactions: () => request<any[]>('/admin/transactions'),
   getDuplicateIdentities: () => request<any[]>('/admin/duplicate-identities'),
+  flagDuplicateIdentity: (idNo: string, data?: any) =>
+    request<any>(`/admin/duplicate-identities/${encodeURIComponent(idNo)}/flag`, {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    }),
+  blockDuplicateIdentity: (idNo: string, data?: any) =>
+    request<any>(`/admin/duplicate-identities/${encodeURIComponent(idNo)}/block`, {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    }),
+  unblockDuplicateIdentity: (idNo: string, data?: any) =>
+    request<any>(`/admin/duplicate-identities/${encodeURIComponent(idNo)}/unblock`, {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    }),
   getAuditLogs: () => request<any[]>('/admin/audit-logs'),
 
   // System: Backup

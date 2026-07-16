@@ -9,12 +9,13 @@ import { Check } from 'lucide-react';
 import profileImage from '../assets/profile.png';
 import { useToast, ToastContainer } from '../hooks/useToast';
 import { safeArray } from '../lib/safe';
+import { api } from '../api/client';
 
 interface SellersViewProps {
   sellers: Seller[];
   sims: SIM[];
   onUpdateSeller: (id: string, updated: Partial<Seller>) => void;
-  onAddBalance: (sellerId: string, amount: number) => void;
+  onAddBalance: (sellerId: string, amount: number, invoiceImage?: string) => void;
   loading?: boolean;
   error?: string | null;
   onRetry?: () => void;
@@ -53,6 +54,8 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
   const camVideoRef = useRef<HTMLVideoElement>(null);
   const camCanvasRef = useRef<HTMLCanvasElement>(null);
   const camFileRef = useRef<HTMLInputElement>(null);
+  const [invoiceImageUrl, setInvoiceImageUrl] = useState<string | null>(null);
+  const [uploadingInvoice, setUploadingInvoice] = useState(false);
 
   const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
 
@@ -87,7 +90,48 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
     }
   }, [camStream]);
 
-  const confirmInvoiceCapture = useCallback(() => {
+  const dataUrlToFile = useCallback((dataUrl: string, filename: string): File => {
+    const [meta, base64] = dataUrl.split(',');
+    const mime = (meta.match(/:(.*?);/) || [, 'image/jpeg'])[1];
+    const binary = atob(base64);
+    const len = binary.length;
+    const arr = new Uint8Array(len);
+    for (let i = 0; i < len; i++) arr[i] = binary.charCodeAt(i);
+    return new File([arr], filename, { type: mime });
+  }, []);
+
+  const uploadInvoiceImage = useCallback(async (dataUrl: string): Promise<string | null> => {
+    try {
+      setUploadingInvoice(true);
+      const file = dataUrlToFile(dataUrl, `invoice-${Date.now()}.jpg`);
+      const result = await api.uploadFile(file, 'image');
+      setInvoiceImageUrl(result.url);
+      toastSuccess('تم رفع صورة فاتورة الشحن بنجاح وستُرفق مع العملية.');
+      return result.url;
+    } catch (err: any) {
+      toastError(err?.message || 'فشل رفع صورة الفاتورة');
+      return null;
+    } finally {
+      setUploadingInvoice(false);
+    }
+  }, [dataUrlToFile, toastError, toastSuccess]);
+
+  const confirmInvoiceCapture = useCallback(async () => {
+    if (camPreview) {
+      await uploadInvoiceImage(camPreview);
+    }
+    setCamPreview(null);
+    setShowCam(false);
+  }, [camPreview, uploadInvoiceImage]);
+
+  const retakeInvoiceCapture = useCallback(async () => {
+    setCamPreview(null);
+    setInvoiceImageUrl(null);
+    openInvoiceCam();
+  }, [openInvoiceCam]);
+
+  const removeInvoiceImage = useCallback(() => {
+    setInvoiceImageUrl(null);
     setCamPreview(null);
     setShowCam(false);
   }, []);
@@ -115,10 +159,11 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
 
   const submitAddBalance = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    onAddBalance(selectedSeller.id, balanceAmount);
+    onAddBalance(selectedSeller.id, balanceAmount, invoiceImageUrl || undefined);
     setShowAddBalanceModal(false);
+    setInvoiceImageUrl(null);
     toastSuccess(`تم إضافة رصيد مبيعات بقيمة ${balanceAmount} ر.ي للبائع ${selectedSeller.name} بنجاح!`);
-  }, [onAddBalance, selectedSeller.id, selectedSeller.name, balanceAmount]);
+  }, [onAddBalance, selectedSeller.id, selectedSeller.name, balanceAmount, invoiceImageUrl]);
 
   if (loading) {
     return (
@@ -383,6 +428,18 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
                     <span className="material-symbols-outlined text-sm">photo_camera</span>
                   </button>
                 </div>
+                {invoiceImageUrl && (
+                  <div className="mt-2 flex items-center gap-2 p-2 bg-emerald-50 border border-emerald-150 rounded-lg">
+                    <img src={invoiceImageUrl} alt="فاتورة الشحن" className="w-12 h-12 object-cover rounded" />
+                    <span className="text-[11px] text-emerald-800 font-semibold flex-1">تم إرفاق صورة الفاتورة وستُحفظ مع العملية.</span>
+                    <button type="button" onClick={() => setInvoiceImageUrl(null)} className="text-emerald-700 hover:text-emerald-900" title="إزالة">
+                      <span className="material-symbols-outlined text-sm">close</span>
+                    </button>
+                  </div>
+                )}
+                {uploadingInvoice && (
+                  <p className="mt-2 text-[11px] text-blue-600 font-semibold">جارٍ رفع صورة الفاتورة...</p>
+                )}
               </div>
               <div className="flex gap-2 justify-end">
                 <button
@@ -407,12 +464,22 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
       {/* Hidden camera elements */}
       <video ref={camVideoRef} autoPlay playsInline className="hidden" />
       <canvas ref={camCanvasRef} className="hidden" />
-      <input ref={camFileRef} type="file" accept="image/*" capture="environment" onChange={(e) => {
+      <input ref={camFileRef} type="file" accept="image/*" capture="environment" onChange={async (e) => {
         const file = e.target.files?.[0];
         if (file) {
           const r = new FileReader();
           r.onload = (ev) => setCamPreview(ev.target?.result as string);
           r.readAsDataURL(file);
+          try {
+            setUploadingInvoice(true);
+            const result = await api.uploadFile(file, 'image');
+            setInvoiceImageUrl(result.url);
+            toastSuccess('تم رفع صورة فاتورة الشحن بنجاح وستُرفق مع العملية.');
+          } catch (err: any) {
+            toastError(err?.message || 'فشل رفع صورة الفاتورة');
+          } finally {
+            setUploadingInvoice(false);
+          }
         }
       }} className="hidden" />
 
@@ -466,7 +533,7 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
               </button>
               <button
                 type="button"
-                onClick={() => { setCamPreview(null); openInvoiceCam(); }}
+                onClick={retakeInvoiceCapture}
                 className="btn btn-sm flex-1 bg-white border border-gray-200 text-gray-600 hover:bg-gray-100 flex items-center justify-center gap-2"
               >
                 <span className="material-symbols-outlined text-sm">refresh</span>

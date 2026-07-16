@@ -65,6 +65,7 @@ export default function GeographicRiskView() {
   const [selectedNode, setSelectedNode] = useState<any>(null);
   const [dimensions, setDimensions] = useState({ width: 320, height: 280 });
   const [blockConfirm, setBlockConfirm] = useState<{idNo: string; name: string} | null>(null);
+  const [actionLoading, setActionLoading] = useState<{ [key: string]: boolean }>({});
 
   const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
 
@@ -129,37 +130,48 @@ export default function GeographicRiskView() {
   }, []);
 
   // Handle flag risk alerts
-  const handleFlagRow = (idNo: string, name: string) => {
-    toastSuccess(`تم إرسال بلاغ أمني لإشتباه الهوية: ${name} (ID: ${idNo}) إلى عقد المراجعة الفورية ورُفع بمستوى التحذير.`);
-    
-    const newLog: AuditLog = {
-      id: String(Date.now()),
-      type: 'security_alert',
-      title: `تصنيف هوية مشبوهة للتحقيق: ${name}`,
-      user: 'مدير عمليات الأمان',
-      time: 'الآن',
-      status: 'blocked'
-    };
-    setLogs((prev) => [newLog, ...prev]);
+  const handleFlagRow = async (idNo: string, name: string) => {
+    try {
+      setActionLoading((p) => ({ ...p, [`flag-${idNo}`]: true }));
+      await api.flagDuplicateIdentity(idNo, { name });
+      toastSuccess(`تم إرسال بلاغ أمني لإشتباه الهوية: ${name} (ID: ${idNo}) إلى عقد المراجعة الفورية ورُفع بمستوى التحذير.`);
+      // Reflect action in the local identities table.
+      setIdentities((prev) => prev.map((i: any) => i.idNo === idNo ? { ...i, flagged: true, reviewStatus: 'flagged' } : i));
+      // Refresh audit log feed from server.
+      try {
+        const auditLogs = await api.getAuditLogs();
+        if (Array.isArray(auditLogs)) setLogs(auditLogs);
+      } catch { /* non-fatal */ }
+    } catch (err: any) {
+      toastError(err?.message || 'فشل في تسجيل بلاغ الاشتباه');
+    } finally {
+      setActionLoading((p) => ({ ...p, [`flag-${idNo}`]: false }));
+    }
   };
 
   const handleBlockRow = (idNo: string, name: string) => {
     setBlockConfirm({ idNo, name });
   };
 
-  const executeBlock = () => {
+  const executeBlock = async () => {
     if (!blockConfirm) return;
     const { idNo, name } = blockConfirm;
-    const newLog: AuditLog = {
-      id: String(Date.now()),
-      type: 'security_alert',
-      title: `حظر احترازي للهوية رقم ${idNo}`,
-      user: 'مدير العمليات الأمني',
-      time: 'الآن',
-      status: 'blocked'
-    };
-    setLogs((prev) => [newLog, ...prev]);
-    setBlockConfirm(null);
+    try {
+      setActionLoading((p) => ({ ...p, [`block-${idNo}`]: true }));
+      await api.blockDuplicateIdentity(idNo, { name });
+      toastSuccess(`تم تجميد وحظر الهوية رقم ${idNo} (${name}) وإيقاف جميع الشرائح المرتبطة بها مؤقتاً.`);
+      // Reflect action in the local identities table.
+      setIdentities((prev) => prev.map((i: any) => i.idNo === idNo ? { ...i, blocked: true, flagged: true, reviewStatus: 'blocked' } : i));
+      try {
+        const auditLogs = await api.getAuditLogs();
+        if (Array.isArray(auditLogs)) setLogs(auditLogs);
+      } catch { /* non-fatal */ }
+    } catch (err: any) {
+      toastError(err?.message || 'فشل في حظر الهوية');
+    } finally {
+      setActionLoading((p) => ({ ...p, [`block-${idNo}`]: false }));
+      setBlockConfirm(null);
+    }
   };
 
   const filteredIdentities = identities.filter(
@@ -537,7 +549,7 @@ export default function GeographicRiskView() {
                     </span>
                   </td>
                   <td className="px-6 py-4">{item.region}</td>
-                  <td className="px-6 py-4">
+                   <td className="px-6 py-4">
                     <div className="flex items-center justify-end gap-2">
                       <button 
                         onClick={() => {
@@ -548,7 +560,10 @@ export default function GeographicRiskView() {
                             region: item.region,
                             idNo: item.idNo,
                             sims: item.simsCount,
-                            risk: item.risk
+                            risk: item.risk,
+                            flagged: item.flagged,
+                            blocked: item.blocked,
+                            reviewStatus: item.reviewStatus
                           });
                           document.getElementById('d3-section')?.scrollIntoView({ behavior: 'smooth' });
                         }}
@@ -564,20 +579,31 @@ export default function GeographicRiskView() {
                        >
                          <span className="material-symbols-outlined text-lg">visibility</span>
                        </button>
-                       <button 
-                         onClick={() => handleFlagRow(item.idNo, item.name)}
-                         className="btn-icon hover:bg-red-50 text-secondary border-red-50" 
-                         title="وضع علامة اشتباه أمني"
-                       >
-                         <span className="material-symbols-outlined text-lg">flag</span>
-                       </button>
-                       <button 
-                         onClick={() => handleBlockRow(item.idNo, item.name)}
-                         className="btn-icon hover:bg-red-900/10 text-secondary border-red-100 font-bold" 
-                         title="حظر الهوية فوراً"
-                       >
-                         <span className="material-symbols-outlined text-lg text-[#e02928]">block</span>
-                      </button>
+                       {item.blocked ? (
+                         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold bg-red-100 text-secondary border border-red-200">
+                           <span className="material-symbols-outlined text-sm">lock</span>
+                           محظور
+                         </span>
+                       ) : (
+                         <>
+                           <button 
+                             disabled={actionLoading[`flag-${item.idNo}`]}
+                             onClick={() => handleFlagRow(item.idNo, item.name)}
+                             className="btn-icon hover:bg-red-50 text-secondary border-red-50 disabled:opacity-50" 
+                             title="وضع علامة اشتباه أمني"
+                           >
+                             <span className="material-symbols-outlined text-lg">flag</span>
+                           </button>
+                           <button 
+                             disabled={actionLoading[`block-${item.idNo}`]}
+                             onClick={() => handleBlockRow(item.idNo, item.name)}
+                             className="btn-icon hover:bg-red-900/10 text-secondary border-red-100 font-bold disabled:opacity-50" 
+                             title="حظر الهوية فوراً"
+                           >
+                             <span className="material-symbols-outlined text-lg text-[#e02928]">block</span>
+                           </button>
+                         </>
+                       )}
                     </div>
                   </td>
                 </tr>
@@ -778,25 +804,34 @@ export default function GeographicRiskView() {
                   </div>
                 </div>
 
-                {/* Target node actions */}
+                 {/* Target node actions */}
                 <div className="pt-4 border-t border-gray-100 flex flex-col gap-2 mt-4 text-xs font-bold">
                   {selectedNode.type === 'identity' ? (
-                    <>
-                      <button
-                        onClick={() => handleFlagRow(selectedNode.idNo, selectedNode.label)}
-                        className="w-full py-2.5 bg-red-100/50 hover:bg-red-100 text-secondary border border-red-200 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                      >
-                        <ShieldAlert size={14} />
-                        وضع علامة اشتباه أمني فوراً
-                      </button>
-                      <button
-                        onClick={() => handleBlockRow(selectedNode.idNo, selectedNode.label)}
-                        className="w-full py-2.5 bg-[#e02928] text-white rounded-lg flex items-center justify-center gap-1.5 hover:bg-red-700 shadow-sm transition-all cursor-pointer"
-                      >
-                        <AlertTriangle size={14} />
-                        تجميد وحظر الهوية فورا
-                      </button>
-                    </>
+                    selectedNode.blocked ? (
+                      <div className="w-full py-2.5 bg-red-100 text-secondary border border-red-200 rounded-lg flex items-center justify-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm">lock</span>
+                        هذه الهوية محظورة حالياً
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          disabled={actionLoading[`flag-${selectedNode.idNo}`]}
+                          onClick={() => handleFlagRow(selectedNode.idNo, selectedNode.label)}
+                          className="w-full py-2.5 bg-red-100/50 hover:bg-red-100 text-secondary border border-red-200 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                        >
+                          <ShieldAlert size={14} />
+                          وضع علامة اشتباه أمني فوراً
+                        </button>
+                        <button
+                          disabled={actionLoading[`block-${selectedNode.idNo}`]}
+                          onClick={() => handleBlockRow(selectedNode.idNo, selectedNode.label)}
+                          className="w-full py-2.5 bg-[#e02928] text-white rounded-lg flex items-center justify-center gap-1.5 hover:bg-red-700 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                        >
+                          <AlertTriangle size={14} />
+                          تجميد وحظر الهوية فورا
+                        </button>
+                      </>
+                    )
                   ) : (
                     <button
                       onClick={() => toastInfo(`تنزيل كامل سجل تكرار المحطة الإقليمية لمدينة: ${selectedNode.label}`)}

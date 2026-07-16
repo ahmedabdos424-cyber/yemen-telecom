@@ -224,7 +224,7 @@ router.put('/:id', requireRole('manager', 'agent'), validate(updateSellerSchema)
 
 router.put('/:id/balance', requireRole('manager', 'agent'), validate(updateSellerBalanceSchema), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
-  const { amount } = req.body;
+  const { amount, invoiceImage } = req.body;
   try {
     const existing = await query('SELECT * FROM sellers WHERE id = $1', [id]);
     if (existing.rows.length === 0) {
@@ -250,6 +250,16 @@ router.put('/:id/balance', requireRole('manager', 'agent'), validate(updateSelle
         `SELECT s.*, a.name as agent_name FROM sellers s LEFT JOIN agents a ON s.agent_id = a.id WHERE s.id = $1`,
         [id]
       );
+      // Record a recharge operation so the captured invoice is persisted and auditable.
+      if (invoiceImage) {
+        const seller = updateResult.rows[0];
+        const opId = `recharge-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        await client.query(
+          `INSERT INTO operations (op_id, type, target, operator, date, time, status, customer_name, contract_image, created_by)
+           VALUES ($1, 'recharge', $2, 'yemen_telecom', NOW()::text, NOW()::text, 'success', $3, $4, $5)`,
+          [opId, `#BALANCE-${seller.seller_id}`, seller.name, invoiceImage, req.user?.id || null]
+        );
+      }
       return finalResult.rows[0];
     });
     res.json(mapSeller(result));
