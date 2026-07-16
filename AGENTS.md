@@ -13,7 +13,7 @@ When this repository is opened, execute this checklist automatically BEFORE any 
 2. **Workspace** — Verify the active workspace is `tea-d8h32is2m8qs73ajnjsg` (My Workspace).
 3. **Services** — List all services. Verify `yemen-telecom-api` is not suspended.
 4. **Deployments** — Check the latest deploy status. Must be `live`. Report any `build_failed` or `deactivated` deploys since the last known good.
-5. **Logs** — Fetch recent logs. Search for: ERROR, WARN, unhandled exceptions, database errors, JWT errors, Firebase errors, SSL errors, memory errors, OOM, timeouts, CORS, connection refused.
+5. **Logs** — Fetch recent logs. Search for: ERROR, WARN, unhandled exceptions, database errors, JWT errors, SSL errors, memory errors, OOM, timeouts, CORS, connection refused.
 6. **Metrics** — Inspect CPU, memory, bandwidth, request count, latency if available (requires Starter plan+).
 7. **Health** — Verify `healthCheckPath` is configured. Report if empty.
 8. **Environment Variables** — Verify all required env vars exist. Never display secret values.
@@ -63,13 +63,7 @@ If any production issue is detected:
 - REFRESH_SECRET
 - CSRF_SECRET
 - CORS_ORIGIN
-- FIREBASE_PROJECT_ID
-- FIREBASE_PRIVATE_KEY
-- FIREBASE_CLIENT_EMAIL
-- FIREBASE_STORAGE_BUCKET
-- FIREBASE_PRIVATE_KEY_ID
-- FIREBASE_CLIENT_ID
-- FIREBASE_CLIENT_CERT_URL
+- UPLOAD_DIR
 - BACKUP_S3_ENDPOINT
 - BACKUP_S3_REGION
 - BACKUP_S3_ACCESS_KEY_ID

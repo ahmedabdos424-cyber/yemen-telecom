@@ -1,8 +1,11 @@
 import { Router, Response } from 'express';
 import multer from 'multer';
-import { getBucket } from '../firebase-admin';
+import { promises as fs } from 'fs';
+import path from 'path';
 import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
+
+const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR || 'uploads');
 
 const MAGIC_BYTES: Record<string, ((buf: Buffer) => boolean)[]> = {
   'image/jpeg': [(buf) => buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF],
@@ -31,25 +34,19 @@ const upload = multer({
   },
 });
 
-async function uploadToFirebase(file: Express.Multer.File): Promise<{ url: string; filename: string }> {
-  const ext = file.originalname.split('.').pop() || 'jpg';
+const EXT_BY_MIME: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+};
+
+async function saveToDisk(file: Express.Multer.File): Promise<{ url: string; filename: string }> {
+  const ext = EXT_BY_MIME[file.mimetype] || 'jpg';
   const filename = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`;
-  const bucket = getBucket();
-  const blob = bucket.file(`uploads/${filename}`);
-  const blobStream = blob.createWriteStream({
-    metadata: { contentType: file.mimetype },
-  });
-  return new Promise((resolve, reject) => {
-    blobStream.on('error', reject);
-    blobStream.on('finish', async () => {
-      const [url] = await blob.getSignedUrl({
-        action: 'read',
-        expires: Date.now() + 3600 * 1000,
-      });
-      resolve({ url, filename });
-    });
-    blobStream.end(file.buffer);
-  });
+  await fs.mkdir(UPLOAD_DIR, { recursive: true });
+  await fs.writeFile(path.join(UPLOAD_DIR, filename), file.buffer);
+  return { url: `/uploads/${filename}`, filename };
 }
 
 function validateFileMagic(file: Express.Multer.File): boolean {
@@ -64,10 +61,10 @@ router.post('/image', requireRole('manager', 'agent'), upload.single('image'), a
     return res.status(400).json({ error: 'Invalid image file — content does not match expected format' });
   }
   try {
-    const result = await uploadToFirebase(req.file);
+    const result = await saveToDisk(req.file);
     res.json(result);
   } catch (err) {
-    logger.error('Error uploading to Firebase:', err);
+    logger.error('Error saving upload:', err);
     res.status(500).json({ error: 'Failed to upload image' });
   }
 });
@@ -83,10 +80,10 @@ router.post('/images', requireRole('manager', 'agent'), upload.array('images', 5
     }
   }
   try {
-    const results = await Promise.all(files.map(uploadToFirebase));
+    const results = await Promise.all(files.map(saveToDisk));
     res.json(results);
   } catch (err) {
-    logger.error('Error uploading to Firebase:', err);
+    logger.error('Error saving uploads:', err);
     res.status(500).json({ error: 'Failed to upload images' });
   }
 });

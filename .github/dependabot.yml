@@ -56,9 +56,6 @@ updates:
         patterns:
           - "express*"
           - "@types/express*"
-      firebase:
-        patterns:
-          - "firebase*"
 
   - package-ecosystem: docker
     directory: /

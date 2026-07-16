@@ -43,21 +43,8 @@ services:
         sync: false
       - key: CORS_ORIGIN
         sync: false
-      # Firebase Admin (required for image uploads)
-      - key: FIREBASE_PROJECT_ID
-        sync: false
-      - key: FIREBASE_PRIVATE_KEY
-        sync: false
-      - key: FIREBASE_CLIENT_EMAIL
-        sync: false
-      - key: FIREBASE_STORAGE_BUCKET
-        sync: false
-      - key: FIREBASE_PRIVATE_KEY_ID
-        sync: false
-      - key: FIREBASE_CLIENT_ID
-        sync: false
-      - key: FIREBASE_CLIENT_CERT_URL
-        sync: false
+      - key: UPLOAD_DIR
+        value: uploads
       # External backup storage (S3-compatible)
       - key: BACKUP_S3_ENDPOINT
         sync: false

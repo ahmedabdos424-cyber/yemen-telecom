@@ -24,6 +24,8 @@ android/app/key.properties
 *.keystore.bak
 *.jks
 keystore.properties
+firebase-service-account.json
+.firebase/
 coverage/
 server/api_test_results.txt
 server/server.err
