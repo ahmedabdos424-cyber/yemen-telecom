@@ -21,7 +21,7 @@ jobs:
           java-version: 21
           distribution: 'zulu'
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
       - run: npm ci
       - run: npm run build
         name: Frontend Build
