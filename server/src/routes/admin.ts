@@ -125,10 +125,18 @@ router.get('/duplicate-identities', requireRole('manager'), async (req: Request,
       seen.add(r.id_no);
       return true;
     });
+    // Pull current flag/block status per id_no (may be empty for new ids).
+    const idNos = deduped.map((r: any) => r.id_no);
+    const statusRows = idNos.length
+      ? await query(`SELECT id_no, flagged, blocked, review_status FROM duplicate_identities WHERE id_no = ANY($1)`, [idNos])
+      : { rows: [] as any[] };
+    const statusMap = new Map<string, any>();
+    for (const s of statusRows.rows) statusMap.set(s.id_no, s);
     res.json(deduped.map((r: { id_no: string; name: string; sims_count: string; duplicates_count: string; region: string }) => {
       const count = parseInt(r.duplicates_count);
       const risk = count >= 5 ? 'مرتفع جداً' : count >= 3 ? 'مرتفع' : 'متوسط';
       const initials = r.name ? r.name.split(' ').slice(0, 2).map((s: string) => s[0]).join(' ') : '';
+      const st = statusMap.get(r.id_no);
       return {
         idNo: r.id_no,
         name: r.name,
@@ -137,11 +145,122 @@ router.get('/duplicate-identities', requireRole('manager'), async (req: Request,
         risk,
         region: r.region || '',
         avatarInitials: initials,
+        flagged: st?.flagged || false,
+        blocked: st?.blocked || false,
+        reviewStatus: st?.review_status || 'pending',
       };
     }));
   } catch (err) {
     logger.error('Error fetching duplicate identities:', err);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ========================
+// Duplicate Identities: Flag / Block actions
+// ========================
+function logIdentityAction(idNo: string, name: string, action: string, performedBy: string) {
+  const logId = `DUP-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const title =
+    action === 'flag'
+      ? `تم وضع علامة اشتباه على الهوية ${idNo}`
+      : action === 'block'
+      ? `تم تجميد وحظر الهوية ${idNo}`
+      : `تم رفع الحظر عن الهوية ${idNo}`;
+  const status = action === 'flag' ? 'flagged' : action === 'block' ? 'blocked' : 'resolved';
+  return query(
+    `INSERT INTO audit_logs (log_id, type, title, username, time, status)
+     VALUES ($1, 'identity_risk', $2, $3, NOW()::text, $4)`,
+    [logId, title, performedBy, status]
+  );
+}
+
+router.post('/duplicate-identities/:idNo/flag', requireRole('manager'), async (req: Request, res: Response) => {
+  try {
+    const idNo = req.params.idNo;
+    if (!idNo) return res.status(400).json({ error: 'idNo is required' });
+    const name = (req.body && typeof req.body.name === 'string') ? req.body.name : '';
+    const reason = (req.body && typeof req.body.reason === 'string') ? req.body.reason : '';
+    const performedBy = (req as any).user?.username || 'manager';
+
+    await query(
+      `INSERT INTO identity_risk_actions (id_no, name, action, reason, performed_by)
+       VALUES ($1, $2, 'flag', $3, $4)`,
+      [idNo, name, reason, performedBy]
+    );
+    // Upsert into duplicate_identities so the list reflects the flag.
+    await query(
+      `INSERT INTO duplicate_identities (id_no, name, review_status, flagged)
+       VALUES ($1, $2, 'flagged', TRUE)
+       ON CONFLICT (id_no) DO UPDATE SET flagged = TRUE, review_status = 'flagged'`,
+      [idNo, name]
+    );
+    await logIdentityAction(idNo, name, 'flag', performedBy);
+    res.json({ success: true, idNo, flagged: true, reviewStatus: 'flagged' });
+  } catch (err) {
+    logger.error('Error flagging duplicate identity:', err);
+    res.status(500).json({ error: 'Failed to flag identity' });
+  }
+});
+
+router.post('/duplicate-identities/:idNo/block', requireRole('manager'), async (req: Request, res: Response) => {
+  try {
+    const idNo = req.params.idNo;
+    if (!idNo) return res.status(400).json({ error: 'idNo is required' });
+    const name = (req.body && typeof req.body.name === 'string') ? req.body.name : '';
+    const reason = (req.body && typeof req.body.reason === 'string') ? req.body.reason : '';
+    const performedBy = (req as any).user?.username || 'manager';
+
+    await query(
+      `INSERT INTO identity_risk_actions (id_no, name, action, reason, performed_by)
+       VALUES ($1, $2, 'block', $3, $4)`,
+      [idNo, name, reason, performedBy]
+    );
+    // Block all sellers sharing this id_number.
+    await query(
+      `UPDATE sellers SET status = 'suspended' WHERE id_number = $1 AND status NOT IN ('deleted')`,
+      [idNo]
+    );
+    // Upsert into duplicate_identities so the list reflects the block.
+    await query(
+      `INSERT INTO duplicate_identities (id_no, name, review_status, flagged, blocked)
+       VALUES ($1, $2, 'blocked', TRUE, TRUE)
+       ON CONFLICT (id_no) DO UPDATE SET blocked = TRUE, flagged = TRUE, review_status = 'blocked'`,
+      [idNo, name]
+    );
+    await logIdentityAction(idNo, name, 'block', performedBy);
+    res.json({ success: true, idNo, blocked: true, reviewStatus: 'blocked' });
+  } catch (err) {
+    logger.error('Error blocking duplicate identity:', err);
+    res.status(500).json({ error: 'Failed to block identity' });
+  }
+});
+
+router.post('/duplicate-identities/:idNo/unblock', requireRole('manager'), async (req: Request, res: Response) => {
+  try {
+    const idNo = req.params.idNo;
+    if (!idNo) return res.status(400).json({ error: 'idNo is required' });
+    const name = (req.body && typeof req.body.name === 'string') ? req.body.name : '';
+    const performedBy = (req as any).user?.username || 'manager';
+
+    await query(
+      `INSERT INTO identity_risk_actions (id_no, name, action, performed_by)
+       VALUES ($1, $2, 'unblock', $3)`,
+      [idNo, name, performedBy]
+    );
+    await query(
+      `UPDATE sellers SET status = 'active' WHERE id_number = $1 AND status = 'suspended'`,
+      [idNo]
+    );
+    await query(
+      `UPDATE duplicate_identities SET blocked = FALSE, review_status = 'resolved' WHERE id_no = $1`,
+      [idNo]
+    );
+    await logIdentityAction(idNo, name, 'unblock', performedBy);
+    res.json({ success: true, idNo, blocked: false, reviewStatus: 'resolved' });
+  } catch (err) {
+    logger.error('Error unblocking duplicate identity:', err);
+    res.status(500).json({ error: 'Failed to unblock identity' });
   }
 });
 
@@ -297,4 +416,59 @@ router.get('/monitoring', requireRole('manager'), async (_req: Request, res: Res
   }
 });
 
+// ========================
+// Idempotent schema bootstrap for identity risk actions
+// (Safe to run on every boot: all statements use IF NOT EXISTS / ON CONFLICT.)
+// ========================
+let bootstrapDone = false;
+async function ensureIdentityRiskSchema() {
+  if (bootstrapDone) return;
+  bootstrapDone = true;
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS identity_risk_actions (
+        id SERIAL PRIMARY KEY,
+        id_no VARCHAR(50) NOT NULL,
+        name VARCHAR(200) DEFAULT '',
+        action VARCHAR(20) NOT NULL CHECK (action IN ('flag', 'block', 'unblock')),
+        reason TEXT DEFAULT '',
+        performed_by VARCHAR(200) DEFAULT '',
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_identity_risk_actions_id_no ON identity_risk_actions(id_no);
+      CREATE INDEX IF NOT EXISTS idx_identity_risk_actions_created ON identity_risk_actions(created_at);
+
+      ALTER TABLE duplicate_identities ADD COLUMN IF NOT EXISTS flagged BOOLEAN DEFAULT FALSE;
+      ALTER TABLE duplicate_identities ADD COLUMN IF NOT EXISTS blocked BOOLEAN DEFAULT FALSE;
+      ALTER TABLE duplicate_identities ADD COLUMN IF NOT EXISTS review_status VARCHAR(20) DEFAULT 'pending'
+        CHECK (review_status IN ('pending', 'flagged', 'blocked', 'resolved'));
+      CREATE INDEX IF NOT EXISTS idx_duplicate_identities_review ON duplicate_identities(review_status);
+    `);
+    // Enable RLS for the new table if not already.
+    await query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'identity_risk_actions'
+        ) THEN
+          CREATE POLICY identity_risk_actions_backend_full_access
+            ON public.identity_risk_actions FOR ALL
+            TO postgres, service_role
+            USING (true) WITH CHECK (true);
+          ALTER TABLE public.identity_risk_actions ENABLE ROW LEVEL SECURITY;
+        END IF;
+      END $$;
+    `);
+    logger.info('Identity risk schema ensured.');
+  } catch (err) {
+    logger.error('Error ensuring identity risk schema:', err);
+  }
+}
+
+// Run bootstrap once the module is loaded (server-side only).
+if (process.env.NODE_ENV !== 'test') {
+  ensureIdentityRiskSchema();
+}
+
 export default router;
+export { ensureIdentityRiskSchema };

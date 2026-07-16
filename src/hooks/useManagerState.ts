@@ -13,21 +13,21 @@ function loadFromStorage<T>(key: string, fallback: T): T {
 }
 
 const DEFAULT_SETTINGS: SystemSettings = {
-  twoFAEnabled: false,
+  twoFAEnabled: true,
   email2FAEnabled: false,
-  trustedDevicesEnabled: false,
-  sessionTimeout: '15',
+  trustedDevicesEnabled: true,
+  sessionTimeout: '30 دقيقة',
   passwordSpecialRequired: true,
-  passwordExpiry90Days: false,
-  passwordNoReuse5: true,
+  passwordExpiry90Days: true,
+  passwordNoReuse5: false,
   maintenanceMode: false,
-  language: 'ar',
+  language: 'العربية (المملكة العربية السعودية)',
   emailAlertsEnabled: true,
   smsAlertsEnabled: true,
-  appNotificationsEnabled: true,
-  stockShortageThreshold: 10,
-  inactiveSimsThreshold: 30,
-  maxFailedLoginsThreshold: 5,
+  appNotificationsEnabled: false,
+  stockShortageThreshold: 5,
+  inactiveSimsThreshold: 90,
+  maxFailedLoginsThreshold: 3,
   highRiskDuplicatesThreshold: 5,
   identityRemindersEnabled: true,
   identityRemindersFrequency: 'weekly',
@@ -136,8 +136,8 @@ export function useManagerState(role: string | null) {
     }).catch((err) => captureError(err, 'handleUpdateSeller'));
   };
 
-  const handleAddBalance = (sellerId: string, amount: number) => {
-    api.updateSellerBalance(Number(sellerId), amount).then(() => {
+  const handleAddBalance = (sellerId: string, amount: number, invoiceImage?: string) => {
+    api.updateSellerBalance(Number(sellerId), amount, invoiceImage).then(() => {
       if (mountedRef.current) setSellers(prev => prev.map(s => s.id === sellerId ? { ...s, sales30Days: s.sales30Days + amount } : s));
     }).catch((err) => captureError(err, 'handleAddBalance'));
   };

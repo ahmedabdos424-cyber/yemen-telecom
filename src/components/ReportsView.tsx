@@ -231,33 +231,16 @@ export default function ReportsView() {
       </div>
 
       {/* Downloads list archive */}
-      <h3 className="font-bold text-sm text-gray-900 mb-3 px-1">سجلات التصدير والتحميل السابقة</h3>
-      <div className="space-y-3">
-        {[
-          { id: '1', title: 'ملخص مبيعات تعز الموزعة', file: 'PDF', date: '2023-11-20', maker: '—' },
-          { id: '2', title: 'جرد المستودع الرئيسي بالعقدة', file: 'XLS', date: '2023-11-20', maker: 'سارة خليل' },
-          { id: '3', title: 'تقرير التدقيق الجغرافي السنوي', file: 'PDF', date: '2023-11-18', maker: 'نظام المراقبة' }
-        ].map((dl) => (
-          <div key={dl.id} className="card flex items-center justify-between">
-            <div className="flex items-center gap-3.5">
-              <div className={`w-10 h-10 rounded-full font-bold text-[11px] flex items-center justify-center shrink-0 ${
-                dl.file === 'PDF' ? 'bg-red-50 text-secondary' : 'bg-green-50 text-green-700'
-              }`}>
-                {dl.file}
-              </div>
-              <div>
-                <p className="text-xs font-bold text-gray-900">{dl.title}</p>
-                <p className="text-[11px] text-gray-505 mt-1 font-mono">{dl.date} • المعدّ: {dl.maker}</p>
-              </div>
-            </div>
-            <button
-              onClick={() => toastInfo(`جاري تنزيل ملف ${dl.title} بصيغة .${dl.file.toLowerCase()}`)}
-              className="btn-icon text-gray-700 hover:text-secondary hover:bg-gray-50"
-            >
-              <span className="material-symbols-outlined text-xl">download</span>
-            </button>
-          </div>
-        ))}
+      <h3 className="font-bold text-sm text-gray-900 mb-3 px-1 flex items-center gap-2">
+        سجلات التصدير والتحميل السابقة
+        <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold">قيد التطوير</span>
+      </h3>
+      <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center space-y-2">
+        <span className="material-symbols-outlined text-3xl text-gray-400">history</span>
+        <p className="text-xs font-bold text-gray-600">أرشيف التقارير السابقة قيد التطوير</p>
+        <p className="text-[11px] text-gray-400 leading-relaxed max-w-sm mx-auto">
+          سيكون بإمكانك تنزيل التقارير المصدّرة سابقاً (PDF / XLS) بمجرد اكتمال ميزة الأرشيف. حالياً يمكنك تصدير التقرير الحالي عبر زر التصدير أعلاه.
+        </p>
       </div>
 
       {/* Drawer Filter popup style */}
