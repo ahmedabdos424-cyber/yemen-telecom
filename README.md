@@ -11,9 +11,10 @@ Full-stack SIM card distribution management system with offline Arabic OCR for i
 | Mobile | Capacitor 8 (Android) |
 | Backend | Express + TypeScript |
 | Database | Supabase (PostgreSQL) |
-| Auth | Firebase Authentication |
+| Auth | Custom JWT (PostgreSQL-backed) |
+| File Storage | Supabase Storage |
 | OCR | Tesseract.js (offline, on-device) |
-| Deploy | Render (server) + Firebase (web) |
+| Deploy | Render (server + web) |
 
 ## Project Structure
 
@@ -22,15 +23,14 @@ Full-stack SIM card distribution management system with offline Arabic OCR for i
 │   ├── api/            # API client (CSRF-protected)
 │   ├── components/     # Views, forms, shared components
 │   ├── hooks/          # useOcr (offline OCR), useAgentSellerState
-│   ├── services/       # Firebase auth/storage wrappers
-│   └── lib/            # Utilities
+│   └── services/       # API/token storage wrappers
 ├── server/             # Express backend
 │   └── src/
-│       ├── routes/     # Auth, SIMs, sellers, agents, admin, reports
+│       ├── routes/     # Auth, SIMs, sellers, agents, admin, reports, upload
 │       └── db.ts       # Supabase connection
 ├── android/            # Capacitor Android project
 ├── public/tesseract/   # Offline OCR assets (WASM + Arabic traineddata)
-└── scripts/            # Firebase setup, tunnel
+└── scripts/            # Setup, tunnel
 ```
 
 ## Installation
@@ -56,17 +56,16 @@ Copy `.env.example` to `server/.env` and configure:
 | `REFRESH_SECRET` | Refresh token secret |
 | `CSRF_SECRET` | CSRF token secret |
 | `CORS_ORIGIN` | Allowed CORS origins (comma-separated) |
-| `FIREBASE_STORAGE_BUCKET` | Firebase Storage bucket |
-| `FIREBASE_SERVICE_ACCOUNT_PATH` | Path to service-account.json |
+| `SUPABASE_URL` | Supabase project URL (image uploads) |
+| `SUPABASE_ANON_KEY` | Supabase anon/publishable key (image uploads) |
+| `UPLOAD_BUCKET` | Supabase Storage bucket for uploads |
 
 Frontend env vars (prefix with `VITE_`):
 
 | Variable | Description |
 |----------|-------------|
-| `VITE_FIREBASE_API_KEY` | Firebase Web API key |
-| `VITE_FIREBASE_AUTH_DOMAIN` | Firebase auth domain |
-| `VITE_FIREBASE_PROJECT_ID` | Firebase project ID |
-| `VITE_FIREBASE_STORAGE_BUCKET` | Firebase storage bucket |
+| `VITE_SUPABASE_URL` | Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | Supabase anon/publishable key |
 | `VITE_FIREBASE_MESSAGING_SENDER_ID` | Firebase sender ID |
 | `VITE_FIREBASE_APP_ID` | Firebase app ID |
 
