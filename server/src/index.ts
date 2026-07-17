@@ -25,6 +25,7 @@ import usersRoutes from './routes/users';
 import customersRoutes from './routes/customers';
 import distributionsRoutes from './routes/distributions';
 import reportsRoutes from './routes/reports';
+import appUpdateRoutes from './routes/app-update';
 
 import { logger, setLogContext, clearLogContext } from './logger';
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
@@ -257,6 +258,9 @@ app.get('/api/health', async (_req, res) => {
   });
 });
 
+// Self-updater endpoints (public, no auth): version check + install reporting.
+app.use('/api', appUpdateRoutes);
+
 // Apply write rate limiter to all POST/PUT/DELETE routes
 app.use('/api', (req, res, next) => {
   if (['POST', 'PUT', 'DELETE'].includes(req.method) && !req.path.startsWith('/auth/')) {
@@ -265,8 +269,8 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-// Apply JWT auth to all /api routes except auth (routes debug is dev-only)
-app.use(/^\/api\/(?!auth).*/, authenticateToken);
+// Apply JWT auth to all /api routes except auth and the public self-updater endpoints.
+app.use(/^\/api\/(?!auth|app-version|app-update-installed).*/, authenticateToken);
 
 // Maintenance mode middleware — block mutation requests when maintenance_mode is on
 app.use('/api', async (req: express.Request, res: express.Response, next: express.NextFunction) => {

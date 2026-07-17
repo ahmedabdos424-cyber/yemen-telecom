@@ -1,0 +1,96 @@
+import { Router, type Response } from 'express';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { logger } from '../logger';
+
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://qxroquilskugfemzmrzp.supabase.co';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
+
+let supabase: SupabaseClient | null = null;
+if (SUPABASE_ANON_KEY) {
+  supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+const router = Router();
+
+// In-memory log of successful installs (deviceId, version, time).
+// Kept in-memory to avoid schema changes; pair with external analytics if needed.
+const installLog: Array<{ deviceId: string; version: string; versionCode: number; time: string }> = [];
+const INSTALL_LOG_MAX = 5000;
+
+function isHttps(url: string): boolean {
+  return /^https:\/\//i.test(url);
+}
+
+// Generate a short-lived (1h) signed URL from Supabase Storage so the APK link
+// cannot be shared/reused indefinitely. Falls back to a static APP_APK_URL.
+async function resolveApkUrl(): Promise<string> {
+  const bucket = process.env.APP_APK_BUCKET || 'uploads';
+  const object = process.env.APP_APK_OBJECT;
+  if (object && supabase) {
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(object, 60 * 60); // 1 hour
+    if (!error && data?.signedUrl) return data.signedUrl;
+  }
+  const staticUrl = process.env.APP_APK_URL || '';
+  return staticUrl;
+}
+
+// GET /api/app-version — public, no auth, no-store cache.
+router.get('/app-version', async (_req, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
+  let apkUrl = await resolveApkUrl();
+
+  // Security: never serve a plaintext-http APK link.
+  if (apkUrl && !isHttps(apkUrl)) {
+    logger.warn('[app-version] refusing to serve non-https APK url');
+    apkUrl = '';
+  }
+
+  const versionCode = process.env.APP_VERSION_CODE
+    ? parseInt(process.env.APP_VERSION_CODE, 10)
+    : 0;
+
+  res.status(200).json({
+    version: process.env.APP_VERSION || '1.0.0',
+    versionCode,
+    apkUrl,
+    sha256: process.env.APP_APK_SHA256 || '',
+    size: process.env.APP_APK_SIZE ? parseInt(process.env.APP_APK_SIZE, 10) : 0,
+    notes: (process.env.APP_UPDATE_NOTES || '').split('|').filter(Boolean),
+    required: process.env.APP_UPDATE_REQUIRED === 'true',
+    checkedAt: new Date().toISOString(),
+  });
+});
+
+// POST /api/app-update-installed — record a successful install.
+// deviceId + version + time let the operator know who updated and who didn't.
+router.post('/app-update-installed', (req: any, res: Response) => {
+  const deviceId = String(req.body?.deviceId || req.body?.device_id || 'unknown').slice(0, 128);
+  const version = String(req.body?.version || '').slice(0, 32);
+  const versionCode = parseInt(req.body?.versionCode, 10) || 0;
+  if (!version) {
+    return res.status(400).json({ error: 'version required' });
+  }
+  const entry = { deviceId, version, versionCode, time: new Date().toISOString() };
+  installLog.push(entry);
+  if (installLog.length > INSTALL_LOG_MAX) installLog.shift();
+  logger.info('[app-update] installed', entry);
+  res.status(200).json({ ok: true });
+});
+
+// Optional: GET /api/app-update-stats (operator, dev-only) — counts per version.
+router.get('/app-update-stats', (_req, res: Response) => {
+  const byVersion: Record<string, number> = {};
+  for (const e of installLog) {
+    byVersion[e.version] = (byVersion[e.version] || 0) + 1;
+  }
+  res.status(200).json({ total: installLog.length, byVersion });
+});
+
+export default router;

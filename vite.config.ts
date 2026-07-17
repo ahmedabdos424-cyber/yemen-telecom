@@ -1,7 +1,38 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import fs from 'fs';
 import {defineConfig} from 'vite';
+
+// Read the Android versionName so the web updater can compare against the
+// installed APK version (single source of truth in android/app/build.gradle).
+function readAndroidVersion(): string {
+  try {
+    const gradle = fs.readFileSync(
+      path.resolve(__dirname, 'android/app/build.gradle'),
+      'utf-8'
+    );
+    const m = gradle.match(/versionName\s+"([^"]+)"/);
+    if (m) return m[1];
+  } catch {
+    /* ignore */
+  }
+  return process.env.VITE_APP_VERSION || '1.0.0';
+}
+
+function readAndroidVersionCode(): number {
+  try {
+    const gradle = fs.readFileSync(
+      path.resolve(__dirname, 'android/app/build.gradle'),
+      'utf-8'
+    );
+    const m = gradle.match(/versionCode\s+(\d+)/);
+    if (m) return parseInt(m[1], 10);
+  } catch {
+    /* ignore */
+  }
+  return parseInt(process.env.VITE_APP_VERSION_CODE || '0', 10) || 0;
+}
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -14,6 +45,10 @@ export default defineConfig({
     target: 'es2022',
     sourcemap: false,
     chunkSizeWarningLimit: 2000,
+    define: {
+      'import.meta.env.VITE_APP_VERSION': JSON.stringify(readAndroidVersion()),
+      'import.meta.env.VITE_APP_VERSION_CODE': JSON.stringify(readAndroidVersionCode()),
+    },
     rollupOptions: {
       output: {
         manualChunks: {
