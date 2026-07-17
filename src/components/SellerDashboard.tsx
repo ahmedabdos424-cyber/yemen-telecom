@@ -87,12 +87,14 @@ export default function SellerDashboard({
   
   // Change password attributes
   const [idNumberEntry, setIdNumberEntry] = useState('');
+  const [currentPasswordEntry, setCurrentPasswordEntry] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isChangingPass, setIsChangingPass] = useState(false);
 
   const handlePasswordChangeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!currentPasswordEntry) { toastWarning('الرجاء إدخال كلمة المرور الحالية للتحقق'); return; }
     if (!idNumberEntry) { toastWarning('الرجاء إدخال رقم الهوية الخاصة بك للتحقق'); return; }
     if (!newPassword || !confirmPassword) { toastWarning('الرجاء تعبئة حقول كلمة المرور الجديدة'); return; }
     if (newPassword !== confirmPassword) { toastWarning('كلمتا المرور غير متطابقتين، الرجاء التحقق'); return; }
@@ -100,7 +102,7 @@ export default function SellerDashboard({
 
     setIsChangingPass(true);
     try {
-      await api.updatePassword('', newPassword);
+      await api.updatePassword(currentPasswordEntry, newPassword);
       onPasswordChanged(newPassword);
       setIdNumberEntry('');
       setNewPassword('');
@@ -128,7 +130,7 @@ export default function SellerDashboard({
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       
       {activeTab === 'home' && (
-        <SellerHome operations={operations} onNavigate={setActiveTab} />
+        <SellerHome operations={operations} sims={sims} onNavigate={setActiveTab} />
       )}
 
       {activeTab === 'account' && (
@@ -335,11 +337,11 @@ export default function SellerDashboard({
                     </div>
                     <div className="flex justify-between items-center border-b border-slate-900 pb-2">
                       <span className="text-slate-400 font-medium">المنطقة الإقليمية</span>
-                      <span className="text-slate-100 font-bold">{sellerData.region || 'المنطقة الإقليمية العليا، الرياض'}</span>
+                      <span className="text-slate-100 font-bold">{sellerData.region || '---'}</span>
                     </div>
                     <div className="flex justify-between items-center border-b border-slate-900 pb-2">
                       <span className="text-slate-400 font-medium">تاريخ إنشاء الحساب</span>
-                      <span className="text-slate-100 font-sans font-bold">{sellerData.creationDate || '2023/10/12'}</span>
+                      <span className="text-slate-100 font-sans font-bold">{sellerData.creationDate || '---'}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-slate-400 font-medium">حالة الحساب</span>
@@ -538,7 +540,21 @@ export default function SellerDashboard({
 
               {/* Password credentials change Form */}
               <form onSubmit={handlePasswordChangeSubmit} className="space-y-4 text-right">
-                
+               
+                <div className="space-y-1.5">
+                  <label htmlFor="pass_current" className="block text-xs font-semibold text-slate-350 pr-1">كلمة المرور الحالية</label>
+                  <input
+                    type="password"
+                    id="pass_current"
+                    value={currentPasswordEntry}
+                    onChange={(e) => setCurrentPasswordEntry(e.target.value)}
+                    placeholder="أدخل كلمة المرور الحالية للتحقق"
+                    className="w-full bg-slate-950 border border-slate-850 rounded-xl px-4 py-3 text-xs outline-none focus:border-blue-600 transition-colors font-sans"
+                    dir="ltr"
+                    style={{ textAlign: 'right' }}
+                  />
+                </div>
+
                 <div className="space-y-1.5">
                   <label htmlFor="pass_id" className="block text-xs font-semibold text-slate-350 pr-1">رقم الهوية الوطنية</label>
                   <input

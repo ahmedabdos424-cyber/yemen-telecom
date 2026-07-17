@@ -1,14 +1,17 @@
-import { Operation } from '../types';
+import { Operation, Sim } from '../types';
 import {
   Smartphone, Cpu, Award, TrendingUp, PlusCircle
 } from 'lucide-react';
 
 interface SellerHomeProps {
   operations: Operation[];
+  sims?: Sim[];
   onNavigate: (tab: string) => void;
 }
 
-export default function SellerHome({ operations = [], onNavigate }: SellerHomeProps) {
+export default function SellerHome({ operations = [], sims = [], onNavigate }: SellerHomeProps) {
+  const soldCount = (operations ?? []).filter(op => op.type === 'activate' && op.status === 'success').length;
+  const remainingCount = (sims ?? []).filter(s => s.status === 'available').length;
   return (
     <div className="space-y-6">
 
@@ -35,13 +38,10 @@ export default function SellerHome({ operations = [], onNavigate }: SellerHomePr
             <span className="btn-icon bg-blue-500/10 rounded-xl text-[#0151d5]">
               <Smartphone size={16} />
             </span>
-            <span className="text-emerald-400 bg-emerald-950/30 text-[9px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-0.5">
-              <TrendingUp size={10} /> +12%
-            </span>
           </div>
           <div className="text-right">
             <h4 className="text-[10px] text-slate-400 font-medium">اجمالي الشرائح المباعة</h4>
-            <p className="stat-card-value text-slate-100">42 <span className="text-[11px] text-slate-500">شريحة</span></p>
+            <p className="stat-card-value text-slate-100">{soldCount} <span className="text-[11px] text-slate-500">شريحة</span></p>
           </div>
         </div>
 
@@ -51,11 +51,10 @@ export default function SellerHome({ operations = [], onNavigate }: SellerHomePr
             <span className="btn-icon bg-purple-500/10 rounded-xl text-purple-400">
               <Cpu size={16} />
             </span>
-            <span className="text-[8px] text-slate-500 bg-slate-950 px-2 py-0.5 rounded-full">مزامنة تامة</span>
           </div>
           <div className="text-right">
             <h4 className="text-[10px] text-slate-400 font-medium">إجمالي الشرائح المتبقية</h4>
-            <p className="stat-card-value text-slate-100">1,250 <span className="text-[11px] text-slate-500">نقطة</span></p>
+            <p className="stat-card-value text-slate-100">{remainingCount} <span className="text-[11px] text-slate-500">شريحة</span></p>
           </div>
         </div>
 
@@ -68,8 +67,8 @@ export default function SellerHome({ operations = [], onNavigate }: SellerHomePr
             <span className="text-emerald-400 bg-emerald-950/40 border border-emerald-900/30 px-2.5 py-0.5 rounded-full text-[9px] font-bold">نشط معتمد</span>
           </div>
           <div className="text-right">
-            <h4 className="text-[10px] text-slate-400 font-medium">حالة الحساب والعمولات الممتازة</h4>
-            <p className="text-sm font-bold tracking-tight text-slate-100 mt-1">ممتاز (فئة أ)</p>
+            <h4 className="text-[10px] text-slate-400 font-medium">إجمالي الشرائح تحت الإدارة</h4>
+            <p className="text-sm font-bold tracking-tight text-slate-100 mt-1">{(sims ?? []).length} شريحة</p>
           </div>
         </div>
 

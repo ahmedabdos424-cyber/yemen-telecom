@@ -231,7 +231,7 @@ export default function SellerSimsView({ sims = [], onUpdateSims }: SellerSimsVi
                                     <button onClick={() => handleStatusChange(sim.id, 'available')} className="w-full text-right px-3 py-2 text-[10px] text-emerald-400 hover:bg-slate-900 rounded-lg flex items-center gap-2"><RefreshCw size={12} /><span>إلغاء الحجز</span></button>
                                   )}
                                   <button onClick={() => handleStatusChange(sim.id, 'sold')} className="w-full text-right px-3 py-2 text-[10px] text-blue-400 hover:bg-slate-900 rounded-lg flex items-center gap-2"><Check size={12} /><span>بيع الشريحة</span></button>
-                                  <button onClick={() => { toastInfo(`جاري طباعة بيانات الشريحة...\nالمشغل: ${operatorLabel}\nICCID: ${sim.iccid}\nالحالة الحالية: ${sim.status}`); setActiveMenuSimId(null); }} className="w-full text-right px-3 py-2 text-[10px] text-slate-300 hover:bg-slate-900 hover:text-slate-100 rounded-lg flex items-center gap-2"><Printer size={12} /><span>طباعة بيانات الشريحة</span></button>
+                                  <button onClick={() => { setDetailSim(sim); setActiveMenuSimId(null); setTimeout(() => window.print(), 300); }} className="w-full text-right px-3 py-2 text-[10px] text-slate-300 hover:bg-slate-900 hover:text-slate-100 rounded-lg flex items-center gap-2"><Printer size={12} /><span>طباعة بيانات الشريحة</span></button>
                                   <button onClick={() => handleDeleteSim(sim.id)} className="w-full text-right px-3 py-2 text-[10px] text-red-500 hover:bg-red-950/20 rounded-lg flex items-center gap-2 border-t border-slate-900 mt-1 pb-1"><Trash2 size={12} /><span>حذف الشريحة</span></button>
                                 </div>
                               </>
@@ -280,7 +280,7 @@ export default function SellerSimsView({ sims = [], onUpdateSims }: SellerSimsVi
                               <button onClick={() => handleStatusChange(sim.id, 'available')} className="w-full text-right px-3 py-2 text-[10px] text-emerald-400 hover:bg-slate-900 rounded-lg flex items-center gap-2"><RefreshCw size={12} /><span>إلغاء الحجز</span></button>
                             )}
                             <button onClick={() => { setTransferSim(sim); setActiveMenuSimId(null); }} className="w-full text-right px-3 py-2 text-[10px] text-slate-300 hover:bg-slate-900 hover:text-slate-100 rounded-lg flex items-center gap-2"><ArrowRightLeft size={12} /><span>نقل الشريحة</span></button>
-                            <button onClick={() => { toastInfo(`جاري طباعة بيانات الشريحة...\nICCID: ${sim.iccid}\nالحالة: ${sim.status}`); setActiveMenuSimId(null); }} className="w-full text-right px-3 py-2 text-[10px] text-slate-300 hover:bg-slate-900 hover:text-slate-100 rounded-lg flex items-center gap-2"><Printer size={12} /><span>طباعة</span></button>
+                            <button onClick={() => { setDetailSim(sim); setActiveMenuSimId(null); setTimeout(() => window.print(), 300); }} className="w-full text-right px-3 py-2 text-[10px] text-slate-300 hover:bg-slate-900 hover:text-slate-100 rounded-lg flex items-center gap-2"><Printer size={12} /><span>طباعة</span></button>
                           </div>
                         </>
                       )}
