@@ -2,7 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { useToast, ToastContainer } from '../hooks/useToast';
 import OperatorLogo from './shared/OperatorLogo';
 import { motion, AnimatePresence } from 'motion/react';
-import { Seller, Sim, OperatorInventory, Operator, Role } from '../types';
+import { Seller, Sim, OperatorInventory, Operator, Role, Operation } from '../types';
+import { api } from '../api/client';
 import { Plus, RefreshCw, X, Send, ArrowLeft, Activity } from 'lucide-react';
 import EmptyState from './shared/EmptyState';
 import profileImage from '../assets/profile.png';
@@ -23,6 +24,7 @@ interface AgentDashboardProps {
   onEditSeller: (seller: Seller) => void;
   onDeleteSeller: (sellerId: string) => Promise<void>;
   onUpdateInventories: (inventories: OperatorInventory[]) => void;
+  operations?: Operation[];
   username: string;
   onLogout: () => void;
   onConfirmLogout?: () => void;
@@ -46,6 +48,7 @@ export default function AgentDashboard({
   onEditSeller,
   onDeleteSeller,
   onUpdateInventories,
+  operations = [],
   username,
   onLogout,
   onConfirmLogout,
@@ -99,9 +102,6 @@ export default function AgentDashboard({
   const handleRefreshInventory = async (operator: Operator) => {
     setRefreshingOperator(operator);
     try {
-      const currentInv = inventories.find(i => i.operator === operator);
-      if (!currentInv) return;
-
       const operatorName = 
         operator === 'yemen_mobile' || operator === 'Yemen Mobile' 
           ? 'يمن موبايل' 
@@ -109,14 +109,13 @@ export default function AgentDashboard({
           ? 'YOU' 
           : 'سبأفون';
 
-      const updatedInventories = inventories.map(i => {
-        if (i.operator === operator) {
-          return { ...i, periodDays: Math.min(30, i.periodDays + 1) };
-        }
-        return i;
-      });
-      onUpdateInventories(updatedInventories);
-      toastSuccess(`تم تحديث بيانات المخزون لـ ${operatorName}.`);
+      const fresh = await api.getInventories();
+      if (fresh && fresh.length) {
+        onUpdateInventories(fresh);
+        toastSuccess(`تم تحديث بيانات المخزون لـ ${operatorName}.`);
+      } else {
+        toastInfo(`لا توجد بيانات مخزون متاحة لـ ${operatorName}.`);
+      }
     } catch {
       toastError('فشلت عملية تحديث المخزون. يرجى المحاولة لاحقاً.');
     } finally {
@@ -380,7 +379,7 @@ export default function AgentDashboard({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/40">
-                  {(false) ? null : (
+                  {(operations ?? []).length === 0 ? (
                     <tr>
                       <td colSpan={6} className="p-8">
                         <EmptyState
@@ -390,6 +389,25 @@ export default function AgentDashboard({
                         />
                       </td>
                     </tr>
+                  ) : (
+                    (operations ?? []).slice(0, 8).map((op) => (
+                      <tr key={op.id} className="hover:bg-slate-950/20">
+                        <td className="p-4 font-sans">{op.date}</td>
+                        <td className="p-4 text-slate-300">{op.target}</td>
+                        <td className="p-4 text-slate-300">
+                          {op.operator === 'yemen_mobile' ? 'يمن موبايل' : op.operator === 'you' ? 'YOU' : op.operator === 'sabafon' ? 'سبأفون' : op.operator}
+                        </td>
+                        <td className="p-4 font-mono text-slate-300">1</td>
+                        <td className="p-4 text-slate-300">
+                          {op.type === 'recharge' ? 'شحن' : op.type === 'activate' ? 'تفعيل' : op.type === 'transfer' ? 'تحويل' : op.type}
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className={`badge ${op.status === 'success' ? 'badge-success' : 'badge-failed'}`}>
+                            {op.status === 'success' ? 'ناجحة' : 'فشلت'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>

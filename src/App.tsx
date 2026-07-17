@@ -24,6 +24,8 @@ const ActivateSimForm = lazy(() => import('./components/ActivateSimForm'));
 import { useAuth } from './hooks/useAuth';
 import { useManagerState } from './hooks/useManagerState';
 import { useAgentSellerState } from './hooks/useAgentSellerState';
+import { useAppUpdater } from './hooks/useAppUpdater';
+import UpdateModal from './components/UpdateModal';
 
 const AgentDashboard = lazy(() => import('./components/AgentDashboard'));
 const AgentProfileView = lazy(() => import('./components/agent/AgentProfileView'));
@@ -165,6 +167,7 @@ function AuthenticatedApp() {
         onEditSeller: agt.handleEditSellerForAgent,
         onDeleteSeller: agt.handleDeleteSellerForAgent,
         onUpdateInventories: agt.handleUpdateInventories,
+        operations: agt.operations,
         username, onLogout: () => {}, onConfirmLogout: handleLogout,
         darkMode, setDarkMode,
       };
@@ -180,12 +183,13 @@ function AuthenticatedApp() {
         </Routes>
       );
     } else if (role === 'seller') {
+      const sellerOnUpdateSims = (updated: any[]) => agt.handleUpdateSimsForSeller(updated as any);
       return (
         <Routes>
-          <Route path="/seller/home" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? []).filter(s => s.status === 'available')} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={() => {}} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} />} />
+          <Route path="/seller/home" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? []).filter(s => s.status === 'available')} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={() => {}} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} onUpdateSims={sellerOnUpdateSims} />} />
           <Route path="/seller/activate" element={<ActivateSimForm onSimActivated={agt.handleSimActivationForSeller} />} />
-          <Route path="/seller/my-sims" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? [])} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={() => {}} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} />} />
-          <Route path="/seller/account" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? [])} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={() => {}} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} />} />
+          <Route path="/seller/my-sims" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? [])} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={() => {}} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} onUpdateSims={sellerOnUpdateSims} />} />
+          <Route path="/seller/account" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? [])} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={() => {}} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} onUpdateSims={sellerOnUpdateSims} />} />
           <Route path="*" element={<Navigate to="/seller/home" replace />} />
         </Routes>
       );
@@ -257,6 +261,7 @@ function AuthenticatedApp() {
 
 export default function App() {
   const [splashDone, setSplashDone] = useState(false);
+  const updater = useAppUpdater();
 
   if (!splashDone) {
     return (
@@ -268,7 +273,40 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <AuthenticatedApp />
+      {/* Block app entry while a REQUIRED update is pending. The user cannot
+          bypass it — they must update before using the app. */}
+      {updater.available?.required && updater.showModal ? (
+        <UpdateModal
+          open={updater.showModal}
+          info={updater.available}
+          downloading={updater.downloading}
+          progress={updater.progress}
+          error={updater.error}
+          needsInstallPermission={updater.needsInstallPermission}
+          canRetry={updater.canRetry}
+          required={true}
+          onUpdate={updater.startUpdate}
+          onDismiss={updater.dismiss}
+          onOpenSettings={updater.startUpdate}
+        />
+      ) : (
+        <>
+          <AuthenticatedApp />
+          <UpdateModal
+            open={updater.showModal}
+            info={updater.available}
+            downloading={updater.downloading}
+            progress={updater.progress}
+            error={updater.error}
+            needsInstallPermission={updater.needsInstallPermission}
+            canRetry={updater.canRetry}
+            required={!!updater.available?.required}
+            onUpdate={updater.startUpdate}
+            onDismiss={updater.dismiss}
+            onOpenSettings={updater.startUpdate}
+          />
+        </>
+      )}
     </ErrorBoundary>
   );
 }

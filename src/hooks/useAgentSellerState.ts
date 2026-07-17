@@ -147,6 +147,43 @@ export function useAgentSellerState(role: string | null, username: string) {
     setInventories(updated);
   };
 
+  // Persist SIM changes made by the seller (sell / reserve / edit / transfer / delete).
+  // Receives the full updated list and reconciles it against the local list,
+  // pushing inserts/updates/deletes to the server.
+  const handleUpdateSimsForSeller = async (updated: Sim[]) => {
+    const prev = sims;
+    const prevById = new Map(prev.map(s => [s.id, s]));
+    const updatedById = new Map(updated.map(s => [s.id, s]));
+    try {
+      for (const sim of updated) {
+        const before = prevById.get(sim.id);
+        if (!before) {
+          await api.createSim(sim as any);
+        } else if (before.status !== sim.status || before.iccid !== sim.iccid || before.phone !== sim.phone || before.category !== sim.category || before.operator !== sim.operator || before.owner !== (sim as any).owner) {
+          await api.updateSim(Number(sim.id), {
+            status: sim.status,
+            iccid: sim.iccid,
+            phone: sim.phone,
+            category: sim.category,
+            operator: sim.operator,
+            owner: (sim as any).owner,
+          } as any);
+        }
+      }
+      for (const old of prev) {
+        if (!updatedById.has(old.id)) {
+          await api.deleteSim(Number(old.id));
+        }
+      }
+      if (mountedRef.current) setSims(updated);
+    } catch (err) {
+      captureError(err, 'handleUpdateSimsForSeller');
+      // Roll back to the server-faithful local list on failure
+      if (mountedRef.current) setSims(prev);
+      throw err;
+    }
+  };
+
   // Self seller data for seller role — starts empty for new accounts
   const selfSellerData: Seller = sellers.find(s => s.username === username || s.name === username || s.id === '99283') || {
     id: '', name: username, storeName: '', idNumber: '',
@@ -159,6 +196,6 @@ export function useAgentSellerState(role: string | null, username: string) {
     sellers, sims, operations, inventories, activeTab, sellerCredentials, selfSellerData,
     handleSetRoleTab, setSellerCredentials, setSims, setSellers,
     handleAddSellerForAgent, handleTransferSimsForAgent, handleSimActivationForSeller,
-    handleUpdateSellerStatusForAgent, handleResetSellerPasswordForAgent, handleEditSellerForAgent, handleDeleteSellerForAgent, handleUpdateInventories,
+    handleUpdateSellerStatusForAgent, handleResetSellerPasswordForAgent, handleEditSellerForAgent, handleDeleteSellerForAgent, handleUpdateInventories, handleUpdateSimsForSeller,
   };
 }
