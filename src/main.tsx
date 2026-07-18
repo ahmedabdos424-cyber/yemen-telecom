@@ -9,8 +9,11 @@ import { initFrontendSentry } from './lib/sentry.ts';
 initMonitor();
 initFrontendSentry();
 
-// Register service worker for PWA
-if ('serviceWorker' in navigator) {
+// Register service worker for PWA (web only). Skip inside the Capacitor
+// native app: its WebView runs on a different origin (https://localhost) and
+// the SW's cross-origin fetch interception breaks API calls such as login.
+const isNative = !!(window as unknown as { Capacitor?: { isNative?: boolean } }).Capacitor?.isNative;
+if (!isNative && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch((err) =>
       console.warn('[SW] registration failed', err)
