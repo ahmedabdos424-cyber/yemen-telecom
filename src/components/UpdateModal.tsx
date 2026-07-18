@@ -113,44 +113,56 @@ export default function UpdateModal({
               </div>
             )}
 
-            <div className="flex gap-2 pt-2">
-              {error && canRetry && !downloading && (
+            <div className="flex flex-col gap-2 pt-2">
+              {needsInstallPermission && !downloading && (
+                <button
+                  type="button"
+                  onClick={onOpenSettings}
+                  className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition-all"
+                >
+                  <ShieldCheck size={14} />
+                  <span>فتح إعدادات التثبيت من مصادر غير معروفة</span>
+                </button>
+              )}
+              <div className="flex gap-2">
+                {error && canRetry && !downloading && (
+                  <button
+                    type="button"
+                    onClick={onUpdate}
+                    className="flex-1 py-3 bg-slate-800 hover:bg-slate-755 text-slate-300 font-medium text-xs rounded-xl border border-slate-700 transition-all flex items-center justify-center gap-2"
+                  >
+                    <RefreshCw size={14} />
+                    <span>إعادة المحاولة</span>
+                  </button>
+                )}
+                {!required && !downloading && (
+                  <button
+                    type="button"
+                    onClick={onDismiss}
+                    className="flex-1 py-3 bg-slate-800 hover:bg-slate-755 text-slate-300 font-medium text-xs rounded-xl border border-slate-700 transition-all"
+                  >
+                    لاحقاً
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={onUpdate}
-                  className="flex-1 py-3 bg-slate-800 hover:bg-slate-755 text-slate-300 font-medium text-xs rounded-xl border border-slate-700 transition-all flex items-center justify-center gap-2"
+                  disabled={downloading}
+                  className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition-all disabled:opacity-60"
                 >
-                  <RefreshCw size={14} />
-                  <span>إعادة المحاولة</span>
+                  {downloading ? (
+                    <>
+                      <RefreshCw className="animate-spin" size={14} />
+                      <span>جاري التنزيل...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download size={14} />
+                      <span>تحديث الآن</span>
+                    </>
+                  )}
                 </button>
-              )}
-              {!required && !downloading && (
-                <button
-                  type="button"
-                  onClick={onDismiss}
-                  className="flex-1 py-3 bg-slate-800 hover:bg-slate-755 text-slate-300 font-medium text-xs rounded-xl border border-slate-700 transition-all"
-                >
-                  لاحقاً
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={needsInstallPermission && !downloading ? onOpenSettings : onUpdate}
-                disabled={downloading}
-                className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition-all disabled:opacity-60"
-              >
-                {downloading ? (
-                  <>
-                    <RefreshCw className="animate-spin" size={14} />
-                    <span>جاري التنزيل...</span>
-                  </>
-                ) : (
-                  <>
-                    <Download size={14} />
-                    <span>{needsInstallPermission ? 'فتح الإعدادات' : 'تحديث الآن'}</span>
-                  </>
-                )}
-              </button>
+              </div>
             </div>
           </motion.div>
         </div>
