@@ -85,13 +85,23 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
         setErrorMsg('اسم المستخدم أو كلمة المرور غير صحيحة');
         setFieldError('password');
       }
-    } catch {
-      if (abortRef.current) return;
-      setIsLoading(false);
-      setErrorMsg('تعذر الاتصال بالخادم. قد يكون الخادم في وضع السكون، يرجى الانتظار لحظات وإعادة المحاولة');
-      setFieldError('password');
-    }
-  };
+     } catch (err) {
+       if (abortRef.current) return;
+       setIsLoading(false);
+       setFieldError('password');
+       const raw = err instanceof Error ? err.message : String(err);
+       const msg = raw.toLowerCase();
+       if (msg.includes('failed to fetch') || msg.includes('network') || msg.includes('timeout') || msg.includes('abort') || msg.includes('dns')) {
+         setErrorMsg('تعذر الاتصال بالخادم. تأكد من تشغيل بيانات الجوال أو الواي فاي لديك، ثم أعد المحاولة');
+       } else if (msg.includes('certificate') || msg.includes('ssl') || msg.includes('secure')) {
+         setErrorMsg('تعذر الاتصال: مشكلة في شهادة الأمان. تأكد من تاريخ ووقت جهازك مضبوطين بشكل صحيح');
+       } else if (msg.includes('cors')) {
+         setErrorMsg('تعذر الاتصال بالخادم. يرجى تحديث التطبيق إلى أحدث نسخة من متجر التوزيع');
+       } else {
+         setErrorMsg('تعذر الاتصال بالخادم. يرجى التأكد من اتصال الإنترنت وإعادة المحاولة، أو تحديث التطبيق');
+       }
+     }
+   };
 
   const selectRecent = (u: string) => {
     setUsername(u);

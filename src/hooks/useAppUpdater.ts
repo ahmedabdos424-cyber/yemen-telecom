@@ -76,14 +76,34 @@ export function useAppUpdater() {
     check();
   }, [check]);
 
+  // Re-verify install permission when the user returns from the OS settings
+  // screen (where they grant "install from unknown sources"). This flips
+  // needsInstallPermission off so the modal's main button starts the download.
+  useEffect(() => {
+    if (!isNativeApp) return;
+    const onVisible = async () => {
+      if (document.visibilityState !== 'visible') return;
+      if (!state.available || downloadingRef.current) return;
+      const allowed = await canInstallPackages();
+      setState((s) => (s.needsInstallPermission === !allowed ? s : { ...s, needsInstallPermission: !allowed }));
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [state.available]);
+
   const startUpdate = useCallback(async () => {
     if (!state.available || downloadingRef.current) return;
     // Re-check install permission in case the user just granted it.
     const allowed = await canInstallPackages();
     if (!allowed) {
       await openInstallSettings();
-      setState((s) => ({ ...s, needsInstallPermission: true }));
-      return;
+      // Re-verify after the user returns from settings; if they granted it,
+      // proceed straight to download instead of looping back to settings.
+      const reAllowed = await canInstallPackages();
+      if (!reAllowed) {
+        setState((s) => ({ ...s, needsInstallPermission: true }));
+        return;
+      }
     }
     setState((s) => ({ ...s, needsInstallPermission: false }));
     downloadingRef.current = true;
