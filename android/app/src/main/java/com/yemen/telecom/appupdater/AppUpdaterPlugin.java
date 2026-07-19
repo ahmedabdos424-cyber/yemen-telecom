@@ -361,6 +361,14 @@ public class AppUpdaterPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void cancelDownload(PluginCall call) {
+        cancelDownload();
+        JSObject ret = new JSObject();
+        ret.put("cancelled", true);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
     public void deleteApk(PluginCall call) {
         String path = call.getString("path");
         boolean deleted = false;

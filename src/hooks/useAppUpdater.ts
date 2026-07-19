@@ -9,6 +9,7 @@ import {
   reportInstall,
   canInstallPackages,
   openInstallSettings,
+  cancelDownloadApk,
   isNativeApp,
   type AppVersionInfo,
   type UpdateProgress,
@@ -18,11 +19,22 @@ interface UpdaterState {
   available: AppVersionInfo | null;
   checking: boolean;
   downloading: boolean;
+  verifying: boolean;
   progress: number;
+  downloaded: number;
+  total: number;
+  speed: number; // bytes/sec
+  etaSeconds: number;
   error: string | null;
   canRetry: boolean;
   needsInstallPermission: boolean;
   showModal: boolean;
+}
+
+// Samples used to estimate download speed (bytes/sec).
+interface Sample {
+  t: number;
+  downloaded: number;
 }
 
 export function useAppUpdater() {
@@ -30,7 +42,12 @@ export function useAppUpdater() {
     available: null,
     checking: false,
     downloading: false,
+    verifying: false,
     progress: 0,
+    downloaded: 0,
+    total: 0,
+    speed: 0,
+    etaSeconds: 0,
     error: null,
     canRetry: false,
     needsInstallPermission: false,
@@ -38,6 +55,21 @@ export function useAppUpdater() {
   });
   const checkedRef = useRef(false);
   const downloadingRef = useRef(false);
+  const samplesRef = useRef<Sample[]>([]);
+  const cancelRef = useRef(false);
+
+  const estimateSpeed = useCallback((downloaded: number): number => {
+    const now = Date.now();
+    const samples = samplesRef.current;
+    samples.push({ t: now, downloaded });
+    while (samples.length > 1 && now - samples[0].t > 10000) samples.shift();
+    if (samples.length < 2) return 0;
+    const first = samples[0];
+    const dt = (now - first.t) / 1000;
+    const db = downloaded - first.downloaded;
+    if (dt <= 0) return 0;
+    return db / dt;
+  }, []);
 
   const check = useCallback(async () => {
     if (!isNativeApp || checkedRef.current) return;
@@ -57,7 +89,12 @@ export function useAppUpdater() {
           available: latest,
           checking: false,
           downloading: false,
+          verifying: false,
           progress: 0,
+          downloaded: 0,
+          total: 0,
+          speed: 0,
+          etaSeconds: 0,
           error: null,
           canRetry: false,
           needsInstallPermission: !allowed,
@@ -83,13 +120,13 @@ export function useAppUpdater() {
     if (!isNativeApp) return;
     const onVisible = async () => {
       if (document.visibilityState !== 'visible') return;
-      if (!state.available || downloadingRef.current) return;
+      if (!state.available || downloadingRef.current || state.verifying) return;
       const allowed = await canInstallPackages();
       setState((s) => (s.needsInstallPermission === !allowed ? s : { ...s, needsInstallPermission: !allowed }));
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [state.available]);
+  }, [state.available, state.verifying]);
 
   const startUpdate = useCallback(async () => {
     if (!state.available || downloadingRef.current) return;
@@ -107,38 +144,85 @@ export function useAppUpdater() {
     }
     setState((s) => ({ ...s, needsInstallPermission: false }));
     downloadingRef.current = true;
-    setState((s) => ({ ...s, downloading: true, progress: 0, error: null, canRetry: false }));
+    cancelRef.current = false;
+    samplesRef.current = [];
+    setState((s) => ({
+      ...s,
+      downloading: true,
+      verifying: false,
+      progress: 0,
+      downloaded: 0,
+      total: 0,
+      speed: 0,
+      etaSeconds: 0,
+      error: null,
+      canRetry: false,
+    }));
     try {
       const res = await downloadAndInstallApk(
         state.available.apkUrl,
         { sha256: state.available.sha256, size: state.available.size },
         (p: UpdateProgress) => {
-          setState((s) => ({ ...s, progress: Math.max(0, p.progress) }));
+          const dl = p.downloaded || 0;
+          const total = p.total || 0;
+          const speed = estimateSpeed(dl);
+          const remaining = speed > 0 && total > 0 ? (total - dl) / speed : 0;
+          setState((s) => ({
+            ...s,
+            progress: typeof p.progress === 'number' ? p.progress : s.progress,
+            downloaded: dl,
+            total,
+            speed,
+            etaSeconds: remaining > 0 ? remaining : 0,
+          }));
         }
       );
-      // Install intent launched by the native side. The APK is intentionally
-      // NOT deleted here: deleting too early can fail the install on some
-      // devices. Stale APKs are cleaned on next app launch instead.
-      // Report the successful install to the operator (who updated / who didn't).
+      // Native side verified SHA-256 + signature and launched the install intent.
+      // Show the verification stage briefly before closing the modal.
+      setState((s) => ({ ...s, downloading: false, verifying: true, progress: 100 }));
+      await new Promise((r) => setTimeout(r, 1400));
       if (res.installed) {
         await reportInstall(state.available);
       }
-      setState((s) => ({ ...s, downloading: false, showModal: false, canRetry: false }));
+      setState((s) => ({ ...s, verifying: false, showModal: false, canRetry: false }));
     } catch (err: any) {
       downloadingRef.current = false;
+      if (cancelRef.current) {
+        // User cancelled — keep the (required) modal open, allow restart.
+        setState((s) => ({
+          ...s,
+          downloading: false,
+          verifying: false,
+          progress: 0,
+          downloaded: 0,
+          total: 0,
+          speed: 0,
+          etaSeconds: 0,
+          error: null,
+          canRetry: false,
+        }));
+        return;
+      }
       const message = err?.message || 'فشل تنزيل التحديث. حاول مرة أخرى.';
       // Integrity errors (tampered/corrupt) must NOT offer a retry.
       const retry = !isIntegrityError(message);
       setState((s) => ({
         ...s,
         downloading: false,
+        verifying: false,
         error: message,
         canRetry: retry,
       }));
     } finally {
       downloadingRef.current = false;
     }
-  }, [state.available, state.needsInstallPermission]);
+  }, [state.available, state.needsInstallPermission, estimateSpeed]);
+
+  const cancel = useCallback(async () => {
+    cancelRef.current = true;
+    downloadingRef.current = false;
+    await cancelDownloadApk();
+  }, []);
 
   const dismiss = useCallback(() => {
     if (state.available?.required) return; // required updates cannot be dismissed
@@ -148,6 +232,7 @@ export function useAppUpdater() {
   return {
     ...state,
     startUpdate,
+    cancel,
     dismiss,
     recheckPermission: check,
   };

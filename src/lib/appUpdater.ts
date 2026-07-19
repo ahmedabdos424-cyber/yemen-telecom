@@ -214,4 +214,16 @@ export async function deleteDownloadedApk(path?: string): Promise<boolean> {
   }
 }
 
+// Cancels an in-progress download (native DownloadManager removal). The required
+// update screen stays open — the user can start the download again.
+export async function cancelDownloadApk(): Promise<boolean> {
+  if (!isNative) return false;
+  try {
+    const r = await callNative<{ cancelled: boolean }>('cancelDownload');
+    return !!r.cancelled;
+  } catch {
+    return false;
+  }
+}
+
 export const isNativeApp = isNative;
