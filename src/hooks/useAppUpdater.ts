@@ -57,6 +57,7 @@ export function useAppUpdater() {
   const downloadingRef = useRef(false);
   const samplesRef = useRef<Sample[]>([]);
   const cancelRef = useRef(false);
+  const startUpdateRef = useRef<() => void>(() => {});
 
   const estimateSpeed = useCallback((downloaded: number): number => {
     const now = Date.now();
@@ -114,15 +115,22 @@ export function useAppUpdater() {
   }, [check]);
 
   // Re-verify install permission when the user returns from the OS settings
-  // screen (where they grant "install from unknown sources"). This flips
-  // needsInstallPermission off so the modal's main button starts the download.
+  // screen (where they grant "install from unknown sources"). If the user
+  // granted it, we flip needsInstallPermission off AND start the download
+  // automatically — the user never has to tap again.
   useEffect(() => {
     if (!isNativeApp) return;
     const onVisible = async () => {
       if (document.visibilityState !== 'visible') return;
       if (!state.available || downloadingRef.current || state.verifying) return;
       const allowed = await canInstallPackages();
-      setState((s) => (s.needsInstallPermission === !allowed ? s : { ...s, needsInstallPermission: !allowed }));
+      if (allowed) {
+        setState((s) => (s.needsInstallPermission ? { ...s, needsInstallPermission: false } : s));
+        // Auto-resume: begin the download immediately.
+        startUpdateRef.current();
+      } else {
+        setState((s) => (!s.needsInstallPermission ? { ...s, needsInstallPermission: true } : s));
+      }
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
@@ -217,6 +225,12 @@ export function useAppUpdater() {
       downloadingRef.current = false;
     }
   }, [state.available, state.needsInstallPermission, estimateSpeed]);
+
+  // Keep a stable ref so the visibilitychange auto-resume always calls the
+  // latest startUpdate without re-subscribing the listener.
+  useEffect(() => {
+    startUpdateRef.current = startUpdate;
+  }, [startUpdate]);
 
   const cancel = useCallback(async () => {
     cancelRef.current = true;
