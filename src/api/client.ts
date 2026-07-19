@@ -27,12 +27,37 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, retries 
   throw lastErr instanceof Error ? lastErr : new Error('Network request failed');
 }
 
-const isCapacitor = !!(window as unknown as { Capacitor?: { isNative?: boolean } }).Capacitor?.isNative;
 const hostname = window.location.hostname;
 const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('10.') || hostname.startsWith('192.168.');
-const API_BASE = isCapacitor
-  ? 'https://yemen-telecom.onrender.com/api'
-  : (import.meta.env.DEV || isLocal ? '/api' : 'https://yemen-telecom.onrender.com/api');
+
+function detectCapacitor(): boolean {
+  try {
+    return !!(window as unknown as { Capacitor?: { isNative?: boolean } }).Capacitor?.isNative;
+  } catch {
+    return false;
+  }
+}
+
+// Resolve the API base URL for every request rather than once at module load.
+// In the Capacitor WebView the page origin is https://localhost but the API is
+// served from yemen-telecom.onrender.com. If window.Capacitor is not yet injected
+// (timing) we still must target the real API host, so any localhost origin inside
+// the packaged app resolves to the production API. The dev server (Vite proxy)
+// keeps the relative '/api' path.
+const PROD_API = 'https://yemen-telecom.onrender.com/api';
+function resolveApiBase(): string {
+  if (import.meta.env.DEV) return '/api';
+  if (detectCapacitor()) return PROD_API;
+  if (isLocal) {
+    // Inside the native WebView (androidScheme https) the origin is localhost but
+    // there is no local server, so always use the production API.
+    return PROD_API;
+  }
+  return PROD_API;
+}
+
+const isCapacitor = detectCapacitor();
+const API_BASE = resolveApiBase();
 
 const CREDENTIALS_MODE: RequestCredentials = isCapacitor ? 'omit' : 'include';
 
