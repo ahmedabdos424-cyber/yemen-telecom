@@ -156,9 +156,16 @@ export async function canInstallPackages(): Promise<boolean> {
   }
 }
 
-export async function openInstallSettings(): Promise<void> {
-  if (!isNative) return;
-  await callNative('openInstallSettings');
+export async function openInstallSettings(): Promise<boolean> {
+  if (!isNative) return false;
+  try {
+    const r = await callNative<{ launched?: boolean }>('openInstallSettings');
+    return !!r.launched;
+  } catch {
+    // Native call itself failed (e.g. ActivityNotFoundException propagated before
+    // the try/catch was added). Treat as "not launched" so the UI can inform the user.
+    return false;
+  }
 }
 
 // Downloads the APK via the native plugin and streams progress through onProgress.

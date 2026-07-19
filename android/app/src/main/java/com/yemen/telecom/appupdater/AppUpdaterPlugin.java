@@ -11,6 +11,7 @@ import android.content.pm.Signature;
 import android.content.pm.SigningInfo;
 import android.net.Uri;
 import android.os.Build;
+import android.util.Log;
 
 import androidx.core.content.FileProvider;
 
@@ -127,6 +128,9 @@ public class AppUpdaterPlugin extends Plugin {
         watchdog = Executors.newSingleThreadScheduledExecutor();
         watchdog.schedule(() -> {
             if (downloadId == -1) return;
+            // A PAUSED transfer (e.g. network dropped) is not a hung connection:
+            // DownloadManager resumes it automatically, so never time it out.
+            if (queryStatus() == DownloadManager.STATUS_PAUSED) return;
             long idle = System.currentTimeMillis() - lastProgressTs;
             if (idle >= DOWNLOAD_TIMEOUT_MS) {
                 cancelDownload();
@@ -172,12 +176,24 @@ public class AppUpdaterPlugin extends Plugin {
                     emitProgress(100, queryDownloaded(), queryTotal());
                     break;
                 } else if (status == DownloadManager.STATUS_FAILED) {
-                    emitProgress(-1, queryDownloaded(), queryTotal());
+                    emitProgress(0, queryDownloaded(), queryTotal());
                     finalizeCallWithError("فشل تنزيل التحديث.");
                     return;
+                } else if (status == DownloadManager.STATUS_PAUSED) {
+                    // DownloadManager is legitimately waiting (network dropped, metered
+                    // policy, etc.) and will RESUME automatically when conditions return.
+                    // Do NOT advance lastProgressTs here — but also do NOT treat this as a
+                    // dead connection that should time out: the watchdog only fires after a
+                    // long idle while RUNNING, so a paused download is left alone to resume.
+                    long downloaded = queryDownloaded();
+                    long total = queryTotal();
+                    emitProgress(total > 0 ? (int) ((downloaded * 100) / total) : 0, downloaded, total);
                 } else if (status == DownloadManager.STATUS_PENDING || status == DownloadManager.STATUS_RUNNING) {
                     long downloaded = queryDownloaded();
                     long total = queryTotal();
+                    // Only bump the watchdog timer when bytes are actually moving, so a
+                    // momentary stall within an active transfer is tolerated, while a truly
+                    // hung connection (no bytes for DOWNLOAD_TIMEOUT_MS) is aborted.
                     if (downloaded > 0) lastProgressTs = System.currentTimeMillis();
                     emitProgress(total > 0 ? (int) ((downloaded * 100) / total) : 0, downloaded, total);
                 }
@@ -399,13 +415,48 @@ public class AppUpdaterPlugin extends Plugin {
 
     @PluginMethod
     public void openInstallSettings(PluginCall call) {
+        boolean launched = false;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Intent intent = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
-            intent.setData(Uri.parse("package:" + getContext().getPackageName()));
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            getContext().startActivity(intent);
+            try {
+                Intent intent = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
+                intent.setData(Uri.parse("package:" + getContext().getPackageName()));
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(intent);
+                launched = true;
+            } catch (Exception e) {
+                // No Activity matched ACTION_MANAGE_UNKNOWN_APP_SOURCES on this device
+                // (restricted OEM ROM, managed device, etc.). Log it and fall back to
+                // the generic "install unknown apps" settings page.
+                Log.e("AppUpdater", "openInstallSettings: cannot open app-specific unknown-sources settings", e);
+            }
         }
-        call.resolve();
+        // Fallback: open the general "install other apps" list (older Android, or when
+        // the app-specific screen is unavailable). Still app-centric where supported.
+        if (!launched) {
+            try {
+                Intent fallback = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
+                fallback.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(fallback);
+                launched = true;
+            } catch (Exception e) {
+                Log.e("AppUpdater", "openInstallSettings: fallback also failed", e);
+            }
+        }
+        if (!launched) {
+            // Last resort: general security settings. The user may still grant the
+            // permission manually; we surface a clear message on the JS side.
+            try {
+                Intent last = new Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS);
+                last.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(last);
+                launched = true;
+            } catch (Exception e) {
+                Log.e("AppUpdater", "openInstallSettings: all fallbacks failed", e);
+            }
+        }
+        JSObject ret = new JSObject();
+        ret.put("launched", launched);
+        call.resolve(ret);
     }
 
     @Override

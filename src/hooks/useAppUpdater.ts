@@ -141,7 +141,18 @@ export function useAppUpdater() {
     // Re-check install permission in case the user just granted it.
     const allowed = await canInstallPackages();
     if (!allowed) {
-      await openInstallSettings();
+      const launched = await openInstallSettings();
+      if (!launched) {
+        // No settings screen could be opened (restricted device). Tell the user
+        // clearly instead of leaving them stuck on the modal with no path forward.
+        setState((s) => ({
+          ...s,
+          needsInstallPermission: true,
+          error: 'تعذّر فتح إعدادات التثبيت تلقائياً. يرجى فتح إعدادات جهازك > التطبيقات > يمن تيليكوم، ثم فعّل «تثبيت التطبيقات غير المعروفة» يدوياً.',
+          canRetry: false,
+        }));
+        return;
+      }
       // Re-verify after the user returns from settings; if they granted it,
       // proceed straight to download instead of looping back to settings.
       const reAllowed = await canInstallPackages();
