@@ -249,10 +249,6 @@ function AuthenticatedApp() {
             </>
           )}
         </AnimatePresence>
-
-        <div className="fixed bottom-4 left-4 z-50">
-          <button onClick={handleLogout} className="px-4 py-2 bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-lg">تسجيل الخروج</button>
-        </div>
       </>
       )}
     </div>
@@ -273,39 +269,30 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      {/* Block app entry while a REQUIRED update is pending. The user cannot
-          bypass it — they must update before using the app. */}
-      {updater.available?.required && updater.showModal ? (
+      {/* Block app entry while an update is available — the user must update
+          before using the app. The modal is full-screen and not dismissable. */}
+      {updater.showModal && updater.available ? (
         <UpdateModal
           open={updater.showModal}
           info={updater.available}
           downloading={updater.downloading}
+          verifying={updater.verifying}
           progress={updater.progress}
+          downloaded={updater.downloaded}
+          total={updater.total}
+          speed={updater.speed}
+          etaSeconds={updater.etaSeconds}
           error={updater.error}
           needsInstallPermission={updater.needsInstallPermission}
           canRetry={updater.canRetry}
-          required={true}
+          required={!!updater.available?.required}
           onUpdate={updater.startUpdate}
           onDismiss={updater.dismiss}
           onOpenSettings={updater.startUpdate}
+          onCancel={updater.cancel}
         />
       ) : (
-        <>
-          <AuthenticatedApp />
-          <UpdateModal
-            open={updater.showModal}
-            info={updater.available}
-            downloading={updater.downloading}
-            progress={updater.progress}
-            error={updater.error}
-            needsInstallPermission={updater.needsInstallPermission}
-            canRetry={updater.canRetry}
-            required={!!updater.available?.required}
-            onUpdate={updater.startUpdate}
-            onDismiss={updater.dismiss}
-            onOpenSettings={updater.startUpdate}
-          />
-        </>
+        <AuthenticatedApp />
       )}
     </ErrorBoundary>
   );
