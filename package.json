@@ -37,9 +37,9 @@
     "html5-qrcode": "^2.3.8",
     "lucide-react": "^0.546.0",
     "motion": "12.42.0",
-    "react": "19.2.7",
-    "react-dom": "19.2.7",
-    "react-router-dom": "^7.18.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-router-dom": "^7.18.1",
     "sharp": "^0.34.5",
     "tesseract.js": "^7.0.0",
     "uuid": "14.0.1"
