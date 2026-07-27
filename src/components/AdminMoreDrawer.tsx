@@ -85,6 +85,9 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
         transition={{ type: 'spring', damping: 28, stiffness: 300 }}
         className="bottom-sheet z-[101] md:!relative md:!rounded-2xl md:max-w-lg lg:max-w-2xl md:mx-auto md:my-auto md:max-h-[85vh]"
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="الخيارات الإدارية"
       >
         <div className="bottom-sheet-drag md:hidden" />
         <div className="bottom-sheet-header">
@@ -187,6 +190,9 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
             transition={{ type: 'spring', damping: 28, stiffness: 300 }}
             className="bottom-sheet z-[111] md:!relative md:!rounded-2xl md:max-w-2xl md:mx-auto md:my-auto md:max-h-[85vh]"
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="الشاشة الفرعية"
           >
             <div className="bottom-sheet-drag md:hidden" />
             <div className="bottom-sheet-header">
@@ -322,7 +328,7 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
       </AnimatePresence>
 
       {showLogOutDialog && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[120] flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[120] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="تأكيد تسجيل الخروج">
           <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="card-enhanced max-w-sm w-full p-6 space-y-4">
             <div className="flex items-center gap-2.5 text-red-500">
               <span className="material-symbols-outlined text-2xl font-bold">warning</span>

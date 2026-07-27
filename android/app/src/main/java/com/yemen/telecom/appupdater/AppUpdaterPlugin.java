@@ -427,7 +427,7 @@ public class AppUpdaterPlugin extends Plugin {
                 // No Activity matched ACTION_MANAGE_UNKNOWN_APP_SOURCES on this device
                 // (restricted OEM ROM, managed device, etc.). Log it and fall back to
                 // the generic "install unknown apps" settings page.
-                Log.e("AppUpdater", "openInstallSettings: cannot open app-specific unknown-sources settings", e);
+                Log.w("AppUpdater", "openInstallSettings: cannot open app-specific unknown-sources settings", e);
             }
         }
         // Fallback: open the general "install other apps" list (older Android, or when
@@ -439,7 +439,7 @@ public class AppUpdaterPlugin extends Plugin {
                 getContext().startActivity(fallback);
                 launched = true;
             } catch (Exception e) {
-                Log.e("AppUpdater", "openInstallSettings: fallback also failed", e);
+                Log.w("AppUpdater", "openInstallSettings: fallback also failed", e);
             }
         }
         if (!launched) {
@@ -451,7 +451,7 @@ public class AppUpdaterPlugin extends Plugin {
                 getContext().startActivity(last);
                 launched = true;
             } catch (Exception e) {
-                Log.e("AppUpdater", "openInstallSettings: all fallbacks failed", e);
+                Log.w("AppUpdater", "openInstallSettings: all fallbacks failed", e);
             }
         }
         JSObject ret = new JSObject();

@@ -155,7 +155,7 @@ export default function SellerDashboard({
       {/* Settings Modal ("إعدادات الحساب") */}
       <AnimatePresence>
         {settingsOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="إعدادات الحساب">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -446,7 +446,7 @@ export default function SellerDashboard({
       {/* Logout Confirmation Dialog */}
       <AnimatePresence>
         {logoutConfirmOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="تسجيل الخروج">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -514,7 +514,7 @@ export default function SellerDashboard({
       {/* Password Change Form Modal ("تغيير كلمة المرور") */}
       <AnimatePresence>
         {passwordOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="تغيير كلمة المرور">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

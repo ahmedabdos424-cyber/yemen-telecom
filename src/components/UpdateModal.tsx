@@ -70,16 +70,17 @@ export default function UpdateModal({
   return (
     <AnimatePresence>
       {open && info && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center font-sans bg-[#0a0e1a]">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center font-sans bg-[#0a0e1a]" role="dialog" aria-modal="true" aria-label="تحديث التطبيق">
           <motion.div
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
-            className="relative w-full h-full max-w-md mx-auto flex flex-col bg-[#0a0e1a] text-right text-slate-200 overflow-y-auto"
+            className="relative w-full min-h-dvh max-w-md mx-auto flex flex-col bg-[#0a0e1a] text-right text-slate-200 overflow-y-auto"
             dir="rtl"
+            style={{ willChange: 'transform' }}
           >
             {/* Header */}
-            <div className="pt-12 pb-6 px-6 flex flex-col items-center text-center">
+            <div className="pt-[calc(3rem+env(safe-area-inset-top))] pb-6 px-6 flex flex-col items-center text-center">
               <div className="w-16 h-16 rounded-[22px] bg-red-600/10 border border-red-500/20 flex items-center justify-center text-red-500 mb-4">
                 <Lock size={30} />
               </div>
@@ -113,7 +114,7 @@ export default function UpdateModal({
 
             {/* Install permission notice */}
             {needsInstallPermission && !downloading && !verifying && (
-              <div className="px-6 mb-4">
+              <div className="px-6 mb-4" role="status">
                 <div className="p-3 rounded-2xl bg-amber-950/30 border border-amber-900/40 flex items-start gap-2">
                   <AlertTriangle size={16} className="text-amber-400 mt-0.5 shrink-0" />
                   <p className="text-[11px] text-amber-300 leading-relaxed">
@@ -125,7 +126,7 @@ export default function UpdateModal({
 
             {/* Error notice */}
             {error && !downloading && !verifying && (
-              <div className="px-6 mb-4">
+              <div className="px-6 mb-4" role="alert">
                 <div className="p-3 rounded-2xl bg-red-950/30 border border-red-900/40 flex items-start gap-2">
                   <AlertTriangle size={16} className="text-red-400 mt-0.5 shrink-0" />
                   <p className="text-[11px] text-red-300 leading-relaxed">{error}</p>
@@ -144,7 +145,12 @@ export default function UpdateModal({
                       {verifying ? '100%' : `${progress}%`}
                     </span>
                   </div>
-                  <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                  <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden"
+                    role="progressbar"
+                    aria-valuenow={verifying ? 100 : progress}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={verifying ? 'جارٍ التحقق من التحديث' : 'تقدم تنزيل التحديث'}>
                     <motion.div
                       className="h-full bg-gradient-to-l from-emerald-500 to-emerald-400 rounded-full"
                       animate={{ width: `${verifying ? 100 : progress}%` }}
@@ -192,7 +198,7 @@ export default function UpdateModal({
             </div>
 
             {/* Actions (always at the bottom, full-screen modal) */}
-            <div className="mt-auto px-6 pb-10 pt-2 flex flex-col gap-2">
+            <div className="mt-auto px-6 pb-[calc(2.5rem+env(safe-area-inset-bottom))] pt-2 flex flex-col gap-2">
               {needsInstallPermission && !downloading && !verifying && (
                 <button
                   type="button"
@@ -240,7 +246,7 @@ export default function UpdateModal({
                 <button
                   type="button"
                   onClick={onDismiss}
-                  className="w-full py-3 text-slate-400 hover:text-slate-200 font-medium text-xs rounded-xl transition-all"
+                  className="w-full py-3.5 text-slate-400 hover:text-slate-200 font-medium text-xs rounded-xl transition-all"
                 >
                   لاحقاً
                 </button>

@@ -313,7 +313,7 @@ export default function AgentProfileView({
       {/* Change Password Modal */}
       <AnimatePresence>
         {passwordModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="تغيير كلمة المرور">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -455,7 +455,7 @@ export default function AgentProfileView({
       {/* Logout Confirmation Dialog */}
       <AnimatePresence>
         {logoutConfirmOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="تسجيل الخروج">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -513,7 +513,7 @@ export default function AgentProfileView({
       {/* Delete Account Confirmation Dialog */}
       <AnimatePresence>
         {deleteConfirmOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="حذف الحساب">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
