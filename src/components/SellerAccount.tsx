@@ -318,7 +318,7 @@ export default function SellerAccount({
       {/* Logout Confirmation */}
       <AnimatePresence>
         {logoutConfirmOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="تسجيل الخروج">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -376,7 +376,7 @@ export default function SellerAccount({
       {/* Password Change Modal */}
       <AnimatePresence>
         {passwordOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="تغيير كلمة المرور">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -473,7 +473,7 @@ export default function SellerAccount({
       {/* Settings Modal */}
       <AnimatePresence>
         {settingsOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="إعدادات الحساب">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -707,7 +707,7 @@ export default function SellerAccount({
       {/* Settings Logout Confirmation */}
       <AnimatePresence>
         {settingsLogoutConfirmOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="تسجيل الخروج">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -760,7 +760,7 @@ export default function SellerAccount({
       {/* Delete Account Confirmation */}
       <AnimatePresence>
         {deleteConfirmOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="حذف الحساب">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

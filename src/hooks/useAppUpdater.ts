@@ -58,6 +58,7 @@ export function useAppUpdater() {
   const samplesRef = useRef<Sample[]>([]);
   const cancelRef = useRef(false);
   const startUpdateRef = useRef<() => void>(() => {});
+  const visibilityGuardRef = useRef(false);
 
   const estimateSpeed = useCallback((downloaded: number): number => {
     const now = Date.now();
@@ -123,6 +124,8 @@ export function useAppUpdater() {
     const onVisible = async () => {
       if (document.visibilityState !== 'visible') return;
       if (!state.available || downloadingRef.current || state.verifying) return;
+      if (visibilityGuardRef.current) return;
+      visibilityGuardRef.current = true;
       const allowed = await canInstallPackages();
       if (allowed) {
         setState((s) => (s.needsInstallPermission ? { ...s, needsInstallPermission: false } : s));
@@ -131,6 +134,7 @@ export function useAppUpdater() {
       } else {
         setState((s) => (!s.needsInstallPermission ? { ...s, needsInstallPermission: true } : s));
       }
+      setTimeout(() => { visibilityGuardRef.current = false; }, 1000);
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);

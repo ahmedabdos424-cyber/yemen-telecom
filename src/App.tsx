@@ -168,7 +168,7 @@ function AuthenticatedApp() {
         onDeleteSeller: agt.handleDeleteSellerForAgent,
         onUpdateInventories: agt.handleUpdateInventories,
         operations: agt.operations,
-        username, onLogout: () => {}, onConfirmLogout: handleLogout,
+        username, onLogout: handleLogout, onConfirmLogout: handleLogout,
         darkMode, setDarkMode,
       };
       return (
@@ -186,10 +186,10 @@ function AuthenticatedApp() {
       const sellerOnUpdateSims = (updated: any[]) => agt.handleUpdateSimsForSeller(updated as any);
       return (
         <Routes>
-          <Route path="/seller/home" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? []).filter(s => s.status === 'available')} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={() => {}} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} onUpdateSims={sellerOnUpdateSims} />} />
+          <Route path="/seller/home" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? []).filter(s => s.status === 'available')} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={handleLogout} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} onUpdateSims={sellerOnUpdateSims} />} />
           <Route path="/seller/activate" element={<ActivateSimForm onSimActivated={agt.handleSimActivationForSeller} />} />
-          <Route path="/seller/my-sims" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? [])} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={() => {}} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} onUpdateSims={sellerOnUpdateSims} />} />
-          <Route path="/seller/account" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? [])} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={() => {}} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} onUpdateSims={sellerOnUpdateSims} />} />
+          <Route path="/seller/my-sims" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? [])} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={handleLogout} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} onUpdateSims={sellerOnUpdateSims} />} />
+          <Route path="/seller/account" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? [])} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={handleLogout} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} onUpdateSims={sellerOnUpdateSims} />} />
           <Route path="*" element={<Navigate to="/seller/home" replace />} />
         </Routes>
       );
@@ -198,12 +198,12 @@ function AuthenticatedApp() {
   };
 
   return (
-    <div className="min-h-screen transition-colors duration-300 font-sans bg-slate-950 text-slate-100">
+    <div className="min-h-dvh transition-colors duration-300 font-sans bg-slate-950 text-slate-100">
       <SharedOfflineBanner />
       {isLoading && !role ? <LoadingScreen /> : (
       <>
         <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:32px_32px] opacity-15 pointer-events-none" />
-        <NavBar role={role} activeTab={agt.activeTab} setActiveTab={(tab) => { agt.handleSetRoleTab(tab); navigate(`/${role}/${tab.replace(/_/g, '-')}`); }} username={username} onLogout={() => {}} />
+        <NavBar role={role} activeTab={agt.activeTab} setActiveTab={(tab) => { agt.handleSetRoleTab(tab); navigate(`/${role}/${tab.replace(/_/g, '-')}`); }} username={username} onLogout={handleLogout} />
         <main className="lg:pr-70 pt-6 pb-[4.5rem] px-3 sm:px-4 md:px-8 max-w-5xl mx-auto relative z-10 transition-all">
           <AnimatePresence mode="wait">
             <motion.div key={agt.activeTab + '_' + role} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.25 }}>
