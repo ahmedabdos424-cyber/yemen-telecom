@@ -24,8 +24,7 @@ const ActivateSimForm = lazy(() => import('./components/ActivateSimForm'));
 import { useAuth } from './hooks/useAuth';
 import { useManagerState } from './hooks/useManagerState';
 import { useAgentSellerState } from './hooks/useAgentSellerState';
-import { useAppUpdater } from './hooks/useAppUpdater';
-import UpdateModal from './components/UpdateModal';
+
 
 const AgentDashboard = lazy(() => import('./components/AgentDashboard'));
 const AgentProfileView = lazy(() => import('./components/agent/AgentProfileView'));
@@ -258,7 +257,6 @@ function AuthenticatedApp() {
 
 export default function App() {
   const [splashDone, setSplashDone] = useState(false);
-  const updater = useAppUpdater();
 
   if (!splashDone) {
     return (
@@ -270,31 +268,7 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      {/* Block app entry while an update is available — the user must update
-          before using the app. The modal is full-screen and not dismissable. */}
-      {updater.showModal && updater.available ? (
-        <UpdateModal
-          open={updater.showModal}
-          info={updater.available}
-          downloading={updater.downloading}
-          verifying={updater.verifying}
-          progress={updater.progress}
-          downloaded={updater.downloaded}
-          total={updater.total}
-          speed={updater.speed}
-          etaSeconds={updater.etaSeconds}
-          error={updater.error}
-          needsInstallPermission={updater.needsInstallPermission}
-          canRetry={updater.canRetry}
-          required={!!updater.available?.required}
-          onUpdate={updater.startUpdate}
-          onDismiss={updater.dismiss}
-          onOpenSettings={updater.startUpdate}
-          onCancel={updater.cancel}
-        />
-      ) : (
-        <AuthenticatedApp />
-      )}
+      <AuthenticatedApp />
     </ErrorBoundary>
   );
 }
