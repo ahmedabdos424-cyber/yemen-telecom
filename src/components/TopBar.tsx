@@ -97,9 +97,14 @@ export default function TopBar({
             )}
           </button>
 
+          {/* Overlay backdrop to close notifications when clicking outside */}
+          {showNotifications && (
+            <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
+          )}
+
           {/* Quick Notification Dropdown */}
           {showNotifications && (
-            <div className="absolute left-0 right-0 sm:left-auto mx-2 sm:mx-0 sm:w-80 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden text-right animate-in fade-in slide-in-from-top-2 duration-150">
+            <div className="absolute left-0 right-0 sm:left-auto sm:-right-2 mx-2 sm:mx-0 sm:w-80 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden text-right animate-in fade-in slide-in-from-top-2 duration-150">
               <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
                 <span className="text-xs bg-red-100 text-red-700 font-bold px-2 py-0.5 rounded-full">
                   {unresolvedAlertsCount} تنبيه نشط
