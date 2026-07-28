@@ -75,7 +75,7 @@ export default function AgentSettingsModal({
                 </div>
                 <button 
                   onClick={() => setSettingsOpen(false)}
-                  className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-800/40 rounded-full transition-colors cursor-pointer"
+                  className="p-2.5 text-slate-500 hover:text-white hover:bg-slate-800/40 rounded-full transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
                   <X size={16} />
                 </button>
@@ -320,7 +320,7 @@ export default function AgentSettingsModal({
                 <button
                   type="button"
                   onClick={() => setLogoutConfirmOpen(false)}
-                  className="p-1 text-slate-500 hover:text-white rounded-full transition-colors cursor-pointer"
+                  className="p-2.5 text-slate-500 hover:text-white rounded-full transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
                   <X size={15} />
                 </button>

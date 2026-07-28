@@ -448,7 +448,7 @@ export default function AgentDashboard({
                 </div>
                 <button 
                   onClick={() => setTransferModalOpen(false)}
-                  className="p-1 text-slate-500 hover:text-slate-100 hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
+                  className="p-2.5 text-slate-500 hover:text-slate-100 hover:bg-slate-800 rounded-full transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
                   <X size={18} />
                 </button>
@@ -609,7 +609,7 @@ export default function AgentDashboard({
                 <h3 className="text-base font-bold text-slate-100">تفاصيل البائع والاعتماد</h3>
                 <button 
                   onClick={() => setSellerDetailsOpen(false)}
-                  className="p-1.5 text-slate-500 hover:text-slate-100 hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
+                  className="p-2.5 text-slate-500 hover:text-slate-100 hover:bg-slate-800 rounded-full transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
                   <X size={18} />
                 </button>
@@ -702,7 +702,7 @@ export default function AgentDashboard({
                 </div>
                 <button 
                   onClick={() => setSellerActionsOpen(false)}
-                  className="p-1.5 text-slate-500 hover:text-slate-100 hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
+                  className="p-2.5 text-slate-500 hover:text-slate-100 hover:bg-slate-800 rounded-full transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
                   <X size={18} />
                 </button>

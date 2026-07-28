@@ -85,7 +85,7 @@ export default function ProfileAvatar({
                 <h3 className="text-sm font-bold text-slate-100">الصورة الشخصية</h3>
                 <button
                   onClick={() => setModalOpen(false)}
-                  className="p-1.5 text-slate-500 hover:text-slate-100 hover:bg-slate-800/40 rounded-full transition-colors"
+                  className="p-2.5 text-slate-500 hover:text-slate-100 hover:bg-slate-800/40 rounded-full transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
                   <X size={16} />
                 </button>

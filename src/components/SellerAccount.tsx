@@ -342,7 +342,7 @@ export default function SellerAccount({
                 </div>
                 <button
                   onClick={() => setLogoutConfirmOpen(false)}
-                  className="p-1 text-slate-500 hover:text-slate-100 rounded-full transition-colors cursor-pointer"
+                  className="p-2.5 text-slate-500 hover:text-slate-100 rounded-full transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
                   <X size={15} />
                 </button>
@@ -400,7 +400,7 @@ export default function SellerAccount({
                 </div>
                 <button
                   onClick={() => setPasswordOpen(false)}
-                  className="p-1.5 text-slate-500 hover:text-slate-100 hover:bg-slate-800/40 rounded-full transition-colors cursor-pointer"
+                  className="p-2.5 text-slate-500 hover:text-slate-100 hover:bg-slate-800/40 rounded-full transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
                   <X size={16} />
                 </button>
@@ -497,7 +497,7 @@ export default function SellerAccount({
                 </div>
                 <button
                   onClick={() => setSettingsOpen(false)}
-                  className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-800/40 rounded-full transition-colors cursor-pointer"
+                  className="p-2.5 text-slate-500 hover:text-white hover:bg-slate-800/40 rounded-full transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
                   <X size={16} />
                 </button>
@@ -731,7 +731,7 @@ export default function SellerAccount({
                 </div>
                 <button
                   onClick={() => setSettingsLogoutConfirmOpen(false)}
-                  className="p-1 text-slate-500 hover:text-slate-100 rounded-full transition-colors cursor-pointer"
+                  className="p-2.5 text-slate-500 hover:text-slate-100 rounded-full transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
                   <X size={15} />
                 </button>
@@ -784,7 +784,7 @@ export default function SellerAccount({
                 </div>
                 <button
                   onClick={() => { if (!deleting) setDeleteConfirmOpen(false); }}
-                  className="p-1 text-slate-500 hover:text-slate-100 rounded-full transition-colors cursor-pointer"
+                  className="p-2.5 text-slate-500 hover:text-slate-100 rounded-full transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
                   disabled={deleting}
                 >
                   <X size={15} />

@@ -518,7 +518,7 @@ function AgentsView({ agents = [], setView, onUpdateAgent }: AgentsViewProps) {
               <button
                 type="button"
                 onClick={() => setSearchTerm('')}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center"
               >
                 <span className="material-symbols-outlined text-sm">close</span>
               </button>
@@ -720,7 +720,7 @@ function AgentsView({ agents = [], setView, onUpdateAgent }: AgentsViewProps) {
               </div>
               <button
                 onClick={() => setShowPrintModal(false)}
-                className="p-1 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors cursor-pointer"
+                className="p-2.5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
               >
                 <span className="material-symbols-outlined text-lg">close</span>
               </button>

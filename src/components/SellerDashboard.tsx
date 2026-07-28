@@ -179,7 +179,7 @@ export default function SellerDashboard({
                 </div>
                 <button 
                   onClick={() => setSettingsOpen(false)}
-                  className="p-1.5 text-slate-500 hover:text-slate-100 hover:bg-slate-800/40 rounded-full transition-colors cursor-pointer"
+                  className="p-2.5 text-slate-500 hover:text-slate-100 hover:bg-slate-800/40 rounded-full transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
                   <X size={16} />
                 </button>
@@ -471,7 +471,7 @@ export default function SellerDashboard({
                 </div>
                 <button
                   onClick={() => setLogoutConfirmOpen(false)}
-                  className="p-1 text-slate-500 hover:text-slate-100 rounded-full transition-colors cursor-pointer"
+                  className="p-2.5 text-slate-500 hover:text-slate-100 rounded-full transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
                   <span className="material-symbols-outlined text-sm">close</span>
                 </button>
@@ -532,7 +532,7 @@ export default function SellerDashboard({
                 <h3 className="text-sm font-bold text-slate-100">تغيير كلمة المرور</h3>
                 <button 
                   onClick={() => setPasswordOpen(false)}
-                  className="p-1 text-slate-500 hover:text-slate-100 rounded-full transition-colors cursor-pointer"
+                  className="p-2.5 text-slate-500 hover:text-slate-100 rounded-full transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
                   <X size={16} />
                 </button>

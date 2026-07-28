@@ -431,7 +431,7 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
           <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-xl w-full sm:max-w-md overflow-hidden text-right leading-relaxed animate-in fade-in slide-in-from-bottom duration-200 sm:zoom-in-95 sm:duration-150">
             <div className="hidden sm:block bottom-sheet-drag mx-auto mb-2 mt-2" />
             <div className="px-4 md:px-5 py-3 md:py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-              <button onClick={() => setShowAddBalanceModal(false)} className="text-gray-400 hover:text-gray-700">
+              <button onClick={() => setShowAddBalanceModal(false)} className="p-2.5 text-gray-400 hover:text-gray-700 min-w-[44px] min-h-[44px] flex items-center justify-center">
                 <span className="material-symbols-outlined text-lg">close</span>
               </button>
               <h3 className="font-bold text-sm text-gray-800">شحن رصيد لوكيل التوزيع</h3>
@@ -459,7 +459,7 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
                   <div className="mt-2 flex items-center gap-2 p-2 bg-emerald-50 border border-emerald-150 rounded-lg">
                     <img src={invoiceImageUrl} alt="فاتورة الشحن" className="w-12 h-12 object-cover rounded" />
                     <span className="text-[11px] text-emerald-800 font-semibold flex-1">تم إرفاق صورة الفاتورة وستُحفظ مع العملية.</span>
-                    <button type="button" onClick={() => setInvoiceImageUrl(null)} className="text-emerald-700 hover:text-emerald-900" title="إزالة">
+                    <button type="button" onClick={() => setInvoiceImageUrl(null)} className="p-2.5 text-emerald-700 hover:text-emerald-900 min-w-[44px] min-h-[44px] flex items-center justify-center" title="إزالة">
                       <span className="material-symbols-outlined text-sm">close</span>
                     </button>
                   </div>

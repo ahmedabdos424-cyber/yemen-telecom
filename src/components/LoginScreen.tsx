@@ -248,7 +248,7 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
                   <button
                     type="button"
                     onClick={() => { setUsername(''); setErrorMsg(''); setFieldError(null); passwordRef.current?.focus(); }}
-                    className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors p-1 cursor-pointer ${darkMode ? 'text-white/20 hover:text-white/50' : 'text-gray-300 hover:text-gray-500'}`}
+                    className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors p-2.5 cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center ${darkMode ? 'text-white/20 hover:text-white/50' : 'text-gray-300 hover:text-gray-500'}`}
                     tabIndex={-1}
                     aria-label="مسح"
                   >

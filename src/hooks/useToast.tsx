@@ -40,7 +40,7 @@ export function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismi
                 <span className="material-symbols-outlined text-sm">{icons[toast.type]}</span>
                 <span>{toast.title}</span>
               </div>
-              <button onClick={() => onDismiss(toast.id)} className="text-slate-500 hover:text-slate-100 transition-colors cursor-pointer p-1">
+              <button onClick={() => onDismiss(toast.id)} className="text-slate-500 hover:text-slate-100 transition-colors cursor-pointer p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center">
                 <span className="material-symbols-outlined text-xs">close</span>
               </button>
             </div>
