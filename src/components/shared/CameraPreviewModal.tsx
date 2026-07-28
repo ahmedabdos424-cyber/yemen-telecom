@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Check, RefreshCw, X, Camera, Zap, ZapOff } from 'lucide-react';
+import { Check, RefreshCw, X, Camera, Loader } from 'lucide-react';
 
 interface CameraPreviewModalProps {
   show: boolean;
@@ -11,6 +11,7 @@ interface CameraPreviewModalProps {
   onConfirm: () => void;
   onRetake: () => void;
   onCancel: () => void;
+  processing?: boolean;
 }
 
 export default function CameraPreviewModal({
@@ -22,6 +23,7 @@ export default function CameraPreviewModal({
   onConfirm,
   onRetake,
   onCancel,
+  processing = false,
 }: CameraPreviewModalProps) {
   const [flash, setFlash] = useState(false);
 
@@ -45,7 +47,7 @@ export default function CameraPreviewModal({
             </button>
             <div className="flex items-center gap-2">
               <span className="text-white/80 text-xs font-medium">
-                {previewImage ? 'معاينة الصورة' : 'كاميرا التصوير'}
+                {processing ? 'جارٍ معالجة الصورة...' : previewImage ? 'معاينة الصورة' : 'كاميرا التصوير'}
               </span>
             </div>
             <div className="w-10" />
@@ -63,6 +65,21 @@ export default function CameraPreviewModal({
                   transition={{ duration: 0.3 }}
                   className="absolute inset-0 z-20 bg-white pointer-events-none"
                 />
+              )}
+            </AnimatePresence>
+
+            {/* Processing overlay */}
+            <AnimatePresence>
+              {processing && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 z-30 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center gap-3"
+                >
+                  <Loader size={32} className="text-white animate-spin" />
+                  <span className="text-white/80 text-sm font-medium">جارٍ معالجة الصورة...</span>
+                </motion.div>
               )}
             </AnimatePresence>
 
@@ -98,7 +115,8 @@ export default function CameraPreviewModal({
                 <button
                   type="button"
                   onClick={onRetake}
-                  className="flex-1 h-14 flex items-center justify-center gap-2 bg-white/10 backdrop-blur-sm hover:bg-white/20 active:bg-white/30 text-white text-sm font-bold rounded-2xl transition-all active:scale-[0.97]"
+                  disabled={processing}
+                  className="flex-1 h-14 flex items-center justify-center gap-2 bg-white/10 backdrop-blur-sm hover:bg-white/20 active:bg-white/30 text-white text-sm font-bold rounded-2xl transition-all active:scale-[0.97] disabled:opacity-50"
                 >
                   <RefreshCw size={18} />
                   إعادة التقاط
@@ -106,10 +124,15 @@ export default function CameraPreviewModal({
                 <button
                   type="button"
                   onClick={onConfirm}
-                  className="flex-[2] h-14 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-sm font-bold rounded-2xl transition-all active:scale-[0.97] shadow-lg shadow-emerald-600/30"
+                  disabled={processing}
+                  className="flex-[2] h-14 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-sm font-bold rounded-2xl transition-all active:scale-[0.97] shadow-lg shadow-emerald-600/30 disabled:opacity-50"
                 >
-                  <Check size={20} strokeWidth={3} />
-                  موافقة واستخدام الصورة
+                  {processing ? (
+                    <Loader size={20} className="animate-spin" />
+                  ) : (
+                    <Check size={20} strokeWidth={3} />
+                  )}
+                  {processing ? 'جارٍ المعالجة...' : 'موافقة واستخدام الصورة'}
                 </button>
               </div>
             ) : (

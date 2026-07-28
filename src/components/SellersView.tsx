@@ -101,10 +101,19 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
     if (camVideoRef.current && camCanvasRef.current) {
       const v = camVideoRef.current;
       const c = camCanvasRef.current;
-      c.width = Math.min(v.videoWidth, 1920);
-      c.height = Math.min(v.videoHeight, 1920);
-      c.getContext('2d')?.drawImage(v, 0, 0);
-      setCamPreview(c.toDataURL('image/jpeg', 0.8));
+      const vw = v.videoWidth || 1280;
+      const vh = v.videoHeight || 960;
+      const maxDim = 2048;
+      let w = vw, h = vh;
+      if (w > maxDim || h > maxDim) {
+        const ratio = Math.min(maxDim / w, maxDim / h);
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+      }
+      c.width = w;
+      c.height = h;
+      c.getContext('2d')?.drawImage(v, 0, 0, w, h);
+      setCamPreview(c.toDataURL('image/jpeg', 0.9));
     }
     if (camStreamRef.current) {
       camStreamRef.current.getTracks().forEach(t => t.stop());
