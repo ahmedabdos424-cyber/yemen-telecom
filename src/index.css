@@ -572,29 +572,43 @@ body {
 /* Camera icon inside input */
 .input-camera-btn {
   position: absolute;
-  left: 0.625rem;
+  left: 0.5rem;
   top: 50%;
   transform: translateY(-50%);
   z-index: 10;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
-  color: var(--slate-500);
+  border-radius: 12px;
+  color: var(--slate-400);
   cursor: pointer;
   transition: all 0.15s ease;
   border: none;
-  background: transparent;
+  background: var(--slate-800);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 .input-camera-btn:hover {
-  background: var(--slate-800);
-  color: var(--slate-400);
+  background: var(--slate-700);
+  color: var(--slate-300);
 }
 .input-camera-btn:active {
-  background: var(--slate-700);
+  background: var(--slate-600);
   transform: translateY(-50%) scale(0.92);
+}
+
+/* Mobile touch targets - ensure minimum 44px for accessibility */
+@media (max-width: 639px) {
+  .input-camera-btn {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    min-height: 48px;
+  }
 }
 
 /* ========== TABLES ========== */
