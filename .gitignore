@@ -105,3 +105,5 @@ playwright-report/
 playwright/.cache/
 
 testsprite_tests/tmp/config.json
+
+testsprite_tests\tmp\config.json

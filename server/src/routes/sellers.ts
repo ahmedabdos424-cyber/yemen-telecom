@@ -110,6 +110,36 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   }
 });
 
+router.get('/:id', async (req: AuthRequest, res: Response) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  const { id } = req.params;
+  try {
+    const result = await query(
+      `SELECT s.*, a.name as agent_name FROM sellers s LEFT JOIN agents a ON s.agent_id = a.id WHERE s.id = $1`,
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Seller not found' });
+    }
+    if (req.user.role === 'agent') {
+      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
+      if (agentRes.rows.length === 0 || agentRes.rows[0].id !== result.rows[0].agent_id) {
+        return res.status(403).json({ error: 'Access denied: this seller does not belong to your agency' });
+      }
+    } else if (req.user.role === 'seller') {
+      if (String(result.rows[0].user_id) !== String(req.user.id)) {
+        return res.status(403).json({ error: 'Access denied: this is not your seller profile' });
+      }
+    }
+    res.json(mapSeller(result.rows[0]));
+  } catch (err) {
+    logger.error('Error fetching seller:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), async (req: Request, res: Response) => {
   const {
     name, store_name, id_number, phone, region, region_code, status,
