@@ -73,7 +73,9 @@ describe('P0-08 Camera Preview videoRef Wiring', () => {
     });
 
     it('should clean up stream on unmount', () => {
-      expect(source).toContain('streamRef.current.getTracks().forEach(t => t.stop())');
+      // Cleanup may use try/catch wrapper around t.stop() for safety
+      const hasStreamCleanup = source.includes('streamRef.current.getTracks().forEach') && source.includes('.stop()');
+      expect(hasStreamCleanup).toBe(true);
     });
   });
 });

@@ -57,45 +57,62 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
   const camStreamRef = useRef<MediaStream | null>(null);
   const [invoiceImageUrl, setInvoiceImageUrl] = useState<string | null>(null);
   const [uploadingInvoice, setUploadingInvoice] = useState(false);
+  const camConfirmingRef = useRef(false);
+  const camMountedRef = useRef(true);
+  const camPermDeniedRef = useRef(false);
 
   const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
 
   useEffect(() => {
+    camMountedRef.current = true;
     return () => {
+      camMountedRef.current = false;
       if (camStreamRef.current) {
         camStreamRef.current.getTracks().forEach(t => t.stop());
         camStreamRef.current = null;
       }
+      if (camVideoRef.current) camVideoRef.current.srcObject = null;
     };
   }, []);
 
   const openInvoiceCam = useCallback(async () => {
+    if (!camMountedRef.current) return;
+    camPermDeniedRef.current = false;
     setShowCam(true);
     setCamPreview(null);
     try {
-      const resolution = Math.min(screen.width, screen.height, 1280);
-      const s = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: resolution }, height: { ideal: resolution } },
-      });
+      const resolution = Math.min(screen.width, screen.height, 1920);
+      let s: MediaStream;
+      try {
+        s = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment', width: { ideal: resolution }, height: { ideal: resolution } },
+        });
+      } catch {
+        s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      }
+      if (!camMountedRef.current) {
+        s.getTracks().forEach(t => t.stop());
+        return;
+      }
       camStreamRef.current = s;
       if (camVideoRef.current) {
         camVideoRef.current.srcObject = s;
-        camVideoRef.current.play();
+        try { await camVideoRef.current.play(); } catch { /* autoplay blocked */ }
       }
-    } catch {
-      try {
-        const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        camStreamRef.current = s;
-        if (camVideoRef.current) {
-          camVideoRef.current.srcObject = s;
-          camVideoRef.current.play();
-        }
-      } catch {
+    } catch (err) {
+      if (!camMountedRef.current) return;
+      const isPerm = err instanceof DOMException && (
+        err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError' || err.name === 'AbortError'
+      );
+      if (isPerm) {
+        camPermDeniedRef.current = true;
+        toastWarning('تم رفض صلاحية الكاميرا. يرجى السماح بالوصول من إعدادات الجهاز.');
         setShowCam(false);
+      } else {
         camFileRef.current?.click();
       }
     }
-  }, []);
+  }, [toastWarning]);
 
   const captureInvoiceFrame = useCallback(() => {
     if (camVideoRef.current && camCanvasRef.current) {
@@ -112,13 +129,19 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
       }
       c.width = w;
       c.height = h;
-      c.getContext('2d')?.drawImage(v, 0, 0, w, h);
-      setCamPreview(c.toDataURL('image/jpeg', 0.9));
+      const ctx = c.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(v, 0, 0, w, h);
+        setCamPreview(c.toDataURL('image/jpeg', 0.9));
+      }
+      c.width = 0;
+      c.height = 0;
     }
     if (camStreamRef.current) {
       camStreamRef.current.getTracks().forEach(t => t.stop());
       camStreamRef.current = null;
     }
+    if (camVideoRef.current) camVideoRef.current.srcObject = null;
   }, []);
 
   const dataUrlToFile = useCallback((dataUrl: string, filename: string): File => {
@@ -148,11 +171,15 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
   }, [dataUrlToFile, toastError, toastSuccess]);
 
   const confirmInvoiceCapture = useCallback(async () => {
-    if (camPreview) {
+    if (!camPreview || camConfirmingRef.current) return;
+    camConfirmingRef.current = true;
+    try {
       await uploadInvoiceImage(camPreview);
+    } finally {
+      camConfirmingRef.current = false;
+      setCamPreview(null);
+      setShowCam(false);
     }
-    setCamPreview(null);
-    setShowCam(false);
   }, [camPreview, uploadInvoiceImage]);
 
   const retakeInvoiceCapture = useCallback(() => {
@@ -499,23 +526,19 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
 
       {/* Hidden camera elements */}
       <canvas ref={camCanvasRef} className="hidden" />
-      <input ref={camFileRef} type="file" accept="image/*" capture="environment" onChange={async (e) => {
+      <input ref={camFileRef} type="file" accept="image/*" capture="environment" onChange={(e) => {
         const file = e.target.files?.[0];
         if (file) {
           const r = new FileReader();
-          r.onload = (ev) => setCamPreview(ev.target?.result as string);
+          r.onload = (ev) => {
+            if (ev.target?.result) {
+              setCamPreview(ev.target.result as string);
+              setShowCam(true);
+            }
+          };
           r.readAsDataURL(file);
-          try {
-            setUploadingInvoice(true);
-            const result = await api.uploadFile(file, 'image');
-            setInvoiceImageUrl(result.url);
-            toastSuccess('تم رفع صورة فاتورة الشحن بنجاح وستُرفق مع العملية.');
-          } catch (err: any) {
-            toastError(err?.message || 'فشل رفع صورة الفاتورة');
-          } finally {
-            setUploadingInvoice(false);
-          }
         }
+        e.target.value = '';
       }} className="hidden" />
 
       {/* Camera viewfinder + preview modal */}
@@ -527,6 +550,7 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
         onConfirm={confirmInvoiceCapture}
         onRetake={retakeInvoiceCapture}
         onCancel={closeInvoiceCam}
+        processing={uploadingInvoice}
       />
     </div>
   );

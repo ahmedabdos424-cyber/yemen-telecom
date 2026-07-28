@@ -125,15 +125,19 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
   const streamRef = useRef<MediaStream | null>(null);
   const denialCountRef = useRef(0);
   const mountedRef = useRef(true);
+  const capturingRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current.getTracks().forEach(t => {
+          try { t.stop(); } catch { /* already stopped */ }
+        });
         streamRef.current = null;
       }
+      if (videoRef.current) videoRef.current.srcObject = null;
       disposeCanvas(canvasRef.current);
     };
   }, []);
@@ -145,10 +149,8 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
       });
       streamRef.current = null;
     }
+    if (videoRef.current) videoRef.current.srcObject = null;
     disposeCanvas(canvasRef.current);
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
     setShowViewfinder(false);
     setScanning(false);
   }, []);
@@ -212,28 +214,33 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
   }, []);
 
   const captureFrame = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current) return;
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const vw = video.videoWidth || 1280;
-    const vh = video.videoHeight || 960;
+    if (!videoRef.current || !canvasRef.current || capturingRef.current) return;
+    capturingRef.current = true;
+    try {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const vw = video.videoWidth || 1280;
+      const vh = video.videoHeight || 960;
 
-    let w = vw;
-    let h = vh;
-    if (w > MAX_DIMENSION || h > MAX_DIMENSION) {
-      const ratio = Math.min(MAX_DIMENSION / w, MAX_DIMENSION / h);
-      w = Math.round(w * ratio);
-      h = Math.round(h * ratio);
-    }
+      let w = vw;
+      let h = vh;
+      if (w > MAX_DIMENSION || h > MAX_DIMENSION) {
+        const ratio = Math.min(MAX_DIMENSION / w, MAX_DIMENSION / h);
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+      }
 
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.drawImage(video, 0, 0, w, h);
-      const dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
-      disposeCanvas(canvas);
-      setPreviewImage(dataUrl);
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
+        disposeCanvas(canvas);
+        setPreviewImage(dataUrl);
+      }
+    } finally {
+      capturingRef.current = false;
     }
 
     if (streamRef.current) {
@@ -387,6 +394,7 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
   const streamRef = useRef<MediaStream | null>(null);
   const denialCountRef = useRef(0);
   const mountedRef = useRef(true);
+  const capturingRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -467,28 +475,33 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
   }, []);
 
   const captureFrame = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current) return;
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const vw = video.videoWidth || 1280;
-    const vh = video.videoHeight || 960;
+    if (!videoRef.current || !canvasRef.current || capturingRef.current) return;
+    capturingRef.current = true;
+    try {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const vw = video.videoWidth || 1280;
+      const vh = video.videoHeight || 960;
 
-    let w = vw;
-    let h = vh;
-    if (w > MAX_DIMENSION || h > MAX_DIMENSION) {
-      const ratio = Math.min(MAX_DIMENSION / w, MAX_DIMENSION / h);
-      w = Math.round(w * ratio);
-      h = Math.round(h * ratio);
-    }
+      let w = vw;
+      let h = vh;
+      if (w > MAX_DIMENSION || h > MAX_DIMENSION) {
+        const ratio = Math.min(MAX_DIMENSION / w, MAX_DIMENSION / h);
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+      }
 
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.drawImage(video, 0, 0, w, h);
-      const dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
-      disposeCanvas(canvas);
-      setPreviewImage(dataUrl);
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
+        disposeCanvas(canvas);
+        setPreviewImage(dataUrl);
+      }
+    } finally {
+      capturingRef.current = false;
     }
 
     if (streamRef.current) {
