@@ -663,17 +663,17 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
                   />
                 </div>
               </div>
-              <div className="flex gap-2 justify-end pt-4 border-t border-gray-100">
+              <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-4 border-t border-gray-100">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 border border-gray-200 text-gray-700 bg-white hover:bg-gray-55/70 rounded-xl text-xs font-bold transition-all hover:border-gray-300 cursor-pointer"
+                  className="px-4 py-2.5 border border-gray-200 text-gray-700 bg-white hover:bg-gray-55/70 rounded-xl text-xs font-bold transition-all hover:border-gray-300 cursor-pointer w-full sm:w-auto"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:brightness-110 shadow-md active:scale-[0.98] transition-all cursor-pointer"
+                  className="px-5 py-2.5 bg-primary text-white rounded-xl text-xs font-bold hover:brightness-110 shadow-md active:scale-[0.98] transition-all cursor-pointer w-full sm:w-auto"
                 >
                   حفظ الشريحة بالمستودع
                 </button>
@@ -715,18 +715,18 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
                   {csvPreview.length > 5 && <p className="text-[10px] text-gray-400">...و{csvPreview.length - 5} سجل آخر</p>}
                 </div>
               )}
-              <div className="flex gap-2 justify-end pt-3 border-t border-gray-100">
+              <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-3 border-t border-gray-100">
                 <button
                   type="button"
                   onClick={() => { setShowImportModal(false); setCsvFile(null); setCsvPreview([]); }}
-                  className="px-4 py-2 border border-gray-200 text-gray-700 bg-white hover:bg-gray-55/70 rounded-xl text-xs font-bold transition-all hover:border-gray-300 cursor-pointer"
+                  className="px-4 py-2.5 border border-gray-200 text-gray-700 bg-white hover:bg-gray-55/70 rounded-xl text-xs font-bold transition-all hover:border-gray-300 cursor-pointer w-full sm:w-auto"
                 >
                   إلغاء التوريد
                 </button>
                 <button
                   type="submit"
                   disabled={csvPreview.length === 0 || csvImporting}
-                  className="px-5 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:brightness-110 shadow-md active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2.5 bg-primary text-white rounded-xl text-xs font-bold hover:brightness-110 shadow-md active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 w-full sm:w-auto"
                 >
                   {csvImporting ? 'جارٍ الاستيراد...' : `بدء استيراد ${csvPreview.length} شريحة`}
                 </button>
@@ -864,17 +864,17 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
                   className="w-full px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all"
                 />
               </div>
-              <div className="flex gap-2 justify-end pt-4 border-t border-gray-100">
+              <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-4 border-t border-gray-100">
                 <button
                   type="button"
                   onClick={() => setSelectedSimEdit(null)}
-                  className="px-4 py-2 border border-gray-200 text-gray-700 bg-white hover:bg-gray-55/70 rounded-xl text-xs font-bold transition-all hover:border-gray-300 cursor-pointer"
+                  className="px-4 py-2.5 border border-gray-200 text-gray-700 bg-white hover:bg-gray-55/70 rounded-xl text-xs font-bold transition-all hover:border-gray-300 cursor-pointer w-full sm:w-auto"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:brightness-110 shadow-md active:scale-[0.98] transition-all cursor-pointer"
+                  className="px-5 py-2.5 bg-primary text-white rounded-xl text-xs font-bold hover:brightness-110 shadow-md active:scale-[0.98] transition-all cursor-pointer w-full sm:w-auto"
                 >
                   حفظ التعديلات
                 </button>

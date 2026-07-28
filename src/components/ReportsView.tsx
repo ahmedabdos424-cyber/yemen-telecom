@@ -86,13 +86,14 @@ export default function ReportsView() {
     <div className="space-y-6">
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       {/* Top action metrics */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
         <button
           onClick={() => triggerExport()}
-          className="btn btn-primary flex items-center justify-center gap-2"
+          className="btn btn-primary flex items-center justify-center gap-2 w-full sm:w-auto"
         >
           <span className="material-symbols-outlined text-[20px]">file_download</span>
-          تصدير التقرير الحالي للشبكة
+          <span className="hidden sm:inline">تصدير التقرير الحالي للشبكة</span>
+          <span className="sm:hidden">تصدير التقرير</span>
         </button>
         <button
           onClick={() => setShowFilterDrawer(true)}
@@ -290,18 +291,18 @@ export default function ReportsView() {
                 </div>
               </div>
 
-              <div className="flex gap-2 justify-end pt-4">
+              <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-4">
                 <button
                   type="button"
                   onClick={() => setShowFilterDrawer(false)}
-                  className="btn btn-ghost text-xs"
+                  className="btn btn-ghost text-xs w-full sm:w-auto"
                 >
                   إلغاء
                 </button>
                 <button
                   type="button"
                   onClick={() => { setShowFilterDrawer(false); triggerExport(); }}
-                  className="btn btn-primary text-xs"
+                  className="btn btn-primary text-xs w-full sm:w-auto"
                 >
                   تطبيق الفلاتر والتجهيز
                 </button>
