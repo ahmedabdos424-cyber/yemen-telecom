@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { ViewType } from '../types';
 import ProfileAvatar from './shared/ProfileAvatar';
+import { LogOut } from 'lucide-react';
 
 interface TopBarProps {
   currentView: ViewType;
@@ -14,6 +15,7 @@ interface TopBarProps {
   unresolvedAlertsCount: number;
   displayName?: string;
   role?: string;
+  onLogout?: () => void;
 }
 
 export default function TopBar({
@@ -22,9 +24,11 @@ export default function TopBar({
   onMenuToggle,
   unresolvedAlertsCount,
   displayName,
-  role
+  role,
+  onLogout,
 }: TopBarProps) {
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const getTitle = () => {
     switch (currentView) {
@@ -155,18 +159,45 @@ export default function TopBar({
         <div className="w-px h-5 md:h-6 bg-gray-300 hidden sm:block"></div>
 
         {/* Admin profile user header */}
-        <div className="flex items-center gap-2">
-          <div className="text-right hidden sm:block">
-            <p className="text-[11px] md:text-xs font-bold text-gray-900">{displayName || 'المستخدم'}</p>
-          </div>
-          <ProfileAvatar
-            photo=""
-            name={displayName || 'المستخدم'}
-            onPhotoChange={() => {}}
-            onPhotoDelete={() => {}}
-            size={28}
-            editable={false}
-          />
+        <div className="relative flex items-center gap-2">
+          <button
+            onClick={() => setShowProfileMenu(!showProfileMenu)}
+            className="flex items-center gap-2 cursor-pointer"
+          >
+            <div className="text-right hidden sm:block">
+              <p className="text-[11px] md:text-xs font-bold text-gray-900">{displayName || 'المستخدم'}</p>
+            </div>
+            <ProfileAvatar
+              photo=""
+              name={displayName || 'المستخدم'}
+              onPhotoChange={() => {}}
+              onPhotoDelete={() => {}}
+              size={28}
+              editable={false}
+            />
+          </button>
+
+          {/* Profile dropdown */}
+          {showProfileMenu && (
+            <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
+          )}
+          {showProfileMenu && (
+            <div className="absolute left-0 top-full mt-2 w-44 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden text-right animate-in fade-in slide-in-from-top-2 duration-150">
+              <div className="px-3 py-2 border-b border-gray-100">
+                <p className="text-[11px] font-bold text-gray-900 truncate">{displayName || 'المستخدم'}</p>
+                <p className="text-[10px] text-gray-500">{role === 'manager' ? 'مدير النظام' : 'مشرف'}</p>
+              </div>
+              {onLogout && (
+                <button
+                  onClick={() => { setShowProfileMenu(false); onLogout(); }}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                >
+                  <LogOut size={14} />
+                  تسجيل الخروج
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </header>
