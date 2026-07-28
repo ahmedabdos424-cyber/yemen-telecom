@@ -313,7 +313,7 @@ export default function SellerSimsView({ sims = [], onUpdateSims }: SellerSimsVi
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="relative bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl w-full max-w-sm md:max-w-md text-right text-slate-300 max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center pb-4 border-b border-slate-800 mb-4">
                 <h3 className="font-extrabold text-sm text-slate-100">تفاصيل الشريحة الكاملة</h3>
-                <button onClick={() => setDetailSim(null)} className="p-1 hover:bg-slate-850 text-slate-400 hover:text-slate-100 rounded-full transition-colors"><X size={15} /></button>
+                <button onClick={() => setDetailSim(null)} className="p-2.5 hover:bg-slate-850 text-slate-400 hover:text-slate-100 rounded-full transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><X size={15} /></button>
               </div>
               <div className="space-y-3.5 text-xs">
                 <div className="flex justify-between items-center border-b border-slate-950 pb-2"><span className="text-slate-400">رقم ICCID التسلسلي:</span><span className="font-mono font-bold text-slate-100" dir="ltr">{detailSim.iccid}</span></div>
@@ -334,7 +334,7 @@ export default function SellerSimsView({ sims = [], onUpdateSims }: SellerSimsVi
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="relative bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl w-full max-w-sm md:max-w-md text-right text-slate-300 max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center pb-4 border-b border-slate-800 mb-4">
                 <h3 className="font-extrabold text-sm text-slate-100">تعديل معلومات الشريحة</h3>
-                <button onClick={() => setEditSim(null)} className="p-1 hover:bg-slate-850 text-slate-400 hover:text-slate-100 rounded-full transition-colors"><X size={15} /></button>
+                <button onClick={() => setEditSim(null)} className="p-2.5 hover:bg-slate-850 text-slate-400 hover:text-slate-100 rounded-full transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><X size={15} /></button>
               </div>
               <form onSubmit={handleEditSubmit} className="space-y-4">
                 <div className="space-y-1">
@@ -372,7 +372,7 @@ export default function SellerSimsView({ sims = [], onUpdateSims }: SellerSimsVi
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="relative bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl w-full max-w-sm md:max-w-md text-right text-slate-200 max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center pb-4 border-b border-slate-800 mb-4">
                 <h3 className="font-extrabold text-sm text-slate-100">نقل ملكية الشريحة</h3>
-                <button onClick={() => setTransferSim(null)} className="p-1 hover:bg-slate-850 text-slate-400 hover:text-slate-100 rounded-full transition-colors"><X size={15} /></button>
+                <button onClick={() => setTransferSim(null)} className="p-2.5 hover:bg-slate-850 text-slate-400 hover:text-slate-100 rounded-full transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><X size={15} /></button>
               </div>
               <div className="space-y-4">
                 <p className="text-[11px] text-slate-400 leading-relaxed">

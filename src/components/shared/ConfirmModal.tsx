@@ -64,7 +64,7 @@ export default function ConfirmModal({
               </div>
               <button
                 onClick={onCancel}
-                className="btn-icon text-slate-500 hover:text-slate-100"
+                className="p-2.5 text-slate-500 hover:text-slate-100 min-w-[44px] min-h-[44px] flex items-center justify-center"
               >
                 <span className="material-symbols-outlined text-sm">close</span>
               </button>

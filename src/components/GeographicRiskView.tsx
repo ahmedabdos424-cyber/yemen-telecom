@@ -742,7 +742,7 @@ export default function GeographicRiskView() {
 
                     <button
                       onClick={() => setSelectedNode(null)}
-                      className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-700 transition"
+                      className="p-2.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-700 transition min-w-[44px] min-h-[44px] flex items-center justify-center"
                       title="إغلاق التفتيش"
                     >
                       <X size={14} />

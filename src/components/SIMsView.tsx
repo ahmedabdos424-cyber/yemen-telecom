@@ -325,7 +325,7 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
               <button
                 type="button"
                 onClick={() => setSearchTerm('')}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center"
               >
                 <span className="material-symbols-outlined text-sm">close</span>
               </button>

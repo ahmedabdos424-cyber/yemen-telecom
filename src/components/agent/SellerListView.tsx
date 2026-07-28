@@ -503,7 +503,7 @@ export default function SellerListView({
              >
                <div className="flex justify-between items-center pb-4 border-b border-slate-800 mb-4">
                  <h3 className="text-sm font-bold text-slate-100">تعديل بيانات البائع</h3>
-                <button onClick={() => setEditModalSeller(null)} className="p-1 text-slate-500 hover:text-slate-100 hover:bg-slate-800 rounded-full transition-colors cursor-pointer">
+                <button onClick={() => setEditModalSeller(null)} className="p-2.5 text-slate-500 hover:text-slate-100 hover:bg-slate-800 rounded-full transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center">
                   <X size={18} />
                 </button>
               </div>
@@ -599,7 +599,7 @@ export default function SellerListView({
                    <h3 className="text-sm font-bold text-slate-100">تخصيص شرائح</h3>
                   <p className="text-[10px] text-slate-400 mt-0.5">للبائع: {allocModalSeller.name}</p>
                 </div>
-                <button onClick={() => setAllocModalSeller(null)} className="p-1 text-slate-500 hover:text-slate-100 hover:bg-slate-800 rounded-full transition-colors cursor-pointer">
+                <button onClick={() => setAllocModalSeller(null)} className="p-2.5 text-slate-500 hover:text-slate-100 hover:bg-slate-800 rounded-full transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center">
                   <X size={18} />
                 </button>
               </div>
