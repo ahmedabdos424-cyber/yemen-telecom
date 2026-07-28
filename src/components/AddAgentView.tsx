@@ -94,12 +94,15 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
           <div>
             <label className="block text-xs font-bold text-gray-600 mb-1.5">رقم الهاتف للفرع (الرئيسي)</label>
             <input
-              type="text"
+              type="tel"
               required
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, '').slice(0, 9))}
               placeholder="7xxxxxx"
+              pattern="[0-9]{7,9}"
               className="input-field"
+              dir="ltr"
+              style={{ textAlign: 'right' }}
             />
           </div>
         </div>

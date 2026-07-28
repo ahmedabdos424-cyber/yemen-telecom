@@ -313,7 +313,7 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
                   <div>
                     <h4 className="font-extrabold text-sm text-slate-200 font-sans tracking-wide">نظام إدارة توزيع الشرائح</h4>
                     <p className="text-[10px] text-slate-500 font-bold mt-1">المؤسسة العامة للاتصالات - الجمهورية اليمنية</p>
-                    <p className="text-[9px] text-slate-600 font-mono mt-2">V-2.4.0 (YEMEN-TELECOM-PROD)</p>
+                    <p className="text-[9px] text-slate-600 font-mono mt-2">v4.2.0 (YEMEN-TELECOM-PROD)</p>
                   </div>
                 </div>
               )}

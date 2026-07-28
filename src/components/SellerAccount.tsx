@@ -670,7 +670,7 @@ export default function SellerAccount({
                   <div className="bg-slate-950/60 border border-slate-850 rounded-2xl p-4 space-y-2 text-xs">
                     <div className="flex justify-between items-center">
                       <span className="text-slate-400 font-medium">إصدار التطبيق</span>
-                      <span className="text-slate-200 font-mono font-bold bg-slate-900 px-2 py-0.5 rounded border border-slate-800">v2.4.0 (Enterprise Build)</span>
+                       <span className="text-slate-200 font-mono font-bold bg-slate-900 px-2 py-0.5 rounded border border-slate-800">v4.2.0 (Enterprise Build)</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-slate-400 font-medium">تاريخ آخر تحديث</span>

@@ -237,10 +237,13 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
             type="text"
             id="id_number"
             value={idNumber}
-            onChange={(e) => setIdNumber(e.target.value)}
+            onChange={(e) => setIdNumber(e.target.value.replace(/[^0-9]/g, '').slice(0, 10))}
             placeholder="xxxxxxxxxx"
             inputMode="numeric"
+            pattern="[0-9]{10}"
+            required
             className="input-field bg-slate-950 border-slate-850 text-sm text-right placeholder:text-slate-700 font-sans"
+            dir="ltr"
           />
         </div>
 
@@ -254,9 +257,11 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
             type="tel"
             id="phone"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, '').slice(0, 9))}
             placeholder="7xxxxxx"
+            pattern="[0-9]{7,9}"
             className="input-field bg-slate-950 border-slate-850 text-sm text-right placeholder:text-slate-700 font-sans"
+            dir="ltr"
           />
         </div>
 
