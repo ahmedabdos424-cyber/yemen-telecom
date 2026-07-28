@@ -71,6 +71,35 @@ router.post('/', requireRole('manager'), validate(createAgentSchema), async (req
   }
 });
 
+router.get('/:id', requireRole('manager', 'agent'), async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const result = await query('SELECT * FROM agents WHERE id = $1', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Agent not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    logger.error('Error fetching agent:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.delete('/:id', requireRole('manager'), async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const existing = await query('SELECT * FROM agents WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Agent not found' });
+    }
+    await query('DELETE FROM agents WHERE id = $1', [id]);
+    res.json({ message: 'Agent deleted successfully' });
+  } catch (err) {
+    logger.error('Error deleting agent:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.put('/:id', requireRole('manager'), validate(updateAgentSchema), async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
