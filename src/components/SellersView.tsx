@@ -3,13 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { Seller, SIM } from '../types';
 import { Check } from 'lucide-react';
 import profileImage from '../assets/profile.png';
 import { useToast, ToastContainer } from '../hooks/useToast';
 import { safeArray } from '../lib/safe';
 import { api } from '../api/client';
+import CameraPreviewModal from './shared/CameraPreviewModal';
 
 interface SellersViewProps {
   sellers: Seller[];
@@ -50,28 +51,49 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
   // Camera capture with preview for invoice photo
   const [showCam, setShowCam] = useState(false);
   const [camPreview, setCamPreview] = useState<string | null>(null);
-  const [camStream, setCamStream] = useState<MediaStream | null>(null);
   const camVideoRef = useRef<HTMLVideoElement>(null);
   const camCanvasRef = useRef<HTMLCanvasElement>(null);
   const camFileRef = useRef<HTMLInputElement>(null);
+  const camStreamRef = useRef<MediaStream | null>(null);
   const [invoiceImageUrl, setInvoiceImageUrl] = useState<string | null>(null);
   const [uploadingInvoice, setUploadingInvoice] = useState(false);
 
   const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
 
+  useEffect(() => {
+    return () => {
+      if (camStreamRef.current) {
+        camStreamRef.current.getTracks().forEach(t => t.stop());
+        camStreamRef.current = null;
+      }
+    };
+  }, []);
+
   const openInvoiceCam = useCallback(async () => {
     setShowCam(true);
     setCamPreview(null);
     try {
-      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      setCamStream(s);
+      const resolution = Math.min(screen.width, screen.height, 1280);
+      const s = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: resolution }, height: { ideal: resolution } },
+      });
+      camStreamRef.current = s;
       if (camVideoRef.current) {
         camVideoRef.current.srcObject = s;
         camVideoRef.current.play();
       }
     } catch {
-      camFileRef.current?.click();
-      setShowCam(false);
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        camStreamRef.current = s;
+        if (camVideoRef.current) {
+          camVideoRef.current.srcObject = s;
+          camVideoRef.current.play();
+        }
+      } catch {
+        setShowCam(false);
+        camFileRef.current?.click();
+      }
     }
   }, []);
 
@@ -79,16 +101,16 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
     if (camVideoRef.current && camCanvasRef.current) {
       const v = camVideoRef.current;
       const c = camCanvasRef.current;
-      c.width = v.videoWidth;
-      c.height = v.videoHeight;
+      c.width = Math.min(v.videoWidth, 1920);
+      c.height = Math.min(v.videoHeight, 1920);
       c.getContext('2d')?.drawImage(v, 0, 0);
       setCamPreview(c.toDataURL('image/jpeg', 0.8));
     }
-    if (camStream) {
-      camStream.getTracks().forEach(t => t.stop());
-      setCamStream(null);
+    if (camStreamRef.current) {
+      camStreamRef.current.getTracks().forEach(t => t.stop());
+      camStreamRef.current = null;
     }
-  }, [camStream]);
+  }, []);
 
   const dataUrlToFile = useCallback((dataUrl: string, filename: string): File => {
     const [meta, base64] = dataUrl.split(',');
@@ -124,9 +146,8 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
     setShowCam(false);
   }, [camPreview, uploadInvoiceImage]);
 
-  const retakeInvoiceCapture = useCallback(async () => {
+  const retakeInvoiceCapture = useCallback(() => {
     setCamPreview(null);
-    setInvoiceImageUrl(null);
     openInvoiceCam();
   }, [openInvoiceCam]);
 
@@ -134,16 +155,20 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
     setInvoiceImageUrl(null);
     setCamPreview(null);
     setShowCam(false);
+    if (camStreamRef.current) {
+      camStreamRef.current.getTracks().forEach(t => t.stop());
+      camStreamRef.current = null;
+    }
   }, []);
 
   const closeInvoiceCam = useCallback(() => {
-    if (camStream) {
-      camStream.getTracks().forEach(t => t.stop());
-      setCamStream(null);
+    if (camStreamRef.current) {
+      camStreamRef.current.getTracks().forEach(t => t.stop());
+      camStreamRef.current = null;
     }
     setCamPreview(null);
     setShowCam(false);
-  }, [camStream]);
+  }, []);
 
   const selectedSeller = sellers.find((s) => s.id === selectedSellerId) || sellers[0] || EMPTY_SELLER;
 
@@ -201,10 +226,10 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
     <div className="space-y-6">
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       {/* Seller Header Profile Card */}
-      <section className="card flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div className="flex items-center gap-4">
+      <section className="card flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-6">
+        <div className="flex items-center gap-3 md:gap-4">
           <div className="relative">
-            <div className="w-16 h-16 rounded-xl overflow-hidden shadow-md border-2 border-white relative">
+            <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl overflow-hidden shadow-md border-2 border-white relative">
               <img
                 alt="SellerProfile"
                 className="w-full h-full object-cover"
@@ -217,8 +242,8 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
           </div>
 
           <div>
-            <h2 className="font-headline-lg text-lg text-gray-900 font-bold">{selectedSeller.name}</h2>
-            <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-gray-500 font-semibold">
+            <h2 className="font-headline-lg text-base md:text-lg text-gray-900 font-bold">{selectedSeller.name}</h2>
+            <div className="flex flex-wrap gap-2 md:gap-3 mt-1 md:mt-1.5 text-[10px] md:text-xs text-gray-500 font-semibold">
               <span className="flex items-center gap-1 font-mono">
                 <span className="material-symbols-outlined text-[15px]">fingerprint</span>
                 معرف البائع: {selectedSeller.id}
@@ -236,17 +261,18 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
           </div>
         </div>
 
-        <div className="flex gap-2 w-full md:w-auto">
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
           <button
             onClick={() => setShowAddBalanceModal(true)}
-            className="flex-1 md:flex-none btn btn-primary"
+            className="flex-1 sm:flex-none btn btn-primary min-h-[40px] md:min-h-[48px]"
           >
             <span className="material-symbols-outlined text-sm">add</span>
-            شحن وتعبئة رصيد البائع
+            <span className="hidden sm:inline">شحن وتعبئة رصيد البائع</span>
+            <span className="sm:hidden">شحن رصيد</span>
           </button>
           <button
             onClick={() => toggleSellerStatus(selectedSeller.id, selectedSeller.status)}
-            className={`flex-1 md:flex-none btn btn-ghost ${
+            className={`flex-1 sm:flex-none btn btn-ghost min-h-[40px] md:min-h-[48px] ${
               selectedSeller.status === 'active'
                 ? 'border-red-200 text-secondary hover:bg-red-50'
                 : 'border-green-200 text-green-700 hover:bg-green-50'
@@ -258,12 +284,12 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
       </section>
 
       {/* Sellers switching quick Selector view */}
-      <section className="bg-gray-100 rounded-xl p-2 flex gap-2 overflow-x-auto">
+      <section className="bg-gray-100 rounded-xl p-1.5 md:p-2 flex gap-1.5 md:gap-2 overflow-x-auto scroll-smooth">
         {sellers.map((s) => (
           <button
             key={s.id}
             onClick={() => setSelectedSellerId(s.id)}
-            className={`px-4 py-2 text-xs font-bold rounded-lg whitespace-nowrap transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-3 md:px-4 py-1.5 md:py-2 text-[11px] md:text-xs font-bold rounded-lg whitespace-nowrap transition-all flex items-center gap-1.5 md:gap-2 cursor-pointer ${
               selectedSellerId === s.id
                 ? 'bg-white shadow-sm text-gray-900 border border-gray-200/80'
                 : 'text-gray-500 hover:text-gray-900'
@@ -276,13 +302,13 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
       </section>
 
       {/* Stats Cards Row */}
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm relative overflow-hidden">
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-gray-500 font-bold text-xs">إجمالي مبيعات البائع (30 يوم)</span>
-            <span className="material-symbols-outlined text-blue-600 bg-blue-50 border border-blue-100 p-1.5 rounded-lg text-sm">payments</span>
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        <div className="bg-white rounded-xl p-3 md:p-5 border border-gray-200 shadow-sm relative overflow-hidden">
+          <div className="flex justify-between items-center mb-2 md:mb-3">
+            <span className="text-gray-500 font-bold text-[10px] md:text-xs">إجمالي مبيعات البائع (30 يوم)</span>
+            <span className="material-symbols-outlined text-blue-600 bg-blue-50 border border-blue-100 p-1 md:p-1.5 rounded-lg text-xs md:text-sm">payments</span>
           </div>
-          <h4 className="text-2xl font-bold text-gray-900 font-mono">{(selectedSeller.sales30Days ?? 0).toLocaleString()}</h4>
+          <h4 className="text-lg md:text-2xl font-bold text-gray-900 font-mono">{(selectedSeller.sales30Days ?? 0).toLocaleString()}</h4>
           {selectedSeller.salesGrowth > 0 ? (
             <p className="text-green-600 font-bold text-[11px] mt-2 flex items-center gap-0.5">
               <span className="material-symbols-outlined text-[13px]">trending_up</span>
@@ -293,56 +319,56 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
           )}
         </div>
 
-        <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-gray-500 font-bold text-xs">المخزون الجاهز بعهدته</span>
-            <span className="material-symbols-outlined text-orange-600 bg-orange-50 border border-orange-100 p-1.5 rounded-lg text-sm">inventory</span>
+        <div className="bg-white rounded-xl p-3 md:p-5 border border-gray-200 shadow-sm">
+          <div className="flex justify-between items-center mb-2 md:mb-3">
+            <span className="text-gray-500 font-bold text-[10px] md:text-xs">المخزون الجاهز بعهدته</span>
+            <span className="material-symbols-outlined text-orange-600 bg-orange-50 border border-orange-100 p-1 md:p-1.5 rounded-lg text-xs md:text-sm">inventory</span>
           </div>
-          <h4 className="text-2xl font-bold text-gray-900 font-mono">{selectedSeller.simsCount}</h4>
-          <p className="text-gray-400 text-[11px] mt-2">شرائح SIM بجميع الشبكات</p>
+          <h4 className="text-lg md:text-2xl font-bold text-gray-900 font-mono">{selectedSeller.simsCount}</h4>
+          <p className="text-gray-400 text-[10px] md:text-[11px] mt-1 md:mt-2">شرائح SIM بجميع الشبكات</p>
         </div>
 
-        <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-gray-500 font-bold text-xs">معدل نشاط الأجهزة والبيع</span>
-            <span className="material-symbols-outlined text-green-650 bg-green-50 border border-green-100 p-1.5 rounded-lg text-sm">bolt</span>
+        <div className="bg-white rounded-xl p-3 md:p-5 border border-gray-200 shadow-sm">
+          <div className="flex justify-between items-center mb-2 md:mb-3">
+            <span className="text-gray-500 font-bold text-[10px] md:text-xs">معدل نشاط الأجهزة والبيع</span>
+            <span className="material-symbols-outlined text-green-650 bg-green-50 border border-green-100 p-1 md:p-1.5 rounded-lg text-xs md:text-sm">bolt</span>
           </div>
-              <h4 className="text-2xl font-bold text-gray-900 font-mono">{selectedSeller.activityRate}%</h4>
-          <p className={`text-[11px] font-bold mt-2 ${selectedSeller.activityRate > 90 ? 'text-green-600' : 'text-gray-450'}`}>
+              <h4 className="text-lg md:text-2xl font-bold text-gray-900 font-mono">{selectedSeller.activityRate}%</h4>
+          <p className={`text-[10px] md:text-[11px] font-bold mt-1 md:mt-2 ${selectedSeller.activityRate > 90 ? 'text-green-600' : 'text-gray-450'}`}>
             {selectedSeller.activityRate > 90 ? 'تقييم أمني وتشغيلي ممتاز' : 'مستقر'}
           </p>
         </div>
 
-        <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-gray-500 font-bold text-xs">رابط الاتصال المسجل</span>
-            <span className="material-symbols-outlined text-purple-600 bg-purple-50 border border-purple-100 p-1.5 rounded-lg text-sm">phone</span>
+        <div className="bg-white rounded-xl p-3 md:p-5 border border-gray-200 shadow-sm">
+          <div className="flex justify-between items-center mb-2 md:mb-3">
+            <span className="text-gray-500 font-bold text-[10px] md:text-xs">رابط الاتصال المسجل</span>
+            <span className="material-symbols-outlined text-purple-600 bg-purple-50 border border-purple-100 p-1 md:p-1.5 rounded-lg text-xs md:text-sm">phone</span>
           </div>
-          <h4 className="text-base font-bold text-gray-900 font-mono mt-1">{selectedSeller.phone}</h4>
-          <p className="text-gray-400 text-[11px] mt-2">رقم الجوال لتوصيل إشعارات SMS</p>
+          <h4 className="text-sm md:text-base font-bold text-gray-900 font-mono mt-0.5 md:mt-1">{selectedSeller.phone}</h4>
+          <p className="text-gray-400 text-[10px] md:text-[11px] mt-1 md:mt-2">رقم الجوال لتوصيل إشعارات SMS</p>
         </div>
       </section>
 
       {/* Table Matrix View */}
       <section className="card overflow-hidden">
         {/* Tabs Control bar */}
-        <div className="flex border-b border-gray-250 bg-gray-50/50">
+        <div className="flex border-b border-gray-250 bg-gray-50/50 overflow-x-auto">
           <button
             onClick={() => setActiveTab('inventory')}
-            className={`px-6 py-4 font-bold text-xs flex items-center gap-1.5 cursor-pointer ${
+            className={`px-4 md:px-6 py-3 md:py-4 font-bold text-[11px] md:text-xs flex items-center gap-1 md:gap-1.5 cursor-pointer whitespace-nowrap ${
               activeTab === 'inventory' ? 'text-secondary border-b-2 border-secondary font-bold bg-white' : 'text-gray-500 hover:text-gray-800'
             }`}
           >
-            <span className="material-symbols-outlined text-sm">inventory_2</span>
+            <span className="material-symbols-outlined text-xs md:text-sm">inventory_2</span>
             مخزون الشرائح بعهدته ({sellerSIMs.length})
           </button>
           <button
             onClick={() => setActiveTab('customers')}
-            className={`px-6 py-4 font-bold text-xs flex items-center gap-1.5 cursor-pointer ${
+            className={`px-4 md:px-6 py-3 md:py-4 font-bold text-[11px] md:text-xs flex items-center gap-1 md:gap-1.5 cursor-pointer whitespace-nowrap ${
               activeTab === 'customers' ? 'text-secondary border-b-2 border-secondary font-bold bg-white' : 'text-gray-500 hover:text-gray-800'
             }`}
           >
-            <span className="material-symbols-outlined text-sm">person</span>
+            <span className="material-symbols-outlined text-xs md:text-sm">person</span>
             سجل العملاء التابعين له
           </button>
         </div>
@@ -401,15 +427,16 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
 
       {/* Add Balance Modal Dialog Box */}
       {showAddBalanceModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm md:max-w-md overflow-hidden text-right leading-relaxed animate-in fade-in zoom-in-95 duration-150">
-            <div className="px-5 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-xl w-full sm:max-w-md overflow-hidden text-right leading-relaxed animate-in fade-in slide-in-from-bottom duration-200 sm:zoom-in-95 sm:duration-150">
+            <div className="hidden sm:block bottom-sheet-drag mx-auto mb-2 mt-2" />
+            <div className="px-4 md:px-5 py-3 md:py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
               <button onClick={() => setShowAddBalanceModal(false)} className="text-gray-400 hover:text-gray-700">
                 <span className="material-symbols-outlined text-lg">close</span>
               </button>
               <h3 className="font-bold text-sm text-gray-800">شحن رصيد لوكيل التوزيع</h3>
             </div>
-            <form onSubmit={submitAddBalance} className="p-5 space-y-4">
+            <form onSubmit={submitAddBalance} className="p-4 md:p-5 space-y-3 md:space-y-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-4">
               <div className="p-3 bg-blue-50 border border-blue-150 rounded-lg text-xs leading-relaxed text-blue-900">
                 أنت على وشك شحن رصيد بيع فوري لـ <strong>{selectedSeller.name}</strong>. يمنح هذا الرصيد القدرة للبائع لتفعيل الباقات مباشرة للزبائن.
               </div>
@@ -462,7 +489,6 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
       )}
 
       {/* Hidden camera elements */}
-      <video ref={camVideoRef} autoPlay playsInline className="hidden" />
       <canvas ref={camCanvasRef} className="hidden" />
       <input ref={camFileRef} type="file" accept="image/*" capture="environment" onChange={async (e) => {
         const file = e.target.files?.[0];
@@ -483,66 +509,16 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
         }
       }} className="hidden" />
 
-      {/* Camera live viewfinder */}
-      {showCam && !camPreview && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="relative w-full max-w-lg xl:max-w-xl bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
-            <div className="relative aspect-[4/3] bg-black flex items-center justify-center">
-              <video ref={camVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
-              <div className="absolute inset-0 border-[3px] border-dashed border-red-400/40 m-8 rounded-2xl pointer-events-none" />
-            </div>
-            <div className="flex gap-3 p-4 bg-gray-50">
-              <button
-                type="button"
-                onClick={captureInvoiceFrame}
-                className="btn btn-sm flex-1 bg-red-600 hover:bg-red-500 text-white flex items-center justify-center gap-2"
-              >
-                <span className="material-symbols-outlined text-sm">photo_camera</span>
-                التقاط الصورة
-              </button>
-              <button
-                type="button"
-                onClick={closeInvoiceCam}
-                className="btn btn-sm flex-1 bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"
-              >
-                إلغاء
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Camera preview confirm/retake */}
-      {showCam && camPreview && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="relative w-full max-w-lg xl:max-w-xl bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
-            <div className="relative aspect-[4/3] bg-black flex items-center justify-center">
-              <img src={camPreview} alt="المعاينة" className="w-full h-full object-contain" />
-              <div className="absolute top-3 right-3 bg-emerald-500/20 border border-emerald-400/30 text-emerald-600 text-[10px] px-2.5 py-1 rounded-full font-bold">
-                معاينة
-              </div>
-            </div>
-            <div className="flex gap-3 p-4 bg-gray-50">
-              <button
-                type="button"
-                onClick={confirmInvoiceCapture}
-                className="btn btn-sm flex-1 bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2"
-              >
-                <Check size={16} />
-                موافق
-              </button>
-              <button
-                type="button"
-                onClick={retakeInvoiceCapture}
-                className="btn btn-sm flex-1 bg-white border border-gray-200 text-gray-600 hover:bg-gray-100 flex items-center justify-center gap-2"
-              >
-                <span className="material-symbols-outlined text-sm">refresh</span>
-                إعادة
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Camera viewfinder + preview modal */}
+      <CameraPreviewModal
+        show={showCam}
+        previewImage={camPreview}
+        videoRef={camVideoRef}
+        onCapture={captureInvoiceFrame}
+        onConfirm={confirmInvoiceCapture}
+        onRetake={retakeInvoiceCapture}
+        onCancel={closeInvoiceCam}
+      />
     </div>
   );
 }

@@ -30,16 +30,16 @@ export default function CameraPreviewModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex sm:items-center justify-center bg-black sm:bg-black/80 sm:backdrop-blur-sm"
         >
           <motion.div
             initial={{ scale: 0.95, y: 20 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.95, y: 20 }}
-            className="relative w-full max-w-lg md:max-w-xl bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl"
+            className="relative w-full h-full sm:h-auto sm:max-w-lg md:max-w-xl bg-slate-900 sm:border sm:border-slate-800 sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col"
           >
-            {/* Preview area */}
-            <div className="relative aspect-[4/3] bg-black flex items-center justify-center">
+            {/* Preview area — fills available space */}
+            <div className="relative flex-1 min-h-0 bg-black flex items-center justify-center">
               {previewImage ? (
                 <>
                   <img src={previewImage} alt="المعاينة" className="w-full h-full object-contain" />
@@ -50,29 +50,29 @@ export default function CameraPreviewModal({
               ) : (
                 <>
                   <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 border-[3px] border-dashed border-red-400/40 m-8 rounded-2xl pointer-events-none" />
+                  <div className="absolute inset-0 border-[3px] border-dashed border-red-400/40 m-6 sm:m-8 rounded-2xl pointer-events-none" />
                 </>
               )}
             </div>
 
-            {/* Actions */}
-            <div className="flex gap-3 p-4 bg-slate-950">
+            {/* Actions — safe area aware, larger touch targets on mobile */}
+            <div className="flex gap-3 p-4 sm:p-4 bg-slate-950 sm:bg-slate-950 safe-bottom">
               {previewImage ? (
                 <>
                   <button
                     type="button"
                     onClick={onConfirm}
-                    className="btn btn-sm flex-1 bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2"
+                    className="btn flex-1 min-h-[48px] sm:min-h-[40px] bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-sm font-medium flex items-center justify-center gap-2 rounded-xl transition-colors"
                   >
-                    <Check size={16} />
+                    <Check size={18} />
                     موافقة واستخدام الصورة
                   </button>
                   <button
                     type="button"
                     onClick={onRetake}
-                    className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center gap-2"
+                    className="btn flex-1 min-h-[48px] sm:min-h-[40px] bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-slate-300 text-sm font-medium flex items-center justify-center gap-2 rounded-xl transition-colors"
                   >
-                    <RefreshCw size={16} />
+                    <RefreshCw size={18} />
                     إعادة التقاط
                   </button>
                 </>
@@ -81,15 +81,15 @@ export default function CameraPreviewModal({
                   <button
                     type="button"
                     onClick={onCapture}
-                    className="btn btn-sm flex-1 bg-red-600 hover:bg-red-500 text-white flex items-center justify-center gap-2"
+                    className="btn flex-1 min-h-[48px] sm:min-h-[40px] bg-red-600 hover:bg-red-500 active:bg-red-700 text-white text-sm font-medium flex items-center justify-center gap-2 rounded-xl transition-colors"
                   >
-                    <Camera size={16} />
+                    <Camera size={18} />
                     التقاط الصورة
                   </button>
                   <button
                     type="button"
                     onClick={onCancel}
-                    className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300"
+                    className="btn flex-1 min-h-[48px] sm:min-h-[40px] bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-slate-300 text-sm font-medium rounded-xl transition-colors"
                   >
                     إلغاء
                   </button>
