@@ -122,7 +122,7 @@ function AuthenticatedApp() {
     return (
       <div className="min-h-dvh bg-theme-background font-sans antialiased text-slate-100 pb-[calc(4rem+env(safe-area-inset-bottom))]">
         <SharedOfflineBanner />
-        <TopBar currentView={mgr.currentView} setView={(v) => { mgr.setView(v); navigate(`/manager/${v}`); }} onMenuToggle={() => {}} unresolvedAlertsCount={mgr.alerts.length} displayName={username} role={role} />
+        <TopBar currentView={mgr.currentView} setView={(v) => { mgr.setView(v); navigate(`/manager/${v}`); }} onMenuToggle={() => {}} unresolvedAlertsCount={mgr.alerts.length} displayName={username} role={role} onLogout={handleLogout} />
         <div className="flex pt-[calc(4rem+env(safe-area-inset-top))] min-h-dvh">
           <main className="flex-1 px-3 sm:px-4 md:px-8 py-4 md:py-8 lg:pt-10">
             <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
