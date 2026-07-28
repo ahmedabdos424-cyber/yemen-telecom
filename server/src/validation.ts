@@ -29,7 +29,7 @@ function so(max = 200) {
 // Auth
 export const loginSchema = z.object({
   username: s(1, 100),
-  password: z.string().min(8, 'Password must be at least 8 characters').max(200),
+  password: z.string().min(1, 'Password is required').max(200),
 });
 
 export const refreshTokenSchema = z.object({

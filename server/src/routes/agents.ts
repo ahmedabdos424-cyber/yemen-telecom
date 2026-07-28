@@ -71,10 +71,20 @@ router.post('/', requireRole('manager'), validate(createAgentSchema), async (req
   }
 });
 
+function parseId(id: string, res: Response): number | null {
+  const num = parseInt(id, 10);
+  if (isNaN(num)) {
+    res.status(404).json({ error: 'Agent not found' });
+    return null;
+  }
+  return num;
+}
+
 router.get('/:id', requireRole('manager', 'agent'), async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const agentId = parseId(req.params.id, res);
+  if (agentId === null) return;
   try {
-    const result = await query('SELECT * FROM agents WHERE id = $1', [id]);
+    const result = await query('SELECT * FROM agents WHERE id = $1', [agentId]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Agent not found' });
     }
@@ -86,13 +96,14 @@ router.get('/:id', requireRole('manager', 'agent'), async (req: Request, res: Re
 });
 
 router.delete('/:id', requireRole('manager'), async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const agentId = parseId(req.params.id, res);
+  if (agentId === null) return;
   try {
-    const existing = await query('SELECT * FROM agents WHERE id = $1', [id]);
+    const existing = await query('SELECT * FROM agents WHERE id = $1', [agentId]);
     if (existing.rows.length === 0) {
       return res.status(404).json({ error: 'Agent not found' });
     }
-    await query('DELETE FROM agents WHERE id = $1', [id]);
+    await query('DELETE FROM agents WHERE id = $1', [agentId]);
     res.json({ message: 'Agent deleted successfully' });
   } catch (err) {
     logger.error('Error deleting agent:', err);
@@ -101,9 +112,10 @@ router.delete('/:id', requireRole('manager'), async (req: Request, res: Response
 });
 
 router.put('/:id', requireRole('manager'), validate(updateAgentSchema), async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const agentId = parseId(req.params.id, res);
+  if (agentId === null) return;
   try {
-    const existing = await query('SELECT * FROM agents WHERE id = $1', [id]);
+    const existing = await query('SELECT * FROM agents WHERE id = $1', [agentId]);
     if (existing.rows.length === 0) {
       return res.status(404).json({ error: 'Agent not found' });
     }
@@ -116,7 +128,7 @@ router.put('/:id', requireRole('manager'), validate(updateAgentSchema), async (r
     const status = req.body.status ?? cur.status;
     const result = await query(
       `UPDATE agents SET name=$1, region=$2, phone=$3, sellers_count=$4, sims_count=$5, status=$6 WHERE id=$7 RETURNING *`,
-      [name, region, phone, sellers_count, sims_count, status, id]
+      [name, region, phone, sellers_count, sims_count, status, agentId]
     );
     res.json(result.rows[0]);
   } catch (err) {

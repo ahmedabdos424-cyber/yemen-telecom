@@ -26,6 +26,20 @@ router.get('/', requireRole('manager', 'agent'), async (req: Request, res: Respo
   }
 });
 
+router.get('/:id', requireRole('manager', 'agent'), async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const result = await query('SELECT * FROM sims WHERE id = $1', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'SIM not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    logger.error('Error fetching sim:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.post('/', requireRole('manager'), validate(createSimSchema), async (req: Request, res: Response) => {
   const { phone, iccid, provider, status, owner, package_type } = req.body;
   try {
