@@ -370,7 +370,7 @@ export default function AlertsView({
                   <p className="font-bold text-gray-900">تحديث أمان جدران حماية النظام</p>
                   <span className="text-gray-300 font-mono">أمس</span>
                 </div>
-                <p className="text-[11px] text-gray-500 mt-1 lines-clamp-1">تمت ترقية جدار العقد بنجاح إلى النسخة V-2.4.0</p>
+                 <p className="text-[11px] text-gray-500 mt-1 lines-clamp-1">تمت ترقية جدار العقد بنجاح إلى النسخة v4.2.0</p>
               </div>
             </div>
           </section>

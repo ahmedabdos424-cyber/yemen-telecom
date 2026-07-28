@@ -8,11 +8,20 @@ import { ViewType } from '../types';
 import ProfileAvatar from './shared/ProfileAvatar';
 import { LogOut } from 'lucide-react';
 
+interface Alert {
+  id: string;
+  title: string;
+  description?: string;
+  priority?: 'high' | 'medium' | 'low';
+  time?: string;
+}
+
 interface TopBarProps {
   currentView: ViewType;
   setView: (view: ViewType) => void;
   onMenuToggle: () => void;
   unresolvedAlertsCount: number;
+  alerts?: Alert[];
   displayName?: string;
   role?: string;
   onLogout?: () => void;
@@ -23,6 +32,7 @@ export default function TopBar({
   setView,
   onMenuToggle,
   unresolvedAlertsCount,
+  alerts = [],
   displayName,
   role,
   onLogout,
@@ -116,32 +126,37 @@ export default function TopBar({
                 <h4 className="font-bold text-sm text-gray-800">التنبيهات الفورية</h4>
               </div>
               <div className="divide-y divide-gray-100 max-h-64 overflow-y-auto">
-                <div 
-                  className="p-3 hover:bg-red-50/50 cursor-pointer transition-colors"
-                  onClick={() => { setView('alerts'); setShowNotifications(false); }}
-                >
-                  <div className="flex gap-2.5 items-start">
-                    <span className="material-symbols-outlined text-secondary mt-0.5">warning</span>
-                    <div className="flex-1">
-                      <p className="font-bold text-xs text-gray-900 leading-tight">نقص حاد في المخزون - صنعاء</p>
-                      <p className="text-[11px] text-gray-500 mt-1 lines-clamp-2">وصلت كمية شرائح SIM المتوفرة لأقل من 5%.</p>
-                      <span className="text-[10px] text-gray-400 block mt-1">منذ دقيقتين</span>
-                    </div>
+                {alerts.length === 0 ? (
+                  <div className="p-4 text-center">
+                    <span className="material-symbols-outlined text-gray-300 text-2xl">notifications_off</span>
+                    <p className="text-xs text-gray-400 mt-1">لا توجد تنبيهات نشطة</p>
                   </div>
-                </div>
-                <div 
-                  className="p-3 hover:bg-orange-50/50 cursor-pointer transition-colors"
-                  onClick={() => { setView('duplicate-identities'); setShowNotifications(false); }}
-                >
-                  <div className="flex gap-2.5 items-start">
-                    <span className="material-symbols-outlined text-orange-600 mt-0.5">security_risk</span>
-                    <div className="flex-1">
-                      <p className="font-bold text-xs text-gray-900 leading-tight">اشتباه هويات مكررة</p>
-                      <p className="text-[11px] text-gray-500 mt-1 lines-clamp-2">تم تسجيل نفس الهوية في 15 عملية تفعيل مؤخراً.</p>
-                      <span className="text-[10px] text-gray-400 block mt-1">منذ ساعة</span>
+                ) : (
+                  alerts.slice(0, 5).map((alert) => (
+                    <div 
+                      key={alert.id}
+                      className="p-3 hover:bg-gray-50 cursor-pointer transition-colors"
+                      onClick={() => { setView('alerts'); setShowNotifications(false); }}
+                    >
+                      <div className="flex gap-2.5 items-start">
+                        <span className={`material-symbols-outlined mt-0.5 ${
+                          alert.priority === 'high' ? 'text-red-500' : alert.priority === 'medium' ? 'text-orange-500' : 'text-blue-500'
+                        }`}>
+                          {alert.priority === 'high' ? 'warning' : alert.priority === 'medium' ? 'content_copy' : 'info'}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-xs text-gray-900 leading-tight truncate">{alert.title}</p>
+                          {alert.description && (
+                            <p className="text-[11px] text-gray-500 mt-1 line-clamp-2">{alert.description}</p>
+                          )}
+                          {alert.time && (
+                            <span className="text-[10px] text-gray-400 block mt-1">{alert.time}</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  ))
+                )}
               </div>
               <div className="p-2 border-t border-gray-100 bg-gray-50 flex">
                 <button

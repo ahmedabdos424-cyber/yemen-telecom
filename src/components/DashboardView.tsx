@@ -117,7 +117,7 @@ export default function DashboardView({
       </div>
         <button
           type="button"
-          onClick={onRefresh}
+          onClick={() => onRefresh?.()}
           className="btn btn-ghost px-3 py-2 shrink-0"
           title="تحديث البيانات"
         >

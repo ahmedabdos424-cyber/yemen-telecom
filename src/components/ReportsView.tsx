@@ -12,7 +12,7 @@ export default function ReportsView() {
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
   const [operator, setOperator] = useState('الكل');
   const [region, setRegion] = useState('كافة المناطق');
-  const [reportDate, setReportDate] = useState('2023-11-20');
+  const [reportDate, setReportDate] = useState(() => new Date().toISOString().split('T')[0]);
 
   const [agentPerformance, setAgentPerformance] = useState<any[]>([]);
   const [dailySales, setDailySales] = useState<any[]>([]);

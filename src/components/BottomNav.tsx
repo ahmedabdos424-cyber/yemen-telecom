@@ -8,10 +8,14 @@ interface BottomNavProps {
   setView: (view: ViewType) => void;
   unresolvedAlertsCount: number;
   onLogout?: () => void;
+  mobileMenuOpen?: boolean;
+  setMobileMenuOpen?: (open: boolean) => void;
 }
 
-export default function BottomNav({ currentView, setView, unresolvedAlertsCount, onLogout }: BottomNavProps) {
-  const [isMoreOpen, setIsMoreOpen] = useState(false);
+export default function BottomNav({ currentView, setView, unresolvedAlertsCount, onLogout, mobileMenuOpen, setMobileMenuOpen }: BottomNavProps) {
+  const [isMoreOpenInternal, setIsMoreOpenInternal] = useState(false);
+  const isMoreOpen = mobileMenuOpen ?? isMoreOpenInternal;
+  const setIsMoreOpen = setMobileMenuOpen ?? setIsMoreOpenInternal;
 
   const primaryNavItems = [
     { id: 'dashboard', label: 'الرئيسية', icon: 'home' },
