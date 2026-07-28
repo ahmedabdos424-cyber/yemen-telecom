@@ -446,22 +446,22 @@ function AgentsView({ agents = [], setView, onUpdateAgent }: AgentsViewProps) {
   return (
     <div className="space-y-6">
       {/* Top action header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
         <div>
-          <h2 className="font-headline-lg text-lg md:text-xl font-bold text-gray-900">إدارة شبكة الوكلاء المعتمدين</h2>
+          <h2 className="font-headline-lg text-base sm:text-lg md:text-xl font-bold text-gray-900">إدارة شبكة الوكلاء المعتمدين</h2>
 
         </div>
         <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
           <button
             onClick={() => setShowPrintModal(true)}
-            className="btn btn-ghost"
+            className="btn btn-ghost w-full sm:w-auto justify-center"
           >
             <span className="material-symbols-outlined text-sm text-red-600">picture_as_pdf</span>
             تصدير تقرير الوكلاء (PDF)
           </button>
           <button
             onClick={() => setView('add-agent')}
-            className="btn btn-primary"
+            className="btn btn-primary w-full sm:w-auto justify-center"
           >
             <span className="material-symbols-outlined text-sm">person_add</span>
             إضافة وكيل نظام جديد
@@ -871,7 +871,7 @@ function AgentsView({ agents = [], setView, onUpdateAgent }: AgentsViewProps) {
 
       {/* Agent Edit Modal */}
       {editAgent && (
-        <div className="fixed inset-0 bg-gray-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-gray-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden text-right leading-relaxed animate-in fade-in zoom-in-95 duration-200 border border-gray-100/80">
             <div className="px-6 py-4.5 bg-gray-50 border-b border-gray-150 flex justify-between items-center">
               <button onClick={() => setEditAgent(null)} className="p-2 hover:bg-gray-150/70 rounded-full text-gray-400 hover:text-gray-700 transition-colors cursor-pointer">
@@ -913,17 +913,17 @@ function AgentsView({ agents = [], setView, onUpdateAgent }: AgentsViewProps) {
                   className="w-full px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all"
                 />
               </div>
-              <div className="flex gap-2 justify-end pt-4 border-t border-gray-100">
+              <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-4 border-t border-gray-100">
                 <button
                   type="button"
                   onClick={() => setEditAgent(null)}
-                  className="px-4 py-2 border border-gray-200 text-gray-700 bg-white hover:bg-gray-55/70 rounded-xl text-xs font-bold transition-all hover:border-gray-300 cursor-pointer"
+                  className="px-4 py-2.5 border border-gray-200 text-gray-700 bg-white hover:bg-gray-55/70 rounded-xl text-xs font-bold transition-all hover:border-gray-300 cursor-pointer w-full sm:w-auto"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:brightness-110 shadow-md active:scale-[0.98] transition-all cursor-pointer"
+                  className="px-5 py-2.5 bg-primary text-white rounded-xl text-xs font-bold hover:brightness-110 shadow-md active:scale-[0.98] transition-all cursor-pointer w-full sm:w-auto"
                 >
                   حفظ التعديلات
                 </button>

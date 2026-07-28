@@ -170,18 +170,18 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
             <p className="text-sm text-slate-200 mb-6 leading-relaxed">
               يجب السماح بالوصول إلى الكاميرا لاستخدام قراءة الهوية
             </p>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
                 type="button"
                 onClick={() => setPermissionDenied(false)}
-                className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300"
+                className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 min-h-[44px]"
               >
                 إغلاق
               </button>
               <button
                 type="button"
                 onClick={() => { setPermissionDenied(false); startCamera(); }}
-                className="btn btn-sm flex-1 bg-red-600 hover:bg-red-500 text-white"
+                className="btn btn-sm flex-1 bg-red-600 hover:bg-red-500 text-white min-h-[44px]"
               >
                 إعادة المحاولة
               </button>
@@ -200,18 +200,18 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
             <p className="text-xs text-slate-400 mb-6 leading-relaxed">
               يرجى فتح إعدادات التطبيق والسماح بالوصول إلى الكاميرا
             </p>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
                 type="button"
                 onClick={() => setPermanentDenial(false)}
-                className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300"
+                className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 min-h-[44px]"
               >
                 إغلاق
               </button>
               <button
                 type="button"
                 onClick={() => { setPermanentDenial(false); openAppSettings(); }}
-                className="btn btn-sm flex-1 bg-amber-600 hover:bg-amber-500 text-white flex items-center justify-center gap-2"
+                className="btn btn-sm flex-1 bg-amber-600 hover:bg-amber-500 text-white flex items-center justify-center gap-2 min-h-[44px]"
               >
                 <Settings size={14} />
                 فتح الإعدادات
@@ -414,18 +414,18 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
             <p className="text-sm text-slate-200 mb-6 leading-relaxed">
               يجب السماح بالوصول إلى الكاميرا لاستخدام قراءة الهوية
             </p>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
                 type="button"
                 onClick={() => setPermissionDenied(false)}
-                className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300"
+                className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 min-h-[44px]"
               >
                 إغلاق
               </button>
               <button
                 type="button"
                 onClick={() => { setPermissionDenied(false); startCamera(); }}
-                className="btn btn-sm flex-1 bg-red-600 hover:bg-red-500 text-white"
+                className="btn btn-sm flex-1 bg-red-600 hover:bg-red-500 text-white min-h-[44px]"
               >
                 إعادة المحاولة
               </button>
@@ -444,18 +444,18 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
             <p className="text-xs text-slate-400 mb-6 leading-relaxed">
               يرجى فتح إعدادات التطبيق والسماح بالوصول إلى الكاميرا
             </p>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
                 type="button"
                 onClick={() => setPermanentDenial(false)}
-                className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300"
+                className="btn btn-sm flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 min-h-[44px]"
               >
                 إغلاق
               </button>
               <button
                 type="button"
                 onClick={() => { setPermanentDenial(false); openAppSettings(); }}
-                className="btn btn-sm flex-1 bg-amber-600 hover:bg-amber-500 text-white flex items-center justify-center gap-2"
+                className="btn btn-sm flex-1 bg-amber-600 hover:bg-amber-500 text-white flex items-center justify-center gap-2 min-h-[44px]"
               >
                 <Settings size={14} />
                 فتح الإعدادات
