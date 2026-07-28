@@ -7,6 +7,9 @@ interface CameraCaptureProps {
   iconSize?: number;
 }
 
+const JPEG_QUALITY = 0.9;
+const MAX_DIMENSION = 2048;
+
 function openAppSettings() {
   const intentUrl = 'intent:#Intent;action=android.settings.APPLICATION_DETAILS_SETTINGS;S:package=com.yemen.telecom;end';
   const fallbackUrl = 'app-settings://';
@@ -25,21 +28,108 @@ function disposeCanvas(c: HTMLCanvasElement | null) {
   if (ctx) ctx.clearRect(0, 0, 0, 0);
 }
 
+function fixImageOrientation(file: File): Promise<File> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let { width, height } = img;
+
+      if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+        const ratio = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+            } else {
+              resolve(file);
+            }
+            URL.revokeObjectURL(img.src);
+          },
+          'image/jpeg',
+          JPEG_QUALITY
+        );
+      } else {
+        URL.revokeObjectURL(img.src);
+        resolve(file);
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(img.src);
+      resolve(file);
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+function dataUrlToOptimizedBlob(dataUrl: string): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let { width, height } = img;
+
+      if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+        const ratio = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error('Failed to create blob'));
+            URL.revokeObjectURL(img.src);
+          },
+          'image/jpeg',
+          JPEG_QUALITY
+        );
+      } else {
+        URL.revokeObjectURL(img.src);
+        reject(new Error('Failed to get canvas context'));
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(img.src);
+      reject(new Error('Failed to load image'));
+    };
+    img.src = dataUrl;
+  });
+}
+
 export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptureProps) {
   const [scanning, setScanning] = useState(false);
   const [showViewfinder, setShowViewfinder] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [permanentDenial, setPermanentDenial] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const streamStartTimeRef = useRef(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const denialCountRef = useRef(0);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(t => t.stop());
         streamRef.current = null;
@@ -50,33 +140,63 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current.getTracks().forEach(t => {
+        try { t.stop(); } catch { /* already stopped */ }
+      });
       streamRef.current = null;
     }
     disposeCanvas(canvasRef.current);
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
     setShowViewfinder(false);
     setScanning(false);
   }, []);
 
   const startCamera = useCallback(async () => {
+    if (!mountedRef.current) return;
     setPermissionDenied(false);
     setPermanentDenial(false);
     setScanning(true);
     setShowViewfinder(true);
     setPreviewImage(null);
+    streamStartTimeRef.current = Date.now();
+
     try {
-      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      const resolution = Math.min(screen.width, screen.height, 1920);
+      let s: MediaStream;
+      try {
+        s = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'environment',
+            width: { ideal: resolution },
+            height: { ideal: resolution },
+          },
+        });
+      } catch {
+        s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      }
+
+      if (!mountedRef.current) {
+        s.getTracks().forEach(t => t.stop());
+        return;
+      }
+
       streamRef.current = s;
       denialCountRef.current = 0;
+
       if (videoRef.current) {
         videoRef.current.srcObject = s;
-        videoRef.current.play();
+        try {
+          await videoRef.current.play();
+        } catch { /* autoplay blocked, UI still shows */ }
       }
     } catch (err) {
+      if (!mountedRef.current) return;
       setShowViewfinder(false);
       setScanning(false);
       const isPermissionError = err instanceof DOMException && (
-        err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError'
+        err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError' || err.name === 'AbortError'
       );
       if (isPermissionError) {
         denialCountRef.current += 1;
@@ -92,29 +212,52 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
   }, []);
 
   const captureFrame = useCallback(() => {
-    if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      canvas.width = Math.min(video.videoWidth, 1920);
-      canvas.height = Math.min(video.videoHeight, 1920);
-      canvas.getContext('2d')?.drawImage(video, 0, 0);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+    if (!videoRef.current || !canvasRef.current) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const vw = video.videoWidth || 1280;
+    const vh = video.videoHeight || 960;
+
+    let w = vw;
+    let h = vh;
+    if (w > MAX_DIMENSION || h > MAX_DIMENSION) {
+      const ratio = Math.min(MAX_DIMENSION / w, MAX_DIMENSION / h);
+      w = Math.round(w * ratio);
+      h = Math.round(h * ratio);
+    }
+
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(video, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
       disposeCanvas(canvas);
       setPreviewImage(dataUrl);
     }
+
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current.getTracks().forEach(t => {
+        try { t.stop(); } catch { /* already stopped */ }
+      });
       streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
   }, []);
 
-  const confirmCapture = useCallback(() => {
-    if (previewImage) {
+  const confirmCapture = useCallback(async () => {
+    if (!previewImage || !mountedRef.current) return;
+    setProcessing(true);
+    try {
       const img = previewImage;
       setPreviewImage(null);
       setShowViewfinder(false);
       setScanning(false);
       onCapture(img);
+    } finally {
+      if (mountedRef.current) setProcessing(false);
     }
   }, [previewImage, onCapture]);
 
@@ -133,6 +276,8 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
         }
       };
       reader.readAsDataURL(file);
+    } else {
+      setShowViewfinder(false);
     }
     setScanning(false);
   }, []);
@@ -161,6 +306,7 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
         onConfirm={confirmCapture}
         onRetake={retakeCapture}
         onCancel={stopCamera}
+        processing={processing}
       />
 
       {permissionDenied && (
@@ -234,102 +380,137 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [permanentDenial, setPermanentDenial] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const denialCountRef = useRef(0);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current.getTracks().forEach(t => {
+          try { t.stop(); } catch { /* already stopped */ }
+        });
         streamRef.current = null;
       }
+      if (videoRef.current) videoRef.current.srcObject = null;
       disposeCanvas(canvasRef.current);
     };
   }, []);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current.getTracks().forEach(t => {
+        try { t.stop(); } catch { /* already stopped */ }
+      });
       streamRef.current = null;
     }
+    if (videoRef.current) videoRef.current.srcObject = null;
     disposeCanvas(canvasRef.current);
     setShowViewfinder(false);
     setScanning(false);
   }, []);
 
   const startCamera = useCallback(async () => {
+    if (!mountedRef.current) return;
     setPermissionDenied(false);
     setPermanentDenial(false);
     setScanning(true);
     setShowViewfinder(true);
     setPreviewImage(null);
+
     try {
-      const resolution = Math.min(screen.width, screen.height, 1280);
-      const s = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: resolution }, height: { ideal: resolution } },
-      });
+      const resolution = Math.min(screen.width, screen.height, 1920);
+      let s: MediaStream;
+      try {
+        s = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment', width: { ideal: resolution }, height: { ideal: resolution } },
+        });
+      } catch {
+        s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      }
+
+      if (!mountedRef.current) {
+        s.getTracks().forEach(t => t.stop());
+        return;
+      }
+
       streamRef.current = s;
       denialCountRef.current = 0;
       if (videoRef.current) {
         videoRef.current.srcObject = s;
-        videoRef.current.play();
+        try { await videoRef.current.play(); } catch { /* autoplay blocked */ }
       }
-    } catch {
-      try {
-        const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        streamRef.current = s;
-        denialCountRef.current = 0;
-        if (videoRef.current) {
-          videoRef.current.srcObject = s;
-          videoRef.current.play();
-        }
-      } catch (err) {
-        setShowViewfinder(false);
-        setScanning(false);
-        const isPermissionError = err instanceof DOMException && (
-          err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError'
-        );
-        if (isPermissionError) {
-          denialCountRef.current += 1;
-          if (denialCountRef.current >= 2) {
-            setPermanentDenial(true);
-          } else {
-            setPermissionDenied(true);
-          }
+    } catch (err) {
+      if (!mountedRef.current) return;
+      setShowViewfinder(false);
+      setScanning(false);
+      const isPermissionError = err instanceof DOMException && (
+        err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError' || err.name === 'AbortError'
+      );
+      if (isPermissionError) {
+        denialCountRef.current += 1;
+        if (denialCountRef.current >= 2) {
+          setPermanentDenial(true);
         } else {
-          fileInputRef.current?.click();
+          setPermissionDenied(true);
         }
+      } else {
+        fileInputRef.current?.click();
       }
     }
   }, []);
 
   const captureFrame = useCallback(() => {
-    if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      canvas.width = Math.min(video.videoWidth, 1920);
-      canvas.height = Math.min(video.videoHeight, 1920);
-      canvas.getContext('2d')?.drawImage(video, 0, 0);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+    if (!videoRef.current || !canvasRef.current) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const vw = video.videoWidth || 1280;
+    const vh = video.videoHeight || 960;
+
+    let w = vw;
+    let h = vh;
+    if (w > MAX_DIMENSION || h > MAX_DIMENSION) {
+      const ratio = Math.min(MAX_DIMENSION / w, MAX_DIMENSION / h);
+      w = Math.round(w * ratio);
+      h = Math.round(h * ratio);
+    }
+
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(video, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
       disposeCanvas(canvas);
       setPreviewImage(dataUrl);
     }
+
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current.getTracks().forEach(t => {
+        try { t.stop(); } catch { /* already stopped */ }
+      });
       streamRef.current = null;
     }
+    if (videoRef.current) videoRef.current.srcObject = null;
   }, []);
 
-  const confirmCapture = useCallback(() => {
-    if (previewImage) {
+  const confirmCapture = useCallback(async () => {
+    if (!previewImage || !mountedRef.current) return;
+    setProcessing(true);
+    try {
       const img = previewImage;
       setPreviewImage(null);
       setShowViewfinder(false);
       setScanning(false);
       onCapture(img);
+    } finally {
+      if (mountedRef.current) setProcessing(false);
     }
   }, [previewImage, onCapture]);
 
@@ -346,6 +527,8 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
         if (ev.target?.result) setPreviewImage(ev.target.result as string);
       };
       reader.readAsDataURL(file);
+    } else {
+      setShowViewfinder(false);
     }
     setScanning(false);
   }, []);
@@ -405,6 +588,7 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
         onConfirm={confirmCapture}
         onRetake={retakeCapture}
         onCancel={stopCamera}
+        processing={processing}
       />
 
       {permissionDenied && (
