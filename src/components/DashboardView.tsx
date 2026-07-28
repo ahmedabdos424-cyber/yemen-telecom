@@ -109,9 +109,10 @@ export default function DashboardView({
           <button 
             type="button"
             onClick={handleSearch}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-secondary bg-red-100 hover:bg-red-200 px-3 py-2 rounded-lg transition-colors"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-secondary bg-red-100 hover:bg-red-200 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg transition-colors whitespace-nowrap"
           >
-            بحث متقدم
+            <span className="hidden sm:inline">بحث متقدم</span>
+            <span className="sm:hidden">بحث</span>
           </button>
         )}
       </div>
