@@ -77,7 +77,6 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
               onChange={(e) => setName(e.target.value)}
               placeholder="الاسم التجاري"
               className="input-field"
-              autoFocus
              />
          </div>
 
