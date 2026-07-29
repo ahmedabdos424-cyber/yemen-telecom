@@ -38,9 +38,9 @@ export default function ReportsView() {
         setDailySales(sales || []);
         setSellerPerformance(sellers || []);
         setOperatorDistribution(dist || null);
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!mounted) return;
-        setFetchError(err?.message || 'فشل تحميل التقارير');
+        setFetchError(err instanceof Error ? err.message : String(err));
         setAgentPerformance([]);
         setDailySales([]);
         setSellerPerformance([]);

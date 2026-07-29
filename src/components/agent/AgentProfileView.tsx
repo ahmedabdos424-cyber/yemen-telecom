@@ -38,7 +38,6 @@ export default function AgentProfileView({
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsLogoutConfirmOpen, setSettingsLogoutConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -108,8 +107,8 @@ export default function AgentProfileView({
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-    } catch (err: any) {
-      setPasswordError(err?.message || 'فشل تغيير كلمة المرور');
+    } catch (err: unknown) {
+      setPasswordError(err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -445,8 +444,6 @@ export default function AgentProfileView({
         onLogout={onLogout}
         onConfirmLogout={onConfirmLogout}
         handleConfirmLogout={handleConfirmLogout}
-        logoutConfirmOpen={settingsLogoutConfirmOpen}
-        setLogoutConfirmOpen={setSettingsLogoutConfirmOpen}
         username={username}
         biometricEnabled={biometricEnabled}
         handleToggleBiometric={handleToggleBiometric}

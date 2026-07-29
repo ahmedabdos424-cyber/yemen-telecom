@@ -1,5 +1,20 @@
 import { tokenStorage } from '../services/tokenStorage.ts';
 import { captureTiming } from '../lib/monitor.ts';
+import type {
+  ApiLoginResponse, ApiMeResponse, ApiBackupResponse, ApiLockdownResponse, ApiResetPasswordResponse,
+  SimRow, CreateSimRequest, UpdateSimRequest,
+  AgentRow, CreateAgentRequest, CreateAgentResponse, UpdateAgentRequest,
+  MappedSeller, CreateSellerRequest, CreateSellerResponse, UpdateSellerRequest, UpdateSellerBalanceRequest,
+  MappedOperation, CreateOperationRequest,
+  MappedInventory, UpdateInventoryItem,
+  AlertRow,
+  AdminSettingsResponse, UpdateSettingsRequest, MappedTransaction, DuplicateIdentityRow, AuditLogEntry,
+  UpdateProfileRequest,
+  StatsResponse,
+  CustomerRow,
+  DistributionRequestRow, CreateDistributionRequest,
+  AppVersionResponse,
+} from './types';
 
 const REQUEST_TIMEOUT_MS = 60000;
 
@@ -258,11 +273,7 @@ async function uploadFile(file: File | Blob, fieldName = 'image'): Promise<{ url
   return res.json();
 }
 
-export interface ApiLoginResponse { token: string; refreshToken: string; user: { id: number; username: string; displayName: string; role: string; phone: string; region: string } }
-export interface ApiMeResponse { id: number; username: string; displayName: string; role: string; phone: string; region: string; lastLogin: string }
-export interface ApiBackupResponse { success: boolean; filename: string; size: number; sizeFormatted: string; tables: number; records: number; downloadUrl: string }
-export interface ApiLockdownResponse { success: boolean; locked: boolean; message: string }
-export interface ApiResetPasswordResponse { message: string; credentials: { username: string; password: string } }
+export type { ApiLoginResponse, ApiMeResponse, ApiBackupResponse, ApiLockdownResponse, ApiResetPasswordResponse } from './types';
 
 export const api = {
   // Auth
@@ -278,85 +289,85 @@ export const api = {
 
   // Users (profile, password)
   updatePassword: (currentPassword: string, newPassword: string) =>
-    request<any>('/users/password', {
+    request<{ message: string }>('/users/password', {
       method: 'PUT',
       body: JSON.stringify({ currentPassword, newPassword }),
     }),
-  updateProfile: (data: any) =>
-    request<any>('/users/profile', { method: 'PUT', body: JSON.stringify(data) }),
+  updateProfile: (data: UpdateProfileRequest) =>
+    request<{ id: number; username: string; displayName: string; role: string; phone: string; region: string }>('/users/profile', { method: 'PUT', body: JSON.stringify(data) }),
 
   // SIMs (admin)
-  getSims: () => request<any[]>('/sims'),
-  createSim: (data: any) =>
-    request<any>('/sims', { method: 'POST', body: JSON.stringify(data) }),
-  updateSim: (id: number, data: any) =>
-    request<any>(`/sims/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  getSims: () => request<SimRow[]>('/sims'),
+  createSim: (data: CreateSimRequest) =>
+    request<SimRow>('/sims', { method: 'POST', body: JSON.stringify(data) }),
+  updateSim: (id: number, data: UpdateSimRequest) =>
+    request<SimRow>(`/sims/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteSim: (id: number) =>
-    request<any>(`/sims/${id}`, { method: 'DELETE' }),
+    request<{ message: string }>(`/sims/${id}`, { method: 'DELETE' }),
 
   // Agents
-  getAgents: () => request<any[]>('/agents'),
-  createAgent: (data: any) =>
-    request<any>('/agents', { method: 'POST', body: JSON.stringify(data) }),
-  updateAgent: (id: number, data: any) =>
-    request<any>(`/agents/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  getAgents: () => request<AgentRow[]>('/agents'),
+  createAgent: (data: CreateAgentRequest) =>
+    request<CreateAgentResponse>('/agents', { method: 'POST', body: JSON.stringify(data) }),
+  updateAgent: (id: number, data: UpdateAgentRequest) =>
+    request<AgentRow>(`/agents/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 
   // Sellers
-  getSellers: () => request<any[]>('/sellers'),
-  createSeller: (data: any) =>
-    request<any>('/sellers', { method: 'POST', body: JSON.stringify(data) }),
-  updateSeller: (id: number, data: any) =>
-    request<any>(`/sellers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  getSellers: () => request<MappedSeller[]>('/sellers'),
+  createSeller: (data: CreateSellerRequest) =>
+    request<CreateSellerResponse>('/sellers', { method: 'POST', body: JSON.stringify(data) }),
+  updateSeller: (id: number, data: UpdateSellerRequest) =>
+    request<MappedSeller>(`/sellers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   updateSellerBalance: (id: number, amount: number, invoiceImage?: string) =>
-    request<any>(`/sellers/${id}/balance`, {
+    request<MappedSeller>(`/sellers/${id}/balance`, {
       method: 'PUT',
       body: JSON.stringify(invoiceImage ? { amount, invoiceImage } : { amount }),
     }),
   deleteSeller: (id: number) =>
-    request<any>(`/sellers/${id}`, { method: 'DELETE' }),
+    request<{ message: string }>(`/sellers/${id}`, { method: 'DELETE' }),
   resetSellerPassword: (id: number) =>
     request<ApiResetPasswordResponse>(
       `/sellers/${id}/reset-password`, { method: 'POST' }
     ),
 
   // Operations
-  getOperations: () => request<any[]>('/operations'),
-  createOperation: (data: any) =>
-    request<any>('/operations', { method: 'POST', body: JSON.stringify(data) }),
+  getOperations: () => request<MappedOperation[]>('/operations'),
+  createOperation: (data: CreateOperationRequest) =>
+    request<MappedOperation>('/operations', { method: 'POST', body: JSON.stringify(data) }),
 
   // Inventories
-  getInventories: () => request<any[]>('/inventories'),
-  updateInventories: (data: any[]) =>
-    request<any[]>('/inventories', { method: 'PUT', body: JSON.stringify(data) }),
+  getInventories: () => request<MappedInventory[]>('/inventories'),
+  updateInventories: (data: UpdateInventoryItem[]) =>
+    request<MappedInventory[]>('/inventories', { method: 'PUT', body: JSON.stringify(data) }),
 
   // Alerts
-  getAlerts: () => request<any[]>('/alerts'),
+  getAlerts: () => request<AlertRow[]>('/alerts'),
   resolveAlert: (id: number) =>
-    request<any>(`/alerts/${id}`, { method: 'DELETE' }),
+    request<{ message: string }>(`/alerts/${id}`, { method: 'DELETE' }),
 
   // Admin
-  getStats: () => request<any>('/stats'),
-  getSettings: () => request<any>('/admin/settings'),
-  updateSettings: (data: any) =>
-    request<any>('/admin/settings', { method: 'PUT', body: JSON.stringify(data) }),
-  getTransactions: () => request<any[]>('/admin/transactions'),
-  getDuplicateIdentities: () => request<any[]>('/admin/duplicate-identities'),
-  flagDuplicateIdentity: (idNo: string, data?: any) =>
-    request<any>(`/admin/duplicate-identities/${encodeURIComponent(idNo)}/flag`, {
+  getStats: () => request<StatsResponse>('/stats'),
+  getSettings: () => request<AdminSettingsResponse>('/admin/settings'),
+  updateSettings: (data: UpdateSettingsRequest) =>
+    request<AdminSettingsResponse>('/admin/settings', { method: 'PUT', body: JSON.stringify(data) }),
+  getTransactions: () => request<MappedTransaction[]>('/admin/transactions'),
+  getDuplicateIdentities: () => request<DuplicateIdentityRow[]>('/admin/duplicate-identities'),
+  flagDuplicateIdentity: (idNo: string, data?: Record<string, unknown>) =>
+    request<{ success: boolean; idNo: string }>(`/admin/duplicate-identities/${encodeURIComponent(idNo)}/flag`, {
       method: 'POST',
       body: JSON.stringify(data || {}),
     }),
-  blockDuplicateIdentity: (idNo: string, data?: any) =>
-    request<any>(`/admin/duplicate-identities/${encodeURIComponent(idNo)}/block`, {
+  blockDuplicateIdentity: (idNo: string, data?: Record<string, unknown>) =>
+    request<{ success: boolean; idNo: string }>(`/admin/duplicate-identities/${encodeURIComponent(idNo)}/block`, {
       method: 'POST',
       body: JSON.stringify(data || {}),
     }),
-  unblockDuplicateIdentity: (idNo: string, data?: any) =>
-    request<any>(`/admin/duplicate-identities/${encodeURIComponent(idNo)}/unblock`, {
+  unblockDuplicateIdentity: (idNo: string, data?: Record<string, unknown>) =>
+    request<{ success: boolean; idNo: string }>(`/admin/duplicate-identities/${encodeURIComponent(idNo)}/unblock`, {
       method: 'POST',
       body: JSON.stringify(data || {}),
     }),
-  getAuditLogs: () => request<any[]>('/admin/audit-logs'),
+  getAuditLogs: () => request<AuditLogEntry[]>('/admin/audit-logs'),
 
   // System: Backup
   createBackup: () =>
@@ -376,13 +387,22 @@ export const api = {
 
   // Reports
   getDailySales: () =>
-    request<any[]>('/reports/daily-sales'),
+    request<Array<{ day: string; activations: number; unique_customers: number; operator: string }>>('/reports/daily-sales'),
   getAgentPerformance: () =>
-    request<any[]>('/reports/agent-performance'),
+    request<Array<{ id: number; agent_name: string; region: string; seller_count: number; total_sims: number; sales_30_days: number; avg_efficiency: number }>>('/reports/agent-performance'),
   getOperatorDistribution: () =>
-    request<any>('/reports/operator-distribution'),
+    request<{ sims: Array<{ operator: string; count: number; status: string }>; operations: Array<{ operator: string; count: number; status: string }> }>('/reports/operator-distribution'),
   getSellerPerformance: () =>
-    request<any[]>('/reports/seller-performance'),
+    request<Array<{ id: number; name: string; store_name: string; region: string; sims_count: number; sales_30_days: number; sales_growth: number; efficiency: number; activity_rate: number; status: string; agent_name: string }>>('/reports/seller-performance'),
+
+  // App Update
+  getAppVersion: () =>
+    request<AppVersionResponse>('/app-version'),
+  recordAppUpdate: (data: { deviceId: string; version: string; versionCode: number }) =>
+    request<{ ok: boolean }>('/app-update-installed', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   // Upload
   uploadFile,

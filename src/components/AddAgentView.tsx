@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { Agent, ViewType } from '../types';
 import { useToast, ToastContainer } from '../hooks/useToast';
 import { api } from '../api/client';
+import { RefreshCw } from 'lucide-react';
 
 interface AddAgentViewProps {
   onAddAgent: (agent: Partial<Agent>) => void;
@@ -42,8 +43,8 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
 
       toastSuccess(`تم تسجيل الوكيل الموزع: "${name}" بنجاح في النظام وتخصيص العقدة الأمانية له.`);
       setView('agents');
-    } catch (err: any) {
-      toastError(err?.message || 'فشل تسجيل الوكيل. الرجاء المحاولة مرة أخرى.');
+    } catch (err: unknown) {
+      toastError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -69,14 +70,15 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
       <form onSubmit={handleSubmit} className="space-y-4 text-right">
         <div>
           <label className="block text-xs font-bold text-gray-600 mb-1.5">الاسم التجاري الكامل للوكيل</label>
-          <input
-            type="text"
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="الاسم التجاري"
-            className="input-field"
-           />
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="الاسم التجاري"
+              className="input-field"
+              autoFocus
+             />
          </div>
 
          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -149,12 +151,14 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
              إلغاء التراجع
            </button>
            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="btn btn-primary"
-           >
-             {isSubmitting ? 'جاري التسجيل...' : 'تأكيد وتسجيل الوكيل'}
-           </button>
+               type="submit"
+               disabled={isSubmitting}
+               className="btn btn-primary flex items-center gap-2"
+            >
+              {isSubmitting ? (
+                <><RefreshCw size={14} className="animate-spin" /> جاري التسجيل...</>
+              ) : 'تأكيد وتسجيل الوكيل'}
+            </button>
         </div>
       </form>
     </div>

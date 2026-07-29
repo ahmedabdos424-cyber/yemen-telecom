@@ -1,36 +1,16 @@
 ﻿{
-    "web":  {
-                "lang":  "ar",
-                "status":  "fixed (CORS blank-page bug resolved)",
-                "dir":  "rtl"
-            },
-    "versionCode":  3,
-    "internalBuild":  "v4.2.0",
-    "backend":  {
-                    "url":  "https://yemen-telecom.onrender.com",
-                    "health":  "live (HTTP 200, db connected)",
-                    "lastDeploy":  "dep-d9b8t79oagis739migag"
-                },
-    "android":  {
-                    "abis":  [
-                                 "arm64-v8a",
-                                 "armeabi-v7a",
-                                 "x86",
-                                 "x86_64"
-                             ],
-                    "apkSha256":  "8207295E6FB62D3F014DF9095F551CDEB3EE81122F895A8DC4E24003B14D4EDD",
-                    "sizeAabBytes":  25348654,
-                    "targetSdk":  36,
-                    "apk":  "release/yemen-telecom-release.apk",
-                    "aab":  "release/yemen-telecom-release.aab",
-                    "aabSha256":  "D4BD1541A668ED7C2DA58D4E11EECCAFA40153B8E2F596C02A96550718329A8C",
-                    "sizeApkBytes":  24931792,
-                    "signing":  "RSA-4096 / SHA384withRSA, alias release",
-                    "minSdk":  24
-                },
-    "packageName":  "com.yemen.telecom",
-    "releaseDate":  "2026-07-15",
-    "commit":  "b3b359d9ade73b228e173b0946100c4d997b0ebd",
-    "app":  "Yemen Telecom SIM Management",
-    "versionName":  "1.0.0"
+  "versionCode": 14,
+  "versionName": "1.0.9",
+  "buildTimestamp": "2026-07-29T12:00:00Z",
+  "apk": {
+    "filename": "yemen-telecom-release.apk",
+    "size": 27787749,
+    "sha256": "A012B3FC51FE8F0ABC5BD85280576435E03CBD3887AF2EDB254E49CC1AA0A634"
+  },
+  "aab": {
+    "filename": "yemen-telecom-release.aab",
+    "size": 27333333,
+    "sha256": "337BEA5FA771290E3B149B7DE48AB56547027FC6F0B9C7EA051C25EE7D80506F"
+  },
+  "environment": "production"
 }

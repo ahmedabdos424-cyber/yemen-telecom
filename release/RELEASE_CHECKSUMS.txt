@@ -1,27 +1,2 @@
-﻿Yemen Telecom SIM Management System - Release Checksums
-=======================================================
-Generated : 2026-07-16 01:45:00
-Build     : v4.4.0 (versionCode 3, versionName 1.0.0)
-Release   : APK connectivity fix — 60s timeout + auto-retry for cold starts, omit credentials on native (Bearer token auth)
-Signer    : release keystore (4096-bit RSA, SHA384withRSA)
-           SHA-256 fingerprint of signing cert:
-           10802bfc0ad5893f9d6ac1087ce0016c4d307923fbcce7b7d9743f5572766eab
-
-FILE                          SHA-256 (upper)                          SIZE
-yemen-telecom-release.apk     1D9928FFA99B0F4642897D95B9EC426BB07A233EB6E308EC902E7A8729684715  24932036 bytes
-yemen-telecom-release.aab     0EB1E35842015F39FA401FE74534FA8236EF3B4E14DB43A11194B27DF268F3A7  25348844 bytes
-
-SHA-256:
-1D9928FFA99B0F4642897D95B9EC426BB07A233EB6E308EC902E7A8729684715  yemen-telecom-release.apk
-0EB1E35842015F39FA401FE74534FA8236EF3B4E14DB43A11194B27DF268F3A7  yemen-telecom-release.aab
-
-MD5 (legacy/secondary only):
-496168C1A2EDC984F27A8B6F9C81619F  yemen-telecom-release.apk
-D48ECEADA4656B5CAFB0CEAF9175C7F9  yemen-telecom-release.aab
-
-VERIFY (PowerShell):
-  Get-FileHash yemen-telecom-release.apk -Algorithm SHA256
-  Get-FileHash yemen-telecom-release.aab -Algorithm SHA256
-
-VERIFY (apksigner):
-  apksigner verify --verbose release/yemen-telecom-release.apk
+﻿yemen-telecom-release.apk:A012B3FC51FE8F0ABC5BD85280576435E03CBD3887AF2EDB254E49CC1AA0A634
+yemen-telecom-release.aab:(not built - APK only)

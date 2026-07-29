@@ -2,11 +2,11 @@ import { Router, type Response } from 'express';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { logger } from '../logger';
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://qxroquilskugfemzmrzp.supabase.co';
+const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
 
 let supabase: SupabaseClient | null = null;
-if (SUPABASE_ANON_KEY) {
+if (SUPABASE_URL && SUPABASE_ANON_KEY) {
   supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });

@@ -107,3 +107,13 @@ playwright/.cache/
 testsprite_tests/tmp/config.json
 
 testsprite_tests\tmp\config.json
+
+# QA reports and test artifacts
+qa-reports/
+
+# AI-generated documentation files (lowercase variants)
+android-*.md
+security-*.md
+
+# Temporary debug files
+.domdump.txt

@@ -4,26 +4,32 @@ android {
     namespace = "com.yemen.telecom"
     compileSdk = rootProject.ext.compileSdkVersion
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
     }
     defaultConfig {
         applicationId "com.yemen.telecom"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 13
-        versionName "1.0.8"
+        versionCode 14
+        versionName "1.0.9"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    def keystorePropertiesFile = rootProject.file("app/key.properties")
+    def keystoreProperties = new Properties()
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+    }
+
     signingConfigs {
         release {
-            storeFile file("$projectDir/release.keystore")
-            storePassword 'android'
-            keyAlias 'androiddebugkey'
-            keyPassword 'android'
+            storeFile file(keystoreProperties['storeFile'] ?: System.getenv('KEYSTORE_PATH') ?: "$projectDir/release.keystore")
+            storePassword keystoreProperties['storePassword'] ?: System.getenv('KEYSTORE_PASSWORD')
+            keyAlias keystoreProperties['keyAlias'] ?: System.getenv('KEYSTORE_ALIAS')
+            keyPassword keystoreProperties['keyPassword'] ?: System.getenv('KEY_PASSWORD')
         }
     }
     buildTypes {

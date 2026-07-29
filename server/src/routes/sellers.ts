@@ -165,7 +165,7 @@ router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), 
       }
     }
 
-    const sid = req.body.seller_id || req.body.sellerId || `SLR-${String(Math.floor(10000 + Math.random() * 90000))}`;
+    const sid = req.body.seller_id || req.body.sellerId || `SLR-${crypto.randomUUID().split('-').slice(0, 2).join('')}`;
     const now = new Date().toISOString().split('T')[0].replace(/-/g, '/');
 
     // Execute all DB writes inside a transaction
@@ -207,9 +207,9 @@ router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), 
         password: sellerPassword
       }
     });
-  } catch (err: any) {
-    if (err.statusCode === 409) {
-      return res.status(409).json({ error: err.message });
+  } catch (err: unknown) {
+    if (err && typeof err === 'object' && 'statusCode' in err && (err as any).statusCode === 409) {
+      return res.status(409).json({ error: err instanceof Error ? err.message : String(err) });
     }
     logger.error('Error creating seller:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -283,7 +283,7 @@ router.put('/:id/balance', requireRole('manager', 'agent'), validate(updateSelle
       // Record a recharge operation so the captured invoice is persisted and auditable.
       if (invoiceImage) {
         const seller = updateResult.rows[0];
-        const opId = `recharge-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const opId = `recharge-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
         await client.query(
           `INSERT INTO operations (op_id, type, target, operator, date, time, status, customer_name, contract_image, created_by)
            VALUES ($1, 'recharge', $2, 'yemen_telecom', NOW()::text, NOW()::text, 'success', $3, $4, $5)`,

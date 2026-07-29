@@ -55,7 +55,7 @@ export function useAgentSellerState(role: string | null, username: string) {
       await api.createOperation({
         type: 'recharge', target: `#TRSF-${Date.now()}`, operator: op, status: 'success',
       });
-      const updatedInv = await api.updateInventories([
+      const updatedInv: any = await api.updateInventories([
         { operator: op, available: 0, remaining: 0 }
       ]);
       if (mountedRef.current) setInventories(updatedInv);
@@ -111,7 +111,7 @@ export function useAgentSellerState(role: string | null, username: string) {
   const handleEditSellerForAgent = async (seller: Seller) => {
     try {
       const updated = await api.updateSeller(Number(seller.id), { name: seller.name, phone: seller.phone, region: seller.region });
-      if (mountedRef.current) setSellers(prev => prev.map(s => s.id === seller.id ? { ...s, ...updated } : s));
+      if (mountedRef.current) setSellers(prev => prev.map(s => s.id === seller.id ? { ...s, ...(updated as any) } : s));
     } catch (err) {
       captureError(err, 'handleEditSellerForAgent');
       throw err;
