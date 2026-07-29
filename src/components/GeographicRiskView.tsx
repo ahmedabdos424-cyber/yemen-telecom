@@ -84,10 +84,10 @@ export default function GeographicRiskView() {
         ]);
         if (!mounted) return;
         setIdentities(idents || []);
-        setLogs(auditLogs || []);
-      } catch (err: any) {
+        setLogs((auditLogs || []) as any);
+      } catch (err: unknown) {
         if (!mounted) return;
-        setFetchError(err?.message || 'فشل تحميل البيانات');
+        setFetchError(err instanceof Error ? err.message : String(err));
         setIdentities([]);
         setLogs([]);
       } finally {
@@ -140,10 +140,10 @@ export default function GeographicRiskView() {
       // Refresh audit log feed from server.
       try {
         const auditLogs = await api.getAuditLogs();
-        if (Array.isArray(auditLogs)) setLogs(auditLogs);
+        if (Array.isArray(auditLogs)) setLogs(auditLogs as any);
       } catch { /* non-fatal */ }
-    } catch (err: any) {
-      toastError(err?.message || 'فشل في تسجيل بلاغ الاشتباه');
+    } catch (err: unknown) {
+      toastError(err instanceof Error ? err.message : String(err));
     } finally {
       setActionLoading((p) => ({ ...p, [`flag-${idNo}`]: false }));
     }
@@ -164,10 +164,10 @@ export default function GeographicRiskView() {
       setIdentities((prev) => prev.map((i: any) => i.idNo === idNo ? { ...i, blocked: true, flagged: true, reviewStatus: 'blocked' } : i));
       try {
         const auditLogs = await api.getAuditLogs();
-        if (Array.isArray(auditLogs)) setLogs(auditLogs);
+        if (Array.isArray(auditLogs)) setLogs(auditLogs as any);
       } catch { /* non-fatal */ }
-    } catch (err: any) {
-      toastError(err?.message || 'فشل في حظر الهوية');
+    } catch (err: unknown) {
+      toastError(err instanceof Error ? err.message : String(err));
     } finally {
       setActionLoading((p) => ({ ...p, [`block-${idNo}`]: false }));
       setBlockConfirm(null);

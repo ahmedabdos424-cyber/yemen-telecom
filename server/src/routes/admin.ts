@@ -1,9 +1,10 @@
 import path from 'path';
+import crypto from 'crypto';
 import { Router, Request, Response } from 'express';
 import { query } from '../db';
 import { logger } from '../logger';
 import { cacheStats } from '../cache';
-import { requireRole } from '../middleware/auth';
+import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination } from '../helpers';
 import { validate, updateSettingsSchema } from '../validation';
 
@@ -160,7 +161,7 @@ router.get('/duplicate-identities', requireRole('manager'), async (req: Request,
 // Duplicate Identities: Flag / Block actions
 // ========================
 function logIdentityAction(idNo: string, name: string, action: string, performedBy: string) {
-  const logId = `DUP-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const logId = `DUP-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
   const title =
     action === 'flag'
       ? `تم وضع علامة اشتباه على الهوية ${idNo}`
@@ -175,13 +176,13 @@ function logIdentityAction(idNo: string, name: string, action: string, performed
   );
 }
 
-router.post('/duplicate-identities/:idNo/flag', requireRole('manager'), async (req: Request, res: Response) => {
+router.post('/duplicate-identities/:idNo/flag', requireRole('manager'), async (req: AuthRequest, res: Response) => {
   try {
     const idNo = req.params.idNo;
     if (!idNo) return res.status(400).json({ error: 'idNo is required' });
     const name = (req.body && typeof req.body.name === 'string') ? req.body.name : '';
     const reason = (req.body && typeof req.body.reason === 'string') ? req.body.reason : '';
-    const performedBy = (req as any).user?.username || 'manager';
+    const performedBy = req.user?.username || 'manager';
 
     await query(
       `INSERT INTO identity_risk_actions (id_no, name, action, reason, performed_by)
@@ -203,13 +204,13 @@ router.post('/duplicate-identities/:idNo/flag', requireRole('manager'), async (r
   }
 });
 
-router.post('/duplicate-identities/:idNo/block', requireRole('manager'), async (req: Request, res: Response) => {
+router.post('/duplicate-identities/:idNo/block', requireRole('manager'), async (req: AuthRequest, res: Response) => {
   try {
     const idNo = req.params.idNo;
     if (!idNo) return res.status(400).json({ error: 'idNo is required' });
     const name = (req.body && typeof req.body.name === 'string') ? req.body.name : '';
     const reason = (req.body && typeof req.body.reason === 'string') ? req.body.reason : '';
-    const performedBy = (req as any).user?.username || 'manager';
+    const performedBy = req.user?.username || 'manager';
 
     await query(
       `INSERT INTO identity_risk_actions (id_no, name, action, reason, performed_by)
@@ -236,12 +237,12 @@ router.post('/duplicate-identities/:idNo/block', requireRole('manager'), async (
   }
 });
 
-router.post('/duplicate-identities/:idNo/unblock', requireRole('manager'), async (req: Request, res: Response) => {
+router.post('/duplicate-identities/:idNo/unblock', requireRole('manager'), async (req: AuthRequest, res: Response) => {
   try {
     const idNo = req.params.idNo;
     if (!idNo) return res.status(400).json({ error: 'idNo is required' });
     const name = (req.body && typeof req.body.name === 'string') ? req.body.name : '';
-    const performedBy = (req as any).user?.username || 'manager';
+    const performedBy = req.user?.username || 'manager';
 
     await query(
       `INSERT INTO identity_risk_actions (id_no, name, action, performed_by)

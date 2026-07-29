@@ -1,15 +1,16 @@
 import { Router, Response } from 'express';
+import crypto from 'crypto';
 import multer from 'multer';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://qxroquilskugfemzmrzp.supabase.co';
+const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
 const UPLOAD_BUCKET = process.env.UPLOAD_BUCKET || 'uploads';
 
 let supabase: SupabaseClient | null = null;
-if (SUPABASE_ANON_KEY) {
+if (SUPABASE_URL && SUPABASE_ANON_KEY) {
   supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
@@ -54,7 +55,7 @@ async function uploadToSupabase(file: Express.Multer.File): Promise<{ url: strin
     throw new Error('Supabase storage is not configured (missing SUPABASE_ANON_KEY)');
   }
   const ext = EXT_BY_MIME[file.mimetype] || 'jpg';
-  const filename = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`;
+  const filename = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
   const { error } = await supabase.storage
     .from(UPLOAD_BUCKET)
     .upload(filename, file.buffer, {

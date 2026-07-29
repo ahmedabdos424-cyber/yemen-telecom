@@ -7,17 +7,24 @@ interface CameraCaptureProps {
   iconSize?: number;
 }
 
-const JPEG_QUALITY = 0.9;
+const JPEG_QUALITY = 0.95;
 const MAX_DIMENSION = 2048;
+const MAX_FILE_SIZE = 15 * 1024 * 1024;
+const HIGH_RES_THRESHOLD = 8000;
+
+let permissionGranted = false;
+
+function isNative(): boolean {
+  try {
+    return !!(window as unknown as { Capacitor?: { isNative?: boolean } }).Capacitor?.isNative;
+  } catch {
+    return false;
+  }
+}
 
 function openAppSettings() {
   const intentUrl = 'intent:#Intent;action=android.settings.APPLICATION_DETAILS_SETTINGS;S:package=com.yemen.telecom;end';
-  const fallbackUrl = 'app-settings://';
-  try { window.location.href = intentUrl; } catch {
-    try { window.open(fallbackUrl, '_blank'); } catch {
-      /* cannot open settings */
-    }
-  }
+  try { window.location.href = intentUrl; } catch {}
 }
 
 function disposeCanvas(c: HTMLCanvasElement | null) {
@@ -28,86 +35,147 @@ function disposeCanvas(c: HTMLCanvasElement | null) {
   if (ctx) ctx.clearRect(0, 0, 0, 0);
 }
 
-function fixImageOrientation(file: File): Promise<File> {
-  return new Promise((resolve) => {
+async function getImageDimensions(blob: Blob): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
     const img = new Image();
+    const url = URL.createObjectURL(blob);
     img.onload = () => {
-      const canvas = document.createElement('canvas');
-      let { width, height } = img;
-
-      if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
-        const ratio = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
-        width = Math.round(width * ratio);
-        height = Math.round(height * ratio);
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(img, 0, 0, width, height);
-        canvas.toBlob(
-          (blob) => {
-            if (blob) {
-              resolve(new File([blob], file.name, { type: 'image/jpeg' }));
-            } else {
-              resolve(file);
-            }
-            URL.revokeObjectURL(img.src);
-          },
-          'image/jpeg',
-          JPEG_QUALITY
-        );
-      } else {
-        URL.revokeObjectURL(img.src);
-        resolve(file);
-      }
+      URL.revokeObjectURL(url);
+      resolve({ width: img.width, height: img.height });
     };
-    img.onerror = () => {
-      URL.revokeObjectURL(img.src);
-      resolve(file);
-    };
-    img.src = URL.createObjectURL(file);
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Failed to load image')); };
+    img.src = url;
   });
 }
 
-function dataUrlToOptimizedBlob(dataUrl: string): Promise<Blob> {
+function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function compressImage(blob: Blob, maxDim: number, quality = JPEG_QUALITY): Promise<Blob> {
+  const dims = await getImageDimensions(blob);
+  let { width, height } = dims;
+  if (width > maxDim || height > maxDim) {
+    const ratio = Math.min(maxDim / width, maxDim / height);
+    width = Math.round(width * ratio);
+    height = Math.round(height * ratio);
+  }
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) { resolve(blob); return; }
+    const url = URL.createObjectURL(blob);
     const img = new Image();
     img.onload = () => {
+      ctx.drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(
+        (b) => { resolve(b || blob); disposeCanvas(canvas); },
+        'image/jpeg',
+        quality
+      );
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(blob); };
+    img.src = url;
+  });
+}
+
+async function captureWithCapacitorCamera(): Promise<string> {
+  const { Camera, CameraResultType, CameraDirection, CameraSource } = await import('@capacitor/camera');
+  const { Filesystem, Directory } = await import('@capacitor/filesystem');
+
+  const photo = await Camera.getPhoto({
+    quality: 95,
+    allowEditing: false,
+    resultType: CameraResultType.Uri,
+    direction: CameraDirection.Rear,
+    source: CameraSource.Camera,
+  });
+
+  if (!photo.webPath) throw new Error('فشل التقاط الصورة');
+
+  const response = await fetch(photo.webPath);
+  let blob = await response.blob();
+  URL.revokeObjectURL(photo.webPath);
+
+  if (blob.size > MAX_FILE_SIZE) {
+    blob = await compressImage(blob, MAX_DIMENSION);
+  } else {
+    const dims = await getImageDimensions(blob);
+    if (dims.width > HIGH_RES_THRESHOLD || dims.height > HIGH_RES_THRESHOLD) {
+      blob = await compressImage(blob, MAX_DIMENSION);
+    }
+  }
+
+  const dataUrl = await blobToDataUrl(blob);
+
+  try {
+    if (photo.path) {
+      await Filesystem.deleteFile({ path: photo.path, directory: Directory.Cache });
+    }
+  } catch {}
+
+  return dataUrl;
+}
+
+async function captureWithWebRTC(resolution: number, video: HTMLVideoElement, canvas: HTMLCanvasElement): Promise<string> {
+  const vw = video.videoWidth || 1280;
+  const vh = video.videoHeight || 960;
+  let w = vw, h = vh;
+  if (w > MAX_DIMENSION || h > MAX_DIMENSION) {
+    const ratio = Math.min(MAX_DIMENSION / w, MAX_DIMENSION / h);
+    w = Math.round(w * ratio);
+    h = Math.round(h * ratio);
+  }
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Failed to get canvas context');
+  ctx.drawImage(video, 0, 0, w, h);
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY));
+  disposeCanvas(canvas);
+  if (!blob) throw new Error('Failed to capture frame');
+  const dataUrl = await blobToDataUrl(blob);
+  return dataUrl;
+}
+
+function fixOrientationIfNeeded(blob: Blob): Promise<Blob> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(blob);
+    img.onload = () => {
+      if (img.width > img.height) {
+        URL.revokeObjectURL(url);
+        resolve(blob);
+        return;
+      }
       const canvas = document.createElement('canvas');
       let { width, height } = img;
-
       if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
         const ratio = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
         width = Math.round(width * ratio);
         height = Math.round(height * ratio);
       }
-
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(img, 0, 0, width, height);
-        canvas.toBlob(
-          (blob) => {
-            if (blob) resolve(blob);
-            else reject(new Error('Failed to create blob'));
-            URL.revokeObjectURL(img.src);
-          },
-          'image/jpeg',
-          JPEG_QUALITY
-        );
-      } else {
-        URL.revokeObjectURL(img.src);
-        reject(new Error('Failed to get canvas context'));
-      }
+      if (!ctx) { URL.revokeObjectURL(url); resolve(blob); return; }
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (b) => { resolve(b || blob); disposeCanvas(canvas); URL.revokeObjectURL(url); },
+        'image/jpeg',
+        JPEG_QUALITY
+      );
     };
-    img.onerror = () => {
-      URL.revokeObjectURL(img.src);
-      reject(new Error('Failed to load image'));
-    };
-    img.src = dataUrl;
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(blob); };
+    img.src = url;
   });
 }
 
@@ -118,23 +186,21 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [permanentDenial, setPermanentDenial] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const streamStartTimeRef = useRef(0);
+  const [captureLocked, setCaptureLocked] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const denialCountRef = useRef(0);
   const mountedRef = useRef(true);
-  const capturingRef = useRef(false);
+  const capturedDataRef = useRef<string | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => {
-          try { t.stop(); } catch { /* already stopped */ }
-        });
+        streamRef.current.getTracks().forEach(t => { try { t.stop(); } catch {} });
         streamRef.current = null;
       }
       if (videoRef.current) videoRef.current.srcObject = null;
@@ -144,9 +210,7 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => {
-        try { t.stop(); } catch { /* already stopped */ }
-      });
+      streamRef.current.getTracks().forEach(t => { try { t.stop(); } catch {} });
       streamRef.current = null;
     }
     if (videoRef.current) videoRef.current.srcObject = null;
@@ -155,43 +219,114 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
     setScanning(false);
   }, []);
 
+  const handleCaptureResult = useCallback(async (dataUrl: string) => {
+    if (!mountedRef.current) return;
+    capturedDataRef.current = dataUrl;
+    setPreviewImage(dataUrl);
+    setProcessing(false);
+    setCaptureLocked(false);
+  }, []);
+
+  const doCaptureWebRTC = useCallback(async () => {
+    if (!videoRef.current || !canvasRef.current || captureLocked) return;
+    setCaptureLocked(true);
+    setProcessing(true);
+    try {
+      const resolution = Math.min(screen.width, screen.height, 1920);
+      const dataUrl = await captureWithWebRTC(resolution, videoRef.current, canvasRef.current);
+      stopCamera();
+      await handleCaptureResult(dataUrl);
+    } catch {
+      setCaptureLocked(false);
+      setProcessing(false);
+    }
+  }, [captureLocked, stopCamera, handleCaptureResult]);
+
+  const doCaptureNative = useCallback(async () => {
+    if (captureLocked) return;
+    setCaptureLocked(true);
+    setProcessing(true);
+    try {
+      const dataUrl = await captureWithCapacitorCamera();
+      await handleCaptureResult(dataUrl);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('cancelled') || msg.includes('User cancelled')) {
+        setShowViewfinder(false);
+        setScanning(false);
+      }
+      setCaptureLocked(false);
+      setProcessing(false);
+    }
+  }, [captureLocked, handleCaptureResult]);
+
   const startCamera = useCallback(async () => {
     if (!mountedRef.current) return;
     setPermissionDenied(false);
     setPermanentDenial(false);
     setScanning(true);
-    setShowViewfinder(true);
     setPreviewImage(null);
-    streamStartTimeRef.current = Date.now();
+    capturedDataRef.current = null;
 
+    if (isNative()) {
+      setShowViewfinder(true);
+      setProcessing(true);
+      try {
+        const dataUrl = await captureWithCapacitorCamera();
+        await handleCaptureResult(dataUrl);
+      } catch (err: unknown) {
+        if (!mountedRef.current) return;
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes('cancelled') || msg.includes('User cancelled')) {
+          setShowViewfinder(false);
+          setScanning(false);
+          return;
+        }
+        setProcessing(false);
+        setCaptureLocked(false);
+        const isPermission = msg.includes('permission') || msg.includes('denied');
+        if (isPermission) {
+          denialCountRef.current += 1;
+          if (denialCountRef.current >= 2) {
+            setPermanentDenial(true);
+          } else {
+            setPermissionDenied(true);
+          }
+        } else {
+          setShowViewfinder(false);
+          setScanning(false);
+          fileInputRef.current?.click();
+        }
+      }
+      return;
+    }
+
+    setShowViewfinder(true);
     try {
+      if (!permissionGranted) {
+        const perm = await navigator.permissions.query({ name: 'camera' as PermissionName });
+        if (perm.state === 'denied') {
+          setPermanentDenial(true);
+          setScanning(false);
+          return;
+        }
+        if (perm.state === 'granted') permissionGranted = true;
+      }
       const resolution = Math.min(screen.width, screen.height, 1920);
       let s: MediaStream;
       try {
         s = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: 'environment',
-            width: { ideal: resolution },
-            height: { ideal: resolution },
-          },
+          video: { facingMode: 'environment', width: { ideal: resolution }, height: { ideal: resolution } },
         });
       } catch {
         s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       }
-
-      if (!mountedRef.current) {
-        s.getTracks().forEach(t => t.stop());
-        return;
-      }
-
+      if (!mountedRef.current) { s.getTracks().forEach(t => t.stop()); return; }
       streamRef.current = s;
       denialCountRef.current = 0;
-
       if (videoRef.current) {
         videoRef.current.srcObject = s;
-        try {
-          await videoRef.current.play();
-        } catch { /* autoplay blocked, UI still shows */ }
+        try { await videoRef.current.play(); } catch {}
       }
     } catch (err) {
       if (!mountedRef.current) return;
@@ -211,54 +346,22 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
         fileInputRef.current?.click();
       }
     }
-  }, []);
+  }, [handleCaptureResult]);
 
   const captureFrame = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current || capturingRef.current) return;
-    capturingRef.current = true;
-    try {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      const vw = video.videoWidth || 1280;
-      const vh = video.videoHeight || 960;
-
-      let w = vw;
-      let h = vh;
-      if (w > MAX_DIMENSION || h > MAX_DIMENSION) {
-        const ratio = Math.min(MAX_DIMENSION / w, MAX_DIMENSION / h);
-        w = Math.round(w * ratio);
-        h = Math.round(h * ratio);
-      }
-
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(video, 0, 0, w, h);
-        const dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
-        disposeCanvas(canvas);
-        setPreviewImage(dataUrl);
-      }
-    } finally {
-      capturingRef.current = false;
+    if (isNative()) {
+      doCaptureNative();
+    } else {
+      doCaptureWebRTC();
     }
-
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => {
-        try { t.stop(); } catch { /* already stopped */ }
-      });
-      streamRef.current = null;
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-  }, []);
+  }, [doCaptureNative, doCaptureWebRTC]);
 
   const confirmCapture = useCallback(async () => {
-    if (!previewImage || !mountedRef.current) return;
+    if (!capturedDataRef.current || !mountedRef.current) return;
     setProcessing(true);
     try {
-      const img = previewImage;
+      const img = capturedDataRef.current;
+      capturedDataRef.current = null;
       setPreviewImage(null);
       setShowViewfinder(false);
       setScanning(false);
@@ -266,26 +369,24 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
     } finally {
       if (mountedRef.current) setProcessing(false);
     }
-  }, [previewImage, onCapture]);
+  }, [onCapture]);
 
   const retakeCapture = useCallback(() => {
     setPreviewImage(null);
+    capturedDataRef.current = null;
     startCamera();
   }, [startCamera]);
 
-  const handleFileFallback = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileFallback = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        if (ev.target?.result) {
-          setPreviewImage(ev.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
-    } else {
-      setShowViewfinder(false);
+    if (!file) { setShowViewfinder(false); setScanning(false); return; }
+    let blob: Blob = file;
+    if (blob.size > MAX_FILE_SIZE) {
+      blob = await compressImage(blob, MAX_DIMENSION);
     }
+    const dataUrl = await blobToDataUrl(blob);
+    capturedDataRef.current = dataUrl;
+    setPreviewImage(dataUrl);
     setScanning(false);
   }, []);
 
@@ -304,11 +405,11 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
         {scanning ? <RefreshCw className="animate-spin" size={iconSize} /> : <Camera size={iconSize} />}
       </button>
 
-      {/* Preview modal — viewfinder or captured image */}
       <CameraPreviewModal
         show={showViewfinder}
         previewImage={previewImage}
         videoRef={videoRef}
+        isViewfinder={!previewImage && !isNative()}
         onCapture={captureFrame}
         onConfirm={confirmCapture}
         onRetake={retakeCapture}
@@ -321,7 +422,7 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
           <div className="w-full max-w-sm md:max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-center">
             <Camera size={40} className="mx-auto text-red-400 mb-4" />
             <p className="text-sm text-slate-200 mb-6 leading-relaxed">
-              يجب السماح بالوصول إلى الكاميرا لاستخدام قراءة الهوية
+              يجب السماح بالوصول إلى الكاميرا لاستخدام التصوير
             </p>
             <div className="flex flex-col sm:flex-row gap-3">
               <button
@@ -388,22 +489,21 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [permanentDenial, setPermanentDenial] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [captureLocked, setCaptureLocked] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const denialCountRef = useRef(0);
   const mountedRef = useRef(true);
-  const capturingRef = useRef(false);
+  const capturedDataRef = useRef<string | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => {
-          try { t.stop(); } catch { /* already stopped */ }
-        });
+        streamRef.current.getTracks().forEach(t => { try { t.stop(); } catch {} });
         streamRef.current = null;
       }
       if (videoRef.current) videoRef.current.srcObject = null;
@@ -413,9 +513,7 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => {
-        try { t.stop(); } catch { /* already stopped */ }
-      });
+      streamRef.current.getTracks().forEach(t => { try { t.stop(); } catch {} });
       streamRef.current = null;
     }
     if (videoRef.current) videoRef.current.srcObject = null;
@@ -424,14 +522,56 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
     setScanning(false);
   }, []);
 
+  const handleCaptureResult = useCallback(async (dataUrl: string) => {
+    if (!mountedRef.current) return;
+    capturedDataRef.current = dataUrl;
+    setPreviewImage(dataUrl);
+    setProcessing(false);
+    setCaptureLocked(false);
+  }, []);
+
   const startCamera = useCallback(async () => {
     if (!mountedRef.current) return;
     setPermissionDenied(false);
     setPermanentDenial(false);
     setScanning(true);
-    setShowViewfinder(true);
     setPreviewImage(null);
+    capturedDataRef.current = null;
 
+    if (isNative()) {
+      setShowViewfinder(true);
+      setProcessing(true);
+      try {
+        const dataUrl = await captureWithCapacitorCamera();
+        await handleCaptureResult(dataUrl);
+      } catch (err: unknown) {
+        if (!mountedRef.current) return;
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes('cancelled') || msg.includes('User cancelled')) {
+          setShowViewfinder(false);
+          setScanning(false);
+          return;
+        }
+        setProcessing(false);
+        setCaptureLocked(false);
+        const isPermission = msg.includes('permission') || msg.includes('denied');
+        if (isPermission) {
+          denialCountRef.current += 1;
+          if (denialCountRef.current >= 2) {
+            setPermanentDenial(true);
+          } else {
+            setPermissionDenied(true);
+          }
+        } else {
+          setShowViewfinder(false);
+          setScanning(false);
+          fileInputRef.current?.click();
+        }
+      }
+      return;
+    }
+
+    setShowViewfinder(true);
     try {
       const resolution = Math.min(screen.width, screen.height, 1920);
       let s: MediaStream;
@@ -442,17 +582,12 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
       } catch {
         s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       }
-
-      if (!mountedRef.current) {
-        s.getTracks().forEach(t => t.stop());
-        return;
-      }
-
+      if (!mountedRef.current) { s.getTracks().forEach(t => t.stop()); return; }
       streamRef.current = s;
       denialCountRef.current = 0;
       if (videoRef.current) {
         videoRef.current.srcObject = s;
-        try { await videoRef.current.play(); } catch { /* autoplay blocked */ }
+        try { await videoRef.current.play(); } catch {}
       }
     } catch (err) {
       if (!mountedRef.current) return;
@@ -463,61 +598,53 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
       );
       if (isPermissionError) {
         denialCountRef.current += 1;
-        if (denialCountRef.current >= 2) {
-          setPermanentDenial(true);
-        } else {
-          setPermissionDenied(true);
-        }
-      } else {
-        fileInputRef.current?.click();
-      }
+        if (denialCountRef.current >= 2) { setPermanentDenial(true); }
+        else { setPermissionDenied(true); }
+      } else { fileInputRef.current?.click(); }
     }
-  }, []);
+  }, [handleCaptureResult]);
 
   const captureFrame = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current || capturingRef.current) return;
-    capturingRef.current = true;
+    if (!videoRef.current || !canvasRef.current || captureLocked) return;
+    setCaptureLocked(true);
+    setProcessing(true);
     try {
       const video = videoRef.current;
       const canvas = canvasRef.current;
       const vw = video.videoWidth || 1280;
       const vh = video.videoHeight || 960;
-
-      let w = vw;
-      let h = vh;
+      let w = vw, h = vh;
       if (w > MAX_DIMENSION || h > MAX_DIMENSION) {
         const ratio = Math.min(MAX_DIMENSION / w, MAX_DIMENSION / h);
         w = Math.round(w * ratio);
         h = Math.round(h * ratio);
       }
-
       canvas.width = w;
       canvas.height = h;
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.drawImage(video, 0, 0, w, h);
-        const dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
-        disposeCanvas(canvas);
-        setPreviewImage(dataUrl);
+        canvas.toBlob(async (blob) => {
+          if (!blob) { setCaptureLocked(false); setProcessing(false); return; }
+          const dataUrl = await blobToDataUrl(blob);
+          disposeCanvas(canvas);
+          if (streamRef.current) {
+            streamRef.current.getTracks().forEach(t => { try { t.stop(); } catch {} });
+            streamRef.current = null;
+          }
+          if (videoRef.current) videoRef.current.srcObject = null;
+          await handleCaptureResult(dataUrl);
+        }, 'image/jpeg', JPEG_QUALITY);
       }
-    } finally {
-      capturingRef.current = false;
-    }
-
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => {
-        try { t.stop(); } catch { /* already stopped */ }
-      });
-      streamRef.current = null;
-    }
-    if (videoRef.current) videoRef.current.srcObject = null;
-  }, []);
+    } catch { setCaptureLocked(false); setProcessing(false); }
+  }, [captureLocked, handleCaptureResult]);
 
   const confirmCapture = useCallback(async () => {
-    if (!previewImage || !mountedRef.current) return;
+    if (!capturedDataRef.current || !mountedRef.current) return;
     setProcessing(true);
     try {
-      const img = previewImage;
+      const img = capturedDataRef.current;
+      capturedDataRef.current = null;
       setPreviewImage(null);
       setShowViewfinder(false);
       setScanning(false);
@@ -525,24 +652,24 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
     } finally {
       if (mountedRef.current) setProcessing(false);
     }
-  }, [previewImage, onCapture]);
+  }, [onCapture]);
 
   const retakeCapture = useCallback(() => {
     setPreviewImage(null);
+    capturedDataRef.current = null;
     startCamera();
   }, [startCamera]);
 
-  const handleFileFallback = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileFallback = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        if (ev.target?.result) setPreviewImage(ev.target.result as string);
-      };
-      reader.readAsDataURL(file);
-    } else {
-      setShowViewfinder(false);
+    if (!file) { setShowViewfinder(false); setScanning(false); return; }
+    let blob: Blob = file;
+    if (blob.size > MAX_FILE_SIZE) {
+      blob = await compressImage(blob, MAX_DIMENSION);
     }
+    const dataUrl = await blobToDataUrl(blob);
+    capturedDataRef.current = dataUrl;
+    setPreviewImage(dataUrl);
     setScanning(false);
   }, []);
 
@@ -556,14 +683,10 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
           type="button"
           onClick={startCamera}
           disabled={scanning}
-           className="btn w-full flex items-center justify-between border border-dashed border-slate-800 text-xs text-slate-400 font-medium hover:border-slate-700 hover:text-slate-200 disabled:opacity-50"
+          className="btn w-full flex items-center justify-between border border-dashed border-slate-800 text-xs text-slate-400 font-medium hover:border-slate-700 hover:text-slate-200 disabled:opacity-50"
         >
           <span>التقط صورة العقد</span>
-          {scanning ? (
-            <RefreshCw className="animate-spin" size={16} />
-          ) : (
-            <Camera size={16} />
-          )}
+          {scanning ? <RefreshCw className="animate-spin" size={16} /> : <Camera size={16} />}
         </button>
       ) : (
         <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl flex gap-4 items-center">
@@ -592,11 +715,11 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
         </div>
       )}
 
-      {/* Preview modal for DocumentCapture */}
       <CameraPreviewModal
         show={showViewfinder}
         previewImage={previewImage}
         videoRef={videoRef}
+        isViewfinder={!previewImage && !isNative()}
         onCapture={captureFrame}
         onConfirm={confirmCapture}
         onRetake={retakeCapture}
@@ -609,7 +732,7 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
           <div className="w-full max-w-sm md:max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-center">
             <Camera size={40} className="mx-auto text-red-400 mb-4" />
             <p className="text-sm text-slate-200 mb-6 leading-relaxed">
-              يجب السماح بالوصول إلى الكاميرا لاستخدام قراءة الهوية
+              يجب السماح بالوصول إلى الكاميرا لاستخدام التصوير
             </p>
             <div className="flex flex-col sm:flex-row gap-3">
               <button

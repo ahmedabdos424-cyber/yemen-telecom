@@ -28,10 +28,18 @@ subprojects {
         if (it.hasProperty('android')) {
             android {
                 compileOptions {
-                    sourceCompatibility JavaVersion.VERSION_17
-                    targetCompatibility JavaVersion.VERSION_17
+                    sourceCompatibility JavaVersion.VERSION_21
+                    targetCompatibility JavaVersion.VERSION_21
                 }
             }
+        }
+    }
+}
+
+subprojects {
+    tasks.whenTaskAdded { task ->
+        if (task.name.startsWith('compile') && task.name.contains('Kotlin') && task.hasProperty('kotlinOptions')) {
+            task.kotlinOptions.jvmTarget = "21"
         }
     }
 }

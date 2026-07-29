@@ -50,8 +50,8 @@ router.post('/', requireRole('manager'), validate(createSimSchema), async (req: 
        new Date().toLocaleDateString('ar-YE'), package_type || 'باقة مزايا الشهرية']
     );
     res.status(201).json(result.rows[0]);
-  } catch (err: any) {
-    if (err.code === '23505') {
+  } catch (err: unknown) {
+    if (err && typeof err === 'object' && 'code' in err && (err as any).code === '23505') {
       return res.status(409).json({ error: 'ICCID already exists' });
     }
     logger.error('Error creating sim:', err);

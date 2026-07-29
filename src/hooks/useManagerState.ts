@@ -63,13 +63,13 @@ export function useManagerState(role: string | null) {
   };
 
   const refreshData = useCallback(() => Promise.all([
-    api.getSims().then(data => { if (mountedRef.current) setSims(data ?? []); }).catch((err) => captureError(err, 'refresh:getSims')),
-    api.getAgents().then(data => { if (mountedRef.current) setAgents(data ?? []); }).catch((err) => captureError(err, 'refresh:getAgents')),
-    api.getSellers().then(data => { if (mountedRef.current) setSellers(data ?? []); }).catch((err) => captureError(err, 'refresh:getSellers')),
-    api.getAlerts().then(data => { if (mountedRef.current) setAlerts(data ?? []); }).catch((err) => captureError(err, 'refresh:getAlerts')),
-    api.getSettings().then(data => { if (mountedRef.current) setSettings(data ?? {}); }).catch((err) => captureError(err, 'refresh:getSettings')),
-    api.getTransactions().then(data => { if (mountedRef.current) setTransactions(data ?? []); }).catch((err) => captureError(err, 'refresh:getTransactions')),
-    api.getStats().then(data => { if (mountedRef.current) setStats(data ?? {}); }).catch((err) => captureError(err, 'refresh:getStats')),
+    api.getSims().then((data: any) => { if (mountedRef.current) setSims(data ?? []); }).catch((err) => captureError(err, 'refresh:getSims')),
+    api.getAgents().then((data: any) => { if (mountedRef.current) setAgents(data ?? []); }).catch((err) => captureError(err, 'refresh:getAgents')),
+    api.getSellers().then((data: any) => { if (mountedRef.current) setSellers(data ?? []); }).catch((err) => captureError(err, 'refresh:getSellers')),
+    api.getAlerts().then((data: any) => { if (mountedRef.current) setAlerts(data ?? []); }).catch((err) => captureError(err, 'refresh:getAlerts')),
+    api.getSettings().then((data: any) => { if (mountedRef.current) setSettings(data ?? {}); }).catch((err) => captureError(err, 'refresh:getSettings')),
+    api.getTransactions().then((data: any) => { if (mountedRef.current) setTransactions(data ?? []); }).catch((err) => captureError(err, 'refresh:getTransactions')),
+    api.getStats().then((data: any) => { if (mountedRef.current) setStats(data ?? {}); }).catch((err) => captureError(err, 'refresh:getStats')),
   ]), [mountedRef]);
 
   useEffect(() => {
@@ -107,7 +107,7 @@ export function useManagerState(role: string | null) {
   // Handlers
   const handleAddSIM = async (newSIM: Partial<SIM>) => {
     try {
-      const created = await api.createSim(newSIM);
+      const created: any = await api.createSim(newSIM as any);
       if (mountedRef.current) setSims(prev => [created, ...prev]);
     } catch (err) {
       captureError(err, 'handleAddSIM');
@@ -116,7 +116,7 @@ export function useManagerState(role: string | null) {
 
   const handleAddAgent = async (newAgent: Partial<Agent>) => {
     try {
-      const created = await api.createAgent(newAgent);
+      const created: any = await api.createAgent(newAgent as any);
       if (mountedRef.current) setAgents(prev => [created, ...prev]);
     } catch (err) {
       captureError(err, 'handleAddAgent');

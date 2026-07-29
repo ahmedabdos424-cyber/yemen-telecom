@@ -59,14 +59,14 @@ router.post('/login', validate(loginSchema), async (req: Request, res: Response)
         region: user.region,
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (process.env.NODE_ENV !== 'production') {
       logger.error('[LOGIN ERROR]', {
-        message: err.message,
-        stack: err.stack,
-        code: err.code,
-        detail: err.detail,
-        name: err.name,
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+        code: err && typeof err === 'object' && 'code' in err ? (err as any).code : undefined,
+        detail: err && typeof err === 'object' && 'detail' in err ? (err as any).detail : undefined,
+        name: err instanceof Error ? err.name : undefined,
       });
     }
     res.status(500).json({ error: 'Internal server error' });
@@ -101,8 +101,8 @@ router.post('/refresh', async (req: Request, res: Response) => {
     res.cookie('token', newToken, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 3600 * 1000, path: '/' });
     res.cookie('refreshToken', newRefreshToken, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 7 * 24 * 3600 * 1000, path: '/api/auth' });
     res.json({ token: newToken, refreshToken: newRefreshToken });
-  } catch (err: any) {
-    if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
+  } catch (err: unknown) {
+    if (err instanceof Error && (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError')) {
       return res.status(401).json({ error: 'Invalid or expired refresh token' });
     }
     logger.error('Refresh token error:', err);
@@ -144,8 +144,8 @@ router.post('/logout', async (req: Request, res: Response) => {
     res.clearCookie('token', { path: '/', httpOnly: true, secure: true, sameSite: 'strict' });
     res.clearCookie('refreshToken', { path: '/api/auth', httpOnly: true, secure: true, sameSite: 'strict' });
     res.json({ message: 'Logged out successfully' });
-  } catch (err: any) {
-    if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
+  } catch (err: unknown) {
+    if (err instanceof Error && (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError')) {
       return res.status(401).json({ error: 'Invalid token' });
     }
     logger.error('Logout error:', err);
@@ -185,8 +185,8 @@ router.get('/me', async (req: Request, res: Response) => {
       region: u.region,
       lastLogin: u.last_login,
     });
-  } catch (err: any) {
-    if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
+  } catch (err: unknown) {
+    if (err instanceof Error && (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError')) {
       return res.status(401).json({ error: 'Invalid token' });
     }
     logger.error('Auth me error:', err);

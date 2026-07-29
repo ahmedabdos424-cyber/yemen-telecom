@@ -8,7 +8,7 @@ import { useToast, ToastContainer } from '../hooks/useToast';
 import { api } from '../api/client';
 
 interface AddSellerFormProps {
-  onSellerAdded: (newSeller: Omit<Seller, 'id' | 'creationDate' | 'lastLogin'>) => void;
+  onSellerAdded: (result: any) => void;
   agentName?: string;
 }
 
@@ -104,10 +104,10 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
       setIdNumber('');
       setPhone('');
       setRegion('');
-    } catch (err: any) {
+    } catch (err: unknown) {
       setIsSubmitting(false);
       setProgressStage('idle');
-      toastError(err?.message || 'فشل إنشاء البائع. الرجاء المحاولة مرة أخرى.');
+      toastError(err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -131,14 +131,15 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
             الاسم الكامل للبائع
           </label>
           <div className="relative">
-            <input
-              type="text"
-              id="full_name"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="اسم البائع"
-              className="input-field pl-12 bg-slate-950 border-slate-850 text-sm text-right placeholder:text-slate-700"
-            />
+              <input
+                type="text"
+                id="full_name"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="اسم البائع"
+                className="input-field pl-12 bg-slate-950 border-slate-850 text-sm text-right placeholder:text-slate-700"
+                autoFocus
+              />
             <CameraCapture onCapture={handleNameCapture} />
           </div>
           <AnimatePresence>

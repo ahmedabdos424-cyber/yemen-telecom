@@ -53,10 +53,10 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
         ...prev
       ]);
       toastSuccess(`تم إنشاء النسخة الاحتياطية بنجاح (${result.sizeFormatted})`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setBackupStatus('idle');
       setBackupProgress(null);
-      toastError(err?.message || 'فشل إنشاء النسخة الاحتياطية');
+      toastError(err instanceof Error ? err.message : String(err));
     }
   };
 

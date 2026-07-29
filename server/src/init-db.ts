@@ -37,9 +37,9 @@ async function runMigrations(client: any) {
       await client.query('INSERT INTO schema_migrations (filename) VALUES ($1)', [file]);
       await client.query('COMMIT');
       logger.info(`Migration ${file} applied successfully`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       await client.query('ROLLBACK');
-      logger.error(`Migration ${file} failed:`, err.message);
+      logger.error(`Migration ${file} failed:`, err instanceof Error ? err.message : String(err));
       throw err;
     }
   }

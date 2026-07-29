@@ -109,7 +109,7 @@ export default function AgentDashboard({
           ? 'YOU' 
           : 'سبأفون';
 
-      const fresh = await api.getInventories();
+      const fresh: any = await api.getInventories();
       if (fresh && fresh.length) {
         onUpdateInventories(fresh);
         toastSuccess(`تم تحديث بيانات المخزون لـ ${operatorName}.`);

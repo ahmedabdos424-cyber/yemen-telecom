@@ -123,7 +123,7 @@ function AuthenticatedApp() {
       <div className="min-h-dvh bg-theme-background font-sans antialiased text-slate-100 pb-[calc(4rem+env(safe-area-inset-bottom))]">
         <SharedOfflineBanner />
         <TopBar currentView={mgr.currentView} setView={(v) => { mgr.setView(v); navigate(`/manager/${v}`); }} onMenuToggle={() => setMobileMenuOpen(true)} unresolvedAlertsCount={mgr.alerts.length} alerts={mgr.alerts} displayName={username} role={role} onLogout={handleLogout} />
-        <div className="flex pt-[calc(4rem+env(safe-area-inset-top))] min-h-dvh">
+        <div className="flex pt-[calc(4rem+env(safe-area-inset-top))] min-h-dvh overflow-y-auto">
           <main className="flex-1 px-3 sm:px-4 md:px-8 py-4 md:py-8 lg:pt-10">
             <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
               <ErrorBoundary>
@@ -159,7 +159,7 @@ function AuthenticatedApp() {
       const sharedProps = {
         role: role as Role, activeTab: agt.activeTab, sellers: agentSellers, sims: agt.sims,
         inventories: agt.inventories,
-        onAddSeller: () => navigate('/agent/add_seller'),
+        onAddSeller: () => navigate('/agent/add-seller'),
         onActivateSim: () => navigate('/agent/activate'),
         onTransferSims: agt.handleTransferSimsForAgent,
         onUpdateSellerStatus: agt.handleUpdateSellerStatusForAgent,
@@ -204,7 +204,7 @@ function AuthenticatedApp() {
       <>
         <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:32px_32px] opacity-15 pointer-events-none" />
         <NavBar role={role} activeTab={agt.activeTab} setActiveTab={(tab) => { agt.handleSetRoleTab(tab); navigate(`/${role}/${tab.replace(/_/g, '-')}`); }} username={username} onLogout={handleLogout} />
-        <main className="lg:pr-70 pt-6 pb-[4.5rem] px-3 sm:px-4 md:px-8 max-w-5xl mx-auto relative z-10 transition-all">
+        <main className="lg:pr-70 pt-6 pb-[calc(4.5rem+env(safe-area-inset-bottom))] px-3 sm:px-4 md:px-8 max-w-5xl mx-auto relative z-10 transition-all overflow-y-auto">
           <AnimatePresence mode="wait">
             <motion.div key={agt.activeTab + '_' + role} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.25 }}>
               <ErrorBoundary>

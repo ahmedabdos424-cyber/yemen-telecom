@@ -117,9 +117,9 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
 
       setSuccessMsg(`تهانينا! تم تفعيل الشريحة رقم (${iccid}) بنجاح للشبكة المحددة وعميلها المتربط.`);
       handleClear();
-    } catch (err: any) {
+    } catch (err: unknown) {
       setIsSubmitting(false);
-      toastError(err?.message || 'فشل تفعيل الشريحة. الرجاء المحاولة مرة أخرى.');
+      toastError(err instanceof Error ? err.message : String(err));
     }
   };
 

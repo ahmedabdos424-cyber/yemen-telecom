@@ -113,12 +113,13 @@ router.put('/:id/approve', requireRole('manager'), validate(approveDistributionS
       }
     });
     res.json({ message: `Request ${decision} successfully` });
-  } catch (err: any) {
-    if (err.message === 'DISTRIBUTION_NOT_FOUND') {
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    if (errMsg === 'DISTRIBUTION_NOT_FOUND') {
       return res.status(404).json({ error: 'Distribution request not found' });
     }
-    if (err.message.startsWith('DISTRIBUTION_ALREADY_')) {
-      const status = err.message.replace('DISTRIBUTION_ALREADY_', '').toLowerCase();
+    if (errMsg.startsWith('DISTRIBUTION_ALREADY_')) {
+      const status = errMsg.replace('DISTRIBUTION_ALREADY_', '').toLowerCase();
       return res.status(400).json({ error: `Request is already ${status}` });
     }
     logger.error('Error approving distribution request:', err);

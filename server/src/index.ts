@@ -95,7 +95,7 @@ app.use((req, res, next) => {
   next();
 });
 const isDev = process.env.NODE_ENV !== 'production';
-const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,https://yemen-telecom-1699.web.app')
+const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,https://yemen-telecom-1699.web.app,https://yemen-telecom.onrender.com')
   .split(',')
   .map((o) => o.trim())
   .filter(Boolean);
@@ -326,13 +326,8 @@ function listRoutes(): { method: string; path: string }[] {
   return routes;
 }
 
-// Validate numeric :id route parameters to prevent SQL cast errors from non-numeric input
-app.param('id', (req: express.Request, res: express.Response, next: express.NextFunction, id: string) => {
-  if (!/^\d+$/.test(id)) {
-    return res.status(400).json({ error: 'Invalid id parameter' });
-  }
-  next();
-});
+// Note: app.param does not apply to sub-routers mounted with Router().
+// Route-level :id validation is handled individually in each route file instead.
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -485,7 +480,6 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 // OCR asset check — warn if tesseract assets are missing
 const tesseractPath = path.resolve(__dirname, '../../dist/tesseract');
 try {
-  const fs = require('fs');
   if (!fs.existsSync(tesseractPath) || !fs.existsSync(path.join(tesseractPath, 'lang', 'ara.traineddata.gz'))) {
     logger.warn('[WARN] OCR tesseract assets not found at dist/tesseract/ — client-side OCR will be unavailable');
   }
