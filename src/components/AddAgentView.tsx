@@ -51,12 +51,11 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
   };
 
   return (
-    <div className="max-w-xl mx-auto card p-6">
+    <div className="max-w-xl mx-auto card p-4 md:p-6">
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-      <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
+      <div className="flex justify-between items-center mb-4 md:mb-6 border-b border-gray-100 pb-3 md:pb-4">
         <div>
-          <h2 className="font-headline-lg text-lg font-bold text-gray-905">تسجيل وكيل أو فرع توزيع معتمد</h2>
-
+          <h2 className="font-headline-lg text-sm md:text-lg font-bold text-gray-905">تسجيل وكيل أو فرع توزيع معتمد</h2>
         </div>
         <button
           onClick={() => setView('agents')}
@@ -67,9 +66,9 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4 text-right">
+      <form onSubmit={handleSubmit} className="space-y-3 md:space-y-4 text-right">
         <div>
-          <label className="block text-xs font-bold text-gray-600 mb-1.5">الاسم التجاري الكامل للوكيل</label>
+          <label className="block text-[11px] md:text-xs font-bold text-gray-600 mb-1">الاسم التجاري الكامل للوكيل</label>
             <input
               type="text"
               required
@@ -80,9 +79,9 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
              />
          </div>
 
-         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
            <div>
-             <label className="block text-xs font-bold text-gray-600 mb-1.5">إقليم ومنطقة التغطية</label>
+             <label className="block text-[11px] md:text-xs font-bold text-gray-600 mb-1">إقليم ومنطقة التغطية</label>
              <input
                type="text"
                value={region}
@@ -90,76 +89,76 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
                 placeholder="المنطقة / المدينة"
                className="input-field"
             />
-          </div>
+           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-gray-600 mb-1.5">رقم الهاتف للفرع (الرئيسي)</label>
-            <input
-              type="tel"
-              required
-              value={phone}
-              onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, '').slice(0, 9))}
-              placeholder="7xxxxxx"
-              pattern="[0-9]{7,9}"
-              className="input-field"
-              dir="ltr"
-              style={{ textAlign: 'right' }}
-            />
-          </div>
-        </div>
+           <div>
+             <label className="block text-[11px] md:text-xs font-bold text-gray-600 mb-1">رقم الهاتف للفرع (الرئيسي)</label>
+             <input
+               type="tel"
+               required
+               value={phone}
+               onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, '').slice(0, 9))}
+               placeholder="7xxxxxx"
+               pattern="[0-9]{7,9}"
+               className="input-field"
+               dir="ltr"
+               style={{ textAlign: 'right' }}
+             />
+           </div>
+         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-gray-100 pt-4">
-          <div>
-            <label className="block text-xs font-bold text-gray-600 mb-1.5">عدد نقاط البيع التابعة له مبدئياً</label>
-            <input
-              type="number"
-              min="0"
-              value={sellersCount}
-              onChange={(e) => setSellersCount(Number(e.target.value))}
-              placeholder="عدد النقاط"
-              className="input-field"
-            />
-          </div>
+         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 border-t border-gray-100 pt-3 md:pt-4">
+           <div>
+             <label className="block text-[11px] md:text-xs font-bold text-gray-600 mb-1">عدد نقاط البيع التابعة له مبدئياً</label>
+             <input
+               type="number"
+               min="0"
+               value={sellersCount}
+               onChange={(e) => setSellersCount(Number(e.target.value))}
+               placeholder="عدد النقاط"
+               className="input-field"
+             />
+           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-gray-600 mb-1.5">عدد شرائح SIM المخصّصة كعهدة</label>
-            <input
-              type="number"
-              min="0"
-              value={simsCount}
-              onChange={(e) => setSimsCount(Number(e.target.value))}
-              placeholder="عدد الشرائح"
-              className="input-field"
-            />
-          </div>
-        </div>
+           <div>
+             <label className="block text-[11px] md:text-xs font-bold text-gray-600 mb-1">عدد شرائح SIM المخصّصة كعهدة</label>
+             <input
+               type="number"
+               min="0"
+               value={simsCount}
+               onChange={(e) => setSimsCount(Number(e.target.value))}
+               placeholder="عدد الشرائح"
+               className="input-field"
+             />
+           </div>
+         </div>
 
-        <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-[11px] leading-relaxed text-red-950 flex gap-2 items-start mt-3">
-          <span className="material-symbols-outlined text-red-700 text-sm">security</span>
-          <span>
-            بتسجيل هذا الوكيل، يتعهد العميل بالالتزام بجميع القوانين الأمنية لمكافحة تكرار الهويات والتحقق من رقم الهوية الأصلية لكل مشتري مستجد للشرائح.
-          </span>
-        </div>
+         <div className="p-2.5 md:p-3 bg-red-50 border border-red-100 rounded-lg text-[10px] md:text-[11px] leading-relaxed text-red-950 flex gap-2 items-start mt-2 md:mt-3">
+           <span className="material-symbols-outlined text-red-700 text-sm shrink-0">security</span>
+           <span>
+             بتسجيل هذا الوكيل، يتعهد العميل بالالتزام بجميع القوانين الأمنية لمكافحة تكرار الهويات والتحقق من رقم الهوية الأصلية لكل مشتري مستجد للشرائح.
+           </span>
+         </div>
 
-        <div className="flex gap-2 justify-end pt-4 border-t border-gray-100 mt-4">
-          <button
-            type="button"
-            onClick={() => setView('agents')}
-            className="btn btn-ghost"
-           >
-             إلغاء التراجع
-           </button>
+         <div className="flex gap-2 justify-end pt-3 md:pt-4 border-t border-gray-100 mt-3 md:mt-4">
            <button
-               type="submit"
-               disabled={isSubmitting}
-               className="btn btn-primary flex items-center gap-2"
+             type="button"
+             onClick={() => setView('agents')}
+             className="btn btn-ghost"
             >
-              {isSubmitting ? (
-                <><RefreshCw size={14} className="animate-spin" /> جاري التسجيل...</>
-              ) : 'تأكيد وتسجيل الوكيل'}
+              إلغاء التراجع
             </button>
-        </div>
-      </form>
-    </div>
-  );
+            <button
+                type="submit"
+                disabled={isSubmitting}
+                className="btn btn-primary flex items-center gap-2"
+             >
+               {isSubmitting ? (
+                 <><RefreshCw size={14} className="animate-spin" /> جاري التسجيل...</>
+               ) : 'تأكيد وتسجيل الوكيل'}
+             </button>
+         </div>
+       </form>
+     </div>
+   );
 }
