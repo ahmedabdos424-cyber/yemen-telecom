@@ -27,4 +27,4 @@ EXPOSE 4000
 USER appuser
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=15s \
   CMD wget --no-verbose --tries=1 --spider http://localhost:4000/api/health || exit 1
-CMD ["node", "server/dist/index.js"]
+CMD ["node", "-r", "./server/dist/sentry-preload.js", "server/dist/index.js"]

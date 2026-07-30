@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { SystemSettings } from '../types';
 import ConfirmModal from './shared/ConfirmModal';
 import { captureError } from '../lib/monitor.ts';
+import * as Sentry from '@sentry/react';
 import { api } from '../api/client';
 import { Trash2 } from 'lucide-react';
 import { useToast, ToastContainer } from '../hooks/useToast';
@@ -596,6 +597,17 @@ export default function SettingsView({ settings, onUpdateSettings }: SettingsVie
               >إلغاء</button>
             </div>
           </div>
+        </div>
+      )}
+      {import.meta.env.DEV && (
+        <div className="mt-6 p-4 border border-dashed border-red-500/30 rounded-xl">
+          <p className="text-xs text-red-400 mb-2">DEV: اختبار Sentry</p>
+          <button
+            onClick={() => { throw new Error('اختبار Sentry من الواجهة!'); }}
+            className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/40 text-red-400 text-sm rounded-lg transition-all"
+          >
+            🔥 اختبار خطأ Sentry
+          </button>
         </div>
       )}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />

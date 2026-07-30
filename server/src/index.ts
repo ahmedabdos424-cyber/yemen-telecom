@@ -44,8 +44,6 @@ if (envMode === 'development') {
 }
 logger.info(`[ENV] NODE_ENV=${envMode}`);
 
-initSentry();
-
 const app = express();
 const PORT = parseInt(process.env.API_PORT || '4000');
 const START_TIME = Date.now();
