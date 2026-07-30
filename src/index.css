@@ -874,6 +874,48 @@ button:active,
   }
 }
 
+/* ========== 2XS BREAKPOINT (>= 380px) ========== */
+@media (min-width: 380px) {
+  .\32xs\:inline {
+    display: inline !important;
+  }
+  .\32xs\:hidden {
+    display: none !important;
+  }
+}
+@media (max-width: 379px) {
+  .\<32xs\:inline {
+    display: inline !important;
+  }
+  .\<32xs\:hidden {
+    display: none !important;
+  }
+}
+
+/* ========== FILTER SNAP SCROLL ========== */
+.snap-dashboard-filters {
+  display: flex;
+  gap: 0.375rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.snap-dashboard-filters::-webkit-scrollbar {
+  display: none;
+}
+.snap-dashboard-filters > * {
+  scroll-snap-align: start;
+}
+
+@media (min-width: 640px) {
+  .snap-dashboard-filters {
+    flex-wrap: wrap;
+    overflow: visible;
+    gap: 0.5rem;
+  }
+}
+
 /* ========== ANIMATIONS ========== */
 @keyframes fadeIn {
   from { opacity: 0; }

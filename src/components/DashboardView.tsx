@@ -90,7 +90,7 @@ export default function DashboardView({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <div className="flex items-center gap-2">
         {/* Search Input Bar */}
         <div className="input-group shadow-sm flex-1">
@@ -127,7 +127,7 @@ export default function DashboardView({
       </div>
 
       {/* Main Stats Bento Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5 md:gap-5">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-5">
         {/* Card 1: Total SIMs */}
         <motion.div 
           whileHover={{ y: -3 }}
@@ -241,35 +241,35 @@ export default function DashboardView({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Smart Alerts Box */}
         <section className="lg:col-span-5">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-full flex flex-col">
-            <div className="p-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+          <div className="card overflow-hidden h-full flex flex-col">
+            <div className="p-3 md:p-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-secondary font-bold">bolt</span>
-                <h2 className="font-title-lg text-sm font-bold text-gray-900">تنبيهات النظام الذكية</h2>
+                <h2 className="font-title-lg text-xs md:text-sm font-bold text-gray-900">تنبيهات النظام الذكية</h2>
               </div>
               <span className="badge badge-active">
                 {alerts.length} نشطة
               </span>
             </div>
-            <div className="p-4 space-y-3 flex-1 overflow-y-auto max-h-72">
+            <div className="p-3 md:p-4 space-y-2.5 md:space-y-3 flex-1 overflow-y-auto max-h-60 md:max-h-72">
               {alerts.length === 0 && (
-                <div className="text-center py-8 text-gray-400 text-xs">
+                <div className="text-center py-6 md:py-8 text-gray-400 text-xs">
                   لا توجد تنبيهات نشطة حالياً
                 </div>
               )}
               {alerts.map((alert) => (
-                <div key={alert.id} className={`card border-r-4 ${alert.priority === 'high' ? 'border-red-500' : alert.priority === 'medium' ? 'border-orange-500' : 'border-blue-500'} flex gap-3 items-start`}>
-                  <span className={`material-symbols-outlined ${alert.priority === 'high' ? 'text-red-600' : alert.priority === 'medium' ? 'text-orange-600' : 'text-blue-600'} text-xl`}>
+                <div key={alert.id} className={`p-2.5 md:p-3 rounded-xl border-r-4 ${alert.priority === 'high' ? 'border-red-500 bg-red-50/30' : alert.priority === 'medium' ? 'border-orange-500 bg-orange-50/30' : 'border-blue-500 bg-blue-50/30'} flex gap-2.5 md:gap-3 items-start`}>
+                  <span className={`material-symbols-outlined ${alert.priority === 'high' ? 'text-red-600' : alert.priority === 'medium' ? 'text-orange-600' : 'text-blue-600'} text-lg md:text-xl`}>
                     {alert.priority === 'high' ? 'warning' : alert.priority === 'medium' ? 'content_copy' : 'info'}
                   </span>
-                  <div className="flex-1">
-                    <h4 className="font-bold text-xs leading-tight">{alert.title}</h4>
-                    <p className="text-[11px] mt-1">{alert.description}</p>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-bold text-[11px] md:text-xs leading-tight">{alert.title}</h4>
+                    <p className="text-[10px] md:text-[11px] mt-0.5 md:mt-1 text-gray-600">{alert.description}</p>
                   </div>
                 </div>
               ))}
             </div>
-            <div className="p-4 pt-0 border-t border-gray-100 bg-gray-50/50">
+            <div className="p-3 md:p-4 pt-0 border-t border-gray-100 bg-gray-50/50">
               <button 
                 onClick={() => setView('alerts')}
                 className="btn btn-ghost btn-sm w-full"
@@ -283,12 +283,12 @@ export default function DashboardView({
 
         {/* Provider Analytics Summary */}
         <section className="lg:col-span-7">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 h-full flex flex-col justify-between">
-            <h2 className="font-title-lg text-sm font-bold text-gray-900 mb-5 flex items-center gap-2">
+          <div className="card h-full flex flex-col justify-between">
+            <h2 className="font-title-lg text-xs md:text-sm font-bold text-gray-900 mb-3 md:mb-5 flex items-center gap-2">
               <span className="material-symbols-outlined text-primary">analytics</span>
               أداء شركات المزودين والشرائح المفعّلة
             </h2>
-            <div className="space-y-6 flex-1 flex flex-col justify-center">
+            <div className="space-y-4 md:space-y-6 flex-1 flex flex-col justify-center">
               {operators.length === 0 && (
                 <div className="text-center py-8 text-gray-400 text-xs">
                   لا توجد بيانات مشغلين متاحة حالياً
@@ -321,9 +321,9 @@ export default function DashboardView({
       </div>
 
       {/* Recent Operations Section */}
-      <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="font-title-lg text-sm font-bold text-gray-900">آخر العمليات والتوزيعات للنظام</h2>
+      <section className="card overflow-hidden">
+        <div className="p-3 md:p-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+          <h2 className="font-title-lg text-xs md:text-sm font-bold text-gray-900">آخر العمليات والتوزيعات للنظام</h2>
           <button 
             onClick={() => setView('sims')} 
             className="btn btn-ghost btn-sm"
@@ -334,31 +334,31 @@ export default function DashboardView({
         </div>
         <div className="divide-y divide-gray-100">
           {transactions.map((tx) => (
-            <div key={tx.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
-              <div className="flex items-center gap-3.5">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+            <div key={tx.id} className="p-3 md:p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+              <div className="flex items-center gap-3 md:gap-3.5 min-w-0 flex-1">
+                <div className={`w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center shrink-0 ${
                   tx.status === 'completed' ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-blue-600'
                 }`}>
-                  <span className="material-symbols-outlined text-[20px]">
+                  <span className="material-symbols-outlined text-[18px] md:text-[20px]">
                     {tx.status === 'completed' ? 'receipt_long' : 'pending'}
                   </span>
                 </div>
-                <div>
-                  <h4 className="font-bold text-xs text-gray-900">{tx.clientName}</h4>
-                  <p className="text-[11px] text-gray-500 mt-1">
+                <div className="min-w-0">
+                  <h4 className="font-bold text-[11px] md:text-xs text-gray-900 truncate">{tx.clientName}</h4>
+                  <p className="text-[10px] md:text-[11px] text-gray-500 mt-0.5 md:mt-1 truncate">
                     {tx.provider === 'Yemen Mobile' ? 'يمن موبايل' : tx.provider === 'Sabafon' ? 'سبأفون' : 'YOU'} • {(tx.simsCount ?? 0).toLocaleString()} شريحة مخصصة
                   </p>
                 </div>
               </div>
-              <div className="text-left">
-                <span className={`px-2.5 py-0.5 text-[11px] font-bold rounded-full ${
+              <div className="text-left shrink-0 mr-2">
+                <span className={`px-2 py-0.5 text-[10px] md:text-[11px] font-bold rounded-full ${
                   tx.status === 'completed'
                     ? 'bg-green-100 text-green-800'
                     : 'bg-blue-100 text-blue-800'
                 }`}>
                   {tx.status === 'completed' ? 'مكتمل' : 'قيد المعالجة'}
                 </span>
-                <p className="text-[11px] text-gray-400 mt-1 font-mono">{tx.relativeTime}</p>
+                <p className="text-[10px] md:text-[11px] text-gray-400 mt-0.5 md:mt-1 font-mono">{tx.relativeTime}</p>
               </div>
             </div>
           ))}

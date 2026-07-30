@@ -233,85 +233,85 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
   }, [csvPreview, onAddSIM]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       {/* Header and Add Actions */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-4">
         <div>
-          <h2 className="font-headline-lg text-lg md:text-xl font-bold text-gray-900">إدارة ومخزن شرائح الاتصال</h2>
+          <h2 className="font-headline-lg text-sm md:text-xl font-bold text-gray-900">إدارة ومخزن شرائح الاتصال</h2>
 
         </div>
-        <div className="flex items-center gap-2.5 w-full md:w-auto">
+        <div className="flex items-center gap-2 w-full md:w-auto">
           {/* CSV Import */}
           <button
             onClick={() => setShowImportModal(true)}
-            className="flex-1 md:flex-none btn btn-ghost"
+            className="flex-1 md:flex-none btn btn-ghost text-[11px] md:text-[13px]"
           >
             <span className="material-symbols-outlined text-sm">upload_file</span>
-            استيراد CSV
+            <span className="hidden 2xs:inline">استيراد CSV</span>
           </button>
           {/* Manual insert SIM */}
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex-1 md:flex-none btn btn-primary"
+            className="flex-1 md:flex-none btn btn-primary text-[11px] md:text-[13px]"
           >
             <span className="material-symbols-outlined text-sm">add_circle</span>
-            إضافة شريحة يدوياً
+            <span className="hidden 2xs:inline">إضافة شريحة يدوياً</span>
           </button>
         </div>
       </div>
 
       {/* Summary counters grid */}
       {sims.length === 0 ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-4">
           <StatsCardSkeleton />
           <StatsCardSkeleton />
           <StatsCardSkeleton />
           <StatsCardSkeleton />
         </div>
       ) : (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-4">
         <div className="stat-card stat-card-ym">
-          <div className="flex justify-between items-start mb-2">
+          <div className="flex justify-between items-start mb-1.5 md:mb-2">
             <OperatorLogo provider="yemen_mobile" size="sm" />
-            <span className="text-[11px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">+12%</span>
+            <span className="text-[10px] md:text-[11px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">+12%</span>
           </div>
-          <p className="text-gray-400 text-[11px] font-bold">إجمالي الشرائح</p>
+          <p className="text-gray-400 text-[10px] md:text-[11px] font-bold">إجمالي الشرائح</p>
           <h4 className="stat-card-value font-mono">{stats.total}</h4>
         </div>
 
         <div className="stat-card">
-          <div className="flex justify-between items-start mb-2">
-            <span className="material-symbols-outlined text-green-600 bg-green-50 border border-green-100 p-2 rounded-lg text-sm">check_circle</span>
-            <span className="text-[11px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">جاهز</span>
+          <div className="flex justify-between items-start mb-1.5 md:mb-2">
+            <span className="material-symbols-outlined text-green-600 bg-green-50 border border-green-100 p-1.5 md:p-2 rounded-lg text-xs md:text-sm">check_circle</span>
+            <span className="text-[10px] md:text-[11px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">جاهز</span>
           </div>
-          <p className="text-gray-400 text-[11px] font-bold">المتاحة للبيع</p>
+          <p className="text-gray-400 text-[10px] md:text-[11px] font-bold">المتاحة للبيع</p>
           <h4 className="stat-card-value font-mono">{stats.available}</h4>
         </div>
 
         <div className="stat-card">
-          <div className="flex justify-between items-start mb-2">
-            <span className="material-symbols-outlined text-yellow-600 bg-yellow-50 border border-yellow-100 p-2 rounded-lg text-sm">pending_actions</span>
-            <span className="text-[11px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-full">محجوز</span>
+          <div className="flex justify-between items-start mb-1.5 md:mb-2">
+            <span className="material-symbols-outlined text-yellow-600 bg-yellow-50 border border-yellow-100 p-1.5 md:p-2 rounded-lg text-xs md:text-sm">pending_actions</span>
+            <span className="text-[10px] md:text-[11px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-full">محجوز</span>
           </div>
-          <p className="text-gray-400 text-[11px] font-bold">المحجوزة مؤقتاً</p>
+          <p className="text-gray-400 text-[10px] md:text-[11px] font-bold">المحجوزة مؤقتاً</p>
           <h4 className="stat-card-value font-mono">{stats.reserved}</h4>
         </div>
 
         <div className="stat-card">
-          <div className="flex justify-between items-start mb-2">
-            <span className="material-symbols-outlined text-red-600 bg-red-50 border border-red-100 p-2 rounded-lg text-sm font-bold">block</span>
-            <span className="text-[11px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full">تالف</span>
+          <div className="flex justify-between items-start mb-1.5 md:mb-2">
+            <span className="material-symbols-outlined text-red-600 bg-red-50 border border-red-100 p-1.5 md:p-2 rounded-lg text-xs md:text-sm font-bold">block</span>
+            <span className="text-[10px] md:text-[11px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full">تالف</span>
           </div>
-          <p className="text-gray-400 text-[11px] font-bold">غير نشطة / تالفة</p>
+          <p className="text-gray-400 text-[10px] md:text-[11px] font-bold">غير نشطة / تالفة</p>
           <h4 className="stat-card-value font-mono">{stats.inactive}</h4>
         </div>
       </div>
       )}
 
       {/* Advanced search and dropdown filters row */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3 shadow-sm">
-        <div className="flex flex-col md:flex-row gap-3">
+      <div className="card p-3 md:p-4 space-y-2.5 md:space-y-3">
+        <div className="flex flex-col md:flex-row gap-2.5 md:gap-3">
           <div className="input-group flex-1">
             <span className="material-symbols-outlined input-icon">search</span>
             <input
@@ -334,22 +334,22 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
         </div>
 
         {/* Dropdowns row */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-          <div>
-            <label className="block text-[11px] text-gray-400 font-bold mb-1">الشبكة المزودة</label>
-            <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-2.5">
+          <div className="lg:col-span-1 col-span-2">
+            <label className="block text-[10px] md:text-[11px] text-gray-400 font-bold mb-1">الشبكة المزودة</label>
+            <div className="flex gap-1.5 md:gap-2 overflow-x-auto hide-scrollbar pb-0.5 snap-dashboard-filters">
               <button
                 type="button"
                 onClick={() => setSelectedProvider('all')}
-                className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold border-2 transition-all duration-200 flex items-center gap-2 active:scale-[0.97] ${selectedProvider === 'all' ? 'bg-gray-800 text-white border-gray-600 shadow-sm' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100 hover:border-gray-300'}`}
+                className={`min-h-[44px] px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[10px] md:text-xs font-bold border-2 transition-all duration-200 flex items-center gap-1.5 md:gap-2 active:scale-[0.97] shrink-0 snap-start ${selectedProvider === 'all' ? 'bg-gray-800 text-white border-gray-600 shadow-sm' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100 hover:border-gray-300'}`}
               >
-                <span className="material-symbols-outlined text-lg">apps</span>
+                <span className="material-symbols-outlined text-base md:text-lg">apps</span>
                 الكل
               </button>
               <button
                 type="button"
                 onClick={() => setSelectedProvider('Yemen Mobile')}
-                className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold border-2 transition-all duration-200 flex items-center gap-2 active:scale-[0.97] ${selectedProvider === 'Yemen Mobile' ? 'bg-op-ym border-op-ym shadow-lg text-white' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-op-ym/60 hover:bg-op-ym-light'}`}
+                className={`min-h-[44px] px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[10px] md:text-xs font-bold border-2 transition-all duration-200 flex items-center gap-1.5 md:gap-2 active:scale-[0.97] shrink-0 snap-start ${selectedProvider === 'Yemen Mobile' ? 'bg-op-ym border-op-ym shadow-lg text-white' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-op-ym/60 hover:bg-op-ym-light'}`}
               >
                 <OperatorLogo provider="Yemen Mobile" size="md" plain />
                 <span>يمن موبايل</span>
@@ -357,7 +357,7 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
               <button
                 type="button"
                 onClick={() => setSelectedProvider('Sabafon')}
-                className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold border-2 transition-all duration-200 flex items-center gap-2 active:scale-[0.97] ${selectedProvider === 'Sabafon' ? 'bg-op-sf border-op-sf shadow-lg text-white' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-op-sf/60 hover:bg-op-sf-light'}`}
+                className={`min-h-[44px] px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[10px] md:text-xs font-bold border-2 transition-all duration-200 flex items-center gap-1.5 md:gap-2 active:scale-[0.97] shrink-0 snap-start ${selectedProvider === 'Sabafon' ? 'bg-op-sf border-op-sf shadow-lg text-white' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-op-sf/60 hover:bg-op-sf-light'}`}
               >
                 <OperatorLogo provider="Sabafon" size="md" plain />
                 <span>سبأفون</span>
@@ -365,7 +365,7 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
               <button
                 type="button"
                 onClick={() => setSelectedProvider('YOU')}
-                className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold border-2 transition-all duration-200 flex items-center gap-2 active:scale-[0.97] ${selectedProvider === 'YOU' ? 'bg-op-you border-op-you shadow-lg text-you-text' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-op-you/60 hover:bg-op-you-light'}`}
+                className={`min-h-[44px] px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[10px] md:text-xs font-bold border-2 transition-all duration-200 flex items-center gap-1.5 md:gap-2 active:scale-[0.97] shrink-0 snap-start ${selectedProvider === 'YOU' ? 'bg-op-you border-op-you shadow-lg text-you-text' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-op-you/60 hover:bg-op-you-light'}`}
               >
                 <OperatorLogo provider="YOU" size="md" plain />
                 <span>YOU</span>
@@ -374,11 +374,11 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
           </div>
 
           <div>
-            <label className="block text-[11px] text-gray-400 font-bold mb-1">حالة الشريحة</label>
+            <label className="block text-[10px] md:text-[11px] text-gray-400 font-bold mb-1">حالة الشريحة</label>
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 text-xs py-2 px-3 rounded-lg cursor-pointer hover:bg-gray-100/75 text-gray-700 outline-none"
+              className="w-full bg-gray-50 border border-gray-200 text-xs py-2 px-3 rounded-lg cursor-pointer hover:bg-gray-100/75 text-gray-700 outline-none min-h-[44px]"
             >
               <option value="all">كل الحالات</option>
               <option value="available">متاح</option>
@@ -389,11 +389,11 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
           </div>
 
           <div>
-            <label className="block text-[11px] text-gray-400 font-bold mb-1">المالك / الوكيل الموزع</label>
+            <label className="block text-[10px] md:text-[11px] text-gray-400 font-bold mb-1">المالك / الوكيل الموزع</label>
             <select
               value={selectedOwner}
               onChange={(e) => setSelectedOwner(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 text-xs py-2 px-3 rounded-lg cursor-pointer hover:bg-gray-100/75 text-gray-700 outline-none"
+              className="w-full bg-gray-50 border border-gray-200 text-xs py-2 px-3 rounded-lg cursor-pointer hover:bg-gray-100/75 text-gray-700 outline-none min-h-[44px]"
             >
               <option value="all">كل الملاك والموزعين</option>
               {uniqueOwners.map(owner => (
@@ -403,11 +403,11 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
           </div>
 
           <div>
-            <label className="block text-[11px] text-gray-400 font-bold mb-1">باقة البداية المخصصة</label>
+            <label className="block text-[10px] md:text-[11px] text-gray-400 font-bold mb-1">باقة البداية المخصصة</label>
             <select
               value={selectedPackage}
               onChange={(e) => setSelectedPackage(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 text-xs py-2 px-3 rounded-lg cursor-pointer hover:bg-gray-100/75 text-gray-700 outline-none"
+              className="w-full bg-gray-50 border border-gray-200 text-xs py-2 px-3 rounded-lg cursor-pointer hover:bg-gray-100/75 text-gray-700 outline-none min-h-[44px]"
             >
               <option value="all">كل الباقات</option>
               {uniquePackages.map(pkg => (
@@ -419,7 +419,7 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
 
         {/* Active badges & clear all */}
         {(searchTerm || selectedProvider !== 'all' || selectedStatus !== 'all' || selectedOwner !== 'all' || selectedPackage !== 'all') && (
-          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100 text-[11px]">
+          <div className="flex flex-wrap items-center gap-1.5 md:gap-2 pt-2 border-t border-gray-100 text-[10px] md:text-[11px]">
             <span className="text-gray-400 font-bold">نشط التصفية:</span>
             
             {searchTerm && (
@@ -475,10 +475,10 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
       </div>
 
       {/* Dynamic Data Grid cards and List */}
-      <div className="space-y-4">
+      <div className="space-y-3 md:space-y-4">
         <div className="flex justify-between items-center px-1">
-          <h4 className="font-bold text-sm text-gray-800">تفاصيل مخزون الشرائح الجاري</h4>
-          <span className="text-[11px] text-gray-500 font-mono">إظهار {filteredSIMs.length} من {sims.length}</span>
+          <h4 className="font-bold text-xs md:text-sm text-gray-800">تفاصيل مخزون الشرائح الجاري</h4>
+          <span className="text-[10px] md:text-[11px] text-gray-500 font-mono">إظهار {filteredSIMs.length} من {sims.length}</span>
         </div>
 
         {sims.length === 0 ? (
@@ -501,27 +501,27 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
             ))}
           </div>
         ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
           {filteredSIMs.map((sim) => (
             <div
               key={sim.id}
-              className="bg-white border border-gray-200 shadow-sm p-4 rounded-xl flex flex-col justify-between hover:shadow-md transition-shadow active:scale-[0.99] content-visibility-auto contain-strict"
+              className="card p-3 md:p-4 flex flex-col justify-between hover:shadow-md transition-shadow active:scale-[0.99] content-visibility-auto contain-strict"
             >
-              <div className="flex justify-between items-start mb-3">
-                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <div className="flex justify-between items-start mb-2.5 md:mb-3">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
                   <OperatorLogo provider={sim.provider} size="sm" />
                   <div className="min-w-0">
-                    <p className="text-xs font-bold text-gray-900 font-mono truncate">{highlightMatches(sim.phone, searchTerm)}</p>
-                    <p className="text-[11px] text-gray-500 font-mono mt-0.5 truncate">{highlightMatches(sim.iccid, searchTerm)}</p>
+                    <p className="text-[11px] md:text-xs font-bold text-gray-900 font-mono truncate">{highlightMatches(sim.phone, searchTerm)}</p>
+                    <p className="text-[10px] md:text-[11px] text-gray-500 font-mono mt-0.5 truncate">{highlightMatches(sim.iccid, searchTerm)}</p>
                   </div>
                 </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className={`op-pill flex items-center gap-1 ${
+                  <div className="flex items-center gap-1 md:gap-1.5 shrink-0">
+                    <span className={`op-pill flex items-center gap-1 text-[10px] md:text-[11px] ${
                       sim.provider === 'Yemen Mobile' ? 'op-pill-ym' : sim.provider === 'Sabafon' ? 'op-pill-sf' : 'op-pill-you'
                     }`}>
                       <OperatorLogo provider={sim.provider} size="sm" />
                     </span>
-                    <span className={`badge ${
+                    <span className={`badge text-[10px] md:text-[11px] ${
                       sim.status === 'available'
                         ? 'badge-available'
                         : sim.status === 'sold'
@@ -535,29 +535,29 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
                   </div>
               </div>
 
-              <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-2">
-                <div className="text-[11px] flex-1 min-w-0 pr-1">
-                  <p className="text-gray-400 font-semibold mb-0.5">باقة الشريحة والمالك</p>
-                  <p className="font-bold text-gray-800 text-[11px] truncate">
+              <div className="flex items-center justify-between pt-2.5 md:pt-3 border-t border-gray-100 mt-1.5 md:mt-2">
+                <div className="text-[10px] md:text-[11px] flex-1 min-w-0 pl-1 md:pl-2">
+                  <p className="text-gray-400 font-semibold mb-0.5">الباقة والمالك</p>
+                  <p className="font-bold text-gray-800 text-[10px] md:text-[11px] truncate">
                     {highlightMatches(sim.packageType, searchTerm)} | {highlightMatches(sim.owner, searchTerm)}
                   </p>
                 </div>
-                <div className="flex gap-2 shrink-0">
+                <div className="flex gap-1.5 md:gap-2 shrink-0">
                   <button
                     type="button"
                     onClick={() => setSelectedSimDetail(sim)}
-                    className="touch-target p-3 text-gray-600 hover:text-secondary bg-gray-100 rounded-xl transition-colors border border-gray-200 cursor-pointer"
+                    className="touch-target p-2.5 md:p-3 text-gray-600 hover:text-secondary bg-gray-100 rounded-xl transition-colors border border-gray-200 cursor-pointer"
                     title="عرض التفاصيل"
                   >
-                    <span className="material-symbols-outlined text-lg">visibility</span>
+                    <span className="material-symbols-outlined text-base md:text-lg">visibility</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => openEditModal(sim)}
-                    className="touch-target p-3 text-gray-600 hover:text-secondary bg-gray-100 rounded-xl transition-colors border border-gray-200 cursor-pointer"
+                    className="touch-target p-2.5 md:p-3 text-gray-600 hover:text-secondary bg-gray-100 rounded-xl transition-colors border border-gray-200 cursor-pointer"
                     title="تعديل الشريحة"
                   >
-                    <span className="material-symbols-outlined text-lg">edit_note</span>
+                    <span className="material-symbols-outlined text-base md:text-lg">edit_note</span>
                   </button>
                 </div>
               </div>
