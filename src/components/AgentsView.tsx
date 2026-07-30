@@ -444,11 +444,11 @@ function AgentsView({ agents = [], setView, onUpdateAgent }: AgentsViewProps) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Top action header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
         <div>
-          <h2 className="font-headline-lg text-base sm:text-lg md:text-xl font-bold text-gray-900">إدارة شبكة الوكلاء المعتمدين</h2>
+          <h2 className="font-headline-lg text-sm sm:text-lg md:text-xl font-bold text-gray-900">إدارة شبكة الوكلاء المعتمدين</h2>
 
         </div>
         <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
@@ -470,41 +470,41 @@ function AgentsView({ agents = [], setView, onUpdateAgent }: AgentsViewProps) {
       </div>
 
       {/* Stats tiles */}
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-2">
-          <span className="material-symbols-outlined text-gray-400 text-2xl">groups</span>
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-2.5 md:gap-4">
+        <div className="card p-3 md:p-4 flex flex-col gap-1.5 md:gap-2">
+          <span className="material-symbols-outlined text-gray-400 text-xl md:text-2xl">groups</span>
           <div>
-            <p className="text-gray-400 font-bold text-[11px] uppercase">إجمالي الوكلاء</p>
-            <h4 className="text-lg font-bold text-gray-900 font-mono mt-0.5">{stats.total}</h4>
+            <p className="text-gray-400 font-bold text-[10px] md:text-[11px] uppercase">إجمالي الوكلاء</p>
+            <h4 className="text-base md:text-lg font-bold text-gray-900 font-mono mt-0.5">{stats.total}</h4>
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-2">
-          <span className="material-symbols-outlined text-green-500 text-2xl">check_circle</span>
+        <div className="card p-3 md:p-4 flex flex-col gap-1.5 md:gap-2">
+          <span className="material-symbols-outlined text-green-500 text-xl md:text-2xl">check_circle</span>
           <div>
-            <p className="text-gray-400 font-bold text-[11px] uppercase">الوكلاء النشطون</p>
-            <h4 className="text-lg font-bold text-green-600 font-mono mt-0.5">{stats.active}</h4>
+            <p className="text-gray-400 font-bold text-[10px] md:text-[11px] uppercase">الوكلاء النشطون</p>
+            <h4 className="text-base md:text-lg font-bold text-green-600 font-mono mt-0.5">{stats.active}</h4>
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-2">
-          <span className="material-symbols-outlined text-blue-500 text-2xl">trending_up</span>
+        <div className="card p-3 md:p-4 flex flex-col gap-1.5 md:gap-2">
+          <span className="material-symbols-outlined text-blue-500 text-xl md:text-2xl">trending_up</span>
           <div>
-            <p className="text-gray-400 font-bold text-[11px] uppercase">المبيعات الإجمالية اليومية</p>
-            <h4 className="text-lg font-bold text-gray-900 font-mono mt-0.5">{stats.salesToday} <span className="text-[11px] font-normal text-gray-500">ر.ي</span></h4>
+            <p className="text-gray-400 font-bold text-[10px] md:text-[11px] uppercase">المبيعات الإجمالية اليومية</p>
+            <h4 className="text-base md:text-lg font-bold text-gray-900 font-mono mt-0.5">{stats.salesToday} <span className="text-[10px] md:text-[11px] font-normal text-gray-500">ر.ي</span></h4>
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-2">
-          <span className="material-symbols-outlined text-secondary text-2xl">pending_actions</span>
+        <div className="card p-3 md:p-4 flex flex-col gap-1.5 md:gap-2">
+          <span className="material-symbols-outlined text-secondary text-xl md:text-2xl">pending_actions</span>
           <div>
-            <p className="text-gray-400 font-bold text-[11px] uppercase">طلبات شحن معلقة</p>
-            <h4 className="text-lg font-bold text-secondary font-mono mt-0.5">{stats.pending}</h4>
+            <p className="text-gray-400 font-bold text-[10px] md:text-[11px] uppercase">طلبات شحن معلقة</p>
+            <h4 className="text-base md:text-lg font-bold text-secondary font-mono mt-0.5">{stats.pending}</h4>
           </div>
         </div>
       </section>
-      <section className="bg-white rounded-xl border border-gray-200 p-4 space-y-3 shadow-sm">
-        <div className="flex flex-col md:flex-row gap-3">
+      <section className="card p-3 md:p-4 space-y-2.5 md:space-y-3">
+        <div className="flex flex-col md:flex-row gap-2.5 md:gap-3">
           <div className="input-group flex-1">
             <span className="material-symbols-outlined input-icon">search</span>
             <input
@@ -527,13 +527,13 @@ function AgentsView({ agents = [], setView, onUpdateAgent }: AgentsViewProps) {
         </div>
 
         {/* Dropdowns row */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-2.5">
           <div>
-            <label className="block text-[11px] text-gray-400 font-bold mb-1">تحديد المنطقة الموزعة</label>
+            <label className="block text-[10px] md:text-[11px] text-gray-400 font-bold mb-1">تحديد المنطقة الموزعة</label>
             <select
               value={regionFilter}
               onChange={(e) => setRegionFilter(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 text-xs py-2 px-3 rounded-lg cursor-pointer hover:bg-gray-100/75 text-gray-700 outline-none"
+              className="w-full bg-gray-50 border border-gray-200 text-xs py-2 px-3 rounded-lg cursor-pointer hover:bg-gray-100/75 text-gray-700 outline-none min-h-[44px]"
             >
               <option value="all">جميع المناطق</option>
               <option value="أمانة">أمانة العاصمة</option>
@@ -544,11 +544,11 @@ function AgentsView({ agents = [], setView, onUpdateAgent }: AgentsViewProps) {
           </div>
 
           <div>
-            <label className="block text-[11px] text-gray-400 font-bold mb-1">حالة الوكيل الجارية</label>
+            <label className="block text-[10px] md:text-[11px] text-gray-400 font-bold mb-1">حالة الوكيل الجارية</label>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 text-xs py-2 px-3 rounded-lg cursor-pointer hover:bg-gray-100/75 text-gray-700 outline-none"
+              className="w-full bg-gray-50 border border-gray-200 text-xs py-2 px-3 rounded-lg cursor-pointer hover:bg-gray-100/75 text-gray-700 outline-none min-h-[44px]"
             >
               <option value="all">جميع الحالات</option>
               <option value="active">نشط</option>
@@ -557,11 +557,11 @@ function AgentsView({ agents = [], setView, onUpdateAgent }: AgentsViewProps) {
           </div>
 
           <div>
-            <label className="block text-[11px] text-gray-400 font-bold mb-1">الحد الأدنى لمخزون الشرائح</label>
+            <label className="block text-[10px] md:text-[11px] text-gray-400 font-bold mb-1">الحد الأدنى لمخزون الشرائح</label>
             <select
               value={minSimsFilter}
               onChange={(e) => setMinSimsFilter(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 text-xs py-2 px-3 rounded-lg cursor-pointer hover:bg-gray-100/75 text-gray-700 outline-none"
+              className="w-full bg-gray-50 border border-gray-200 text-xs py-2 px-3 rounded-lg cursor-pointer hover:bg-gray-100/75 text-gray-700 outline-none min-h-[44px]"
             >
               <option value="all">الكل (بدون حد)</option>
               <option value="100">أكثر من 100 شريحة</option>
@@ -619,32 +619,32 @@ function AgentsView({ agents = [], setView, onUpdateAgent }: AgentsViewProps) {
       </section>
 
       {/* High-Contrast detailed Agent list */}
-      <div className="space-y-4">
+      <div className="space-y-3 md:space-y-4">
         <div className="flex justify-between items-center px-1">
-          <h3 className="font-bold text-sm text-gray-800">قائمة الفروع والوكلاء الموزعين</h3>
-          <span className="text-xs text-gray-500 font-semibold">{filteredAgents.length} وكيل مفضل مسجل</span>
+          <h3 className="font-bold text-xs md:text-sm text-gray-800">قائمة الفروع والوكلاء الموزعين</h3>
+          <span className="text-[11px] md:text-xs text-gray-500 font-semibold">{filteredAgents.length} وكيل مفضل مسجل</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
           {filteredAgents.map((agent) => (
             <div
               key={agent.id}
               className="card overflow-hidden flex flex-col hover:shadow-md transition-shadow"
             >
               {/* Profile Card Header */}
-              <div className="p-4 flex justify-between items-start border-b border-gray-100 bg-gray-50/10">
-                <div className="flex gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-primary-container text-white flex items-center justify-center text-sm font-bold shadow-sm">
+              <div className="p-3 md:p-4 flex justify-between items-start border-b border-gray-100 bg-gray-50/10">
+                <div className="flex gap-2.5 md:gap-3 min-w-0 flex-1">
+                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-primary-container text-white flex items-center justify-center text-xs md:text-sm font-bold shadow-sm shrink-0">
                     {safeString(agent.name).split(' ').filter(Boolean).map(n=>n[0]).slice(0,2).join(' ')}
                   </div>
-                  <div>
-                    <h3 className="font-bold text-xs text-gray-900">{highlightMatches(agent.name, searchTerm)}</h3>
-                    <p className="text-[11px] text-gray-500 font-semibold mt-1 font-mono">
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-[11px] md:text-xs text-gray-900 truncate">{highlightMatches(agent.name, searchTerm)}</h3>
+                    <p className="text-[10px] md:text-[11px] text-gray-500 font-semibold mt-0.5 md:mt-1 font-mono truncate">
                       {highlightMatches(agent.region, searchTerm)} • ID: {highlightMatches(agent.phone, searchTerm)}
                     </p>
                   </div>
                 </div>
-                <span className={`badge ${
+                <span className={`badge shrink-0 mr-1 ${
                   agent.status === 'active'
                     ? 'badge-active'
                     : 'badge-inactive'
@@ -654,36 +654,36 @@ function AgentsView({ agents = [], setView, onUpdateAgent }: AgentsViewProps) {
               </div>
 
               {/* Data numbers row */}
-              <div className="grid grid-cols-2 p-4 bg-gray-50/50 gap-4 border-b border-gray-100">
+              <div className="grid grid-cols-2 p-3 md:p-4 bg-gray-50/50 gap-2.5 md:gap-4 border-b border-gray-100">
                 <div className="flex flex-col">
-                  <span className="text-[11px] text-gray-400 font-bold">عدد نقاط البيع / البائعين</span>
-                  <span className="text-xs font-bold text-gray-955 mt-1 font-mono">{(agent.sellersCount ?? 0)} بائع</span>
+                  <span className="text-[10px] md:text-[11px] text-gray-400 font-bold">نقاط البيع</span>
+                  <span className="text-[11px] md:text-xs font-bold text-gray-955 mt-0.5 md:mt-1 font-mono">{(agent.sellersCount ?? 0)} بائع</span>
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-[11px] text-gray-400 font-bold">مخزون الشرائح الكلي</span>
-                  <span className="text-xs font-bold text-gray-955 mt-1 font-mono">{(agent.simsCount ?? 0).toLocaleString()} شريحة</span>
+                  <span className="text-[10px] md:text-[11px] text-gray-400 font-bold">مخزون الشرائح</span>
+                  <span className="text-[11px] md:text-xs font-bold text-gray-955 mt-0.5 md:mt-1 font-mono">{(agent.simsCount ?? 0).toLocaleString()} شريحة</span>
                 </div>
               </div>
 
               {/* Grid actions */}
-              <div className="flex divide-x divide-x-reverse divide-gray-100 bg-white">
+              <div className="grid grid-cols-3 sm:flex divide-x sm:divide-x-reverse divide-gray-100 bg-white">
                 <a
                   href={`tel:${agent.phone}`}
-                  className="flex-1 btn btn-ghost btn-sm"
+                  className="btn btn-ghost btn-sm rounded-none sm:rounded-none"
                 >
                   <span className="material-symbols-outlined text-sm text-gray-500">call</span>
-                  اتصال
+                  <span className="hidden 2xs:inline">اتصال</span>
                 </a>
                 <button
                   onClick={() => openEditModal(agent)}
-                  className="flex-1 btn btn-ghost btn-sm"
+                  className="btn btn-ghost btn-sm rounded-none sm:rounded-none"
                 >
                   <span className="material-symbols-outlined text-xs text-gray-500 font-bold">edit</span>
-                  تعديل
+                  <span className="hidden 2xs:inline">تعديل</span>
                 </button>
                 <button
                   onClick={() => toggleAgentStatus(agent.id, agent.status)}
-                  className={`flex-1 btn btn-sm ${
+                  className={`btn btn-sm rounded-none sm:rounded-none ${
                     agent.status === 'active'
                       ? 'text-secondary hover:bg-red-50/40'
                       : 'text-green-700 hover:bg-green-50/45'
@@ -692,7 +692,7 @@ function AgentsView({ agents = [], setView, onUpdateAgent }: AgentsViewProps) {
                   <span className="material-symbols-outlined text-sm font-bold">
                     {agent.status === 'active' ? 'block' : 'check_circle'}
                   </span>
-                  {agent.status === 'active' ? 'تعطيل' : 'تنشيط'}
+                  <span className="hidden 2xs:inline">{agent.status === 'active' ? 'تعطيل' : 'تنشيط'}</span>
                 </button>
               </div>
             </div>
