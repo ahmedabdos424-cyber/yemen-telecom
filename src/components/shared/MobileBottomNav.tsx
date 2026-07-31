@@ -38,7 +38,7 @@ export default function MobileBottomNav({ items = [], activeId, onChange, badgeC
               </div>
               <span className="text-[9px] mt-0.5 truncate w-full text-center leading-tight">{item.label}</span>
               {isSelected && <span className="w-1 h-1 rounded-full bg-red-500 mt-0.5" />}
-              {badgeCount && badgeCount > 0 && item.id === badgeOnId && (
+              {Boolean(badgeCount && Number(badgeCount) > 0) && item.id === badgeOnId && (
                 <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }}
                   className="absolute top-0.5 right-1/2 translate-x-3 translate-y-0.5 bg-red-600 text-white font-mono text-[8px] font-bold w-[18px] h-[18px] rounded-full flex items-center justify-center border-2 border-white shadow-sm">
                   {badgeCount > 9 ? '9+' : badgeCount}
