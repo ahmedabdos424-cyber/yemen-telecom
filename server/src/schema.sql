@@ -247,6 +247,39 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_type ON audit_logs(type);
 CREATE INDEX IF NOT EXISTS idx_duplicate_identities_region ON duplicate_identities(region);
 CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires ON token_blacklist(expires_at);
 
+-- Identity risk actions (production: flag/block/unblock decisions on identities)
+CREATE TABLE IF NOT EXISTS identity_risk_actions (
+  id SERIAL PRIMARY KEY,
+  id_no VARCHAR(50) NOT NULL,
+  name VARCHAR(200) DEFAULT '',
+  action VARCHAR(20) NOT NULL CHECK (action IN ('flag', 'block', 'unblock')),
+  reason TEXT DEFAULT '',
+  performed_by VARCHAR(200) DEFAULT '',
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_identity_risk_actions_id_no ON identity_risk_actions(id_no);
+CREATE INDEX IF NOT EXISTS idx_identity_risk_actions_created ON identity_risk_actions(created_at);
+
+-- Providers (production: telecom operators)
+CREATE TABLE IF NOT EXISTS providers (
+  id SERIAL PRIMARY KEY,
+  slug VARCHAR(50) UNIQUE NOT NULL,
+  display_name VARCHAR(100) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Schema migrations (production: applied migration filenames)
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  filename VARCHAR(255) PRIMARY KEY,
+  applied_at TIMESTAMP DEFAULT NOW()
+);
+
+-- TODO: Migrate app code from provider VARCHAR(50) to provider_id FK (providers table).
+-- Production already has provider_id in sims/transactions/inventories/operations/distribution_requests
+-- (migration 009_normalize_providers.sql). Code still writes/reads the legacy text column.
+-- See docs/provider-id-migration-impact.md for the full impact report.
+
 -- Periodic cleanup function for expired blacklisted tokens
 CREATE OR REPLACE FUNCTION cleanup_expired_tokens()
 RETURNS void AS $$
