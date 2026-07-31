@@ -3,14 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { Seller, SIM } from '../types';
 import { Check } from 'lucide-react';
 import profileImage from '../assets/profile.png';
 import { useToast, ToastContainer } from '../hooks/useToast';
 import { safeArray } from '../lib/safe';
 import { api } from '../api/client';
-import CameraPreviewModal from './shared/CameraPreviewModal';
+import CameraCapture from './shared/CameraCapture';
 
 interface SellersViewProps {
   sellers: Seller[];
@@ -48,214 +48,25 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
   const [showAddBalanceModal, setShowAddBalanceModal] = useState(false);
   const [balanceAmount, setBalanceAmount] = useState<number>(5000);
 
-  // Camera capture with preview for invoice photo
-  const [showCam, setShowCam] = useState(false);
-  const [camPreview, setCamPreview] = useState<string | null>(null);
-  const camVideoRef = useRef<HTMLVideoElement>(null);
-  const camCanvasRef = useRef<HTMLCanvasElement>(null);
-  const camFileRef = useRef<HTMLInputElement>(null);
-  const camStreamRef = useRef<MediaStream | null>(null);
   const [invoiceImageUrl, setInvoiceImageUrl] = useState<string | null>(null);
   const [uploadingInvoice, setUploadingInvoice] = useState(false);
-  const camConfirmingRef = useRef(false);
-  const camMountedRef = useRef(true);
-  const camProcessingRef = useRef(false);
 
   const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
 
-  function isNative(): boolean {
-    try { return !!(window as unknown as { Capacitor?: { isNative?: boolean } }).Capacitor?.isNative; } catch { return false; }
-  }
-
-  useEffect(() => {
-    camMountedRef.current = true;
-    return () => {
-      camMountedRef.current = false;
-      if (camStreamRef.current) {
-        camStreamRef.current.getTracks().forEach(t => { try { t.stop(); } catch {} });
-        camStreamRef.current = null;
-      }
-      if (camVideoRef.current) camVideoRef.current.srcObject = null;
-    };
-  }, []);
-
-  const openInvoiceCam = useCallback(async () => {
-    if (!camMountedRef.current || camProcessingRef.current) return;
-    camProcessingRef.current = true;
-    setShowCam(true);
-    setCamPreview(null);
-
-    if (isNative()) {
-      try {
-        const { Camera, CameraResultType, CameraDirection, CameraSource } = await import('@capacitor/camera');
-        const photo = await Camera.getPhoto({
-          quality: 95,
-          allowEditing: false,
-          resultType: CameraResultType.Uri,
-          direction: CameraDirection.Rear,
-          source: CameraSource.Camera,
-        });
-        if (!photo.webPath) throw new Error('فشل التقاط الصورة');
-        const response = await fetch(photo.webPath);
-        const blob = await response.blob();
-        URL.revokeObjectURL(photo.webPath);
-        const result = await api.uploadFile(blob, 'image');
-        setInvoiceImageUrl(result.url);
-        toastSuccess('تم رفع صورة فاتورة الشحن بنجاح وستُرفق مع العملية.');
-        setShowCam(false);
-        camProcessingRef.current = false;
-        try {
-          const { Filesystem, Directory } = await import('@capacitor/filesystem');
-          if (photo.path) await Filesystem.deleteFile({ path: photo.path, directory: Directory.Cache });
-        } catch {}
-        return;
-      } catch (err: unknown) {
-        if (!camMountedRef.current) return;
-        camProcessingRef.current = false;
-        const msg = err instanceof Error ? err.message : String(err);
-        if (msg.includes('cancelled') || msg.includes('User cancelled')) {
-          setShowCam(false);
-          return;
-        }
-        if (msg.includes('permission') || msg.includes('denied')) {
-          toastWarning('تم رفض صلاحية الكاميرا. يرجى السماح بالوصول من إعدادات الجهاز.');
-          setShowCam(false);
-          return;
-        }
-        toastError(msg);
-        setShowCam(false);
-        return;
-      }
-    }
-
-    camProcessingRef.current = false;
+  const handleInvoiceCapture = useCallback(async (imageData: string) => {
+    setUploadingInvoice(true);
     try {
-      const resolution = Math.min(screen.width, screen.height, 1920);
-      let s: MediaStream;
-      try {
-        s = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment', width: { ideal: resolution }, height: { ideal: resolution } },
-        });
-      } catch {
-        s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      }
-      if (!camMountedRef.current) {
-        s.getTracks().forEach(t => t.stop());
-        return;
-      }
-      camStreamRef.current = s;
-      if (camVideoRef.current) {
-        camVideoRef.current.srcObject = s;
-        try { await camVideoRef.current.play(); } catch { }
-      }
-    } catch (err) {
-      if (!camMountedRef.current) return;
-      const isPerm = err instanceof DOMException && (
-        err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError' || err.name === 'AbortError'
-      );
-      if (isPerm) {
-        toastWarning('تم رفض صلاحية الكاميرا. يرجى السماح بالوصول من إعدادات الجهاز.');
-        setShowCam(false);
-      } else {
-        camFileRef.current?.click();
-      }
-    }
-  }, [toastError, toastSuccess, toastWarning]);
-
-  const uploadInvoiceImage = useCallback(async (dataUrl: string): Promise<string | null> => {
-    try {
-      setUploadingInvoice(true);
-      const response = await fetch(dataUrl);
+      const response = await fetch(imageData);
       const blob = await response.blob();
       const result = await api.uploadFile(blob, 'image');
       setInvoiceImageUrl(result.url);
       toastSuccess('تم رفع صورة فاتورة الشحن بنجاح وستُرفق مع العملية.');
-      return result.url;
     } catch (err: unknown) {
       toastError(err instanceof Error ? err.message : String(err));
-      return null;
     } finally {
       setUploadingInvoice(false);
     }
   }, [toastError, toastSuccess]);
-
-  const captureInvoiceFrame = useCallback(() => {
-    if (!camVideoRef.current || !camCanvasRef.current) return;
-    const v = camVideoRef.current;
-    const c = camCanvasRef.current;
-    const vw = v.videoWidth || 1280;
-    const vh = v.videoHeight || 960;
-    const maxDim = 2048;
-    let w = vw, h = vh;
-    if (w > maxDim || h > maxDim) {
-      const ratio = Math.min(maxDim / w, maxDim / h);
-      w = Math.round(w * ratio);
-      h = Math.round(h * ratio);
-    }
-    c.width = w;
-    c.height = h;
-    const ctx = c.getContext('2d');
-    if (ctx) {
-      ctx.drawImage(v, 0, 0, w, h);
-      c.toBlob((blob) => {
-        if (!blob) return;
-        const url = URL.createObjectURL(blob);
-        setCamPreview(url);
-      }, 'image/jpeg', 0.95);
-    }
-    disposeCanvas(c);
-    if (camStreamRef.current) {
-      camStreamRef.current.getTracks().forEach(t => { try { t.stop(); } catch {} });
-      camStreamRef.current = null;
-    }
-    if (camVideoRef.current) camVideoRef.current.srcObject = null;
-  }, []);
-
-  function disposeCanvas(c: HTMLCanvasElement | null) {
-    if (!c) return;
-    c.width = 0;
-    c.height = 0;
-    const ctx = c.getContext('2d');
-    if (ctx) ctx.clearRect(0, 0, 0, 0);
-  }
-
-  const confirmInvoiceCapture = useCallback(async () => {
-    if (!camPreview || camConfirmingRef.current) return;
-    camConfirmingRef.current = true;
-    try {
-      await uploadInvoiceImage(camPreview);
-    } finally {
-      camConfirmingRef.current = false;
-      URL.revokeObjectURL(camPreview);
-      setCamPreview(null);
-      setShowCam(false);
-    }
-  }, [camPreview, uploadInvoiceImage]);
-
-  const retakeInvoiceCapture = useCallback(() => {
-    if (camPreview) URL.revokeObjectURL(camPreview);
-    setCamPreview(null);
-    openInvoiceCam();
-  }, [openInvoiceCam, camPreview]);
-
-  const removeInvoiceImage = useCallback(() => {
-    setInvoiceImageUrl(null);
-    setCamPreview(null);
-    setShowCam(false);
-    if (camStreamRef.current) {
-      camStreamRef.current.getTracks().forEach(t => t.stop());
-      camStreamRef.current = null;
-    }
-  }, []);
-
-  const closeInvoiceCam = useCallback(() => {
-    if (camStreamRef.current) {
-      camStreamRef.current.getTracks().forEach(t => t.stop());
-      camStreamRef.current = null;
-    }
-    setCamPreview(null);
-    setShowCam(false);
-  }, []);
 
   const selectedSeller = sellers.find((s) => s.id === selectedSellerId) || sellers[0] || EMPTY_SELLER;
 
@@ -538,9 +349,7 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
                     placeholder="مبلغ الشحن"
                     className="input-field with-icon-left"
                   />
-                  <button type="button" onClick={openInvoiceCam} className="input-camera-btn" title="تصوير الفاتورة">
-                    <span className="material-symbols-outlined text-sm">photo_camera</span>
-                  </button>
+                  <CameraCapture onCapture={handleInvoiceCapture} iconSize={14} />
                 </div>
                 {invoiceImageUrl && (
                   <div className="mt-2 flex items-center gap-2 p-2 bg-emerald-50 border border-emerald-150 rounded-lg">
@@ -575,34 +384,7 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
         </div>
       )}
 
-      {/* Hidden camera elements */}
-      <canvas ref={camCanvasRef} className="hidden" />
-      <input ref={camFileRef} type="file" accept="image/*" capture="environment" onChange={(e) => {
-        const file = e.target.files?.[0];
-        if (file) {
-          const r = new FileReader();
-          r.onload = (ev) => {
-            if (ev.target?.result) {
-              setCamPreview(ev.target.result as string);
-              setShowCam(true);
-            }
-          };
-          r.readAsDataURL(file);
-        }
-        e.target.value = '';
-      }} className="hidden" />
 
-      {/* Camera viewfinder + preview modal */}
-      <CameraPreviewModal
-        show={showCam}
-        previewImage={camPreview}
-        videoRef={camVideoRef}
-        onCapture={captureInvoiceFrame}
-        onConfirm={confirmInvoiceCapture}
-        onRetake={retakeInvoiceCapture}
-        onCancel={closeInvoiceCam}
-        processing={uploadingInvoice}
-      />
     </div>
   );
 }

@@ -20,6 +20,7 @@ firebase-service-account.json
 android/key.properties
 android/app/key.properties
 **/key.properties
+android/app/signing.properties
 *.keystore
 *.keystore.bak
 *.jks

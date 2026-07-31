@@ -588,16 +588,15 @@ body {
   cursor: pointer;
   transition: all 0.15s ease;
   border: none;
-  background: var(--slate-800);
+  background: transparent;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
 .input-camera-btn:hover {
-  background: var(--slate-700);
-  color: var(--slate-300);
+  background: rgba(148, 163, 184, 0.1);
+  color: var(--slate-600);
 }
 .input-camera-btn:active {
-  background: var(--slate-600);
   transform: translateY(-50%) scale(0.92);
 }
 

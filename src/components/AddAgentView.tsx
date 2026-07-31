@@ -17,10 +17,10 @@ interface AddAgentViewProps {
 export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps) {
   const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
   const [name, setName] = useState('');
-  const [region, setRegion] = useState('أمانة العاصمة');
+  const [region, setRegion] = useState('');
   const [phone, setPhone] = useState('');
-  const [sellersCount, setSellersCount] = useState<number>(0);
-  const [simsCount, setSimsCount] = useState<number>(0);
+  const [sellersCount, setSellersCount] = useState<string>('');
+  const [simsCount, setSimsCount] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,8 +36,8 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
         name,
         region,
         phone,
-        sellersCount,
-        simsCount,
+        sellersCount: Number(sellersCount) || 0,
+        simsCount: Number(simsCount) || 0,
         status: 'active'
       });
 
@@ -86,7 +86,7 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
                type="text"
                value={region}
                onChange={(e) => setRegion(e.target.value)}
-                placeholder="المنطقة / المدينة"
+                 placeholder="أمانة العاصمة"
                className="input-field"
             />
            </div>
@@ -98,7 +98,7 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
                required
                value={phone}
                onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, '').slice(0, 9))}
-               placeholder="7xxxxxx"
+                placeholder="7xxxxxxx"
                pattern="[0-9]{7,9}"
                className="input-field"
                dir="ltr"
@@ -114,8 +114,8 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
                type="number"
                min="0"
                value={sellersCount}
-               onChange={(e) => setSellersCount(Number(e.target.value))}
-               placeholder="عدد النقاط"
+                onChange={(e) => setSellersCount(e.target.value)}
+                placeholder="عدد النقاط"
                className="input-field"
              />
            </div>
@@ -126,8 +126,8 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
                type="number"
                min="0"
                value={simsCount}
-               onChange={(e) => setSimsCount(Number(e.target.value))}
-               placeholder="عدد الشرائح"
+                onChange={(e) => setSimsCount(e.target.value)}
+                placeholder="عدد الشرائح"
                className="input-field"
              />
            </div>
