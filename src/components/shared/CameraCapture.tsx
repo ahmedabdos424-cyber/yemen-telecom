@@ -399,7 +399,7 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
         type="button"
         onClick={startCamera}
         disabled={scanning}
-        className="input-camera-btn bg-slate-800 hover:bg-red-600 text-slate-300 hover:text-slate-100 disabled:opacity-50"
+        className="input-camera-btn text-slate-500 hover:text-slate-700 disabled:opacity-50"
         title="التقاط صورة"
       >
         {scanning ? <RefreshCw className="animate-spin" size={iconSize} /> : <Camera size={iconSize} />}
@@ -683,7 +683,7 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
           type="button"
           onClick={startCamera}
           disabled={scanning}
-          className="btn w-full flex items-center justify-between border border-dashed border-slate-800 text-xs text-slate-400 font-medium hover:border-slate-700 hover:text-slate-200 disabled:opacity-50"
+          className="btn w-full flex items-center justify-between border border-dashed border-slate-700 text-xs text-slate-500 font-medium hover:border-slate-500 hover:text-slate-300 disabled:opacity-50"
         >
           <span>التقط صورة العقد</span>
           {scanning ? <RefreshCw className="animate-spin" size={16} /> : <Camera size={16} />}
