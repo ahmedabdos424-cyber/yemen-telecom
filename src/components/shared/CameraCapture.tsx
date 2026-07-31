@@ -2,15 +2,16 @@ import React, { useRef, useCallback, useState, useEffect } from 'react';
 import { Camera, RefreshCw, Settings } from 'lucide-react';
 import CameraPreviewModal from './CameraPreviewModal';
 import { useCamera } from '../../context/CameraContext';
+import { useToast, ToastContainer } from '../../hooks/useToast';
 
 interface CameraCaptureProps {
   onCapture: (imageData: string) => void;
   iconSize?: number;
 }
 
-const JPEG_QUALITY = 0.95;
-const MAX_DIMENSION = 2048;
-const MAX_FILE_SIZE = 15 * 1024 * 1024;
+const JPEG_QUALITY = 0.85;
+const MAX_DIMENSION = 1600;
+const COMPRESS_THRESHOLD = 1024 * 1024;
 const HIGH_RES_THRESHOLD = 8000;
 
 let permissionGranted = false;
@@ -106,12 +107,12 @@ async function captureWithCapacitorCamera(): Promise<string> {
   let blob = await response.blob();
   URL.revokeObjectURL(photo.webPath);
 
-  if (blob.size > MAX_FILE_SIZE) {
-    blob = await compressImage(blob, MAX_DIMENSION);
+  if (blob.size > COMPRESS_THRESHOLD) {
+    blob = await compressImage(blob, MAX_DIMENSION, JPEG_QUALITY);
   } else {
     const dims = await getImageDimensions(blob);
     if (dims.width > HIGH_RES_THRESHOLD || dims.height > HIGH_RES_THRESHOLD) {
-      blob = await compressImage(blob, MAX_DIMENSION);
+      blob = await compressImage(blob, MAX_DIMENSION, JPEG_QUALITY);
     }
   }
 
@@ -197,6 +198,7 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
   const capturedDataRef = useRef<string | null>(null);
   const { openCamera, closeCamera } = useCamera();
   const prevShowRef = useRef(showViewfinder);
+  const { toasts, dismissToast, toastSuccess, toastInfo, toastError } = useToast();
 
   useEffect(() => {
     if (showViewfinder && !prevShowRef.current) openCamera();
@@ -234,7 +236,8 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
     setPreviewImage(dataUrl);
     setProcessing(false);
     setCaptureLocked(false);
-  }, []);
+    toastSuccess('تم التقاط الصورة', 'يمكنك الآن مراجعتها وتأكيدها');
+  }, [toastSuccess]);
 
   const doCaptureWebRTC = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current || captureLocked) return;
@@ -281,6 +284,7 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
     setScanning(true);
     setPreviewImage(null);
     capturedDataRef.current = null;
+    toastInfo('جاري فتح الكاميرا...', 'يرجى الانتظار لحظة');
 
     if (isNative()) {
       setShowViewfinder(true);
@@ -306,6 +310,7 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
           } else {
             setPermissionDenied(true);
           }
+          toastError('تعذر الوصول إلى الكاميرا', 'يرجى السماح بالوصول إلى الكاميرا من إعدادات التطبيق');
         } else {
           setShowViewfinder(false);
           setScanning(false);
@@ -322,6 +327,7 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
         if (perm.state === 'denied') {
           setPermanentDenial(true);
           setScanning(false);
+          toastError('تم رفض الوصول إلى الكاميرا', 'يرجى فتح الإعدادات والسماح بالوصول إلى الكاميرا');
           return;
         }
         if (perm.state === 'granted') permissionGranted = true;
@@ -356,11 +362,12 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
         } else {
           setPermissionDenied(true);
         }
+        toastError('تعذر الوصول إلى الكاميرا', 'يرجى السماح بالوصول إلى الكاميرا من إعدادات المتصفح');
       } else {
         fileInputRef.current?.click();
       }
     }
-  }, [handleCaptureResult]);
+  }, [handleCaptureResult, toastInfo, toastError]);
 
   const captureFrame = useCallback(() => {
     if (isNative()) {
@@ -395,8 +402,8 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
     const file = e.target.files?.[0];
     if (!file) { setShowViewfinder(false); setScanning(false); return; }
     let blob: Blob = file;
-    if (blob.size > MAX_FILE_SIZE) {
-      blob = await compressImage(blob, MAX_DIMENSION);
+    if (blob.size > COMPRESS_THRESHOLD) {
+      blob = await compressImage(blob, MAX_DIMENSION, JPEG_QUALITY);
     }
     const dataUrl = await blobToDataUrl(blob);
     capturedDataRef.current = dataUrl;
@@ -488,6 +495,8 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
           </div>
         </div>
       )}
+
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} position="bottom" />
     </>
   );
 }
@@ -513,6 +522,7 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
   const capturedDataRef = useRef<string | null>(null);
   const { openCamera, closeCamera } = useCamera();
   const prevShowRef = useRef(showViewfinder);
+  const { toasts, dismissToast, toastSuccess, toastInfo, toastError } = useToast();
 
   useEffect(() => {
     if (showViewfinder && !prevShowRef.current) openCamera();
@@ -550,7 +560,8 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
     setPreviewImage(dataUrl);
     setProcessing(false);
     setCaptureLocked(false);
-  }, []);
+    toastSuccess('تم التقاط صورة العقد', 'يمكنك الآن مراجعتها وتأكيدها');
+  }, [toastSuccess]);
 
   const startCamera = useCallback(async () => {
     if (!mountedRef.current) return;
@@ -559,6 +570,7 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
     setScanning(true);
     setPreviewImage(null);
     capturedDataRef.current = null;
+    toastInfo('جاري فتح الكاميرا...', 'يرجى الانتظار لحظة');
 
     if (isNative()) {
       setShowViewfinder(true);
@@ -584,6 +596,7 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
           } else {
             setPermissionDenied(true);
           }
+          toastError('تعذر الوصول إلى الكاميرا', 'يرجى السماح بالوصول إلى الكاميرا من إعدادات التطبيق');
         } else {
           setShowViewfinder(false);
           setScanning(false);
@@ -622,9 +635,10 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
         denialCountRef.current += 1;
         if (denialCountRef.current >= 2) { setPermanentDenial(true); }
         else { setPermissionDenied(true); }
+        toastError('تعذر الوصول إلى الكاميرا', 'يرجى السماح بالوصول إلى الكاميرا من إعدادات المتصفح');
       } else { fileInputRef.current?.click(); }
     }
-  }, [handleCaptureResult]);
+  }, [handleCaptureResult, toastInfo, toastError]);
 
   const captureFrame = useCallback(() => {
     if (!videoRef.current || !canvasRef.current || captureLocked) return;
@@ -686,8 +700,8 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
     const file = e.target.files?.[0];
     if (!file) { setShowViewfinder(false); setScanning(false); return; }
     let blob: Blob = file;
-    if (blob.size > MAX_FILE_SIZE) {
-      blob = await compressImage(blob, MAX_DIMENSION);
+    if (blob.size > COMPRESS_THRESHOLD) {
+      blob = await compressImage(blob, MAX_DIMENSION, JPEG_QUALITY);
     }
     const dataUrl = await blobToDataUrl(blob);
     capturedDataRef.current = dataUrl;
@@ -806,6 +820,8 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
           </div>
         </div>
       )}
+
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} position="bottom" />
     </>
   );
 }

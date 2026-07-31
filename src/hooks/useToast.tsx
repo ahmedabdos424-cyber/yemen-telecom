@@ -23,10 +23,10 @@ const colors: Record<ToastType, { bg: string; border: string; icon: string; text
   info: { bg: 'bg-blue-900/95', border: 'border-blue-500/30', icon: 'text-blue-400', text: 'text-blue-100' },
 };
 
-export function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: string) => void }) {
+export function ToastContainer({ toasts, onDismiss, position = 'top' }: { toasts: Toast[]; onDismiss: (id: string) => void; position?: 'top' | 'bottom' }) {
   if (toasts.length === 0) return null;
   return (
-    <div className="fixed top-20 left-4 z-50 w-full max-w-sm flex flex-col gap-2 pointer-events-none" dir="rtl">
+    <div className={`fixed ${position === 'top' ? 'top-20' : 'bottom-24'} left-4 z-50 w-full max-w-sm flex flex-col gap-2 pointer-events-none`} dir="rtl">
       {toasts.map(toast => {
         const c = colors[toast.type] ?? colors.info;
         return (
