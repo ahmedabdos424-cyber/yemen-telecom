@@ -243,13 +243,18 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
     try {
       const resolution = Math.min(screen.width, screen.height, 1920);
       const dataUrl = await captureWithWebRTC(resolution, videoRef.current, canvasRef.current);
-      stopCamera();
-      await handleCaptureResult(dataUrl);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => { try { t.stop(); } catch {} });
+        streamRef.current = null;
+      }
+      if (videoRef.current) videoRef.current.srcObject = null;
+      disposeCanvas(canvasRef.current);
+      handleCaptureResult(dataUrl);
     } catch {
       setCaptureLocked(false);
       setProcessing(false);
     }
-  }, [captureLocked, stopCamera, handleCaptureResult]);
+  }, [captureLocked, handleCaptureResult]);
 
   const doCaptureNative = useCallback(async () => {
     if (captureLocked) return;
