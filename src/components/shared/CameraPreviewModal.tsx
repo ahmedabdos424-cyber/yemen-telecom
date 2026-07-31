@@ -106,7 +106,7 @@ export default function CameraPreviewModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[200] flex flex-col bg-black"
+          className="fixed inset-0 z-[9999] flex flex-col bg-black"
         >
           {/* Header bar */}
           <div className="relative z-10 flex items-center justify-between px-4 pt-[env(safe-area-inset-top)] pb-2 bg-gradient-to-b from-black/80 to-transparent">
