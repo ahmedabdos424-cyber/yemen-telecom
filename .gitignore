@@ -119,6 +119,9 @@ security-*.md
 # Temporary debug files
 .domdump.txt
 
+# TestSprite execution reports
+testsprite-reports/
+
 # Local AI tool configs (opencode, codedev-mcp) — never commit API keys
 .opencode/
 .codedev-mcp/
