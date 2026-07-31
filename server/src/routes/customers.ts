@@ -84,21 +84,26 @@ router.post('/', requireRole('manager', 'agent', 'seller'), validate(createCusto
   const body = req.body;
   const full_name = body.full_name || body.fullName;
   const id_number = body.id_number || body.idNumber;
+  const id_type = body.id_type || body.idType || '';
+  const id_issue_date = body.id_issue_date || body.idIssueDate || '';
   const { phone, region } = body;
   const activated_by = body.activated_by || body.activatedBy;
   try {
     const existing = await query('SELECT id FROM customers WHERE id_number = $1', [id_number]);
     if (existing.rows.length > 0) {
       const updated = await query(
-        `UPDATE customers SET sims_count = sims_count + 1, last_activation = NOW(), phone = COALESCE($2, phone), region = COALESCE($3, region) WHERE id = $1 RETURNING *`,
-        [existing.rows[0].id, phone, region]
+        `UPDATE customers SET sims_count = sims_count + 1, last_activation = NOW(),
+         phone = COALESCE(NULLIF($2, ''), phone), region = COALESCE(NULLIF($3, ''), region),
+         id_type = COALESCE(NULLIF($4, ''), id_type), id_issue_date = COALESCE(NULLIF($5, ''), id_issue_date)
+         WHERE id = $1 RETURNING *`,
+        [existing.rows[0].id, phone, region, id_type, id_issue_date]
       );
       return res.json(updated.rows[0]);
     }
     const result = await query(
-      `INSERT INTO customers (full_name, id_number, phone, region, first_activation, last_activation, activated_by, created_by)
-       VALUES ($1, $2, $3, $4, NOW(), NOW(), $5, $6) RETURNING *`,
-      [full_name, id_number, phone || '', region || '', activated_by || null, req.user?.id]
+      `INSERT INTO customers (full_name, id_number, id_type, id_issue_date, phone, region, first_activation, last_activation, activated_by, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW(), $7, $8) RETURNING *`,
+      [full_name, id_number, id_type, id_issue_date, phone || '', region || '', activated_by || null, req.user?.id]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {

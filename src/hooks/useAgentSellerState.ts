@@ -69,9 +69,16 @@ export function useAgentSellerState(role: string | null, username: string) {
     }));
   };
 
-  const handleSimActivationForSeller = async (simData: { fullName: string; idNumber: string; iccid: string; phoneNumber: string; operator: Operator }) => {
+  const handleSimActivationForSeller = async (simData: { fullName: string; idNumber: string; idType: string; idIssueDate: string; iccid: string; phoneNumber: string; operator: Operator }) => {
     try {
       await api.createOperation({ type: 'activate', target: simData.phoneNumber, operator: simData.operator, status: 'success' });
+      await api.createCustomer({
+        fullName: simData.fullName,
+        idNumber: simData.idNumber,
+        idType: simData.idType,
+        idIssueDate: simData.idIssueDate,
+        phone: simData.phoneNumber,
+      }).catch(err => { captureError(err, 'createCustomerOnActivation'); });
       const allSims = (await api.getSims()) ?? [];
       const target = allSims.find((s: any) => s.iccid === simData.iccid);
       if (target) {

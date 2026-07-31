@@ -176,6 +176,8 @@ CREATE TABLE IF NOT EXISTS customers (
   id SERIAL PRIMARY KEY,
   full_name VARCHAR(200) NOT NULL,
   id_number VARCHAR(50) NOT NULL,
+  id_type VARCHAR(50) DEFAULT '',
+  id_issue_date VARCHAR(20) DEFAULT '',
   phone VARCHAR(50) DEFAULT '',
   region VARCHAR(200) DEFAULT '',
   sims_count INTEGER DEFAULT 1,

@@ -340,6 +340,10 @@ export const api = {
   updateInventories: (data: UpdateInventoryItem[]) =>
     request<MappedInventory[]>('/inventories', { method: 'PUT', body: JSON.stringify(data) }),
 
+  // Customers
+  createCustomer: (data: { fullName: string; idNumber: string; idType?: string; idIssueDate?: string; phone?: string; region?: string }) =>
+    request<Record<string, unknown>>('/customers', { method: 'POST', body: JSON.stringify(data) }),
+
   // Alerts
   getAlerts: () => request<AlertRow[]>('/alerts'),
   resolveAlert: (id: number) =>
