@@ -1,6 +1,7 @@
 import React, { useRef, useCallback, useState, useEffect } from 'react';
 import { Camera, RefreshCw, Settings } from 'lucide-react';
 import CameraPreviewModal from './CameraPreviewModal';
+import { useCamera } from '../../context/CameraContext';
 
 interface CameraCaptureProps {
   onCapture: (imageData: string) => void;
@@ -194,6 +195,14 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
   const denialCountRef = useRef(0);
   const mountedRef = useRef(true);
   const capturedDataRef = useRef<string | null>(null);
+  const { openCamera, closeCamera } = useCamera();
+  const prevShowRef = useRef(showViewfinder);
+
+  useEffect(() => {
+    if (showViewfinder && !prevShowRef.current) openCamera();
+    else if (!showViewfinder && prevShowRef.current) closeCamera();
+    prevShowRef.current = showViewfinder;
+  }, [showViewfinder]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -497,6 +506,14 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
   const denialCountRef = useRef(0);
   const mountedRef = useRef(true);
   const capturedDataRef = useRef<string | null>(null);
+  const { openCamera, closeCamera } = useCamera();
+  const prevShowRef = useRef(showViewfinder);
+
+  useEffect(() => {
+    if (showViewfinder && !prevShowRef.current) openCamera();
+    else if (!showViewfinder && prevShowRef.current) closeCamera();
+    prevShowRef.current = showViewfinder;
+  }, [showViewfinder]);
 
   useEffect(() => {
     mountedRef.current = true;
