@@ -24,6 +24,7 @@ const ActivateSimForm = lazy(() => import('./components/ActivateSimForm'));
 import { useAuth } from './hooks/useAuth';
 import { useManagerState } from './hooks/useManagerState';
 import { useAgentSellerState } from './hooks/useAgentSellerState';
+import { CameraProvider } from './context/CameraContext';
 
 
 const AgentDashboard = lazy(() => import('./components/AgentDashboard'));
@@ -268,7 +269,9 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <AuthenticatedApp />
+      <CameraProvider>
+        <AuthenticatedApp />
+      </CameraProvider>
     </ErrorBoundary>
   );
 }
