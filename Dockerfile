@@ -7,6 +7,9 @@ ENV NODE_ENV=production
 # Build-time env for Vite (Sentry DSN is public, not a secret)
 ARG VITE_SENTRY_DSN=https://e26574aa3569ad8263215c8c58a3be4b@o4511821570310144.ingest.de.sentry.io/4511821594034256
 ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
+# Release = deployed commit SHA (injected by Render at build time)
+ARG VITE_SENTRY_RELEASE=$RENDER_GIT_COMMIT
+ENV VITE_SENTRY_RELEASE=$VITE_SENTRY_RELEASE
 RUN npm run build
 
 FROM node:22-alpine AS server-build
