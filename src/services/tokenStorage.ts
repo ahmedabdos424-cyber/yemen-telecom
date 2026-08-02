@@ -45,17 +45,9 @@ let storageAdapter: ReturnType<typeof getLocalStorageAdapter> | null = null;
 
 async function getStorage() {
   if (!storageAdapter) {
-    storageAdapter = isCapacitor ? await getCapacitorStorage() : getNoopAdapter();
+    storageAdapter = isCapacitor ? await getCapacitorStorage() : getLocalStorageAdapter();
   }
   return storageAdapter;
-}
-
-function getNoopAdapter() {
-  return {
-    get: async () => null,
-    set: async () => {},
-    remove: async () => {},
-  };
 }
 
 export const tokenStorage = {
