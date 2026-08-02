@@ -67,16 +67,16 @@ jobs:
 
       - name: Create Sentry release & upload source maps
         if: ${{ env.SENTRY_AUTH_TOKEN != '' }}
-        uses: getsentry/action-release@v3
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: mliki-technique
           SENTRY_PROJECT: yemen-telecom-api
           SENTRY_RELEASE: ${{ github.sha }}
-        with:
-          environment: production
-          sourcemaps: dist/assets
-          url_prefix: ~/assets
+        run: |
+          npx --yes @sentry/cli releases new "$SENTRY_RELEASE"
+          npx --yes @sentry/cli releases files "$SENTRY_RELEASE" upload-sourcemaps dist/assets --url-prefix ~/assets
+          npx --yes @sentry/cli releases set-commits "$SENTRY_RELEASE" --auto
+          npx --yes @sentry/cli releases finalize "$SENTRY_RELEASE"
 
   test:
     name: Tests (Frontend + Backend + Security)
