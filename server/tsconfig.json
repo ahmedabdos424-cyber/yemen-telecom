@@ -14,7 +14,7 @@
     "resolveJsonModule": true,
     "declaration": true,
     "declarationMap": false,
-    "sourceMap": false
+    "sourceMap": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "src/__tests__", "src/init-db.ts", "src/seed.ts"]

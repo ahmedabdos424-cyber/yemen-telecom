@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/react';
 
 const DSN = import.meta.env.VITE_SENTRY_DSN as string | undefined;
+const RELEASE = import.meta.env.VITE_SENTRY_RELEASE as string | undefined;
 
 export function initFrontendSentry() {
   if (!DSN) {
@@ -12,6 +13,7 @@ export function initFrontendSentry() {
 
   Sentry.init({
     dsn: DSN,
+    release: RELEASE,
     environment: import.meta.env.MODE,
     integrations: [
       Sentry.browserTracingIntegration(),
