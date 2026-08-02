@@ -72,6 +72,7 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: mliki-technique
           SENTRY_PROJECT: yemen-telecom-api
+          SENTRY_RELEASE: ${{ github.sha }}
         with:
           environment: production
           sourcemaps: dist/assets
