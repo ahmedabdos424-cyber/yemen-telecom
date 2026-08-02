@@ -4,6 +4,9 @@ COPY package*.json ./
 RUN npm ci && npm cache clean --force
 COPY . .
 ENV NODE_ENV=production
+# Build-time env for Vite (Sentry DSN is public, not a secret)
+ARG VITE_SENTRY_DSN=https://e26574aa3569ad8263215c8c58a3be4b@o4511821570310144.ingest.de.sentry.io/4511821594034256
+ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
 RUN npm run build
 
 FROM node:22-alpine AS server-build
@@ -16,6 +19,10 @@ RUN npx tsc
 FROM node:22-alpine
 WORKDIR /app
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+# Runtime Sentry DSN (public value; falls back to service env var at runtime)
+ARG SENTRY_DSN=https://e26574aa3569ad8263215c8c58a3be4b@o4511821570310144.ingest.de.sentry.io/4511821594034256
+ENV SENTRY_DSN=$SENTRY_DSN
 
 COPY --from=frontend-build /app/dist ./dist
 COPY --from=server-build /app/server/dist ./server/dist
