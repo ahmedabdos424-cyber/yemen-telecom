@@ -74,7 +74,7 @@ jobs:
           SENTRY_RELEASE: ${{ github.sha }}
         run: |
           npx --yes @sentry/cli releases new "$SENTRY_RELEASE"
-          npx --yes @sentry/cli releases files "$SENTRY_RELEASE" upload-sourcemaps dist/assets --url-prefix ~/assets
+          npx --yes @sentry/cli sourcemaps upload dist/assets --release "$SENTRY_RELEASE" --url-prefix ~/assets
           npx --yes @sentry/cli releases set-commits "$SENTRY_RELEASE" --auto
           npx --yes @sentry/cli releases finalize "$SENTRY_RELEASE"
 
