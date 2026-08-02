@@ -19,7 +19,6 @@ interface Alert {
 interface TopBarProps {
   currentView: ViewType;
   setView: (view: ViewType) => void;
-  onMenuToggle: () => void;
   unresolvedAlertsCount: number;
   alerts?: Alert[];
   displayName?: string;
@@ -30,7 +29,6 @@ interface TopBarProps {
 export default function TopBar({
   currentView,
   setView,
-  onMenuToggle,
   unresolvedAlertsCount,
   alerts = [],
   displayName,
@@ -67,16 +65,8 @@ export default function TopBar({
 
   return (
     <header className="fixed top-0 safe-top left-0 right-0 z-40 bg-white border-b border-gray-200 flex justify-between items-center h-12 md:h-16 px-3 md:px-8">
-      {/* Right items: Title & Mobile menu button */}
+      {/* Right items: Title */}
       <div className="flex items-center gap-2 md:gap-3">
-        {/* Mobile menu button - hamburger for mobile */}
-        <button
-          onClick={onMenuToggle}
-          className="md:hidden p-1.5 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer touch-target"
-          aria-label="القائمة"
-        >
-          <span className="material-symbols-outlined text-xl">menu</span>
-        </button>
         <span className="material-symbols-outlined text-secondary text-xl md:text-2xl hidden md:inline-block">
           admin_panel_settings
         </span>

@@ -43,7 +43,6 @@ function AuthenticatedApp() {
   const agt = useAgentSellerState(auth.role, auth.username);
 
   const [dashboardSearch, setDashboardSearch] = useState('');
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { role, username, darkMode, setDarkMode, isLoading, handleLogin, handleLogout, clearSession } = auth;
   const { setTokenWrapper } = auth;
   const isOnline = useNetworkStatus();
@@ -123,7 +122,7 @@ function AuthenticatedApp() {
     return (
       <div className="min-h-dvh bg-theme-background font-sans antialiased text-slate-100">
         <SharedOfflineBanner />
-        <TopBar currentView={mgr.currentView} setView={(v) => { mgr.setView(v); navigate(`/manager/${v}`); }} onMenuToggle={() => setMobileMenuOpen(true)} unresolvedAlertsCount={mgr.alerts.length} alerts={mgr.alerts} displayName={username} role={role} onLogout={handleLogout} />
+        <TopBar currentView={mgr.currentView} setView={(v) => { mgr.setView(v); navigate(`/manager/${v}`); }} unresolvedAlertsCount={mgr.alerts.length} alerts={mgr.alerts} displayName={username} role={role} onLogout={handleLogout} />
         <div className="flex pt-[calc(4rem+env(safe-area-inset-top))] min-h-dvh overflow-y-auto pb-[calc(4rem+env(safe-area-inset-bottom))]">
           <main className="flex-1 px-3 sm:px-4 md:px-8 py-4 md:py-8 lg:pt-10">
             <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
@@ -148,7 +147,7 @@ function AuthenticatedApp() {
         </div>
         <ToastNotifications />
         <Suspense fallback={null}>
-          <BottomNav currentView={mgr.currentView} setView={(v) => { mgr.setView(v); navigate(`/manager/${v}`); }} unresolvedAlertsCount={(mgr.alerts ?? []).length} onLogout={handleLogout} mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} />
+          <BottomNav currentView={mgr.currentView} setView={(v) => { mgr.setView(v); navigate(`/manager/${v}`); }} unresolvedAlertsCount={(mgr.alerts ?? []).length} onLogout={handleLogout} />
         </Suspense>
       </div>
     );
