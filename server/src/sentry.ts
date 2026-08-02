@@ -11,7 +11,7 @@ export function initSentry() {
 
   Sentry.init({
     dsn,
-    release: process.env.SENTRY_RELEASE || undefined,
+    release: process.env.SENTRY_RELEASE || process.env.RENDER_GIT_COMMIT || undefined,
     environment: process.env.NODE_ENV || 'development',
     integrations: [nodeProfilingIntegration()],
     tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
