@@ -10,7 +10,7 @@ import { api } from '../api/client';
 import { RefreshCw } from 'lucide-react';
 
 interface AddAgentViewProps {
-  onAddAgent: (agent: Partial<Agent>) => void;
+  onAddAgent: (agent: Partial<Agent> & { username?: string; password?: string }) => void;
   setView: (view: ViewType) => void;
 }
 
@@ -19,14 +19,21 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
   const [name, setName] = useState('');
   const [region, setRegion] = useState('');
   const [phone, setPhone] = useState('');
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [sellersCount, setSellersCount] = useState<string>('');
   const [simsCount, setSimsCount] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !phone) {
-      toastWarning('الرجاء إدخال الاسم ورقم الجوال لتسجيل وكيل التوزيع المعتمد.');
+    if (!name || !phone || !loginUsername.trim() || !loginPassword) {
+      toastWarning('الرجاء إدخال الاسم ورقم الجوال وبيانات تسجيل الدخول لتسجيل وكيل التوزيع المعتمد.');
+      return;
+    }
+    if (loginPassword.length < 8 || !/[A-Z]/.test(loginPassword) || !/[a-z]/.test(loginPassword) || !/[0-9]/.test(loginPassword)) {
+      toastWarning('كلمة المرور يجب أن تتكون من 8 أحرف على الأقل وتحتوي حرفاً كبيراً وحرفاً صغيراً ورقماً.');
       return;
     }
 
@@ -38,7 +45,9 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
         phone,
         sellersCount: Number(sellersCount) || 0,
         simsCount: Number(simsCount) || 0,
-        status: 'active'
+        status: 'active',
+        username: loginUsername.trim().toLowerCase(),
+        password: loginPassword,
       });
 
       toastSuccess(`تم تسجيل الوكيل الموزع: "${name}" بنجاح في النظام وتخصيص العقدة الأمانية له.`);
@@ -80,8 +89,49 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
          </div>
 
          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-           <div>
-             <label className="block text-[11px] md:text-xs font-bold text-gray-600 mb-1">إقليم ومنطقة التغطية</label>
+             <div>
+               <label className="block text-[11px] md:text-xs font-bold text-gray-600 mb-1">اسم مستخدم تسجيل دخول الوكيل</label>
+               <input
+                 type="text"
+                 required
+                 dir="ltr"
+                 value={loginUsername}
+                 onChange={(e) => setLoginUsername(e.target.value)}
+                 placeholder="agent_username"
+                 className="input-field"
+                 style={{ textAlign: 'right' }}
+               />
+             </div>
+
+             <div>
+               <label className="block text-[11px] md:text-xs font-bold text-gray-600 mb-1">كلمة مرور تسجيل دخول الوكيل</label>
+               <div className="relative">
+                 <input
+                   type={showPassword ? 'text' : 'password'}
+                   required
+                   minLength={8}
+                   dir="ltr"
+                   value={loginPassword}
+                   onChange={(e) => setLoginPassword(e.target.value)}
+                   placeholder="••••••••"
+                   className="input-field pr-9"
+                   style={{ textAlign: 'right' }}
+                 />
+                 <button
+                   type="button"
+                   onClick={() => setShowPassword(!showPassword)}
+                   className="absolute top-1/2 -translate-y-1/2 right-2 text-gray-400 hover:text-gray-600 cursor-pointer touch-target p-1"
+                   aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                 >
+                   <span className="material-symbols-outlined text-lg">{showPassword ? 'visibility_off' : 'visibility'}</span>
+                 </button>
+               </div>
+             </div>
+           </div>
+
+           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+             <div>
+               <label className="block text-[11px] md:text-xs font-bold text-gray-600 mb-1">إقليم ومنطقة التغطية</label>
              <input
                type="text"
                value={region}
