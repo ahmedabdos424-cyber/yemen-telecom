@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Role } from '../types';
 import { api, setToken, setRefreshToken, clearTokens, fetchCsrfToken, loadTokens, getLoadedTokens } from '../api/client';
+import { setFrontendSentryUser } from '../lib/sentry';
 
 export function useAuth() {
   const [role, setRole] = useState<Role | null>(() => {
@@ -25,6 +26,7 @@ export function useAuth() {
     setRole(null);
     setUsername('');
     setTokenWrapper(null);
+    setFrontendSentryUser(null);
   }, [setTokenWrapper]);
 
   useEffect(() => {
@@ -45,6 +47,7 @@ export function useAuth() {
             clearSession();
             return;
           }
+          setFrontendSentryUser({ id: user.id, username: user.username, role: user.role });
           fetchCsrfToken();
         } catch {
           if (cancelled) return;
@@ -85,6 +88,7 @@ export function useAuth() {
       setTokenWrapper(result.token);
       if (result.refreshToken) setRefreshToken(result.refreshToken);
       const userRole = result.user.role as Role;
+      setFrontendSentryUser({ id: result.user.id, username: result.user.displayName, role: userRole });
       return {
         role: userRole,
         commit: () => apply(userRole, result.user.displayName),

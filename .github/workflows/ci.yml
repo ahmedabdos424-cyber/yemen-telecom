@@ -58,10 +58,24 @@ jobs:
 
       - name: Build frontend
         run: npm run build
+        env:
+          VITE_SENTRY_RELEASE: ${{ github.sha }}
 
       - name: Build server
         working-directory: server
         run: npm run build
+
+      - name: Create Sentry release & upload source maps
+        if: ${{ secrets.SENTRY_AUTH_TOKEN != '' }}
+        uses: getsentry/action-release@v3
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: mliki-technique
+          SENTRY_PROJECT: yemen-telecom-api
+        with:
+          environment: production
+          sourcemaps: dist/assets
+          url_prefix: ~/assets
 
   test:
     name: Tests (Frontend + Backend + Security)

@@ -2,6 +2,7 @@ import { Pool, PoolConfig } from 'pg';
 import dotenv from 'dotenv';
 import path from 'path';
 import { logger } from './logger';
+import { Sentry } from './sentry';
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 function safeEnv(key: string): string {
@@ -62,6 +63,12 @@ export async function query(text: string, params?: any[]) {
   const duration = Date.now() - start;
   if (duration > slowQueryThreshold) {
     logger.warn('[DB] Slow query', { text: text.substring(0, 120), duration, rows: res.rowCount });
+    Sentry.addBreadcrumb({
+      category: 'db.slow_query',
+      message: text.substring(0, 120),
+      level: 'warning',
+      data: { duration_ms: duration, rows: res.rowCount },
+    });
   }
   return res;
 }

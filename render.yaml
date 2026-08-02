@@ -62,3 +62,8 @@ services:
         sync: false
       - key: BACKUP_S3_BUCKET
         sync: false
+      # Sentry error tracking (DSN is public — not a secret)
+      - key: SENTRY_DSN
+        value: https://e26574aa3569ad8263215c8c58a3be4b@o4511821570310144.ingest.de.sentry.io/4511821594034256
+      - key: VITE_SENTRY_DSN
+        value: https://e26574aa3569ad8263215c8c58a3be4b@o4511821570310144.ingest.de.sentry.io/4511821594034256
