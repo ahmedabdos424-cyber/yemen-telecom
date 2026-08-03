@@ -9,6 +9,7 @@ vi.hoisted(() => {
   process.env.JWT_SECRET = 'p1-20-test-jwt-secret';
   process.env.REFRESH_SECRET = 'p1-20-test-refresh-secret';
   process.env.CSRF_SECRET = 'p1-20-test-csrf-secret';
+  process.env.BLACKLIST_HMAC_SECRET = 'test-blacklist-hmac-secret';
 });
 
 vi.mock('../db', () => ({

@@ -21,7 +21,13 @@ if (process.env.NODE_ENV === 'production') {
 
 const dbHost = process.env.DB_HOST || 'localhost';
 const isLocal = dbHost === 'localhost' || dbHost === '127.0.0.1';
+// In production, SSL certificate validation MUST be enabled.
+ // Default to true; only allow false explicitly in non-production.
 const rejectUnauthorized = process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false';
+if (process.env.NODE_ENV === 'production' && !isLocal && !rejectUnauthorized) {
+  logger.error('FATAL: DB_SSL_REJECT_UNAUTHORIZED must be true in production. Refusing to start with SSL verification disabled.');
+  process.exit(1);
+}
 
 const poolConfig: PoolConfig = {
   host: dbHost,
@@ -45,9 +51,6 @@ const poolConfig: PoolConfig = {
 };
 if (process.env.DB_FAMILY) {
   (poolConfig as any).family = parseInt(process.env.DB_FAMILY, 10);
-}
-if (process.env.NODE_ENV === 'production' && !isLocal && !rejectUnauthorized) {
-  logger.error('[DB] SSL certificate validation is disabled (DB_SSL_REJECT_UNAUTHORIZED=false). Set it to true in production.');
 }
 export const pool = new Pool(poolConfig);
 
