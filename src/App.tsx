@@ -10,7 +10,7 @@ import LoadingScreen from './components/shared/LoadingScreen';
 import ErrorBoundary from './components/shared/ErrorBoundary';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
 import { useToast, ToastContainer } from './hooks/useToast';
-import { SESSION_EXPIRED_EVENT } from './api/client';
+import { SESSION_EXPIRED_EVENT, warmupServer } from './api/client';
 const DashboardView = lazy(() => import('./components/DashboardView'));
 const SIMsView = lazy(() => import('./components/SIMsView'));
 const AgentsView = lazy(() => import('./components/AgentsView'));
@@ -275,6 +275,12 @@ function AuthenticatedApp() {
 
 export default function App() {
   const [splashDone, setSplashDone] = useState(false);
+
+  useEffect(() => {
+    // Wake the Render free-tier service if it is sleeping so the first user
+    // request (login, CSRF, refresh) hits a warm server instead of timing out.
+    warmupServer();
+  }, []);
 
   if (!splashDone) {
     return (
