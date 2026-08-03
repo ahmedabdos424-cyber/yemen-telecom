@@ -117,7 +117,7 @@ export function useManagerState(role: string | null) {
   const handleAddAgent = async (newAgent: Partial<Agent> & { username?: string; password?: string }) => {
     try {
       const created: any = await api.createAgent(newAgent as any);
-      if (mountedRef.current) setAgents(prev => [created, ...prev]);
+      if (mountedRef.current) setAgents(prev => [created?.agent ?? created, ...prev]);
     } catch (err) {
       captureError(err, 'handleAddAgent');
       throw err;
