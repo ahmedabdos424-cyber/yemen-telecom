@@ -21,9 +21,16 @@ export interface TokenPayload {
   id: number;
   username: string;
   role: string;
+  sid?: string;
   iat?: number;
   exp?: number;
   iss?: string;
+}
+
+export const SESSION_EXEMPT_ROLES = new Set<string>(['manager', 'agent', 'seller']);
+
+export function isSessionExempt(role: string): boolean {
+  return SESSION_EXEMPT_ROLES.has(role);
 }
 
 export function hashToken(token: string): string {
@@ -65,6 +72,18 @@ export async function authenticateToken(req: AuthRequest, res: Response, next: N
     const userCheck = await query('SELECT status FROM users WHERE id = $1', [decoded.id]);
     if (userCheck.rows.length === 0 || userCheck.rows[0].status !== 'active') {
       return res.status(401).json({ error: 'Account is not active' });
+    }
+    if (!isSessionExempt(decoded.role)) {
+      const session = await query('SELECT active_session_sid, session_expires_at FROM users WHERE id = $1', [decoded.id]);
+      const row = session.rows[0];
+      if (row) {
+        if (row.session_expires_at && new Date(row.session_expires_at) < new Date()) {
+          return res.status(401).json({ error: 'Session has expired', code: 'SESSION_EXPIRED' });
+        }
+        if (row.active_session_sid && (!decoded.sid || decoded.sid !== row.active_session_sid)) {
+          return res.status(401).json({ error: 'Session terminated by a new login from another device', code: 'SESSION_TERMINATED' });
+        }
+      }
     }
     req.user = { id: decoded.id, username: decoded.username, role: decoded.role };
     setSentryUser(req.user);

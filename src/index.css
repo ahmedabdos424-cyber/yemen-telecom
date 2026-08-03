@@ -1040,8 +1040,7 @@ button:active,
 .bottom-sheet {
   position: fixed;
   bottom: 0;
-  left: 0;
-  right: 0;
+  inset-inline: 0;
   z-index: 100;
   display: flex;
   flex-direction: column;
@@ -1050,6 +1049,13 @@ button:active,
   max-height: 92dvh;
   overflow: hidden;
   box-shadow: 0 -8px 30px rgba(0,0,0,0.15);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  transform-origin: bottom center;
+}
+@media (min-width: 768px) {
+  .bottom-sheet {
+    inset-inline: auto;
+  }
 }
 .dark .bottom-sheet {
   background: var(--slate-900);

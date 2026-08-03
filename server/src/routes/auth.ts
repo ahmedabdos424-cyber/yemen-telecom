@@ -5,9 +5,11 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { logger } from '../logger';
 import { query } from '../db';
-import { hashToken, isTokenBlacklisted, TokenPayload } from '../middleware/auth';
+import { hashToken, isTokenBlacklisted, isSessionExempt, TokenPayload } from '../middleware/auth';
+import { getDeviceInfo } from '../helpers';
 import { validate, loginSchema } from '../validation';
 
 const router = Router();
@@ -16,6 +18,7 @@ if (!process.env.JWT_SECRET || !process.env.REFRESH_SECRET) {
 }
 const JWT_SECRET: string = process.env.JWT_SECRET;
 const REFRESH_SECRET: string = process.env.REFRESH_SECRET;
+const SESSION_DURATION_MS = 2 * 60 * 60 * 1000;
 
 router.post('/login', validate(loginSchema), async (req: Request, res: Response) => {
   const { username, password } = req.body;
@@ -42,7 +45,22 @@ router.post('/login', validate(loginSchema), async (req: Request, res: Response)
       return res.status(401).json({ error: 'Invalid username or password' });
     }
     await query('UPDATE users SET last_login = NOW(), failed_attempts = 0, locked_until = NULL WHERE id = $1', [user.id]);
-    const payload = { id: user.id, username: user.username, role: user.role };
+    const { deviceName, deviceId, ip } = getDeviceInfo(req);
+    const sid = crypto.randomUUID();
+    if (!isSessionExempt(user.role)) {
+      await query('UPDATE users SET active_session_sid = $1, session_expires_at = $2 WHERE id = $3', [
+        sid,
+        new Date(Date.now() + SESSION_DURATION_MS).toISOString(),
+        user.id,
+      ]);
+    }
+    const loginLogId = `LOGIN-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+    await query(
+      `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
+       VALUES ($1, 'login', $2, $3, NOW()::text, 'success', $4, $5, $6, NOW(), 'active')`,
+      [loginLogId, `تسجيل دخول ناجح: ${user.display_name || user.username}`, user.username, deviceName, ip, deviceId]
+    );
+    const payload = { id: user.id, username: user.username, role: user.role, sid };
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h', issuer: 'yemen-telecom', algorithm: 'HS256' });
     const refreshToken = jwt.sign(payload, REFRESH_SECRET, { expiresIn: '7d', issuer: 'yemen-telecom', algorithm: 'HS256' });
     res.cookie('token', token, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 3600 * 1000, path: '/' });
@@ -95,7 +113,21 @@ router.post('/refresh', async (req: Request, res: Response) => {
     if (userRes.rows.length === 0 || userRes.rows[0].status !== 'active') {
       return res.status(403).json({ error: 'Account disabled' });
     }
-    const payload = { id: decoded.id, username: decoded.username, role: decoded.role };
+    if (!isSessionExempt(decoded.role)) {
+      const session = await query('SELECT active_session_sid, session_expires_at FROM users WHERE id = $1', [decoded.id]);
+      const row = session.rows[0];
+      if (row?.active_session_sid && decoded.sid && row.active_session_sid !== decoded.sid) {
+        return res.status(401).json({ error: 'Session terminated by a new login from another device', code: 'SESSION_TERMINATED' });
+      }
+      if (row?.session_expires_at && new Date(row.session_expires_at) < new Date()) {
+        return res.status(401).json({ error: 'Session has expired', code: 'SESSION_EXPIRED' });
+      }
+      await query('UPDATE users SET session_expires_at = $1 WHERE id = $2', [
+        new Date(Date.now() + SESSION_DURATION_MS).toISOString(),
+        decoded.id,
+      ]);
+    }
+    const payload = { id: decoded.id, username: decoded.username, role: decoded.role, sid: decoded.sid };
     const newToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h', issuer: 'yemen-telecom', algorithm: 'HS256' });
     const newRefreshToken = jwt.sign(payload, REFRESH_SECRET, { expiresIn: '7d', issuer: 'yemen-telecom', algorithm: 'HS256' });
     res.cookie('token', newToken, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 3600 * 1000, path: '/' });
@@ -141,6 +173,27 @@ router.post('/logout', async (req: Request, res: Response) => {
         }
       } catch { /* refresh token already expired — ignore */ }
     }
+    if (decoded.sid && !isSessionExempt(decoded.role)) {
+      await query(
+        'UPDATE users SET active_session_sid = NULL, session_expires_at = NULL WHERE id = $1 AND active_session_sid = $2',
+        [decoded.id, decoded.sid]
+      );
+    }
+    const { deviceName, deviceId, ip } = getDeviceInfo(req);
+    await query(
+      `UPDATE audit_logs SET logout_at = NOW(), session_status = 'closed'
+       WHERE id = COALESCE(
+         (SELECT id FROM audit_logs WHERE username = $1 AND type = 'login' AND session_status = 'active' AND mac_address = $2 ORDER BY id DESC LIMIT 1),
+         (SELECT id FROM audit_logs WHERE username = $1 AND type = 'login' AND session_status = 'active' ORDER BY id DESC LIMIT 1)
+       )`,
+      [decoded.username, deviceId]
+    );
+    const logoutLogId = `LOGOUT-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+    await query(
+      `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, logout_at, session_status)
+       VALUES ($1, 'logout', $2, $3, NOW()::text, 'success', $4, $5, $6, NOW(), NOW(), 'closed')`,
+      [logoutLogId, `تسجيل خروج: ${decoded.username}`, decoded.username, deviceName, ip, deviceId]
+    );
     res.clearCookie('token', { path: '/', httpOnly: true, secure: true, sameSite: 'strict' });
     res.clearCookie('refreshToken', { path: '/api/auth', httpOnly: true, secure: true, sameSite: 'strict' });
     res.json({ message: 'Logged out successfully' });

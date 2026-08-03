@@ -307,6 +307,20 @@ export interface AuditLogEntry {
   user: string;
   time: string;
   status: string;
+  deviceName?: string;
+  ipAddress?: string;
+  macAddress?: string;
+  loginAt?: string | null;
+  logoutAt?: string | null;
+  sessionStatus?: string;
+}
+
+export interface AuditLogPageResponse {
+  logs: AuditLogEntry[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 export interface ApiBackupResponse {

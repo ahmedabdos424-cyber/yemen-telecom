@@ -108,8 +108,9 @@ export default function TopBar({
 
           {/* Quick Notification Dropdown */}
           {showNotifications && (
-            <div className="absolute left-0 right-0 sm:left-auto sm:-right-2 mx-2 sm:mx-0 sm:w-80 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden text-right animate-in fade-in slide-in-from-top-2 duration-150">
-              <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+            <div className="fixed top-[calc(3rem+env(safe-area-inset-top))] left-2 right-2 z-[60] sm:absolute sm:top-full sm:left-auto sm:-right-2 sm:w-80 sm:mt-2 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden text-right animate-in fade-in slide-in-from-top-2 duration-150"
+              style={{ maxHeight: 'calc(100dvh - 3.5rem - env(safe-area-inset-top))', display: 'flex', flexDirection: 'column' }}>
+              <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center shrink-0">
                 <span className="text-xs bg-red-100 text-red-700 font-bold px-2 py-0.5 rounded-full">
                   {unresolvedAlertsCount} تنبيه نشط
                 </span>
@@ -137,7 +138,7 @@ export default function TopBar({
                         <div className="flex-1 min-w-0">
                           <p className="font-bold text-xs text-gray-900 leading-tight truncate">{alert.title}</p>
                           {alert.description && (
-                            <p className="text-[11px] text-gray-500 mt-1 line-clamp-2">{alert.description}</p>
+                            <p className="text-[11px] text-gray-500 mt-1 line-clamp-2 break-words">{alert.description}</p>
                           )}
                           {alert.time && (
                             <span className="text-[10px] text-gray-400 block mt-1">{alert.time}</span>
@@ -148,7 +149,7 @@ export default function TopBar({
                   ))
                 )}
               </div>
-              <div className="p-2 border-t border-gray-100 bg-gray-50 flex">
+              <div className="p-2 border-t border-gray-100 bg-gray-50 flex shrink-0">
                 <button
                   onClick={() => { setView('alerts'); setShowNotifications(false); }}
                   className="w-full text-center py-1.5 text-xs text-secondary hover:underline font-bold"
