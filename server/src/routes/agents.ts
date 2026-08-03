@@ -9,6 +9,13 @@ import { validate, createAgentSchema, updateAgentSchema } from '../validation';
 
 const router = Router();
 
+function isPhoneUniqueViolation(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { code?: string; message?: string };
+  const msg = e.message ?? '';
+  return e.code === '23505' && (msg.includes('idx_agents_phone_unique') || msg.includes('agents_phone_key'));
+}
+
 router.get('/', requireRole('manager', 'agent'), async (req: Request, res: Response) => {
   try {
     const { page, limit, offset } = getPagination(req);
@@ -66,6 +73,9 @@ router.post('/', requireRole('manager'), validate(createAgentSchema), async (req
       }
     });
   } catch (err) {
+    if (isPhoneUniqueViolation(err)) {
+      return res.status(409).json({ error: 'رقم الهاتف مستخدم بالفعل لوكيل آخر، يرجى استخدام رقم مختلف' });
+    }
     logger.error('Error creating agent:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -132,6 +142,9 @@ router.put('/:id', requireRole('manager'), validate(updateAgentSchema), async (r
     );
     res.json(result.rows[0]);
   } catch (err) {
+    if (isPhoneUniqueViolation(err)) {
+      return res.status(409).json({ error: 'رقم الهاتف مستخدم بالفعل لوكيل آخر، يرجى استخدام رقم مختلف' });
+    }
     logger.error('Error updating agent:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
