@@ -8,7 +8,7 @@ import type {
   MappedOperation, CreateOperationRequest,
   MappedInventory, UpdateInventoryItem,
   AlertRow,
-  AdminSettingsResponse, UpdateSettingsRequest, MappedTransaction, DuplicateIdentityRow, AuditLogEntry,
+  AdminSettingsResponse, UpdateSettingsRequest, MappedTransaction, DuplicateIdentityRow, AuditLogEntry, AuditLogPageResponse,
   UpdateProfileRequest,
   StatsResponse,
   CustomerRow,
@@ -84,6 +84,37 @@ let isRefreshing = false;
 let pendingRequests: Array<(token: string) => void> = [];
 let tokensLoaded = false;
 let tokensLoadPromise: Promise<void> | null = null;
+
+export const SESSION_EXPIRED_EVENT = 'tele:session-expired';
+
+function emitSessionExpired(reason?: string) {
+  try {
+    window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT, { detail: { reason } }));
+  } catch {
+    /* noop */
+  }
+}
+
+function getDeviceId(): string {
+  try {
+    let id = localStorage.getItem('tele_device_id');
+    if (!id) {
+      id = (crypto as Crypto).randomUUID?.() || `dev-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+      localStorage.setItem('tele_device_id', id);
+    }
+    return id;
+  } catch {
+    return '';
+  }
+}
+
+function getDeviceName(): string {
+  try {
+    return navigator.userAgent.slice(0, 200);
+  } catch {
+    return '';
+  }
+}
 
 export function setToken(token: string | null) {
   authToken = token;
@@ -168,6 +199,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const start = performance.now();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'X-Device-Id': getDeviceId(),
+    'X-Device-Name': getDeviceName(),
     ...(options.headers as Record<string, string> || {}),
   };
   if (authToken) {
@@ -223,6 +256,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
+    if (res.status === 401 && !path.startsWith('/auth/')) {
+      emitSessionExpired(err.error || '');
+    }
     const dur = performance.now() - start;
     captureTiming(`${options.method || 'GET'} ${path}`, dur);
     throw new Error(err.error || `HTTP ${res.status}`);
@@ -351,6 +387,8 @@ export const api = {
       body: JSON.stringify(data || {}),
     }),
   getAuditLogs: () => request<AuditLogEntry[]>('/admin/audit-logs'),
+  getAuditLogsPaged: (page: number, limit = 20) =>
+    request<AuditLogPageResponse>(`/admin/audit-logs?page=${page}&limit=${limit}`),
 
   // System: Backup
   createBackup: () =>

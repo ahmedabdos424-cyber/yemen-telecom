@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ViewType } from '../types';
 import { useToast, ToastContainer } from '../hooks/useToast';
 import { api } from '../api/client';
+import AuditLogsView from './AuditLogsView';
 
 interface AdminMoreDrawerProps {
   isMoreOpen: boolean;
@@ -17,21 +18,9 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
 
   const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
 
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
-  const [auditLogsLoading, setAuditLogsLoading] = useState(false);
   const [backupsList, setBackupsList] = useState<any[]>([]);
   const [backupProgress, setBackupProgress] = useState<number | null>(null);
   const [backupStatus, setBackupStatus] = useState<'idle' | 'running' | 'completed'>('idle');
-
-  useEffect(() => {
-    if (activeSubScreen === 'audit-logs' && auditLogs.length === 0 && !auditLogsLoading) {
-      setAuditLogsLoading(true);
-      api.getAuditLogs()
-        .then(data => { setAuditLogs(data || []); })
-        .catch(() => { toastError('فشل تحميل سجلات التدقيق'); })
-        .finally(() => setAuditLogsLoading(false));
-    }
-  }, [activeSubScreen, auditLogs.length, auditLogsLoading, toastError]);
 
   useEffect(() => {
     if (activeSubScreen === 'backup-restore') {
@@ -160,7 +149,7 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
           </div>
         </div>
 
-        <div className="bottom-sheet-header border-t border-slate-800 mt-auto">
+        <div className="bottom-sheet-header border-t border-slate-800 mt-auto pb-[calc(env(safe-area-inset-bottom)+1rem)]">
           <button onClick={() => setShowLogOutDialog(true)}
             className="w-full flex items-center justify-center gap-2 bg-ym hover:bg-red-700 active:scale-[0.98] text-white py-3.5 px-5 rounded-xl font-bold text-xs transition-all cursor-pointer min-h-[48px]">
             <span className="material-symbols-outlined text-base">logout</span>
@@ -220,29 +209,7 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
 
             <div className="bottom-sheet-body space-y-3 select-text">
               {activeSubScreen === 'audit-logs' && (
-                <div className="space-y-3">
-                  <p className="text-xs sm:text-[11px] text-slate-500">سجل تعقب الأحداث في الخادم للمسؤولين وحراس الأمان بالموقع.</p>
-                  {auditLogsLoading ? (
-                    <div className="text-center py-8 text-slate-500 text-xs">جاري التحميل...</div>
-                  ) : auditLogs.length === 0 ? (
-                    <div className="text-center py-8 text-slate-500 text-xs">لا توجد سجلات تدقيق متاحة</div>
-                  ) : (
-                    <div className="space-y-2">
-                      {auditLogs.map((log: any, i: number) => (
-                        <div key={log.id || i} className="p-3 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between">
-                          <div className="space-y-1">
-                            <span className="text-xs font-bold text-slate-200 block">{log.title}</span>
-                            <span className="text-[10px] text-slate-500">{log.type} • {log.user}</span>
-                          </div>
-                          <div className="text-left">
-                            <span className="text-[10px] text-slate-500 block">{log.time}</span>
-                            <span className={`text-[9px] font-bold ${log.status === 'blocked' ? 'text-red-400' : log.status === 'verified' ? 'text-emerald-400' : log.status === 'analyzing' ? 'text-yellow-400' : 'text-slate-400'}`}>{log.status}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <AuditLogsView />
               )}
 
               {activeSubScreen === 'backup-restore' && (
@@ -319,7 +286,7 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
               )}
             </div>
 
-            <div className="bottom-sheet-header border-t border-slate-800 mt-auto">
+            <div className="bottom-sheet-header border-t border-slate-800 mt-auto pb-[calc(env(safe-area-inset-bottom)+1rem)]">
               <button onClick={() => setActiveSubScreen(null)}
                 className="w-full py-3.5 bg-ym hover:bg-red-700 text-white font-bold text-xs rounded-xl transition-all cursor-pointer min-h-[48px]">حسناً، فهمت ذلك</button>
             </div>

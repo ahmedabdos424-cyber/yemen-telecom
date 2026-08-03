@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useState, useCallback, useEffect } from 'react';
+import React, { Suspense, lazy, useState, useCallback, useEffect, useRef } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { ViewType, Role, Operator } from './types';
 
@@ -9,6 +9,8 @@ import NavBar from './components/NavBar';
 import LoadingScreen from './components/shared/LoadingScreen';
 import ErrorBoundary from './components/shared/ErrorBoundary';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
+import { useToast, ToastContainer } from './hooks/useToast';
+import { SESSION_EXPIRED_EVENT } from './api/client';
 const DashboardView = lazy(() => import('./components/DashboardView'));
 const SIMsView = lazy(() => import('./components/SIMsView'));
 const AgentsView = lazy(() => import('./components/AgentsView'));
@@ -46,6 +48,19 @@ function AuthenticatedApp() {
   const { role, username, darkMode, setDarkMode, isLoading, handleLogin, handleLogout, clearSession } = auth;
   const { setTokenWrapper } = auth;
   const isOnline = useNetworkStatus();
+  const { toasts, dismissToast, toastWarning } = useToast();
+  const roleRef = useRef(role);
+  useEffect(() => { roleRef.current = role; }, [role]);
+
+  useEffect(() => {
+    const onSessionExpired = () => {
+      if (!roleRef.current) return;
+      toastWarning('انتهت الجلسة', 'تم تسجيل الخروج لانتهاء الجلسة أو دخول الحساب من جهاز آخر');
+      clearSession();
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+  }, [clearSession, toastWarning]);
 
   useEffect(() => {
     if (!role) return;
@@ -73,9 +88,12 @@ function AuthenticatedApp() {
 
   if (!role) {
     return (
-      <ErrorBoundary>
-        <LoginScreen onLogin={handleLogin} darkMode={darkMode} setDarkMode={setDarkMode} />
-      </ErrorBoundary>
+      <>
+        <ErrorBoundary>
+          <LoginScreen onLogin={handleLogin} darkMode={darkMode} setDarkMode={setDarkMode} />
+        </ErrorBoundary>
+        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+      </>
     );
   }
 

@@ -5,7 +5,7 @@ import { query } from '../db';
 import { logger } from '../logger';
 import { cacheStats } from '../cache';
 import { requireRole, AuthRequest } from '../middleware/auth';
-import { getPagination } from '../helpers';
+import { getPagination, formatDbTimestamp } from '../helpers';
 import { validate, updateSettingsSchema } from '../validation';
 
 const router = Router();
@@ -270,18 +270,31 @@ router.get('/audit-logs', requireRole('manager'), async (req: Request, res: Resp
     const { page, limit, offset } = getPagination(req);
     const paginate = req.query.page || req.query.limit;
     const queryText = paginate
-      ? 'SELECT * FROM audit_logs ORDER BY id LIMIT $1 OFFSET $2'
-      : 'SELECT * FROM audit_logs ORDER BY id';
+      ? 'SELECT * FROM audit_logs ORDER BY id DESC LIMIT $1 OFFSET $2'
+      : 'SELECT * FROM audit_logs ORDER BY id DESC';
     const params = paginate ? [limit, offset] : [];
     const result = await query(queryText, params);
-    res.json(result.rows.map((r: { log_id: string; type: string; title: string; username: string; time: string; status: string }) => ({
+    const totalResult = paginate ? await query('SELECT COUNT(*) AS count FROM audit_logs') : null;
+    const total = totalResult ? parseInt(totalResult.rows[0]?.count || '0') : 0;
+    const logs = result.rows.map((r: any) => ({
       id: r.log_id,
       type: r.type,
       title: r.title,
       user: r.username,
       time: r.time,
       status: r.status,
-    })));
+      deviceName: r.device_name || '',
+      ipAddress: r.ip_address || '',
+      macAddress: r.mac_address || '',
+      loginAt: formatDbTimestamp(r.login_at),
+      logoutAt: formatDbTimestamp(r.logout_at),
+      sessionStatus: r.session_status || (r.logout_at ? 'closed' : r.type === 'login' ? 'active' : ''),
+    }));
+    if (paginate) {
+      res.json({ logs, total, page, limit, totalPages: Math.max(1, Math.ceil(total / limit)) });
+    } else {
+      res.json(logs);
+    }
   } catch (err) {
     logger.error('Error fetching audit logs:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -469,6 +482,34 @@ async function ensureIdentityRiskSchema() {
 // Run bootstrap once the module is loaded (server-side only).
 if (process.env.NODE_ENV !== 'test') {
   ensureIdentityRiskSchema();
+  ensureSessionSchema();
+}
+
+// ========================
+// Idempotent schema bootstrap for single-device sessions + device audit fields
+// (Safe to run on every boot: all statements use IF NOT EXISTS / ON CONFLICT.)
+// ========================
+let sessionSchemaDone = false;
+async function ensureSessionSchema() {
+  if (sessionSchemaDone) return;
+  sessionSchemaDone = true;
+  try {
+    await query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS active_session_sid VARCHAR(64);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS session_expires_at TIMESTAMP;
+      ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS device_name VARCHAR(200) DEFAULT '';
+      ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS ip_address VARCHAR(64) DEFAULT '';
+      ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS mac_address VARCHAR(128) DEFAULT '';
+      ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS login_at TIMESTAMP;
+      ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS logout_at TIMESTAMP;
+      ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS session_status VARCHAR(20) DEFAULT 'active';
+      CREATE INDEX IF NOT EXISTS idx_audit_logs_username_login ON audit_logs(username, login_at);
+      CREATE INDEX IF NOT EXISTS idx_audit_logs_session_status ON audit_logs(session_status);
+    `);
+    logger.info('Session tracking schema ensured.');
+  } catch (err) {
+    logger.error('Error ensuring session schema:', err);
+  }
 }
 
 export default router;
