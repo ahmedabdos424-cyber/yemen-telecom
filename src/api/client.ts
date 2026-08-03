@@ -16,13 +16,13 @@ import type {
   AppVersionResponse,
 } from './types';
 
-const REQUEST_TIMEOUT_MS = 120000;
+const REQUEST_TIMEOUT_MS = 180000;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchWithTimeout(url: string, options: RequestInit = {}, retries = 3): Promise<Response> {
+async function fetchWithTimeout(url: string, options: RequestInit = {}, retries = 5): Promise<Response> {
   let lastErr: unknown;
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
@@ -32,7 +32,7 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, retries 
     } catch (err) {
       lastErr = err;
       if (attempt < retries) {
-        await delay(1500 * (attempt + 1));
+        await delay(15000);
         continue;
       }
     } finally {
@@ -81,26 +81,43 @@ const CREDENTIALS_MODE: RequestCredentials = isCapacitor ? 'omit' : 'include';
 // timeout, so a fire-and-forget ping to /api/health (long timeout, no retries)
 // lets the first user request hit a warm server. The promise is cached so
 // repeated calls share the same in-flight warm-up.
-let warmupPromise: Promise<boolean> | null = null;
-export function warmupServer(timeoutMs = 120000): Promise<boolean> {
-  if (!warmupPromise) {
-    warmupPromise = (async () => {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-        const res = await fetch(`${PROD_API}/health`, {
-          method: 'GET',
-          credentials: 'omit',
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-        return res.ok;
-      } catch {
-        return false;
+const WAKE_TIMEOUT_MS = 90000;
+let wakePromise: Promise<boolean> | null = null;
+export function ensureServerIsAwake(): Promise<boolean> {
+  if (!wakePromise) {
+    wakePromise = (async () => {
+      const deadline = Date.now() + WAKE_TIMEOUT_MS;
+      let waitMs = 2000;
+      for (;;) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+          const res = await fetch(`${API_BASE}/health`, {
+            method: 'GET',
+            credentials: 'omit',
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+          if (res.ok) return true;
+        } catch {
+          // Network error while the server is still waking up — keep waiting.
+        }
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) return false;
+        const backoff = Math.min(waitMs, 30000, remaining);
+        waitMs = Math.min(waitMs * 2, 30000);
+        await delay(backoff);
       }
     })();
   }
-  return warmupPromise;
+  return wakePromise;
+}
+
+// Blocking gate for requests that must not fire until the server is awake.
+// Resolves instantly once the boot-time warm-up has already finished, so this
+// is safe to await at the start of the login flow even after app startup.
+export function waitForServerAwake(): Promise<boolean> {
+  return ensureServerIsAwake();
 }
 
 let authToken: string | null = null;

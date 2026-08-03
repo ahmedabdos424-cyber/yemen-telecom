@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Role } from '../types';
-import { api, setToken, setRefreshToken, clearTokens, fetchCsrfToken, loadTokens, getLoadedTokens } from '../api/client';
+import { api, setToken, setRefreshToken, clearTokens, fetchCsrfToken, loadTokens, getLoadedTokens, waitForServerAwake } from '../api/client';
 import { setFrontendSentryUser } from '../lib/sentry';
 
 export function useAuth() {
@@ -75,6 +75,9 @@ export function useAuth() {
   }, [darkMode]);
 
   const handleLogin = async (_selectedRole: Role, loggedUser: string, password: string): Promise<{ role: Role; commit: () => void } | null> => {
+    // Never fire the login request while the server is still waking up:
+    // block until the boot-time warm-up resolves (instant if already done).
+    await waitForServerAwake();
     const apply = (userRole: Role, displayName: string) => {
       setRole(userRole);
       setUsername(displayName);

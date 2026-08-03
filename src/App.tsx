@@ -10,7 +10,7 @@ import LoadingScreen from './components/shared/LoadingScreen';
 import ErrorBoundary from './components/shared/ErrorBoundary';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
 import { useToast, ToastContainer } from './hooks/useToast';
-import { SESSION_EXPIRED_EVENT, warmupServer } from './api/client';
+import { SESSION_EXPIRED_EVENT, ensureServerIsAwake } from './api/client';
 const DashboardView = lazy(() => import('./components/DashboardView'));
 const SIMsView = lazy(() => import('./components/SIMsView'));
 const AgentsView = lazy(() => import('./components/AgentsView'));
@@ -275,11 +275,15 @@ function AuthenticatedApp() {
 
 export default function App() {
   const [splashDone, setSplashDone] = useState(false);
+  const [serverAwake, setServerAwake] = useState(false);
 
   useEffect(() => {
-    // Wake the Render free-tier service if it is sleeping so the first user
-    // request (login, CSRF, refresh) hits a warm server instead of timing out.
-    warmupServer();
+    // Blocking boot: wait until the Render free-tier service is awake (it
+    // sleeps after ~15 minutes of idle and its cold start can exceed normal
+    // request timeouts). The UI stays on a loading screen while we retry
+    // /api/health with exponential backoff, so the first login request is
+    // never the one that pays the cold-start cost.
+    ensureServerIsAwake().finally(() => setServerAwake(true));
   }, []);
 
   if (!splashDone) {
@@ -287,6 +291,17 @@ export default function App() {
       <ErrorBoundary>
         <SplashScreen onFinish={() => setSplashDone(true)} />
       </ErrorBoundary>
+    );
+  }
+
+  if (!serverAwake) {
+    return (
+      <div className="min-h-dvh flex flex-col items-center justify-center gap-5 bg-theme-background font-sans text-slate-100 px-8" role="status" aria-live="polite">
+        <div className="w-11 h-11 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-slate-300 text-center leading-relaxed">
+          الرجاء الانتظار قليلاً... يتم الآن تجهيز النظام للعمل...
+        </p>
+      </div>
     );
   }
 
