@@ -114,7 +114,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-CSRF-Hash', 'X-Refresh-Token'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-CSRF-Hash', 'X-Refresh-Token', 'X-Device-Id', 'X-Device-Name'],
 }));
 app.use(compression());
 app.use(express.json({ limit: '1mb' }));
