@@ -36,7 +36,7 @@ router.get('/', requireRole('manager', 'agent'), async (req: Request, res: Respo
 });
 
 router.post('/', requireRole('manager'), validate(createAgentSchema), async (req: Request, res: Response) => {
-  const { name, region, phone, sellers_count, sims_count, status, username, password } = req.body;
+  const { name, full_name, region, phone, sellers_count, sims_count, status, username, password } = req.body;
   try {
     const agentUsername = (username || phone || `agent_${Date.now()}`).trim().toLowerCase();
 
@@ -58,9 +58,9 @@ router.post('/', requireRole('manager'), validate(createAgentSchema), async (req
       const uid = userRes.rows[0].id;
 
       const agentRes = await client.query(
-        `INSERT INTO agents (user_id, name, region, phone, sellers_count, sims_count, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-        [uid, name, region || '', phone || '', sellers_count || 0, sims_count || 0, status || 'active']
+        `INSERT INTO agents (user_id, name, full_name, region, phone, sellers_count, sims_count, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+        [uid, name, full_name || '', region || '', phone || '', sellers_count || 0, sims_count || 0, status || 'active']
       );
       return { userId: uid, agent: agentRes.rows[0] };
     });

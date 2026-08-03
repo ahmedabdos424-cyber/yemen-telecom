@@ -74,6 +74,7 @@ export const updateSimSchema = z.object({
 // Agents
 export const createAgentSchema = z.object({
   name: s(1, 200),
+  full_name: s(1, 200).optional().default(''),
   region: so(200).default(''),
   phone: z.string().max(50).optional().default(''),
   sellers_count: z.number().int().min(0).optional().default(0),

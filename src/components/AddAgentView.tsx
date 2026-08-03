@@ -3,11 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Agent, ViewType } from '../types';
 import { useToast, ToastContainer } from '../hooks/useToast';
 import { api } from '../api/client';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Check } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import CameraCapture from './shared/CameraCapture';
+import { useOcr } from '../hooks/useOcr';
 
 interface AddAgentViewProps {
   onAddAgent: (agent: Partial<Agent> & { username?: string; password?: string }) => void;
@@ -17,19 +20,28 @@ interface AddAgentViewProps {
 export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps) {
   const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
   const [name, setName] = useState('');
+  const [fullName, setFullName] = useState('');
   const [region, setRegion] = useState('');
   const [phone, setPhone] = useState('');
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [sellersCount, setSellersCount] = useState<string>('');
-  const [simsCount, setSimsCount] = useState<string>('');
+  const [nameCaptured, setNameCaptured] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { recognize, progress: ocrProgress } = useOcr();
+
+  const handleFullNameCapture = useCallback(async (imageData: string) => {
+    const captured = await recognize(imageData);
+    if (captured) {
+      setFullName(captured);
+    }
+    setNameCaptured(imageData);
+  }, [recognize]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !phone || !loginUsername.trim() || !loginPassword) {
-      toastWarning('الرجاء إدخال الاسم ورقم الجوال وبيانات تسجيل الدخول لتسجيل وكيل التوزيع المعتمد.');
+    if (!name || !fullName || !phone || !loginUsername.trim() || !loginPassword) {
+      toastWarning('الرجاء إدخال الاسم التجاري والاسم الكامل ورقم الجوال وبيانات تسجيل الدخول لتسجيل وكيل التوزيع المعتمد.');
       return;
     }
     if (loginPassword.length < 8 || !/[A-Z]/.test(loginPassword) || !/[a-z]/.test(loginPassword) || !/[0-9]/.test(loginPassword)) {
@@ -41,16 +53,15 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
     try {
       await onAddAgent({
         name,
+        fullName,
         region,
         phone,
-        sellersCount: Number(sellersCount) || 0,
-        simsCount: Number(simsCount) || 0,
         status: 'active',
         username: loginUsername.trim().toLowerCase(),
         password: loginPassword,
       });
 
-      toastSuccess(`تم تسجيل الوكيل الموزع: "${name}" بنجاح في النظام وتخصيص العقدة الأمانية له.`);
+      toastSuccess(`تم تسجيل الوكيل الموزع: "${fullName}" بنجاح في النظام وتخصيص العقدة الأمانية له.`);
       setView('agents');
     } catch (err: unknown) {
       toastError(err instanceof Error ? err.message : String(err));
@@ -88,6 +99,50 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
              />
          </div>
 
+         <div>
+           <label className="block text-[11px] md:text-xs font-bold text-gray-600 mb-1">الاسم الكامل للوكيل (من الهوية)</label>
+           <div className="relative">
+             <input
+               type="text"
+               required
+               value={fullName}
+               onChange={(e) => setFullName(e.target.value)}
+               placeholder="الاسم الرباعي من البطاقة"
+               className="input-field pl-14"
+             />
+             <CameraCapture onCapture={handleFullNameCapture} />
+           </div>
+           <AnimatePresence>
+             {nameCaptured && (
+               <motion.span
+                 initial={{ opacity: 0 }}
+                 animate={{ opacity: 1 }}
+                 exit={{ opacity: 0 }}
+                 className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1 mt-1"
+               >
+                 <Check size={12} /> تم التقاط صورة الهوية
+               </motion.span>
+             )}
+           </AnimatePresence>
+
+           {ocrProgress.visible && (
+             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+               <div className="w-full max-w-xs bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-center">
+                 <RefreshCw size={32} className="mx-auto text-amber-400 mb-4 animate-spin" />
+                 <p className="text-xs text-slate-200 mb-3 font-semibold">{ocrProgress.stage}</p>
+                 <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                   <motion.div
+                     initial={{ width: 0 }}
+                     animate={{ width: `${ocrProgress.progress}%` }}
+                     className="h-full bg-gradient-to-l from-emerald-500 to-emerald-400 rounded-full"
+                   />
+                 </div>
+                 <p className="text-[10px] text-slate-500 mt-2">{Math.round(ocrProgress.progress)}%</p>
+               </div>
+             </div>
+           )}
+         </div>
+
          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
              <div>
                <label className="block text-[11px] md:text-xs font-bold text-gray-600 mb-1">اسم مستخدم تسجيل دخول الوكيل</label>
@@ -114,13 +169,13 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
                    value={loginPassword}
                    onChange={(e) => setLoginPassword(e.target.value)}
                    placeholder="••••••••"
-                   className="input-field pr-9"
+                   className="input-field pl-9"
                    style={{ textAlign: 'right' }}
                  />
                  <button
                    type="button"
                    onClick={() => setShowPassword(!showPassword)}
-                   className="absolute top-1/2 -translate-y-1/2 right-2 text-gray-400 hover:text-gray-600 cursor-pointer touch-target p-1"
+                   className="absolute top-1/2 -translate-y-1/2 left-3 text-gray-400 hover:text-gray-600 cursor-pointer touch-target p-1"
                    aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
                  >
                    <span className="material-symbols-outlined text-lg">{showPassword ? 'visibility_off' : 'visibility'}</span>
@@ -153,32 +208,6 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
                className="input-field"
                dir="ltr"
                style={{ textAlign: 'right' }}
-             />
-           </div>
-         </div>
-
-         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 border-t border-gray-100 pt-3 md:pt-4">
-           <div>
-             <label className="block text-[11px] md:text-xs font-bold text-gray-600 mb-1">عدد نقاط البيع التابعة له مبدئياً</label>
-             <input
-               type="number"
-               min="0"
-               value={sellersCount}
-                onChange={(e) => setSellersCount(e.target.value)}
-                placeholder="عدد النقاط"
-               className="input-field"
-             />
-           </div>
-
-           <div>
-             <label className="block text-[11px] md:text-xs font-bold text-gray-600 mb-1">عدد شرائح SIM المخصّصة كعهدة</label>
-             <input
-               type="number"
-               min="0"
-               value={simsCount}
-                onChange={(e) => setSimsCount(e.target.value)}
-                placeholder="عدد الشرائح"
-               className="input-field"
              />
            </div>
          </div>
