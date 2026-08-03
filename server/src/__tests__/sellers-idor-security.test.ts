@@ -2,6 +2,13 @@ import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vites
 import express, { NextFunction, Response } from 'express';
 import http from 'http';
 
+vi.hoisted(() => {
+  process.env.JWT_SECRET = 'test-jwt-secret';
+  process.env.REFRESH_SECRET = 'test-refresh-secret';
+  process.env.CSRF_SECRET = 'test-csrf-secret';
+  process.env.BLACKLIST_HMAC_SECRET = 'test-blacklist-hmac-secret';
+});
+
 vi.mock('../db', () => {
   const query = vi.fn();
   return {

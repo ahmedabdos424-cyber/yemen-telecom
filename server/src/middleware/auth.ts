@@ -13,6 +13,11 @@ if (!process.env.JWT_SECRET) {
 }
 const JWT_SECRET = process.env.JWT_SECRET;
 
+if (!process.env.BLACKLIST_HMAC_SECRET) {
+  throw new Error('BLACKLIST_HMAC_SECRET environment variable is required');
+}
+const BLACKLIST_HMAC_SECRET = process.env.BLACKLIST_HMAC_SECRET;
+
 export interface AuthRequest extends Request {
   user?: { id: number; username: string; role: string };
 }
@@ -34,7 +39,7 @@ export function isSessionExempt(role: string): boolean {
 }
 
 export function hashToken(token: string): string {
-  return crypto.createHash('sha256').update(token).digest('hex');
+  return crypto.createHmac('sha256', BLACKLIST_HMAC_SECRET).update(token).digest('hex');
 }
 
 export async function isTokenBlacklisted(token: string): Promise<boolean> {
