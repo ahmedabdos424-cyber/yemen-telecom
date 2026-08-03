@@ -16,13 +16,13 @@ import type {
   AppVersionResponse,
 } from './types';
 
-const REQUEST_TIMEOUT_MS = 60000;
+const REQUEST_TIMEOUT_MS = 120000;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchWithTimeout(url: string, options: RequestInit = {}, retries = 2): Promise<Response> {
+async function fetchWithTimeout(url: string, options: RequestInit = {}, retries = 3): Promise<Response> {
   let lastErr: unknown;
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
@@ -75,6 +75,33 @@ const isCapacitor = detectCapacitor();
 const API_BASE = resolveApiBase();
 
 const CREDENTIALS_MODE: RequestCredentials = isCapacitor ? 'omit' : 'include';
+
+// Wake the Render free-tier service up when the app opens. The service sleeps
+// after ~15 minutes of idle and its cold start can exceed the normal request
+// timeout, so a fire-and-forget ping to /api/health (long timeout, no retries)
+// lets the first user request hit a warm server. The promise is cached so
+// repeated calls share the same in-flight warm-up.
+let warmupPromise: Promise<boolean> | null = null;
+export function warmupServer(timeoutMs = 120000): Promise<boolean> {
+  if (!warmupPromise) {
+    warmupPromise = (async () => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        const res = await fetch(`${PROD_API}/health`, {
+          method: 'GET',
+          credentials: 'omit',
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        return res.ok;
+      } catch {
+        return false;
+      }
+    })();
+  }
+  return warmupPromise;
+}
 
 let authToken: string | null = null;
 let refreshToken: string | null = null;
