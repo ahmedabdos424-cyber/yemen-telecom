@@ -52,6 +52,7 @@ export type Sim = ISim;
 export interface Agent {
   id: string;
   name: string;
+  fullName?: string;
   region: string;
   phone: string;
   sellersCount: number;

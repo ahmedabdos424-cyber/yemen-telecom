@@ -86,6 +86,7 @@ export interface AgentRow {
   id: number;
   user_id: number | null;
   name: string;
+  full_name?: string;
   region: string;
   phone: string;
   email: string;
@@ -97,6 +98,7 @@ export interface AgentRow {
 
 export interface CreateAgentRequest {
   name: string;
+  full_name?: string;
   region?: string;
   phone?: string;
   sellers_count?: number;
@@ -113,6 +115,7 @@ export interface CreateAgentResponse {
 
 export interface UpdateAgentRequest {
   name?: string;
+  full_name?: string;
   region?: string;
   phone?: string;
   sellers_count?: number;

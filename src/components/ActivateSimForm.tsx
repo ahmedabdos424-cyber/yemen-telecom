@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Operator, simProvider } from '../types';
-import { Check, Camera, RefreshCw, Save, X, Phone, User, Shield, CreditCard, Layers } from 'lucide-react';
+import { Check, Camera, RefreshCw, Save, Phone, User, CreditCard, Layers } from 'lucide-react';
 import CameraCapture, { DocumentCapture } from './shared/CameraCapture';
 import OperatorLogo from './shared/OperatorLogo';
 import { useOcr } from '../hooks/useOcr';
@@ -12,8 +12,6 @@ interface ActivateSimFormProps {
   onSimActivated: (simData: {
     fullName: string;
     idNumber: string;
-    idType: string;
-    idIssueDate: string;
     iccid: string;
     phoneNumber: string;
     operator: Operator;
@@ -24,8 +22,6 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
   const [operator, setOperator] = useState<Operator>('yemen_mobile');
   const [fullName, setFullName] = useState('');
   const [idNumber, setIdNumber] = useState('');
-  const [idType, setIdType] = useState('');
-  const [idIssueDate, setIdIssueDate] = useState('');
   const [iccid, setIccid] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [contractPhoto, setContractPhoto] = useState<string | null>(null);
@@ -81,8 +77,6 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
     setFullName('');
     setNameCaptured(null);
     setIdNumber('');
-    setIdType('');
-    setIdIssueDate('');
     setIccid('');
     setIccidCaptured(null);
     setPhoneNumber('');
@@ -100,14 +94,6 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
       toastWarning('الرجاء إدخال رقم الهوية للعميل');
       return;
     }
-    if (!idType) {
-      toastWarning('الرجاء تحديد نوع الهوية');
-      return;
-    }
-    if (!idIssueDate) {
-      toastWarning('الرجاء إدخال تاريخ إصدار الهوية');
-      return;
-    }
     if (!iccid) {
       toastWarning('الرجاء إدخال رقم شريحة الـ SIM (ICCID)');
       return;
@@ -122,8 +108,6 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
       await onSimActivated({
         fullName,
         idNumber,
-        idType,
-        idIssueDate,
         iccid,
         phoneNumber,
         operator,
@@ -167,7 +151,7 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
 
 
       {/* Operator Carrier Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 w-full mb-8">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3 w-full mb-8">
         {/* Yemen Mobile */}
         <div 
           onClick={() => setOperator('yemen_mobile')}
@@ -294,42 +278,6 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
                 className={`input-field bg-slate-900 border-slate-800 text-sm focus:outline-none focus:ring-1 ${brand.ringClass} font-sans`}
                 dir="ltr"
                 style={{ textAlign: 'right' }}
-              />
-            </div>
-
-            {/* ID Type */}
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                <Shield size={14} className="text-slate-500" />
-                نوع الهوية
-              </label>
-              <select
-                value={idType}
-                onChange={(e) => setIdType(e.target.value)}
-                className={`input-field bg-slate-900 border-slate-800 text-sm focus:outline-none focus:ring-1 ${brand.ringClass} cursor-pointer`}
-              >
-                <option value="">اختر نوع الهوية...</option>
-                <option value="national_id">بطاقة وطنية</option>
-                <option value="passport">جواز سفر</option>
-                <option value="driving_license">رخصة قيادة</option>
-                <option value="residence">إقامة أجنبي</option>
-              </select>
-            </div>
-
-            {/* ID Issue Date */}
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                <Shield size={14} className="text-slate-500" />
-                تاريخ إصدار الهوية
-              </label>
-              <input
-                type="date"
-                value={idIssueDate}
-                onChange={(e) => setIdIssueDate(e.target.value)}
-                className={`input-field bg-slate-900 border-slate-800 text-sm focus:outline-none focus:ring-1 ${brand.ringClass} font-sans`}
-                dir="ltr"
-                style={{ textAlign: 'right' }}
-                max={new Date().toISOString().split('T')[0]}
               />
             </div>
 
