@@ -26,7 +26,7 @@ export default function SimManagementView({
     if (sim.status === 'available') acc[op].available += 1;
     else if (sim.status === 'sold') acc[op].sold += 1;
     else if (sim.status === 'reserved' || sim.status === 'suspended') acc[op].reserved += 1;
-    else if (sim.status === 'inactive' || sim.status === 'damaged') acc[op].damaged += 1;
+    else if (sim.status === 'inactive' || (sim.status as string) === 'damaged') acc[op].damaged += 1;
     return acc;
   }, {} as Record<string, { total: number; available: number; sold: number; reserved: number; allocated: number; damaged: number }>);
 

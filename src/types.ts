@@ -5,7 +5,7 @@
 
 export type Role = 'manager' | 'agent' | 'seller';
 
-export type SimStatus = 'available' | 'sold' | 'reserved' | 'inactive' | 'suspended';
+export type SimStatus = 'available' | 'assigned' | 'activated' | 'sold' | 'reserved' | 'inactive' | 'suspended';
 export type SimProvider = 'Yemen Mobile' | 'Sabafon' | 'YOU';
 export type Operator = 'yemen_mobile' | 'sabafon' | 'you' | SimProvider;
 

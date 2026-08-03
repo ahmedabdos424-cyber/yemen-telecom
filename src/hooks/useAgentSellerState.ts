@@ -71,6 +71,11 @@ export function useAgentSellerState(role: string | null, username: string) {
 
   const handleSimActivationForSeller = async (simData: { fullName: string; idNumber: string; iccid: string; phoneNumber: string; operator: Operator }) => {
     try {
+      // Serial validation (agents): the SIM must exist in the agent's available
+      // stock. The server returns 400 otherwise, creating a high-priority alert.
+      if (role === 'agent') {
+        await api.activateSim(simData.iccid);
+      }
       await api.createOperation({ type: 'activate', target: simData.phoneNumber, operator: simData.operator, status: 'success' });
       await api.createCustomer({
         fullName: simData.fullName,
@@ -80,10 +85,10 @@ export function useAgentSellerState(role: string | null, username: string) {
       const allSims = (await api.getSims()) ?? [];
       const target = allSims.find((s: any) => s.iccid === simData.iccid);
       if (target) {
-        await api.updateSim(target.id, { status: 'sold' });
+        await api.updateSim(target.id, { status: 'activated' });
       } else {
         try {
-          await api.createSim({ iccid: simData.iccid, phone: simData.phoneNumber, provider: simData.operator === 'yemen_mobile' ? 'Yemen Mobile' : simData.operator === 'sabafon' ? 'Sabafon' : 'YOU', status: 'sold' });
+          await api.createSim({ iccid: simData.iccid, phone: simData.phoneNumber, provider: simData.operator === 'yemen_mobile' ? 'Yemen Mobile' : simData.operator === 'sabafon' ? 'Sabafon' : 'YOU', status: 'activated' });
         } catch { /* sim may already exist */ }
       }
     } catch (err) {
@@ -101,8 +106,8 @@ export function useAgentSellerState(role: string | null, username: string) {
       o === 'yemen_mobile' ? 'Yemen Mobile' : o === 'sabafon' ? 'Sabafon' : 'YOU';
     if (mountedRef.current) setSims(prev => {
       const match = prev.find(s => s.iccid === simData.iccid);
-      if (match) return prev.map(s => s.iccid === simData.iccid ? { ...s, status: 'sold' as const } : s);
-      return [{ id: `sim_act_${Date.now()}`, iccid: simData.iccid, provider: toProvider(simData.operator), category: 'Prepaid Mobile SIM', status: 'sold', dateAdded: new Date().toISOString().split('T')[0].replace(/-/g, '/') }, ...prev];
+      if (match) return prev.map(s => s.iccid === simData.iccid ? { ...s, status: 'activated' as const } : s);
+      return [{ id: `sim_act_${Date.now()}`, iccid: simData.iccid, provider: toProvider(simData.operator), category: 'Prepaid Mobile SIM', status: 'activated', dateAdded: new Date().toISOString().split('T')[0].replace(/-/g, '/') }, ...prev];
     });
   };
 

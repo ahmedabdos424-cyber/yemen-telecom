@@ -11,6 +11,8 @@ import {
   refreshTokenSchema,
   updateSellerSchema,
   updateSimSchema,
+  createSimBatchSchema,
+  activateSimSchema,
   updateAgentSchema,
   createDistributionSchema,
   approveDistributionSchema,
@@ -197,6 +199,119 @@ describe('Validation — Update SIM Schema', () => {
 
   it('should reject invalid provider in update', () => {
     const result = updateSimSchema.safeParse({ provider: 'Unknown' });
+    expect(result.success).toBe(false);
+  });
+
+  it('should accept assigned status (batch stock)', () => {
+    const result = updateSimSchema.safeParse({ status: 'assigned' });
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept activated status (batch stock)', () => {
+    const result = updateSimSchema.safeParse({ status: 'activated' });
+    expect(result.success).toBe(true);
+  });
+});
+
+describe('Validation — SIM Batch Schema (range-based ICCID)', () => {
+  it('should accept a valid batch range', () => {
+    const result = createSimBatchSchema.safeParse({
+      from_iccid: '8996701123456789012',
+      to_iccid: '8996701123456789020',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.provider).toBe('Yemen Mobile');
+      expect(result.data.owner_role).toBe('admin');
+    }
+  });
+
+  it('should apply defaults for provider, package and owner_role', () => {
+    const result = createSimBatchSchema.safeParse({ from_iccid: '11', to_iccid: '22' });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.provider).toBe('Yemen Mobile');
+      expect(result.data.package_type).toBe('باقة مزايا الشهرية');
+      expect(result.data.owner_role).toBe('admin');
+    }
+  });
+
+  it('should reject empty from_iccid', () => {
+    const result = createSimBatchSchema.safeParse({ from_iccid: '', to_iccid: '10' });
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject non-numeric from_iccid', () => {
+    const result = createSimBatchSchema.safeParse({ from_iccid: 'abc', to_iccid: '10' });
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject missing to_iccid', () => {
+    const result = createSimBatchSchema.safeParse({ from_iccid: '10' });
+    expect(result.success).toBe(false);
+  });
+
+  it('should accept batch assigned to an agent with owner_id', () => {
+    const result = createSimBatchSchema.safeParse({
+      from_iccid: '1001',
+      to_iccid: '1010',
+      owner_role: 'agent',
+      owner_id: 3,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.owner_role).toBe('agent');
+      expect(result.data.owner_id).toBe(3);
+    }
+  });
+
+  it('should accept batch assigned to a seller', () => {
+    const result = createSimBatchSchema.safeParse({
+      from_iccid: '1001',
+      to_iccid: '1010',
+      owner_role: 'seller',
+      owner_id: 7,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('should reject invalid owner_role', () => {
+    const result = createSimBatchSchema.safeParse({ from_iccid: '1', to_iccid: '2', owner_role: 'partner' });
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject non-numeric owner_id', () => {
+    const result = createSimBatchSchema.safeParse({ from_iccid: '1', to_iccid: '2', owner_role: 'agent', owner_id: 'x' });
+    expect(result.success).toBe(false);
+  });
+
+  it('should strip HTML from batch package_type', () => {
+    const result = createSimBatchSchema.safeParse({ from_iccid: '1', to_iccid: '2', package_type: '<b>باقة</b>' });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.package_type).not.toContain('<b>');
+    }
+  });
+
+  it('should reject ICCID longer than 30 digits', () => {
+    const result = createSimBatchSchema.safeParse({ from_iccid: '9'.repeat(31), to_iccid: '9'.repeat(31) });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('Validation — Activate SIM Schema', () => {
+  it('should accept a valid ICCID', () => {
+    const result = activateSimSchema.safeParse({ iccid: '8996701123456789012' });
+    expect(result.success).toBe(true);
+  });
+
+  it('should reject empty ICCID', () => {
+    const result = activateSimSchema.safeParse({ iccid: '' });
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject missing ICCID', () => {
+    const result = activateSimSchema.safeParse({});
     expect(result.success).toBe(false);
   });
 });

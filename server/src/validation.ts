@@ -53,11 +53,13 @@ export const updateProfileSchema = z.object({
 });
 
 // SIMs
+export const SIM_STATUSES = ['available', 'assigned', 'activated', 'sold', 'reserved', 'inactive', 'suspended'] as const;
+
 export const createSimSchema = z.object({
   iccid: z.string().min(1, 'ICCID is required').max(50),
   phone: z.string().max(50).optional().default(''),
   provider: z.enum(['Yemen Mobile', 'Sabafon', 'YOU']).optional().default('Yemen Mobile'),
-  status: z.enum(['available', 'sold', 'reserved', 'inactive', 'suspended']).optional().default('available'),
+  status: z.enum(SIM_STATUSES).optional().default('available'),
   owner: so(200).default('المركز الرئيسي'),
   package_type: so(100).default('باقة مزايا الشهرية'),
 });
@@ -66,9 +68,26 @@ export const updateSimSchema = z.object({
   phone: z.string().max(50).optional(),
   iccid: z.string().max(50).optional(),
   provider: z.enum(['Yemen Mobile', 'Sabafon', 'YOU']).optional(),
-  status: z.enum(['available', 'sold', 'reserved', 'inactive', 'suspended']).optional(),
+  status: z.enum(SIM_STATUSES).optional(),
   owner: so(200),
   package_type: so(100),
+});
+
+// SIM batch inventory — range-based ICCID insertion
+const ICCID_RANGE_REGEX = /^\d+$/;
+const MAX_BATCH_SIMS = 5000;
+
+export const createSimBatchSchema = z.object({
+  from_iccid: z.string().min(1, 'from_iccid is required').max(30).regex(ICCID_RANGE_REGEX, 'from_iccid must be numeric'),
+  to_iccid: z.string().min(1, 'to_iccid is required').max(30).regex(ICCID_RANGE_REGEX, 'to_iccid must be numeric'),
+  provider: z.enum(['Yemen Mobile', 'Sabafon', 'YOU']).optional().default('Yemen Mobile'),
+  package_type: so(100).default('باقة مزايا الشهرية'),
+  owner_role: z.enum(['admin', 'agent', 'seller']).optional().default('admin'),
+  owner_id: z.number().int().positive().optional(),
+});
+
+export const activateSimSchema = z.object({
+  iccid: z.string().min(1, 'ICCID is required').max(50),
 });
 
 // Agents

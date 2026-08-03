@@ -59,14 +59,16 @@ CREATE TABLE IF NOT EXISTS sims (
   phone VARCHAR(50) NOT NULL DEFAULT '',
   iccid VARCHAR(50) UNIQUE NOT NULL,
   provider VARCHAR(50) NOT NULL DEFAULT 'Yemen Mobile',
-  status VARCHAR(20) NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'sold', 'reserved', 'inactive', 'suspended')),
+  status VARCHAR(20) NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'assigned', 'activated', 'sold', 'reserved', 'inactive', 'suspended')),
   owner VARCHAR(200) DEFAULT 'المركز الرئيسي',
   date_added VARCHAR(20) DEFAULT '',
   package_type VARCHAR(100) DEFAULT 'باقة مزايا الشهرية',
   assigned_to INTEGER REFERENCES sellers(id) ON DELETE SET NULL,
   contract_image VARCHAR(500) DEFAULT '',
   customer_name VARCHAR(200) DEFAULT '',
-  customer_id VARCHAR(50) DEFAULT ''
+  customer_id VARCHAR(50) DEFAULT '',
+  owner_role VARCHAR(10) NOT NULL DEFAULT 'admin' CHECK (owner_role IN ('admin', 'agent', 'seller')),
+  assigned_to_agent INTEGER REFERENCES agents(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS alerts (
@@ -243,6 +245,8 @@ CREATE INDEX IF NOT EXISTS idx_sims_iccid ON sims(iccid);
 CREATE INDEX IF NOT EXISTS idx_sims_provider ON sims(provider);
 CREATE INDEX IF NOT EXISTS idx_sims_status ON sims(status);
 CREATE INDEX IF NOT EXISTS idx_sims_assigned_to ON sims(assigned_to);
+CREATE INDEX IF NOT EXISTS idx_sims_owner_role ON sims(owner_role);
+CREATE INDEX IF NOT EXISTS idx_sims_iccid_status ON sims(iccid, status);
 CREATE INDEX IF NOT EXISTS idx_alerts_read ON alerts(is_read);
 CREATE INDEX IF NOT EXISTS idx_operations_type ON operations(type);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_type ON audit_logs(type);

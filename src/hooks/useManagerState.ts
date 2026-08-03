@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { SIM, Agent, Seller, SystemAlert, Transaction, SystemSettings, ViewType } from '../types';
 import { api } from '../api/client';
+import type { CreateSimBatchRequest, SimBatchResult } from '../api/types';
 import { captureError } from '../lib/monitor.ts';
 import { useMountedRef } from './useMountedRef';
 
@@ -114,6 +115,16 @@ export function useManagerState(role: string | null) {
     }
   };
 
+  const handleAddSimBatch = async (payload: CreateSimBatchRequest): Promise<SimBatchResult | void> => {
+    const created: any = await api.createSimBatch(payload);
+    if (mountedRef.current) {
+      api.getSims()
+        .then((data: any) => { if (mountedRef.current) setSims(data ?? []); })
+        .catch((err) => captureError(err, 'handleAddSimBatch:refresh'));
+    }
+    return created;
+  };
+
   const handleAddAgent = async (newAgent: Partial<Agent> & { username?: string; password?: string }) => {
     try {
       const created: any = await api.createAgent({
@@ -170,6 +181,6 @@ export function useManagerState(role: string | null) {
     setView, setSettings, setSims, dismissToast,
     handleAddSIM, handleAddAgent, handleUpdateAgent,
     handleUpdateSeller, handleAddBalance, handleResolveAlert,
-    handleUpdateSIM, refreshData,
+    handleUpdateSIM, handleAddSimBatch, refreshData,
   };
 }

@@ -2,7 +2,7 @@ import { tokenStorage } from '../services/tokenStorage.ts';
 import { captureTiming } from '../lib/monitor.ts';
 import type {
   ApiLoginResponse, ApiMeResponse, ApiBackupResponse, ApiLockdownResponse, ApiResetPasswordResponse,
-  SimRow, CreateSimRequest, UpdateSimRequest,
+  SimRow, CreateSimRequest, UpdateSimRequest, CreateSimBatchRequest, SimBatchResult,
   AgentRow, CreateAgentRequest, CreateAgentResponse, UpdateAgentRequest,
   MappedSeller, CreateSellerRequest, CreateSellerResponse, UpdateSellerRequest, UpdateSellerBalanceRequest,
   MappedOperation, CreateOperationRequest,
@@ -363,6 +363,10 @@ export const api = {
     request<SimRow>(`/sims/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteSim: (id: number) =>
     request<{ message: string }>(`/sims/${id}`, { method: 'DELETE' }),
+  createSimBatch: (data: CreateSimBatchRequest) =>
+    request<SimBatchResult>('/admin/sims/batch', { method: 'POST', body: JSON.stringify(data) }),
+  activateSim: (iccid: string) =>
+    request<SimRow>('/sims/activate', { method: 'POST', body: JSON.stringify({ iccid }) }),
 
   // Agents
   getAgents: () => request<AgentRow[]>('/agents'),

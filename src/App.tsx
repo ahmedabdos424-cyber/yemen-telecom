@@ -148,7 +148,7 @@ function AuthenticatedApp() {
                 <Suspense fallback={<div className="flex justify-center py-12"><span className="w-6 h-6 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" /></div>}>
                   <Routes>
                     <Route path="/manager/dashboard" element={<DashboardView stats={mgr.stats} alerts={mgr.alerts} transactions={mgr.transactions} sims={mgr.sims} setView={(v) => { mgr.setView(v); navigate(`/manager/${v}`); }} onSearch={(q) => { setDashboardSearch(q); navigate('/manager/sims'); }} onRefresh={mgr.refreshData} />} />
-                    <Route path="/manager/sims" element={<SIMsView sims={mgr.sims} onAddSIM={mgr.handleAddSIM} initialSearch={dashboardSearch} onUpdateSIM={mgr.handleUpdateSIM} />} />
+                    <Route path="/manager/sims" element={<SIMsView sims={mgr.sims} onAddSIM={mgr.handleAddSIM} initialSearch={dashboardSearch} onUpdateSIM={mgr.handleUpdateSIM} onAddSimBatch={mgr.handleAddSimBatch} agents={mgr.agents} sellers={mgr.sellers} />} />
                     <Route path="/manager/agents" element={<AgentsView agents={mgr.agents} setView={(v) => { mgr.setView(v); navigate(`/manager/${v}`); }} onUpdateAgent={mgr.handleUpdateAgent} />} />
                     <Route path="/manager/sellers" element={<SellersView sellers={mgr.sellers} sims={mgr.sims} onUpdateSeller={mgr.handleUpdateSeller} onAddBalance={mgr.handleAddBalance} loading={mgr.loading} error={mgr.apiError} onRetry={mgr.refreshData} />} />
                     <Route path="/manager/alerts" element={<AlertsView alerts={mgr.alerts} onResolveAlert={mgr.handleResolveAlert} settings={mgr.settings} onUpdateSettings={mgr.setSettings} />} />
