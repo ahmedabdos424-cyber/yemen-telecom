@@ -61,6 +61,8 @@ export interface SimRow {
   customer_name: string | null;
   customer_id: string | null;
   created_at: string;
+  owner_role?: string;
+  assigned_to_agent?: number | null;
 }
 
 export interface CreateSimRequest {
@@ -79,6 +81,26 @@ export interface UpdateSimRequest {
   status?: string;
   owner?: string;
   package_type?: string;
+}
+
+export interface CreateSimBatchRequest {
+  from_iccid: string;
+  to_iccid: string;
+  provider?: string;
+  package_type?: string;
+  owner_role?: 'admin' | 'agent' | 'seller';
+  owner_id?: number;
+}
+
+export interface SimBatchResult {
+  created: number;
+  skipped: number;
+  total: number;
+  from_iccid: string;
+  to_iccid: string;
+  status: string;
+  owner_role: string;
+  owner: string;
 }
 
 // ==================== Agents ====================

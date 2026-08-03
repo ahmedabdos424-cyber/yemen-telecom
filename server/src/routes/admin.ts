@@ -6,7 +6,7 @@ import { logger } from '../logger';
 import { cacheStats } from '../cache';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination, formatDbTimestamp } from '../helpers';
-import { validate, updateSettingsSchema } from '../validation';
+import { validate, updateSettingsSchema, createSimBatchSchema } from '../validation';
 
 const router = Router();
 
@@ -297,6 +297,131 @@ router.get('/audit-logs', requireRole('manager'), async (req: Request, res: Resp
     }
   } catch (err) {
     logger.error('Error fetching audit logs:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ========================
+// Batch SIM inventory (range-based ICCID)
+// ========================
+const MAX_BATCH_SIMS = 5000;
+
+router.post('/sims/batch', requireRole('manager'), validate(createSimBatchSchema), async (req: AuthRequest, res: Response) => {
+  try {
+    const { from_iccid, to_iccid, provider, package_type, owner_role, owner_id } = req.body;
+
+    if (from_iccid.length !== to_iccid.length) {
+      return res.status(400).json({ error: 'from_iccid and to_iccid must have the same length' });
+    }
+
+    let fromVal: bigint;
+    let toVal: bigint;
+    try {
+      fromVal = BigInt(from_iccid);
+      toVal = BigInt(to_iccid);
+    } catch {
+      return res.status(400).json({ error: 'Invalid ICCID range values' });
+    }
+
+    if (toVal < fromVal) {
+      return res.status(400).json({ error: 'to_iccid must be greater than or equal to from_iccid' });
+    }
+    const totalCount = toVal - fromVal + 1n;
+    if (totalCount > BigInt(MAX_BATCH_SIMS)) {
+      return res.status(400).json({ error: `Batch limit is ${MAX_BATCH_SIMS} SIMs per request` });
+    }
+
+    let status = 'available';
+    let ownerText = 'المركز الرئيسي';
+    let assignedToSeller: number | null = null;
+    let assignedToAgent: number | null = null;
+
+    if (owner_role && owner_role !== 'admin') {
+      if (!owner_id) {
+        return res.status(400).json({ error: 'owner_id is required when assigning to an agent or seller' });
+      }
+      if (owner_role === 'agent') {
+        const agentRes = await query('SELECT id, name FROM agents WHERE id = $1', [owner_id]);
+        if (agentRes.rows.length === 0) {
+          return res.status(400).json({ error: 'Agent not found' });
+        }
+        ownerText = agentRes.rows[0].name || `Agent #${owner_id}`;
+        assignedToAgent = owner_id;
+        status = 'assigned';
+      } else {
+        const sellerRes = await query('SELECT id, name FROM sellers WHERE id = $1', [owner_id]);
+        if (sellerRes.rows.length === 0) {
+          return res.status(400).json({ error: 'Seller not found' });
+        }
+        ownerText = sellerRes.rows[0].name || `Seller #${owner_id}`;
+        assignedToSeller = owner_id;
+        status = 'assigned';
+      }
+    }
+
+    // Expand the range into explicit ICCIDs (zero-padded to the input width).
+    const width = from_iccid.length;
+    const iccids: string[] = [];
+    for (let value = fromVal; value <= toVal; value += 1n) {
+      iccids.push(value.toString().padStart(width, '0'));
+    }
+
+    const dateAdded = new Date().toLocaleDateString('ar-YE');
+    const cols = 10;
+    const placeholders = iccids
+      .map((_, i) => `($${i * cols + 1}, $${i * cols + 2}, $${i * cols + 3}, $${i * cols + 4}, $${i * cols + 5}, $${i * cols + 6}, $${i * cols + 7}, $${i * cols + 8}, $${i * cols + 9}, $${i * cols + 10})`)
+      .join(', ');
+    const params: (string | number | null)[] = [];
+    for (const iccid of iccids) {
+      params.push(
+        iccid,
+        '',
+        provider,
+        status,
+        ownerText,
+        dateAdded,
+        package_type,
+        owner_role,
+        assignedToSeller,
+        assignedToAgent
+      );
+    }
+
+    const insertResult = await query(
+      `INSERT INTO sims (iccid, phone, provider, status, owner, date_added, package_type, owner_role, assigned_to, assigned_to_agent)
+       VALUES ${placeholders}
+       ON CONFLICT (iccid) DO NOTHING
+       RETURNING id`,
+      params
+    );
+    const created = insertResult.rows.length;
+    const skipped = iccids.length - created;
+
+    if (created > 0) {
+      await query(
+        `INSERT INTO alerts (title, description, priority, time, category, created_by)
+         VALUES ($1, $2, 'low', $3, 'مخزون', $4)`,
+        [
+          `تمت إضافة دفعة شرائح (${created} شريحة)`,
+          `أُضيفت ${created} شريحة عبر النطاق ${from_iccid} → ${to_iccid} للمشغل ${provider} (الحالة: ${status === 'assigned' ? 'مسندة' : 'متاحة'})، المالك: ${ownerText}.`,
+          new Date().toLocaleString('ar-YE'),
+          req.user?.id ?? null,
+        ]
+      );
+    }
+
+    res.status(201).json({
+      created,
+      skipped,
+      total: iccids.length,
+      from_iccid,
+      to_iccid,
+      status,
+      owner_role,
+      owner: ownerText,
+    });
+  } catch (err) {
+    logger.error('Error creating sim batch:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

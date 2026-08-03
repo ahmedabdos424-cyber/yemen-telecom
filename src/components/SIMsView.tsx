@@ -5,7 +5,8 @@
 
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { SIM } from '../types';
+import { SIM, Agent, Seller } from '../types';
+import type { CreateSimBatchRequest, SimBatchResult } from '../api/types';
 import { Upload, RefreshCw, Check } from 'lucide-react';
 import CameraCapture from './shared/CameraCapture';
 import { StatsCardSkeleton } from './shared/Skeleton';
@@ -13,15 +14,44 @@ import { useDebounce } from '../hooks/useDebounce';
 import { useOcr } from '../hooks/useOcr';
 import { useToast, ToastContainer } from '../hooks/useToast';
 import OperatorLogo from './shared/OperatorLogo';
+import AddSimModal from './AddSimModal';
 
 interface SIMsViewProps {
   sims: SIM[];
   onAddSIM: (sim: Partial<SIM>) => void;
   initialSearch?: string;
   onUpdateSIM?: (id: string, fields: Partial<SIM>) => void;
+  onAddSimBatch?: (payload: CreateSimBatchRequest) => Promise<SimBatchResult | void>;
+  agents?: Agent[];
+  sellers?: Seller[];
 }
 
-function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewProps) {
+const SIM_STATUS_LABELS: Record<string, string> = {
+  available: 'متاح',
+  assigned: 'مسندة',
+  activated: 'مفعّلة',
+  sold: 'مباع',
+  reserved: 'محجوز',
+  inactive: 'غير نشط',
+  suspended: 'معلّقة',
+};
+
+function statusBadgeClass(status: string): string {
+  switch (status) {
+    case 'available': return 'badge-available';
+    case 'sold':
+    case 'activated': return 'badge-sold';
+    case 'reserved':
+    case 'assigned': return 'badge-reserved';
+    default: return 'badge-inactive';
+  }
+}
+
+function statusLabel(status: string): string {
+  return SIM_STATUS_LABELS[status] || 'تالف';
+}
+
+function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM, onAddSimBatch, agents = [], sellers = [] }: SIMsViewProps) {
   const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
   const [searchTerm, setSearchTerm] = useState(initialSearch || '');
   const debouncedSearch = useDebounce(searchTerm, 300);
@@ -33,6 +63,7 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
   // States for the add SIM dialog
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showBatchModal, setShowBatchModal] = useState(false);
   
   // Add SIM form fields
   const [formPhone, setFormPhone] = useState('');
@@ -47,7 +78,7 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
   const [editProvider, setEditProvider] = useState<'Yemen Mobile' | 'Sabafon' | 'YOU'>('Yemen Mobile');
   const [editPackage, setEditPackage] = useState('');
   const [editOwner, setEditOwner] = useState('');
-  const [editStatus, setEditStatus] = useState<'available' | 'sold' | 'reserved' | 'inactive'>('available');
+  const [editStatus, setEditStatus] = useState<'available' | 'assigned' | 'activated' | 'sold' | 'reserved' | 'inactive'>('available');
 
   const openEditModal = useCallback((sim: SIM) => {
     setSelectedSimEdit(sim);
@@ -55,7 +86,7 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
     setEditProvider(sim.provider as 'Yemen Mobile' | 'Sabafon' | 'YOU');
     setEditPackage(sim.packageType);
     setEditOwner(sim.owner);
-    setEditStatus(sim.status as 'available' | 'sold' | 'reserved' | 'inactive');
+    setEditStatus(sim.status as 'available' | 'assigned' | 'activated' | 'sold' | 'reserved' | 'inactive');
   }, []);
 
   const handleEditSubmit = useCallback((e: React.FormEvent) => {
@@ -159,6 +190,8 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
   const stats = useMemo(() => ({
     total: sims.length,
     available: sims.filter((s) => s.status === 'available').length,
+    assigned: sims.filter((s) => s.status === 'assigned').length,
+    activated: sims.filter((s) => s.status === 'activated').length,
     reserved: sims.filter((s) => s.status === 'reserved').length,
     inactive: sims.filter((s) => s.status === 'inactive').length
   }), [sims]);
@@ -180,6 +213,22 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
     setFormIccid('');
     setShowAddModal(false);
   }, [formPhone, formIccid, formProvider, formPackage, formOwner, onAddSIM]);
+
+  const handleBatchSubmit = useCallback(async (payload: CreateSimBatchRequest) => {
+    if (!onAddSimBatch) return;
+    try {
+      const res = await onAddSimBatch(payload);
+      if (res && res.created > 0) {
+        toastSuccess(`تمت إضافة ${res.created} شريحة بنجاح${res.skipped > 0 ? ` (تخطي ${res.skipped} مكررة)` : ''}.`);
+        setShowBatchModal(false);
+      } else if (res) {
+        toastWarning('لم تُضف أي شريحة جديدة — كل أرقام النطاق موجودة مسبقاً.');
+        setShowBatchModal(false);
+      }
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : 'فشل إضافة الدفعة إلى المخزون');
+    }
+  }, [onAddSimBatch, toastSuccess, toastError, toastWarning]);
 
   const handleCSVFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -250,6 +299,16 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
             <span className="material-symbols-outlined text-sm">upload_file</span>
             <span className="hidden 2xs:inline">استيراد CSV</span>
           </button>
+          {/* Batch (range) insert */}
+          {onAddSimBatch && (
+            <button
+              onClick={() => setShowBatchModal(true)}
+              className="flex-1 md:flex-none btn btn-ghost text-[11px] md:text-[13px]"
+            >
+              <span className="material-symbols-outlined text-sm">inventory_2</span>
+              <span className="hidden 2xs:inline">إضافة دفعة (نطاق)</span>
+            </button>
+          )}
           {/* Manual insert SIM */}
           <button
             onClick={() => setShowAddModal(true)}
@@ -287,6 +346,24 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
           </div>
           <p className="text-gray-400 text-[10px] md:text-[11px] font-bold">المتاحة للبيع</p>
           <h4 className="stat-card-value font-mono">{stats.available}</h4>
+        </div>
+
+        <div className="stat-card">
+          <div className="flex justify-between items-start mb-1.5 md:mb-2">
+            <span className="material-symbols-outlined text-indigo-600 bg-indigo-50 border border-indigo-100 p-1.5 md:p-2 rounded-lg text-xs md:text-sm">assignment_turned_in</span>
+            <span className="text-[10px] md:text-[11px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-full">مسندة</span>
+          </div>
+          <p className="text-gray-400 text-[10px] md:text-[11px] font-bold">المسندة لوكلاء/بائعين</p>
+          <h4 className="stat-card-value font-mono">{stats.assigned}</h4>
+        </div>
+
+        <div className="stat-card">
+          <div className="flex justify-between items-start mb-1.5 md:mb-2">
+            <span className="material-symbols-outlined text-teal-600 bg-teal-50 border border-teal-100 p-1.5 md:p-2 rounded-lg text-xs md:text-sm">verified</span>
+            <span className="text-[10px] md:text-[11px] font-bold text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded-full">مفعّلة</span>
+          </div>
+          <p className="text-gray-400 text-[10px] md:text-[11px] font-bold">المفعّلة للعملاء</p>
+          <h4 className="stat-card-value font-mono">{stats.activated}</h4>
         </div>
 
         <div className="stat-card">
@@ -382,6 +459,8 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
             >
               <option value="all">كل الحالات</option>
               <option value="available">متاح</option>
+              <option value="assigned">مسندة</option>
+              <option value="activated">مفعّلة</option>
               <option value="sold">مباع</option>
               <option value="reserved">محجوز</option>
               <option value="inactive">غير نشط</option>
@@ -440,7 +519,7 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
             )}
             {selectedStatus !== 'all' && (
               <span className="inline-flex items-center gap-1 bg-green-50 text-green-800 border border-green-200 px-2 py-0.5 rounded-full font-semibold">
-                الحالة: {selectedStatus === 'available' ? 'متاح' : selectedStatus === 'sold' ? 'مباع' : selectedStatus === 'reserved' ? 'محجوز' : 'تالف'}
+                الحالة: {statusLabel(selectedStatus)}
                 <button type="button" onClick={() => setSelectedStatus('all')} className="hover:text-green-950 font-bold font-mono">✕</button>
               </span>
             )}
@@ -521,16 +600,8 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
                     }`}>
                       <OperatorLogo provider={sim.provider} size="sm" />
                     </span>
-                    <span className={`badge text-[10px] md:text-[11px] ${
-                      sim.status === 'available'
-                        ? 'badge-available'
-                        : sim.status === 'sold'
-                        ? 'badge-sold'
-                        : sim.status === 'reserved'
-                        ? 'badge-reserved'
-                        : 'badge-inactive'
-                    }`}>
-                      {sim.status === 'available' ? 'متاح' : sim.status === 'sold' ? 'مباع' : sim.status === 'reserved' ? 'محجوز' : 'تالف'}
+                    <span className={`badge text-[10px] md:text-[11px] ${statusBadgeClass(sim.status)}`}>
+                      {statusLabel(sim.status)}
                     </span>
                   </div>
               </div>
@@ -764,8 +835,8 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
                 </div>
                 <div>
                   <p className="text-[10px] text-gray-400 font-bold mb-1">الحالة</p>
-                  <span className={`badge ${selectedSimDetail.status === 'available' ? 'badge-available' : selectedSimDetail.status === 'sold' ? 'badge-sold' : selectedSimDetail.status === 'reserved' ? 'badge-reserved' : 'badge-inactive'}`}>
-                    {selectedSimDetail.status === 'available' ? 'متاح' : selectedSimDetail.status === 'sold' ? 'مباع' : selectedSimDetail.status === 'reserved' ? 'محجوز' : 'تالف'}
+                  <span className={`badge ${statusBadgeClass(selectedSimDetail.status)}`}>
+                    {statusLabel(selectedSimDetail.status)}
                   </span>
                 </div>
                 <div className="col-span-2">
@@ -836,10 +907,12 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
                   <label className="block text-[11px] font-bold text-gray-500 mb-1.5">الحالة</label>
                   <select
                     value={editStatus}
-                    onChange={(e) => setEditStatus(e.target.value as 'available' | 'sold' | 'reserved' | 'inactive')}
+                    onChange={(e) => setEditStatus(e.target.value as 'available' | 'assigned' | 'activated' | 'sold' | 'reserved' | 'inactive')}
                     className="w-full px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 outline-none cursor-pointer"
                   >
                     <option value="available">متاح</option>
+                    <option value="assigned">مسندة</option>
+                    <option value="activated">مفعّلة</option>
                     <option value="sold">مباع</option>
                     <option value="reserved">محجوز</option>
                     <option value="inactive">غير نشط</option>
@@ -882,6 +955,16 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM }: SIMsViewP
             </form>
           </div>
         </div>
+      )}
+
+      {/* Batch Insert Modal */}
+      {showBatchModal && onAddSimBatch && (
+        <AddSimModal
+          agents={agents}
+          sellers={sellers}
+          onClose={() => setShowBatchModal(false)}
+          onSubmit={handleBatchSubmit}
+        />
       )}
 
       {/* OCR Progress Overlay */}

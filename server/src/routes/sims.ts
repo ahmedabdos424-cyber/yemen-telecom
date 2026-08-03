@@ -1,11 +1,60 @@
 import { Router, Request, Response } from 'express';
 import { query } from '../db';
 import { logger } from '../logger';
-import { requireRole } from '../middleware/auth';
+import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination, paginatedQuery } from '../helpers';
-import { validate, createSimSchema, updateSimSchema } from '../validation';
+import { validate, createSimSchema, updateSimSchema, activateSimSchema } from '../validation';
 
 const router = Router();
+
+router.post('/activate', requireRole('manager', 'agent'), validate(activateSimSchema), async (req: AuthRequest, res: Response) => {
+  try {
+    const { iccid } = req.body;
+    const requester = req.user;
+
+    const existing = await query('SELECT * FROM sims WHERE iccid = $1', [iccid]);
+    const sim = existing.rows[0];
+
+    // Serial validation: the SIM must exist in the requester's available stock.
+    let inStock = false;
+    if (sim) {
+      if (requester?.role === 'agent') {
+        const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [requester.id]);
+        const agentId = agentRes.rows[0]?.id;
+        inStock =
+          sim.status === 'available' &&
+          sim.owner_role === 'agent' &&
+          agentId != null &&
+          Number(sim.assigned_to_agent) === Number(agentId);
+      } else {
+        inStock = sim.status === 'available' && sim.owner_role === 'admin';
+      }
+    }
+
+    if (!inStock) {
+      await query(
+        `INSERT INTO alerts (title, description, priority, time, category, created_by)
+         VALUES ($1, $2, 'high', $3, 'مخزون', $4)`,
+        [
+          'محاولة تفعيل شريحة خارج المخزون المتاح',
+          `فشلت محاولة تفعيل الشريحة ${iccid} لأنها غير موجودة في المخزون المتاح للوكيل.`,
+          new Date().toLocaleString('ar-YE'),
+          requester?.id ?? null,
+        ]
+      );
+      return res.status(400).json({ error: 'SIM not found in available stock' });
+    }
+
+    const updated = await query(
+      `UPDATE sims SET status = 'activated', activated_by = $1 WHERE id = $2 RETURNING *`,
+      [requester?.id ?? null, sim.id]
+    );
+    res.json(updated.rows[0]);
+  } catch (err) {
+    logger.error('Error activating sim:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 router.get('/', requireRole('manager', 'agent'), async (req: Request, res: Response) => {
   try {
