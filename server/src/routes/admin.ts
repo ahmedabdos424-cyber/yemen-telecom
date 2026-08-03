@@ -482,7 +482,6 @@ async function ensureIdentityRiskSchema() {
 // Run bootstrap once the module is loaded (server-side only).
 if (process.env.NODE_ENV !== 'test') {
   ensureIdentityRiskSchema();
-  ensureSessionSchema();
 }
 
 // ========================
@@ -510,6 +509,11 @@ async function ensureSessionSchema() {
   } catch (err) {
     logger.error('Error ensuring session schema:', err);
   }
+}
+
+// Bootstrap after definitions (module scope) — server-side only.
+if (process.env.NODE_ENV !== 'test') {
+  ensureSessionSchema();
 }
 
 export default router;
