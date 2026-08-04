@@ -7,6 +7,15 @@ import { useOcr } from '../hooks/useOcr';
 import { useToast, ToastContainer } from '../hooks/useToast';
 import { api } from '../api/client';
 
+function dataUrlToFile(dataUrl: string, filename: string): File {
+  const [meta, base64] = dataUrl.split(',');
+  const mime = (meta.match(/data:(.*?)(;|$)/) || [])[1] || 'image/jpeg';
+  const binary = atob(base64 || '');
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new File([bytes], filename, { type: mime });
+}
+
 interface AddSellerFormProps {
   onSellerAdded: (result: any) => void;
   agentName?: string;
@@ -27,6 +36,7 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
   const [showCredentials, setShowCredentials] = useState(false);
   const [credentialsData, setCredentialsData] = useState<{ username: string; password: string } | null>(null);
   const [progressStage, setProgressStage] = useState<'idle' | 25 | 50 | 75 | 100>('idle');
+  const [idPhoto, setIdPhoto] = useState<string | null>(null);
   const { recognize, progress: ocrProgress } = useOcr();
   const { toasts, dismissToast, toastSuccess, toastError, toastWarning } = useToast();
 
@@ -36,6 +46,7 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
       setFullName(name);
     }
     setNameCaptured(imageData);
+    setIdPhoto(imageData);
   }, [recognize]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -74,6 +85,18 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
     setProgressStage(25);
 
     try {
+      // Upload the captured ID document (if any) so it is persisted as the
+      // seller's avatar and shown in the sellers report.
+      let avatar: string | undefined;
+      if (idPhoto && idPhoto.startsWith('data:')) {
+        try {
+          const uploaded = await api.uploadFile(dataUrlToFile(idPhoto, `id_${Date.now()}.jpg`), 'image');
+          avatar = uploaded.url;
+        } catch {
+          // Non-fatal: proceed without the image if upload fails.
+        }
+      }
+
       const result = await api.createSeller({
         name: fullName,
         username,
@@ -84,6 +107,8 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
         phone,
         region,
         regionCode: region.substring(0, 5),
+        avatar,
+        id_document: avatar,
       });
 
       const creds = result.credentials || { username, password };

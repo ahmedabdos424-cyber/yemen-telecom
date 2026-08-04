@@ -81,6 +81,12 @@ export interface UpdateSimRequest {
   status?: string;
   owner?: string;
   package_type?: string;
+  customer_name?: string;
+  customerName?: string;
+  customer_id?: string;
+  customerId?: string;
+  contract_image?: string;
+  contractImage?: string;
 }
 
 export interface CreateSimBatchRequest {
@@ -185,6 +191,9 @@ export interface CreateSellerRequest {
   store_name?: string;
   id_number?: string;
   region_code?: string;
+  avatar?: string;
+  id_document?: string;
+  idDocument?: string;
 }
 
 export interface CreateSellerResponse {
@@ -203,6 +212,9 @@ export interface UpdateSellerRequest {
   region_code?: string;
   regionCode?: string;
   status?: string;
+  avatar?: string;
+  id_document?: string;
+  idDocument?: string;
 }
 
 export interface UpdateSellerBalanceRequest {
@@ -231,6 +243,12 @@ export interface CreateOperationRequest {
   target: string;
   operator?: string;
   status?: string;
+  customer_name?: string;
+  customerName?: string;
+  customer_id?: string;
+  customerId?: string;
+  contract_image?: string;
+  contractImage?: string;
 }
 
 export interface QueryOperationsRequest {
@@ -440,4 +458,46 @@ export interface AppVersionResponse {
   notes: string[];
   required: boolean;
   checkedAt: string;
+}
+
+// ==================== Reports ====================
+export interface ActivationReportRow {
+  op_id: string;
+  type: string;
+  target: string;
+  operator: string | null;
+  date: string;
+  time: string;
+  status: string;
+  customer_name: string | null;
+  customer_id: string | null;
+  contract_image: string | null;
+  created_at: string;
+  actor_name: string;
+  actor_role: string;
+  agent_name: string;
+  seller_name: string;
+}
+
+export interface SellerReportRow {
+  id: number;
+  seller_id: string;
+  name: string;
+  store_name: string;
+  id_number: string | null;
+  phone: string | null;
+  region: string | null;
+  region_code: string | null;
+  status: string;
+  avatar: string | null;
+  creation_date: string;
+  last_login: string | null;
+  total_sales: number;
+  current_stock: number;
+  efficiency: number;
+  sims_count: number;
+  sales_30_days: number;
+  sales_growth: number;
+  activity_rate: number;
+  agent_name: string | null;
 }

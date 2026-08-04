@@ -71,6 +71,13 @@ export const updateSimSchema = z.object({
   status: z.enum(SIM_STATUSES).optional(),
   owner: so(200),
   package_type: so(100),
+  // Activation data (customer + contract image)
+  customer_name: so(200),
+  customerName: so(200),
+  customer_id: z.string().max(50).optional(),
+  customerId: z.string().max(50).optional(),
+  contract_image: z.string().max(500).optional(),
+  contractImage: z.string().max(500).optional(),
 });
 
 // SIM batch inventory — range-based ICCID insertion
@@ -88,6 +95,12 @@ export const createSimBatchSchema = z.object({
 
 export const activateSimSchema = z.object({
   iccid: z.string().min(1, 'ICCID is required').max(50),
+  customer_name: so(200),
+  customerName: so(200),
+  customer_id: z.string().max(50).optional(),
+  customerId: z.string().max(50).optional(),
+  contract_image: z.string().max(500).optional(),
+  contractImage: z.string().max(500).optional(),
 });
 
 // Agent → seller SIM range transfer
@@ -147,6 +160,10 @@ export const createSellerSchema = z.object({
   agent_name: so(200),
   seller_id: z.string().max(50).optional(),
   sellerId: z.string().max(50).optional(),
+  // Identity/image: uploaded document URL (avatar) or raw identity capture
+  avatar: z.string().max(500).optional(),
+  id_document: z.string().max(500).optional(),
+  idDocument: z.string().max(500).optional(),
 });
 
 export const updateSellerSchema = z.object({
@@ -160,6 +177,9 @@ export const updateSellerSchema = z.object({
   region_code: z.string().max(50).optional(),
   regionCode: z.string().max(50).optional(),
   status: z.enum(['active', 'inactive', 'suspended', 'low_stock']).optional(),
+  avatar: z.string().max(500).optional(),
+  id_document: z.string().max(500).optional(),
+  idDocument: z.string().max(500).optional(),
 });
 
 export const updateSellerBalanceSchema = z.object({
@@ -209,6 +229,13 @@ export const createOperationSchema = z.object({
   target: s(1, 100),
   operator: optionalOperator(),
   status: z.enum(['success', 'failed', 'pending']).optional().default('success'),
+  // Customer data + contract image so activations carry full evidence
+  customer_name: so(200),
+  customerName: so(200),
+  customer_id: z.string().max(50).optional(),
+  customerId: z.string().max(50).optional(),
+  contract_image: z.string().max(500).optional(),
+  contractImage: z.string().max(500).optional(),
 });
 
 // Inventories

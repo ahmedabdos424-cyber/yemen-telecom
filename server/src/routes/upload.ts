@@ -74,7 +74,7 @@ function validateFileMagic(file: Express.Multer.File): boolean {
   return hasValidMagicBytes(file.buffer, file.mimetype);
 }
 
-router.post('/image', requireRole('manager', 'agent'), upload.single('image'), async (req: AuthRequest, res: Response) => {
+router.post('/image', requireRole('manager', 'agent', 'seller'), upload.single('image'), async (req: AuthRequest, res: Response) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No image file provided' });
   }
@@ -90,7 +90,7 @@ router.post('/image', requireRole('manager', 'agent'), upload.single('image'), a
   }
 });
 
-router.post('/images', requireRole('manager', 'agent'), upload.array('images', 5), async (req: AuthRequest, res: Response) => {
+router.post('/images', requireRole('manager', 'agent', 'seller'), upload.array('images', 5), async (req: AuthRequest, res: Response) => {
   const files = req.files as Express.Multer.File[] | undefined;
   if (!files || files.length === 0) {
     return res.status(400).json({ error: 'No image files provided' });

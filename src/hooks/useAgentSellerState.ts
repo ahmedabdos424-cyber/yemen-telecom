@@ -12,6 +12,15 @@ function loadFromStorage<T>(key: string, fallback: T): T {
   return fallback;
 }
 
+function dataUrlToFile(dataUrl: string, filename: string): File {
+  const [meta, base64] = dataUrl.split(',');
+  const mime = (meta.match(/data:(.*?)(;|$)/) || [])[1] || 'image/jpeg';
+  const binary = atob(base64 || '');
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new File([bytes], filename, { type: mime });
+}
+
 export function useAgentSellerState(role: string | null, username: string) {
   const mountedRef = useMountedRef();
   const [sellers, setSellers] = useState<Seller[]>(() => loadFromStorage('tele_sellers', []));
@@ -69,14 +78,29 @@ export function useAgentSellerState(role: string | null, username: string) {
     }));
   };
 
-  const handleSimActivationForSeller = async (simData: { fullName: string; idNumber: string; iccid: string; phoneNumber: string; operator: Operator }) => {
+  const handleSimActivationForSeller = async (simData: { fullName: string; idNumber: string; iccid: string; phoneNumber: string; operator: Operator; contractImage?: string | null }) => {
     try {
+      // Upload the contract image (if captured) so it is persisted as
+      // evidence and appears in the manager's activations report.
+      let contractImage = simData.contractImage || null;
+      if (contractImage && contractImage.startsWith('data:')) {
+        try {
+          const file = dataUrlToFile(contractImage, `contract_${Date.now()}.jpg`);
+          const uploaded = await api.uploadFile(file, 'image');
+          contractImage = uploaded.url;
+        } catch (err) {
+          captureError(err, 'uploadContractImage');
+          contractImage = null;
+        }
+      }
+
       // Serial validation (agents): the SIM must exist in the agent's available
       // stock. The server returns 400 otherwise, creating a high-priority alert.
       if (role === 'agent') {
-        await api.activateSim(simData.iccid);
+        await api.activateSim({ iccid: simData.iccid, customerName: simData.fullName, customerId: simData.idNumber, contractImage: contractImage || undefined });
       }
-      await api.createOperation({ type: 'activate', target: simData.phoneNumber, operator: simData.operator, status: 'success' });
+
+      await api.createOperation({ type: 'activate', target: simData.phoneNumber, operator: simData.operator, status: 'success', customerName: simData.fullName, customerId: simData.idNumber, contractImage: contractImage || undefined });
       await api.createCustomer({
         fullName: simData.fullName,
         idNumber: simData.idNumber,
@@ -85,7 +109,7 @@ export function useAgentSellerState(role: string | null, username: string) {
       const allSims = (await api.getSims()) ?? [];
       const target = allSims.find((s: any) => s.iccid === simData.iccid);
       if (target) {
-        await api.updateSim(target.id, { status: 'activated' });
+        await api.updateSim(target.id, { status: 'activated', customerName: simData.fullName, customerId: simData.idNumber, contractImage: contractImage || undefined });
       } else {
         try {
           await api.createSim({ iccid: simData.iccid, phone: simData.phoneNumber, provider: simData.operator === 'yemen_mobile' ? 'Yemen Mobile' : simData.operator === 'sabafon' ? 'Sabafon' : 'YOU', status: 'activated' });

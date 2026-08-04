@@ -10,6 +10,9 @@ const router = Router();
 router.post('/activate', requireRole('manager', 'agent', 'seller'), validate(activateSimSchema), async (req: AuthRequest, res: Response) => {
   try {
     const { iccid } = req.body;
+    const customerName = req.body.customer_name ?? req.body.customerName ?? null;
+    const customerId = req.body.customer_id ?? req.body.customerId ?? null;
+    const contractImage = req.body.contract_image ?? req.body.contractImage ?? null;
     const requester = req.user;
 
     const existing = await query('SELECT * FROM sims WHERE iccid = $1', [iccid]);
@@ -54,8 +57,12 @@ router.post('/activate', requireRole('manager', 'agent', 'seller'), validate(act
     }
 
     const updated = await query(
-      `UPDATE sims SET status = 'activated', activated_by = $1 WHERE id = $2 RETURNING *`,
-      [requester?.id ?? null, sim.id]
+      `UPDATE sims SET status = 'activated', activated_by = $1,
+         customer_name = COALESCE($2, customer_name),
+         customer_id = COALESCE($3, customer_id),
+         contract_image = COALESCE($4, contract_image)
+       WHERE id = $5 RETURNING *`,
+      [requester?.id ?? null, customerName, customerId, contractImage, sim.id]
     );
     res.json(updated.rows[0]);
   } catch (err) {
@@ -210,7 +217,7 @@ router.post('/', requireRole('manager'), validate(createSimSchema), async (req: 
   }
 });
 
-router.put('/:id', requireRole('manager'), validate(updateSimSchema), async (req: Request, res: Response) => {
+router.put('/:id', requireRole('manager', 'agent', 'seller'), validate(updateSimSchema), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
     const existing = await query('SELECT * FROM sims WHERE id = $1', [id]);
@@ -218,15 +225,38 @@ router.put('/:id', requireRole('manager'), validate(updateSimSchema), async (req
       return res.status(404).json({ error: 'SIM not found' });
     }
     const cur = existing.rows[0];
+
+    // Ownership isolation: agents/sellers may only update SIMs in their own
+    // stock. Managers retain full access.
+    if (req.user?.role === 'agent') {
+      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
+      const agentId = agentRes.rows[0]?.id;
+      const owned = cur.owner_role === 'agent' && agentId != null && Number(cur.assigned_to_agent) === Number(agentId);
+      if (!owned) {
+        return res.status(403).json({ error: 'Access denied: this SIM does not belong to your stock' });
+      }
+    } else if (req.user?.role === 'seller') {
+      const sellerRes = await query('SELECT id FROM sellers WHERE user_id = $1', [req.user.id]);
+      const sellerId = sellerRes.rows[0]?.id;
+      const owned = cur.owner_role === 'seller' && sellerId != null && Number(cur.assigned_to) === Number(sellerId);
+      if (!owned) {
+        return res.status(403).json({ error: 'Access denied: this SIM does not belong to your stock' });
+      }
+    }
+
     const phone = req.body.phone ?? cur.phone;
     const iccid = req.body.iccid ?? cur.iccid;
     const provider = req.body.provider ?? cur.provider;
     const status = req.body.status ?? cur.status;
     const owner = req.body.owner ?? cur.owner;
     const package_type = req.body.package_type ?? cur.package_type;
+    const customerName = req.body.customer_name ?? req.body.customerName ?? cur.customer_name;
+    const customerId = req.body.customer_id ?? req.body.customerId ?? cur.customer_id;
+    const contractImage = req.body.contract_image ?? req.body.contractImage ?? cur.contract_image;
     const result = await query(
-      `UPDATE sims SET phone=$1, iccid=$2, provider=$3, status=$4, owner=$5, package_type=$6 WHERE id=$7 RETURNING *`,
-      [phone, iccid, provider, status, owner, package_type, id]
+      `UPDATE sims SET phone=$1, iccid=$2, provider=$3, status=$4, owner=$5, package_type=$6,
+         customer_name=$7, customer_id=$8, contract_image=$9 WHERE id=$10 RETURNING *`,
+      [phone, iccid, provider, status, owner, package_type, customerName, customerId, contractImage, id]
     );
     res.json(result.rows[0]);
   } catch (err) {

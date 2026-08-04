@@ -94,6 +94,7 @@ router.get('/seller-performance', requireRole('manager', 'agent'), async (req: A
         s.id, s.name, s.store_name, s.region,
         s.sims_count, s.sales_30_days, s.sales_growth,
         s.efficiency, s.activity_rate, s.status,
+        s.avatar, s.id_number, s.phone,
         a.name AS agent_name
       FROM sellers s
       LEFT JOIN agents a ON s.agent_id = a.id
@@ -105,6 +106,84 @@ router.get('/seller-performance', requireRole('manager', 'agent'), async (req: A
     res.json(result.rows);
   } catch (err) {
     logger.error('Error fetching seller performance:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Detailed activation report — every activate operation with customer data
+// and the contract evidence image. This powers the manager's activations
+// table (thumbnail + lightbox) and CSV/Excel export.
+router.get('/activations', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
+  const cacheKey = `report:activations:${req.user?.role === 'agent' ? req.user.id : 'manager'}`;
+  const cached = cacheGet(cacheKey);
+  if (cached) return res.json(cached);
+  try {
+    let whereClause = 'WHERE o.type = $1';
+    let params: any[] = ['activate'];
+    if (req.user?.role === 'agent') {
+      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
+      if (agentRes.rows.length === 0) {
+        return res.json([]);
+      }
+      const agentId = agentRes.rows[0].id;
+      whereClause = `WHERE o.type = $1 AND (
+        o.created_by = $2
+        OR o.created_by IN (SELECT s.user_id FROM sellers s WHERE s.agent_id = $2)
+      )`;
+      params = ['activate', agentId];
+    }
+    const result = await query(`
+      SELECT
+        o.op_id, o.type, o.target, o.operator, o.date, o.time, o.status,
+        o.customer_name, o.customer_id, o.contract_image, o.created_at,
+        COALESCE(u.display_name, '') AS actor_name,
+        COALESCE(u.role, '') AS actor_role,
+        COALESCE(a.name, '') AS agent_name,
+        COALESCE(s.name, '') AS seller_name
+      FROM operations o
+      LEFT JOIN users u ON o.created_by = u.id
+      LEFT JOIN sellers s ON s.user_id = o.created_by
+      LEFT JOIN agents a ON a.id = s.agent_id
+      ${whereClause}
+      ORDER BY o.id DESC
+      LIMIT 500
+    `, params);
+    cacheSet(cacheKey, result.rows, 120_000);
+    res.json(result.rows);
+  } catch (err) {
+    logger.error('Error fetching activations report:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Sellers registry report — seller profile + avatar/id document image.
+router.get('/sellers', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
+  try {
+    let whereClause = '';
+    let params: any[] | undefined;
+    if (req.user?.role === 'agent') {
+      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
+      if (agentRes.rows.length === 0) {
+        return res.json([]);
+      }
+      whereClause = ' WHERE s.agent_id = $1';
+      params = [agentRes.rows[0].id];
+    }
+    const result = await query(`
+      SELECT
+        s.id, s.seller_id, s.name, s.store_name, s.id_number, s.phone,
+        s.region, s.region_code, s.status, s.avatar, s.creation_date, s.last_login,
+        s.total_sales, s.current_stock, s.efficiency, s.sims_count,
+        s.sales_30_days, s.sales_growth, s.activity_rate,
+        a.name AS agent_name
+      FROM sellers s
+      LEFT JOIN agents a ON s.agent_id = a.id
+      ${whereClause}
+      ORDER BY s.id DESC
+    `, params);
+    res.json(result.rows);
+  } catch (err) {
+    logger.error('Error fetching sellers report:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
