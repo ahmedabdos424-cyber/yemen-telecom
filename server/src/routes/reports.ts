@@ -135,7 +135,7 @@ router.get('/activations', requireRole('manager', 'agent'), async (req: AuthRequ
     const result = await query(`
       SELECT
         o.op_id, o.type, o.target, o.operator, o.date, o.time, o.status,
-        o.customer_name, o.customer_id, o.contract_image, o.created_at,
+        o.customer_name, o.customer_id, o.contract_image, o.iccid, o.created_at,
         COALESCE(u.display_name, '') AS actor_name,
         COALESCE(u.role, '') AS actor_role,
         COALESCE(a.name, '') AS agent_name,

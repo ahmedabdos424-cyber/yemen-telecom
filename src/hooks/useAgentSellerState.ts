@@ -100,7 +100,7 @@ export function useAgentSellerState(role: string | null, username: string) {
         await api.activateSim({ iccid: simData.iccid, customerName: simData.fullName, customerId: simData.idNumber, contractImage: contractImage || undefined });
       }
 
-      await api.createOperation({ type: 'activate', target: simData.phoneNumber, operator: simData.operator, status: 'success', customerName: simData.fullName, customerId: simData.idNumber, contractImage: contractImage || undefined });
+      await api.createOperation({ type: 'activate', target: simData.phoneNumber, operator: simData.operator, status: 'success', customerName: simData.fullName, customerId: simData.idNumber, contractImage: contractImage || undefined, iccid: simData.iccid });
       await api.createCustomer({
         fullName: simData.fullName,
         idNumber: simData.idNumber,

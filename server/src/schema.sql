@@ -102,6 +102,7 @@ CREATE TABLE IF NOT EXISTS operations (
   customer_name VARCHAR(200),
   customer_id VARCHAR(50),
   contract_image VARCHAR(500),
+  iccid VARCHAR(30),
   created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -109,6 +110,7 @@ CREATE TABLE IF NOT EXISTS operations (
 ALTER TABLE operations ADD COLUMN IF NOT EXISTS customer_name VARCHAR(200);
 ALTER TABLE operations ADD COLUMN IF NOT EXISTS customer_id VARCHAR(50);
 ALTER TABLE operations ADD COLUMN IF NOT EXISTS contract_image VARCHAR(500);
+ALTER TABLE operations ADD COLUMN IF NOT EXISTS iccid VARCHAR(30);
 ALTER TABLE operations ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
 
 -- Ensure sims and alerts have created_at for tracking

@@ -249,6 +249,7 @@ export interface CreateOperationRequest {
   customerId?: string;
   contract_image?: string;
   contractImage?: string;
+  iccid?: string;
 }
 
 export interface QueryOperationsRequest {
@@ -472,6 +473,7 @@ export interface ActivationReportRow {
   customer_name: string | null;
   customer_id: string | null;
   contract_image: string | null;
+  iccid: string | null;
   created_at: string;
   actor_name: string;
   actor_role: string;

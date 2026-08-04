@@ -236,6 +236,7 @@ export const createOperationSchema = z.object({
   customerId: z.string().max(50).optional(),
   contract_image: z.string().max(500).optional(),
   contractImage: z.string().max(500).optional(),
+  iccid: z.string().max(30).optional(),
 });
 
 // Inventories

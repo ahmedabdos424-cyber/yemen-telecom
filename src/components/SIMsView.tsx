@@ -4,14 +4,11 @@
  */
 
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
-import { motion } from 'motion/react';
 import { SIM, Agent, Seller } from '../types';
 import type { CreateSimBatchRequest, SimBatchResult } from '../api/types';
-import { Upload, RefreshCw, Check } from 'lucide-react';
-import CameraCapture from './shared/CameraCapture';
+import { Upload } from 'lucide-react';
 import { StatsCardSkeleton } from './shared/Skeleton';
 import { useDebounce } from '../hooks/useDebounce';
-import { useOcr } from '../hooks/useOcr';
 import { useToast, ToastContainer } from '../hooks/useToast';
 import OperatorLogo from './shared/OperatorLogo';
 import AddSimModal from './AddSimModal';
@@ -60,17 +57,9 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM, onAddSimBat
   const [selectedOwner, setSelectedOwner] = useState<string>('all');
   const [selectedPackage, setSelectedPackage] = useState<string>('all');
   
-  // States for the add SIM dialog
-  const [showAddModal, setShowAddModal] = useState(false);
+  // States for the add SIM dialogs
   const [showImportModal, setShowImportModal] = useState(false);
   const [showBatchModal, setShowBatchModal] = useState(false);
-  
-  // Add SIM form fields
-  const [formPhone, setFormPhone] = useState('');
-  const [formIccid, setFormIccid] = useState('');
-  const [formProvider, setFormProvider] = useState<'Yemen Mobile' | 'Sabafon' | 'YOU'>('Yemen Mobile');
-  const [formPackage, setFormPackage] = useState('باقة مزايا الشهرية');
-  const [formOwner, setFormOwner] = useState('المركز الرئيسي');
 
   const [selectedSimDetail, setSelectedSimDetail] = useState<SIM | null>(null);
   const [selectedSimEdit, setSelectedSimEdit] = useState<SIM | null>(null);
@@ -101,29 +90,6 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM, onAddSimBat
     });
     setSelectedSimEdit(null);
   }, [selectedSimEdit, onUpdateSIM, editPhone, editProvider, editPackage, editOwner, editStatus]);
-
-  // Camera capture states
-  const [phoneCaptured, setPhoneCaptured] = useState(false);
-  const [iccidCaptured, setIccidCaptured] = useState(false);
-  const { recognize, recognizeRaw, progress: ocrProgress, setProgress: setOcrProgress } = useOcr();
-
-  const handlePhoneCapture = useCallback(async (imageData: string) => {
-    setPhoneCaptured(true);
-    const raw = await recognizeRaw(imageData);
-    const digits = raw.replace(/\D/g, '');
-    if (digits.length >= 7) {
-      setFormPhone(digits);
-    }
-  }, [recognizeRaw]);
-
-  const handleIccidCapture = useCallback(async (imageData: string) => {
-    setIccidCaptured(true);
-    const raw = await recognizeRaw(imageData);
-    const digits = raw.replace(/\D/g, '');
-    if (digits.length >= 10) {
-      setFormIccid(digits);
-    }
-  }, [recognizeRaw]);
 
   // CSV import state
   const [csvFile, setCsvFile] = useState<File | null>(null);
@@ -196,30 +162,12 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM, onAddSimBat
     inactive: sims.filter((s) => s.status === 'inactive').length
   }), [sims]);
 
-  const handleFormSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formPhone || !formIccid) return;
-    onAddSIM({
-      phone: formPhone,
-      iccid: formIccid,
-      provider: formProvider,
-      packageType: formPackage,
-      owner: formOwner,
-      status: 'available',
-      dateAdded: new Date().toLocaleDateString('ar-YE')
-    });
-    // Reset Form
-    setFormPhone('');
-    setFormIccid('');
-    setShowAddModal(false);
-  }, [formPhone, formIccid, formProvider, formPackage, formOwner, onAddSIM]);
-
   const handleBatchSubmit = useCallback(async (payload: CreateSimBatchRequest) => {
     if (!onAddSimBatch) return;
     try {
       const res = await onAddSimBatch(payload);
       if (res && res.created > 0) {
-        toastSuccess(`تمت إضافة ${res.created} شريحة بنجاح${res.skipped > 0 ? ` (تخطي ${res.skipped} مكررة)` : ''}.`);
+        toastSuccess(`تم إضافة النطاق بنجاح وتخصيصه لمخزون ${res.owner || 'المركز الرئيسي'}.${res.skipped > 0 ? ` (تخطي ${res.skipped} مكررة)` : ''}`);
         setShowBatchModal(false);
       } else if (res) {
         toastWarning('لم تُضف أي شريحة جديدة — كل أرقام النطاق موجودة مسبقاً.');
@@ -309,14 +257,6 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM, onAddSimBat
               <span className="hidden 2xs:inline">إضافة دفعة (نطاق)</span>
             </button>
           )}
-          {/* Manual insert SIM */}
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex-1 md:flex-none btn btn-primary text-[11px] md:text-[13px]"
-          >
-            <span className="material-symbols-outlined text-sm">add_circle</span>
-            <span className="hidden 2xs:inline">إضافة شريحة يدوياً</span>
-          </button>
         </div>
       </div>
 
@@ -644,117 +584,7 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM, onAddSimBat
       )}
       </div>
 
-      {/* Manual Insert Dialog Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-gray-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md lg:max-w-lg overflow-hidden text-right leading-relaxed animate-in fade-in zoom-in-95 duration-200 border border-gray-100/80">
-            <div className="px-6 py-4.5 bg-gray-50 border-b border-gray-150 flex justify-between items-center">
-              <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-gray-150/70 rounded-full text-gray-400 hover:text-gray-700 transition-colors cursor-pointer">
-                <span className="material-symbols-outlined text-lg">close</span>
-              </button>
-              <h3 className="font-bold text-sm text-gray-800 flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-sm text-primary">add_circle</span>
-                إضافة شريحة نظام جديدة
-              </h3>
-            </div>
-            <form onSubmit={handleFormSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-[11px] font-bold text-gray-500 mb-1.5">رقم الهاتف الشريحة</label>
-                <div className="relative">
-                  <span className="material-symbols-outlined absolute right-3 top-2.5 text-xs text-gray-400">phone</span>
-                  <input
-                    type="text"
-                    required
-                    value={formPhone}
-                    onChange={(e) => setFormPhone(e.target.value)}
-                    placeholder="7xxxxxx"
-                    className="w-full pr-10 pl-12 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all font-mono"
-                  />
-                  <CameraCapture onCapture={handlePhoneCapture} />
-                  {phoneCaptured && (
-                    <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1 mt-1">
-                      <Check size={12} /> تم التقاط الصورة
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-gray-500 mb-1.5">رقم التسلسلي الأمني (ICCID)</label>
-                <div className="relative">
-                  <span className="material-symbols-outlined absolute right-3 top-2.5 text-xs text-gray-400">fingerprint</span>
-                  <input
-                    type="text"
-                    required
-                    value={formIccid}
-                    onChange={(e) => setFormIccid(e.target.value)}
-                    placeholder="89967XXXXXXXXXXXX"
-                    className="w-full pr-10 pl-12 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all font-mono"
-                  />
-                  <CameraCapture onCapture={handleIccidCapture} />
-                  {iccidCaptured && (
-                    <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1 mt-1">
-                      <Check size={12} /> تم التقاط الصورة
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-500 mb-1.5">الشبكة المزودة</label>
-                  <select
-                    value={formProvider}
-                    onChange={(e) => setFormProvider(e.target.value as 'Yemen Mobile' | 'Sabafon' | 'YOU')}
-                    className="w-full px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs bg-white focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 outline-none cursor-pointer"
-                  >
-                    <option value="Yemen Mobile">يمن موبايل</option>
-                    <option value="Sabafon">سبأفون</option>
-                    <option value="YOU">يو</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-500 mb-1.5">باقة البداية المخصصة</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={formPackage}
-                      onChange={(e) => setFormPackage(e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-gray-500 mb-1.5">المالك / الوكيل الموزع</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={formOwner}
-                    onChange={(e) => setFormOwner(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all"
-                  />
-                </div>
-              </div>
-              <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-4 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2.5 border border-gray-200 text-gray-700 bg-white hover:bg-gray-55/70 rounded-xl text-xs font-bold transition-all hover:border-gray-300 cursor-pointer w-full sm:w-auto"
-                >
-                  إلغاء
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-primary text-white rounded-xl text-xs font-bold hover:brightness-110 shadow-md active:scale-[0.98] transition-all cursor-pointer w-full sm:w-auto"
-                >
-                  حفظ الشريحة بالمستودع
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* CSV Import Modal */}
+{/* CSV Import Modal */}
       {showImportModal && (
         <div className="fixed inset-0 bg-gray-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm md:max-w-md overflow-hidden text-right leading-relaxed animate-in fade-in zoom-in-95 duration-200 border border-gray-100/80">
@@ -965,24 +795,6 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM, onAddSimBat
           onClose={() => setShowBatchModal(false)}
           onSubmit={handleBatchSubmit}
         />
-      )}
-
-      {/* OCR Progress Overlay */}
-      {ocrProgress.visible && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-xs bg-white border border-gray-200 rounded-2xl p-6 shadow-2xl text-center">
-            <RefreshCw size={32} className="mx-auto text-amber-500 mb-4 animate-spin" />
-            <p className="text-xs text-gray-700 mb-3 font-semibold">{ocrProgress.stage}</p>
-            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${ocrProgress.progress}%` }}
-                className="h-full bg-gradient-to-l from-primary to-primary/70 rounded-full"
-              />
-            </div>
-            <p className="text-[10px] text-gray-400 mt-2">{Math.round(ocrProgress.progress)}%</p>
-          </div>
-        </div>
       )}
     </div>
   );
