@@ -3,11 +3,11 @@ import { query } from '../db';
 import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination, paginatedQuery } from '../helpers';
-import { validate, createSimSchema, updateSimSchema, activateSimSchema } from '../validation';
+import { validate, createSimSchema, updateSimSchema, activateSimSchema, transferSimsSchema } from '../validation';
 
 const router = Router();
 
-router.post('/activate', requireRole('manager', 'agent'), validate(activateSimSchema), async (req: AuthRequest, res: Response) => {
+router.post('/activate', requireRole('manager', 'agent', 'seller'), validate(activateSimSchema), async (req: AuthRequest, res: Response) => {
   try {
     const { iccid } = req.body;
     const requester = req.user;
@@ -26,6 +26,14 @@ router.post('/activate', requireRole('manager', 'agent'), validate(activateSimSc
           sim.owner_role === 'agent' &&
           agentId != null &&
           Number(sim.assigned_to_agent) === Number(agentId);
+      } else if (requester?.role === 'seller') {
+        const sellerRes = await query('SELECT id FROM sellers WHERE user_id = $1', [requester.id]);
+        const sellerId = sellerRes.rows[0]?.id;
+        inStock =
+          sim.status === 'available' &&
+          sim.owner_role === 'seller' &&
+          sellerId != null &&
+          Number(sim.assigned_to) === Number(sellerId);
       } else {
         inStock = sim.status === 'available' && sim.owner_role === 'admin';
       }
@@ -42,7 +50,7 @@ router.post('/activate', requireRole('manager', 'agent'), validate(activateSimSc
           requester?.id ?? null,
         ]
       );
-      return res.status(400).json({ error: 'SIM not found in available stock' });
+      return res.status(400).json({ error: 'الرقم التسلسلي غير متوفر في مخزونك' });
     }
 
     const updated = await query(
@@ -52,6 +60,100 @@ router.post('/activate', requireRole('manager', 'agent'), validate(activateSimSc
     res.json(updated.rows[0]);
   } catch (err) {
     logger.error('Error activating sim:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+const MAX_TRANSFER_SIMS = 5000;
+
+// Agent → seller SIM range transfer with strict ownership + isolation checks.
+router.post('/transfer', requireRole('agent'), validate(transferSimsSchema), async (req: AuthRequest, res: Response) => {
+  try {
+    const { seller_id, from_iccid, to_iccid } = req.body;
+
+    if (from_iccid.length !== to_iccid.length) {
+      return res.status(400).json({ error: 'from_iccid and to_iccid must have the same length' });
+    }
+    let fromVal: bigint;
+    let toVal: bigint;
+    try {
+      fromVal = BigInt(from_iccid);
+      toVal = BigInt(to_iccid);
+    } catch {
+      return res.status(400).json({ error: 'Invalid ICCID range values' });
+    }
+    if (toVal < fromVal) {
+      return res.status(400).json({ error: 'to_iccid must be greater than or equal to from_iccid' });
+    }
+    const totalCount = toVal - fromVal + 1n;
+    if (totalCount > BigInt(MAX_TRANSFER_SIMS)) {
+      return res.status(400).json({ error: `Transfer limit is ${MAX_TRANSFER_SIMS} SIMs per request` });
+    }
+
+    const agentRes = await query('SELECT id, name FROM agents WHERE user_id = $1', [req.user!.id]);
+    if (agentRes.rows.length === 0) {
+      return res.status(400).json({ error: 'Agent profile not found' });
+    }
+    const agentId = Number(agentRes.rows[0].id);
+
+    // Isolation: the target seller must belong to the requesting agent.
+    const sellerRes = await query('SELECT * FROM sellers WHERE id = $1', [seller_id]);
+    if (sellerRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Seller not found' });
+    }
+    const seller = sellerRes.rows[0];
+    if (Number(seller.agent_id) !== agentId) {
+      return res.status(403).json({ error: 'Access denied: this seller does not belong to your agency' });
+    }
+
+    // Expand the range into explicit ICCIDs (zero-padded to the input width).
+    const width = from_iccid.length;
+    const iccids: string[] = [];
+    for (let value = fromVal; value <= toVal; value += 1n) {
+      iccids.push(value.toString().padStart(width, '0'));
+    }
+
+    // Strict stock check — every SIM in the range must be in the agent's available stock.
+    const owned = await query(
+      `SELECT iccid FROM sims
+       WHERE iccid = ANY($1) AND owner_role = 'agent' AND assigned_to_agent = $2
+         AND status IN ('available', 'assigned')`,
+      [iccids, agentId]
+    );
+    const ownedSet = new Set(owned.rows.map((r: { iccid: string }) => r.iccid));
+    const missing = iccids.filter(iccid => !ownedSet.has(iccid));
+    if (missing.length > 0) {
+      return res.status(400).json({ error: 'الرقم التسلسلي غير متوفر في مخزونك' });
+    }
+
+    const updated = await query(
+      `UPDATE sims SET owner_role = 'seller', assigned_to = $1, assigned_to_agent = NULL, owner = $2, status = 'available'
+       WHERE iccid = ANY($3) AND owner_role = 'agent' AND assigned_to_agent = $4
+       RETURNING id`,
+      [seller_id, seller.name || `Seller #${seller_id}`, iccids, agentId]
+    );
+
+    await query(
+      `INSERT INTO alerts (title, description, priority, time, category, created_by)
+       VALUES ($1, $2, 'low', $3, 'مخزون', $4)`,
+      [
+        `تم تحويل دفعة شرائح (${updated.rows.length} شريحة)`,
+        `حُوِّلت ${updated.rows.length} شريحة عبر النطاق ${from_iccid} → ${to_iccid} إلى البائع ${seller.name}.`,
+        new Date().toLocaleString('ar-YE'),
+        req.user?.id ?? null,
+      ]
+    );
+
+    res.json({
+      transferred: updated.rows.length,
+      total: iccids.length,
+      from_iccid,
+      to_iccid,
+      seller_id,
+      status: 'available',
+    });
+  } catch (err) {
+    logger.error('Error transferring sims:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

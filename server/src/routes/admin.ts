@@ -6,9 +6,12 @@ import { logger } from '../logger';
 import { cacheStats } from '../cache';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination, formatDbTimestamp } from '../helpers';
-import { validate, updateSettingsSchema, createSimBatchSchema } from '../validation';
+import { validate, updateSettingsSchema, createSimBatchSchema, resetDataSchema } from '../validation';
+import { resetSystemData } from '../reset-data';
 
 const router = Router();
+
+const RESET_CONFIRM_TOKEN = 'RESET_INVENTORY';
 
 router.get('/settings', requireRole('manager'), async (_req: Request, res: Response) => {
   try {
@@ -347,7 +350,8 @@ router.post('/sims/batch', requireRole('manager'), validate(createSimBatchSchema
         }
         ownerText = agentRes.rows[0].name || `Agent #${owner_id}`;
         assignedToAgent = owner_id;
-        status = 'assigned';
+        // The SIM becomes part of the agent's available stock (owner_role=agent).
+        status = 'available';
       } else {
         const sellerRes = await query('SELECT id, name FROM sellers WHERE id = $1', [owner_id]);
         if (sellerRes.rows.length === 0) {
@@ -355,7 +359,8 @@ router.post('/sims/batch', requireRole('manager'), validate(createSimBatchSchema
         }
         ownerText = sellerRes.rows[0].name || `Seller #${owner_id}`;
         assignedToSeller = owner_id;
-        status = 'assigned';
+        // The SIM becomes part of the seller's available stock (owner_role=seller).
+        status = 'available';
       }
     }
 
@@ -423,6 +428,33 @@ router.post('/sims/batch', requireRole('manager'), validate(createSimBatchSchema
   } catch (err) {
     logger.error('Error creating sim batch:', err);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ========================
+// System: Data Reset (secure)
+// ========================
+router.post('/reset', requireRole('manager'), validate(resetDataSchema), async (req: AuthRequest, res: Response) => {
+  try {
+    if (req.body.confirm !== RESET_CONFIRM_TOKEN) {
+      return res.status(400).json({ error: 'Invalid confirmation token. Pass confirm="RESET_INVENTORY" to proceed.' });
+    }
+    const summary = await resetSystemData();
+    // Audit trail for the reset itself (recorded after the wipe).
+    await query(
+      `INSERT INTO alerts (title, description, priority, time, category, created_by)
+       VALUES ($1, $2, 'high', $3, 'أمان', $4)`,
+      [
+        'تم تصفير بيانات النظام',
+        `قام ${req.user?.username || 'manager'} بتصفير المخزون والجداول العلائقية (${Object.values(summary.deleted).reduce((a, b) => a + b, 0)} سجلاً).`,
+        new Date().toLocaleString('ar-YE'),
+        req.user?.id ?? null,
+      ]
+    );
+    res.json({ success: true, message: 'System data reset completed', deleted: summary.deleted });
+  } catch (err) {
+    logger.error('Error resetting system data:', err);
+    res.status(500).json({ error: 'Failed to reset system data' });
   }
 });
 

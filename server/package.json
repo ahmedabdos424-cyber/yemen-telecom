@@ -11,7 +11,8 @@
     "build": "npx tsc",
     "start": "node dist/index.js",
     "test": "cd .. && npx vitest run --config vitest.config.ts",
-    "init-db": "npx tsx src/init-db.ts"
+    "init-db": "npx tsx src/init-db.ts",
+    "reset-inventory": "npx tsx src/reset-inventory.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1073.0",
