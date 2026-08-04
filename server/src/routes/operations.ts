@@ -47,15 +47,16 @@ router.post('/', requireRole('manager', 'agent', 'seller'), validate(createOpera
   const customerName = req.body.customer_name ?? req.body.customerName ?? null;
   const customerId = req.body.customer_id ?? req.body.customerId ?? null;
   const contractImage = req.body.contract_image ?? req.body.contractImage ?? null;
+  const iccid = req.body.iccid ?? null;
   try {
     const opId = `op_${Date.now()}`;
     const now = new Date();
     const date = now.toISOString().split('T')[0].replace(/-/g, '/');
     const time = 'الآن';
     const result = await query(
-      `INSERT INTO operations (op_id, type, target, operator, date, time, status, customer_name, customer_id, contract_image, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
-      [opId, type, target, operator || '', date, time, status || 'success', customerName, customerId, contractImage, req.user?.id]
+      `INSERT INTO operations (op_id, type, target, operator, date, time, status, customer_name, customer_id, contract_image, iccid, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+      [opId, type, target, operator || '', date, time, status || 'success', customerName, customerId, contractImage, iccid, req.user?.id]
     );
     res.status(201).json({
       id: result.rows[0].op_id,
@@ -68,6 +69,7 @@ router.post('/', requireRole('manager', 'agent', 'seller'), validate(createOpera
       customer_name: result.rows[0].customer_name,
       customer_id: result.rows[0].customer_id,
       contract_image: result.rows[0].contract_image,
+      iccid: result.rows[0].iccid,
     });
   } catch (err) {
     logger.error('Error creating operation:', err);

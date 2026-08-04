@@ -15,6 +15,8 @@ interface AddSimModalProps {
 }
 
 const MAX_BATCH_SIMS = 5000;
+const ICCID_LENGTH = 19;
+const DEFAULT_PACKAGE_TYPE = 'باقة مزايا الشهرية';
 
 interface RangeInfo {
   count: bigint | null;
@@ -25,8 +27,8 @@ function computeRange(fromIccid: string, toIccid: string): RangeInfo {
   if (!/^\d+$/.test(fromIccid) || !/^\d+$/.test(toIccid)) {
     return { count: null, error: 'يجب إدخال أرقام فقط في حقلي النطاق' };
   }
-  if (fromIccid.length !== toIccid.length) {
-    return { count: null, error: 'يجب أن يكون الرقمان بنفس الطول' };
+  if (fromIccid.length !== ICCID_LENGTH || toIccid.length !== ICCID_LENGTH) {
+    return { count: null, error: `يجب أن يتكون كل رقم ICCID من ${ICCID_LENGTH} رقماً` };
   }
   const from = BigInt(fromIccid);
   const to = BigInt(toIccid);
@@ -44,7 +46,6 @@ function AddSimModal({ agents, sellers, onClose, onSubmit }: AddSimModalProps) {
   const [fromIccid, setFromIccid] = useState('');
   const [toIccid, setToIccid] = useState('');
   const [provider, setProvider] = useState<'Yemen Mobile' | 'Sabafon' | 'YOU'>('Yemen Mobile');
-  const [packageType, setPackageType] = useState('باقة مزايا الشهرية');
   const [ownerRole, setOwnerRole] = useState<'admin' | 'agent' | 'seller'>('admin');
   const [ownerId, setOwnerId] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -65,14 +66,14 @@ function AddSimModal({ agents, sellers, onClose, onSubmit }: AddSimModalProps) {
         from_iccid: fromIccid,
         to_iccid: toIccid,
         provider,
-        package_type: packageType,
+        package_type: DEFAULT_PACKAGE_TYPE,
         owner_role: ownerRole,
         owner_id: ownerRole === 'admin' ? undefined : Number(ownerId),
       });
     } finally {
       setSubmitting(false);
     }
-  }, [canSubmit, range.count, fromIccid, toIccid, provider, packageType, ownerRole, ownerId, onSubmit]);
+  }, [canSubmit, range.count, fromIccid, toIccid, provider, ownerRole, ownerId, onSubmit]);
 
   return (
     <div className="fixed inset-0 bg-gray-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -87,7 +88,7 @@ function AddSimModal({ agents, sellers, onClose, onSubmit }: AddSimModalProps) {
           </h3>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-[11px] font-bold text-gray-500 mb-1.5">بداية النطاق (من)</label>
               <input
@@ -95,7 +96,9 @@ function AddSimModal({ agents, sellers, onClose, onSubmit }: AddSimModalProps) {
                 required
                 value={fromIccid}
                 onChange={(e) => setFromIccid(e.target.value)}
-                placeholder="8996701123456789"
+                placeholder="8996701123456789012"
+                maxLength={ICCID_LENGTH}
+                inputMode="numeric"
                 dir="ltr"
                 className="w-full px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all font-mono text-left"
               />
@@ -107,7 +110,9 @@ function AddSimModal({ agents, sellers, onClose, onSubmit }: AddSimModalProps) {
                 required
                 value={toIccid}
                 onChange={(e) => setToIccid(e.target.value)}
-                placeholder="8996701123456899"
+                placeholder="8996701123456789021"
+                maxLength={ICCID_LENGTH}
+                inputMode="numeric"
                 dir="ltr"
                 className="w-full px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all font-mono text-left"
               />
@@ -128,28 +133,17 @@ function AddSimModal({ agents, sellers, onClose, onSubmit }: AddSimModalProps) {
               : 'أدخل بداية ونهاية النطاق لاحتساب العدد'}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-bold text-gray-500 mb-1.5">الشبكة المزودة</label>
-              <select
-                value={provider}
-                onChange={(e) => setProvider(e.target.value as 'Yemen Mobile' | 'Sabafon' | 'YOU')}
-                className="w-full px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 outline-none cursor-pointer"
-              >
-                <option value="Yemen Mobile">يمن موبايل</option>
-                <option value="Sabafon">سبأفون</option>
-                <option value="YOU">يو</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-[11px] font-bold text-gray-500 mb-1.5">باقة البداية المخصصة</label>
-              <input
-                type="text"
-                value={packageType}
-                onChange={(e) => setPackageType(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all"
-              />
-            </div>
+          <div>
+            <label className="block text-[11px] font-bold text-gray-500 mb-1.5">الشبكة المزودة</label>
+            <select
+              value={provider}
+              onChange={(e) => setProvider(e.target.value as 'Yemen Mobile' | 'Sabafon' | 'YOU')}
+              className="w-full px-3 py-2 bg-gray-50/55 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-secondary focus:ring-1 focus:ring-secondary/20 outline-none cursor-pointer"
+            >
+              <option value="Yemen Mobile">يمن موبايل</option>
+              <option value="Sabafon">سبأفون</option>
+              <option value="YOU">يو</option>
+            </select>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -200,9 +194,12 @@ function AddSimModal({ agents, sellers, onClose, onSubmit }: AddSimModalProps) {
             <button
               type="submit"
               disabled={!canSubmit}
-              className="px-5 py-2.5 bg-primary text-white rounded-xl text-xs font-bold hover:brightness-110 shadow-md active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 w-full sm:w-auto"
+              className="px-5 py-2.5 bg-primary text-white rounded-xl text-xs font-bold hover:brightness-110 shadow-md active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed w-full flex items-center justify-center gap-2 min-h-[44px]"
             >
-              {submitting ? 'جارٍ الإضافة...' : 'إضافة الدفعة للمخزون'}
+              {submitting && (
+                <span className="w-4 h-4 border-2 border-white/60 border-t-white rounded-full animate-spin" />
+              )}
+              {submitting ? 'جارٍ الإضافة...' : 'تأكيد إضافة وتخصيص الدفعة'}
             </button>
           </div>
         </form>
