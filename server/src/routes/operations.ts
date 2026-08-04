@@ -42,16 +42,20 @@ router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: R
   }
 });
 
-router.post('/', requireRole('manager', 'agent'), validate(createOperationSchema), async (req: AuthRequest, res: Response) => {
+router.post('/', requireRole('manager', 'agent', 'seller'), validate(createOperationSchema), async (req: AuthRequest, res: Response) => {
   const { type, target, operator, status } = req.body;
+  const customerName = req.body.customer_name ?? req.body.customerName ?? null;
+  const customerId = req.body.customer_id ?? req.body.customerId ?? null;
+  const contractImage = req.body.contract_image ?? req.body.contractImage ?? null;
   try {
     const opId = `op_${Date.now()}`;
     const now = new Date();
     const date = now.toISOString().split('T')[0].replace(/-/g, '/');
     const time = 'الآن';
     const result = await query(
-      `INSERT INTO operations (op_id, type, target, operator, date, time, status, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [opId, type, target, operator || '', date, time, status || 'success', req.user?.id]
+      `INSERT INTO operations (op_id, type, target, operator, date, time, status, customer_name, customer_id, contract_image, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+      [opId, type, target, operator || '', date, time, status || 'success', customerName, customerId, contractImage, req.user?.id]
     );
     res.status(201).json({
       id: result.rows[0].op_id,
@@ -61,6 +65,9 @@ router.post('/', requireRole('manager', 'agent'), validate(createOperationSchema
       date: result.rows[0].date,
       time: result.rows[0].time,
       status: result.rows[0].status,
+      customer_name: result.rows[0].customer_name,
+      customer_id: result.rows[0].customer_id,
+      contract_image: result.rows[0].contract_image,
     });
   } catch (err) {
     logger.error('Error creating operation:', err);

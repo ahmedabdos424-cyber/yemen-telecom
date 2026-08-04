@@ -130,11 +130,14 @@ vi.mock('../db', () => {
         if (s && s.owner_role === 'agent' && Number(s.assigned_to_agent) === agentId) rows.push({ iccid });
       }
     } else if (/UPDATE sims SET status = 'activated'/i.test(sql)) {
-      const simId = Number(params[1]);
+      const simId = params.length >= 5 ? Number(params[4]) : Number(params[1]);
       const s = d.sims.find((x) => x.id === simId);
       if (s) {
         s.status = 'activated';
         s.activated_by = params[0] != null ? Number(params[0]) : null;
+        s.customer_name = (params[1] ?? s.customer_name) != null ? String(params[1] ?? s.customer_name) : s.customer_name;
+        s.customer_id = params[2] != null ? String(params[2]) : s.customer_id;
+        s.contract_image = params[3] != null ? String(params[3]) : s.contract_image;
         rows.push({ ...s });
       }
     } else if (/UPDATE sims SET owner_role = 'seller'/i.test(sql)) {

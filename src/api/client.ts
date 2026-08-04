@@ -14,6 +14,7 @@ import type {
   CustomerRow,
   DistributionRequestRow, CreateDistributionRequest,
   AppVersionResponse,
+  ActivationReportRow, SellerReportRow,
 } from './types';
 
 const REQUEST_TIMEOUT_MS = 180000;
@@ -365,8 +366,8 @@ export const api = {
     request<{ message: string }>(`/sims/${id}`, { method: 'DELETE' }),
   createSimBatch: (data: CreateSimBatchRequest) =>
     request<SimBatchResult>('/admin/sims/batch', { method: 'POST', body: JSON.stringify(data) }),
-  activateSim: (iccid: string) =>
-    request<SimRow>('/sims/activate', { method: 'POST', body: JSON.stringify({ iccid }) }),
+  activateSim: (data: { iccid: string; customerName?: string; customerId?: string; contractImage?: string }) =>
+    request<SimRow>('/sims/activate', { method: 'POST', body: JSON.stringify(data) }),
 
   // Agents
   getAgents: () => request<AgentRow[]>('/agents'),
@@ -463,6 +464,10 @@ export const api = {
     request<{ sims: Array<{ operator: string; count: number; status: string }>; operations: Array<{ operator: string; count: number; status: string }> }>('/reports/operator-distribution'),
   getSellerPerformance: () =>
     request<Array<{ id: number; name: string; store_name: string; region: string; sims_count: number; sales_30_days: number; sales_growth: number; efficiency: number; activity_rate: number; status: string; agent_name: string }>>('/reports/seller-performance'),
+  getActivationsReport: () =>
+    request<ActivationReportRow[]>('/reports/activations'),
+  getSellersReport: () =>
+    request<SellerReportRow[]>('/reports/sellers'),
 
   // App Update
   getAppVersion: () =>

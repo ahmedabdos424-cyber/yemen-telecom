@@ -145,6 +145,7 @@ router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), 
     name, store_name, id_number, phone, region, region_code, status,
     username, password, agent_name
   } = req.body;
+  const avatar = req.body.avatar ?? req.body.id_document ?? req.body.idDocument ?? '';
   try {
     // Support camelCase parameters
     const storeNameVal = store_name ?? req.body.storeName ?? '';
@@ -184,9 +185,9 @@ router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), 
       const userId = userResult.rows[0].id;
 
       const sellerResult = await client.query(
-        `INSERT INTO sellers (seller_id, user_id, agent_id, name, store_name, id_number, phone, region, region_code, status, creation_date, last_login)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
-        [sid, userId, agentId, name, storeNameVal, idNumberVal, phone || '', region || '', regionCodeVal, status || 'active', now, 'لم يسجل دخول بعد']
+        `INSERT INTO sellers (seller_id, user_id, agent_id, name, store_name, id_number, phone, region, region_code, status, creation_date, last_login, avatar)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+        [sid, userId, agentId, name, storeNameVal, idNumberVal, phone || '', region || '', regionCodeVal, status || 'active', now, 'لم يسجل دخول بعد', avatar]
       );
 
       const finalResult = await client.query(
@@ -237,9 +238,10 @@ router.put('/:id', requireRole('manager', 'agent'), validate(updateSellerSchema)
     const region = req.body.region ?? cur.region;
     const region_code = req.body.region_code ?? req.body.regionCode ?? cur.region_code;
     const status = req.body.status ?? cur.status;
+    const avatar = req.body.avatar ?? req.body.id_document ?? req.body.idDocument ?? cur.avatar;
     const result = await query(
-      `UPDATE sellers SET name=$1, store_name=$2, id_number=$3, phone=$4, region=$5, region_code=$6, status=$7 WHERE id=$8 RETURNING *`,
-      [name, store_name, id_number, phone, region, region_code, status, id]
+      `UPDATE sellers SET name=$1, store_name=$2, id_number=$3, phone=$4, region=$5, region_code=$6, status=$7, avatar=$8 WHERE id=$9 RETURNING *`,
+      [name, store_name, id_number, phone, region, region_code, status, avatar, id]
     );
     const updated = await query(
       `SELECT s.*, a.name as agent_name FROM sellers s LEFT JOIN agents a ON s.agent_id = a.id WHERE s.id = $1`,

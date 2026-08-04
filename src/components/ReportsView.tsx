@@ -17,9 +17,12 @@ export default function ReportsView() {
   const [agentPerformance, setAgentPerformance] = useState<any[]>([]);
   const [dailySales, setDailySales] = useState<any[]>([]);
   const [sellerPerformance, setSellerPerformance] = useState<any[]>([]);
+  const [activations, setActivations] = useState<any[]>([]);
+  const [sellersReport, setSellersReport] = useState<any[]>([]);
   const [operatorDistribution, setOperatorDistribution] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -27,17 +30,21 @@ export default function ReportsView() {
       try {
         setLoading(true);
         setFetchError(null);
-        const [agents, sales, sellers, dist] = await Promise.all([
+        const [agents, sales, sellers, dist, activ, sellersReg] = await Promise.all([
           api.getAgentPerformance(),
           api.getDailySales(),
           api.getSellerPerformance(),
           api.getOperatorDistribution(),
+          api.getActivationsReport().catch(() => []),
+          api.getSellersReport().catch(() => []),
         ]);
         if (!mounted) return;
         setAgentPerformance(agents || []);
         setDailySales(sales || []);
         setSellerPerformance(sellers || []);
         setOperatorDistribution(dist || null);
+        setActivations(activ || []);
+        setSellersReport(sellersReg || []);
       } catch (err: unknown) {
         if (!mounted) return;
         setFetchError(err instanceof Error ? err.message : String(err));
@@ -45,6 +52,8 @@ export default function ReportsView() {
         setDailySales([]);
         setSellerPerformance([]);
         setOperatorDistribution(null);
+        setActivations([]);
+        setSellersReport([]);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -60,7 +69,45 @@ export default function ReportsView() {
     : 0;
 
   const triggerExport = () => {
-    toastInfo(`تقرير مخصص للشبكة: (${operator}) والمنطقة: (${region}) — ميزة التصدير قيد التطوير`);
+    const rows = activations.length > 0
+      ? activations.map((a: any) => ({
+          'التاريخ': a.date || '',
+          'الوقت': a.time || '',
+          'الرقم': a.target || '',
+          'المشغل': a.operator || '',
+          'اسم العميل': a.customer_name || '',
+          'رقم الهوية': a.customer_id || '',
+          'المنفذ': a.actor_name || a.seller_name || a.agent_name || '',
+          'الحالة': a.status || '',
+        }))
+      : sellerPerformance.map((s: any) => ({
+          'البائع': s.name || '',
+          'المحل': s.store_name || '',
+          'المنطقة': s.region || '',
+          'المبيعات (30 يوم)': s.sales_30_days ?? '',
+          'الكفاءة %': s.efficiency ?? '',
+          'عدد الشرائح': s.sims_count ?? '',
+        }));
+    if (rows.length === 0) {
+      toastWarning('لا توجد بيانات للتصدير بعد');
+      return;
+    }
+    const headers = Object.keys(rows[0]);
+    const escape = (v: any) => {
+      const s = String(v ?? '').replace(/"/g, '""');
+      return /[",\n]/.test(s) ? `"${s}"` : s;
+    };
+    const csv = '\uFEFF' + [headers.join(','), ...rows.map(r => headers.map(h => escape(r[h])).join(','))].join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `yemen-telecom-report-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toastSuccess('تم تصدير التقرير بنجاح بصيغة CSV');
   };
 
   if (loading) {
@@ -285,6 +332,146 @@ export default function ReportsView() {
                 <p className="text-xs text-gray-400 text-center py-4">لا توجد بيانات عمليات متاحة</p>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Activations log with contract images */}
+      <h3 className="font-bold text-sm text-gray-900 mb-3 px-1 flex items-center gap-2">
+        سجل التفعيلات وصور العقود
+        <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold">{activations.length} عملية</span>
+      </h3>
+      <div className="card overflow-hidden">
+        {activations.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-right">
+              <thead>
+                <tr className="bg-gray-50/70 text-[11px] text-gray-500 border-b border-gray-100">
+                  <th className="p-3 font-bold">التاريخ</th>
+                  <th className="p-3 font-bold">رقم الهاتف</th>
+                  <th className="p-3 font-bold">اسم العميل</th>
+                  <th className="p-3 font-bold">رقم الهوية</th>
+                  <th className="p-3 font-bold">المشغل</th>
+                  <th className="p-3 font-bold">المنفذ</th>
+                  <th className="p-3 font-bold">صورة العقد</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {activations.slice(0, 100).map((a: any, i: number) => (
+                  <tr key={a.op_id || i} className="hover:bg-gray-50/60 text-xs">
+                    <td className="p-3 font-mono text-gray-500 whitespace-nowrap">{a.date || ''}{a.time ? ` ${a.time}` : ''}</td>
+                    <td className="p-3 font-mono font-bold text-gray-800">{a.target || ''}</td>
+                    <td className="p-3 font-semibold text-gray-900">{a.customer_name || '—'}</td>
+                    <td className="p-3 font-mono text-gray-600">{a.customer_id || '—'}</td>
+                    <td className="p-3 text-gray-600">{a.operator || '—'}</td>
+                    <td className="p-3 text-gray-600">{a.seller_name || a.actor_name || a.agent_name || '—'}</td>
+                    <td className="p-3">
+                      {a.contract_image ? (
+                        <button
+                          type="button"
+                          onClick={() => setLightboxImage(a.contract_image)}
+                          className="w-10 h-10 rounded-lg overflow-hidden border border-gray-200 hover:ring-2 hover:ring-blue-300 transition-shadow"
+                          title="عرض صورة العقد"
+                        >
+                          <img src={a.contract_image} alt="صورة العقد" className="w-full h-full object-cover" loading="lazy" />
+                        </button>
+                      ) : (
+                        <span className="text-gray-400 text-[11px]">بدون صورة</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-8 text-center space-y-2">
+            <span className="material-symbols-outlined text-3xl text-gray-300">receipt_long</span>
+            <p className="text-xs font-bold text-gray-500">لا توجد عمليات تفعيل مسجلة بعد</p>
+            <p className="text-[11px] text-gray-400">ستظهر هنا عمليات التفعيل مع صور العقود عند إنجاز أول عملية.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Sellers registry with ID photos */}
+      <h3 className="font-bold text-sm text-gray-900 mb-3 px-1 flex items-center gap-2">
+        سجل البائعين وصور الهوية
+        <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">{sellersReport.length} بائع</span>
+      </h3>
+      <div className="card overflow-hidden">
+        {sellersReport.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-right">
+              <thead>
+                <tr className="bg-gray-50/70 text-[11px] text-gray-500 border-b border-gray-100">
+                  <th className="p-3 font-bold">البائع</th>
+                  <th className="p-3 font-bold">المحل</th>
+                  <th className="p-3 font-bold">رقم الهوية</th>
+                  <th className="p-3 font-bold">المنطقة</th>
+                  <th className="p-3 font-bold">الوكيل</th>
+                  <th className="p-3 font-bold">الحالة</th>
+                  <th className="p-3 font-bold">صورة الهوية</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {sellersReport.slice(0, 100).map((s: any, i: number) => (
+                  <tr key={s.id || i} className="hover:bg-gray-50/60 text-xs">
+                    <td className="p-3 font-semibold text-gray-900">{s.name || ''}</td>
+                    <td className="p-3 text-gray-600">{s.store_name || '—'}</td>
+                    <td className="p-3 font-mono text-gray-600">{s.id_number || '—'}</td>
+                    <td className="p-3 text-gray-600">{s.region || '—'}</td>
+                    <td className="p-3 text-gray-600">{s.agent_name || '—'}</td>
+                    <td className="p-3">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${s.status === 'active' ? 'bg-green-50 text-green-600' : s.status === 'suspended' ? 'bg-red-50 text-red-500' : 'bg-amber-50 text-amber-600'}`}>
+                        {s.status === 'active' ? 'نشط' : s.status === 'suspended' ? 'موقوف' : s.status || '—'}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      {s.avatar ? (
+                        <button
+                          type="button"
+                          onClick={() => setLightboxImage(s.avatar)}
+                          className="w-10 h-10 rounded-lg overflow-hidden border border-gray-200 hover:ring-2 hover:ring-emerald-300 transition-shadow"
+                          title="عرض صورة الهوية"
+                        >
+                          <img src={s.avatar} alt="صورة الهوية" className="w-full h-full object-cover" loading="lazy" />
+                        </button>
+                      ) : (
+                        <span className="text-gray-400 text-[11px]">بدون صورة</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-8 text-center space-y-2">
+            <span className="material-symbols-outlined text-3xl text-gray-300">badge</span>
+            <p className="text-xs font-bold text-gray-500">لا يوجد بائعون مسجلون بعد</p>
+            <p className="text-[11px] text-gray-400">ستظهر صور الهويات الملتقطة عند تسجيل أول بائع.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Lightbox */}
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4"
+          onClick={() => setLightboxImage(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="relative max-w-3xl w-full" onClick={(e) => e.stopPropagation()}>
+            <img src={lightboxImage} alt="صورة كبيرة" className="w-full max-h-[85vh] object-contain rounded-xl shadow-2xl" />
+            <button
+              type="button"
+              onClick={() => setLightboxImage(null)}
+              className="absolute -top-3 -left-3 w-9 h-9 rounded-full bg-white text-gray-800 shadow-lg flex items-center justify-center hover:bg-gray-100"
+              title="إغلاق"
+            >
+              <span className="material-symbols-outlined text-[20px]">close</span>
+            </button>
           </div>
         </div>
       )}

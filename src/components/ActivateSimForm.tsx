@@ -15,6 +15,7 @@ interface ActivateSimFormProps {
     iccid: string;
     phoneNumber: string;
     operator: Operator;
+    contractImage?: string | null;
   }) => void;
 }
 
@@ -111,6 +112,7 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
         iccid,
         phoneNumber,
         operator,
+        contractImage: contractPhoto,
       });
 
       setIsSubmitting(false);
