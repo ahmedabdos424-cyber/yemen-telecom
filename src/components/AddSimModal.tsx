@@ -185,7 +185,7 @@ function AddSimModal({ agents, sellers, onClose, onSubmit }: AddSimModalProps) {
           </div>
 
           <p className="text-[10px] text-gray-400 leading-relaxed">
-            عند الإسناد لوكيل أو بائع تصبح الشرائح بحالة «مسندة» ولا يمكن تفعيلها إلا من مخزون الوكيل المتاح.
+            عند الإسناد لوكيل أو بائع تصبح الشرائح «متاحة» ضمن مخزونه ولا يمكن تفعيلها إلا منها.
             الشرائح المكررة في القاعدة سيتم تخطيها تلقائياً.
           </p>
 

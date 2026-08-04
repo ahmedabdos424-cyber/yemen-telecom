@@ -90,6 +90,18 @@ export const activateSimSchema = z.object({
   iccid: z.string().min(1, 'ICCID is required').max(50),
 });
 
+// Agent → seller SIM range transfer
+export const transferSimsSchema = z.object({
+  seller_id: z.number().int().positive(),
+  from_iccid: z.string().min(1, 'from_iccid is required').max(30).regex(ICCID_RANGE_REGEX, 'from_iccid must be numeric'),
+  to_iccid: z.string().min(1, 'to_iccid is required').max(30).regex(ICCID_RANGE_REGEX, 'to_iccid must be numeric'),
+});
+
+// Admin system data reset (confirmation token required)
+export const resetDataSchema = z.object({
+  confirm: z.string().min(1, 'confirmation token is required').max(100),
+});
+
 // Agents
 export const createAgentSchema = z.object({
   name: s(1, 200),
