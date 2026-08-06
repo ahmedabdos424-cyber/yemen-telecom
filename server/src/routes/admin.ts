@@ -1,13 +1,14 @@
 import path from 'path';
 import crypto from 'crypto';
 import { Router, Request, Response } from 'express';
-import { query } from '../db';
+import { query, transaction } from '../db';
 import { logger } from '../logger';
 import { cacheStats } from '../cache';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination, formatDbTimestamp } from '../helpers';
 import { validate, updateSettingsSchema, createSimBatchSchema, resetDataSchema } from '../validation';
 import { resetSystemData } from '../reset-data';
+import { createAlert } from '../services/alerts.service';
 
 const router = Router();
 
@@ -392,28 +393,30 @@ router.post('/sims/batch', requireRole('manager'), validate(createSimBatchSchema
       );
     }
 
-    const insertResult = await query(
-      `INSERT INTO sims (iccid, phone, provider, status, owner, date_added, package_type, owner_role, assigned_to, assigned_to_agent)
-       VALUES ${placeholders}
-       ON CONFLICT (iccid) DO NOTHING
-       RETURNING id`,
-      params
-    );
-    const created = insertResult.rows.length;
-    const skipped = iccids.length - created;
-
-    if (created > 0) {
-      await query(
-        `INSERT INTO alerts (title, description, priority, time, category, created_by)
-         VALUES ($1, $2, 'low', $3, 'مخزون', $4)`,
-        [
-          `تمت إضافة دفعة شرائح (${created} شريحة)`,
-          `أُضيفت ${created} شريحة عبر النطاق ${from_iccid} → ${to_iccid} للمشغل ${provider} (الحالة: ${status === 'assigned' ? 'مسندة' : 'متاحة'})، المالك: ${ownerText}.`,
-          new Date().toLocaleString('ar-YE'),
-          req.user?.id ?? null,
-        ]
+    const created = await transaction(async (client) => {
+      const insertResult = await client.query(
+        `INSERT INTO sims (iccid, phone, provider, status, owner, date_added, package_type, owner_role, assigned_to, assigned_to_agent)
+         VALUES ${placeholders}
+         ON CONFLICT (iccid) DO NOTHING
+         RETURNING id`,
+        params
       );
-    }
+      const inserted = insertResult.rows.length;
+      if (inserted > 0) {
+        await createAlert(
+          {
+            title: `تمت إضافة دفعة شرائح (${inserted} شريحة)`,
+            description: `أُضيفت ${inserted} شريحة عبر النطاق ${from_iccid} → ${to_iccid} للمشغل ${provider} (الحالة: ${status === 'assigned' ? 'مسندة' : 'متاحة'})، المالك: ${ownerText}.`,
+            priority: 'low',
+            category: 'مخزون',
+            userId: req.user?.id ?? null,
+          },
+          client
+        );
+      }
+      return inserted;
+    });
+    const skipped = iccids.length - created;
 
     res.status(201).json({
       created,
@@ -441,16 +444,13 @@ router.post('/reset', requireRole('manager'), validate(resetDataSchema), async (
     }
     const summary = await resetSystemData();
     // Audit trail for the reset itself (recorded after the wipe).
-    await query(
-      `INSERT INTO alerts (title, description, priority, time, category, created_by)
-       VALUES ($1, $2, 'high', $3, 'أمان', $4)`,
-      [
-        'تم تصفير بيانات النظام',
-        `قام ${req.user?.username || 'manager'} بتصفير المخزون والجداول العلائقية (${Object.values(summary.deleted).reduce((a, b) => a + b, 0)} سجلاً).`,
-        new Date().toLocaleString('ar-YE'),
-        req.user?.id ?? null,
-      ]
-    );
+    await createAlert({
+      title: 'تم تصفير بيانات النظام',
+      description: `قام ${req.user?.username || 'manager'} بتصفير المخزون والجداول العلائقية (${Object.values(summary.deleted).reduce((a, b) => a + b, 0)} سجلاً).`,
+      priority: 'high',
+      category: 'أمان',
+      userId: req.user?.id ?? null,
+    });
     res.json({ success: true, message: 'System data reset completed', deleted: summary.deleted });
   } catch (err) {
     logger.error('Error resetting system data:', err);
