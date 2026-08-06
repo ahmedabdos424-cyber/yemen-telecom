@@ -32,10 +32,13 @@ export interface TokenPayload {
   iss?: string;
 }
 
-export const SESSION_EXEMPT_ROLES = new Set<string>(['manager', 'agent', 'seller']);
+// Only demo seed accounts are exempt from single-device session enforcement.
+// Every real production account must pass the active_session_sid check to
+// prevent concurrent-device hijacking.
+export const DEMO_USERNAMES = new Set<string>(['manager', 'agent', 'seller']);
 
-export function isSessionExempt(role: string): boolean {
-  return SESSION_EXEMPT_ROLES.has(role);
+export function isSessionExempt(username?: string): boolean {
+  return !!username && DEMO_USERNAMES.has(username);
 }
 
 export function hashToken(token: string): string {
@@ -78,7 +81,7 @@ export async function authenticateToken(req: AuthRequest, res: Response, next: N
     if (userCheck.rows.length === 0 || userCheck.rows[0].status !== 'active') {
       return res.status(401).json({ error: 'Account is not active' });
     }
-    if (!isSessionExempt(decoded.role)) {
+    if (!isSessionExempt(decoded.username)) {
       const session = await query('SELECT active_session_sid, session_expires_at FROM users WHERE id = $1', [decoded.id]);
       const row = session.rows[0];
       if (row) {

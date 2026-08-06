@@ -47,7 +47,7 @@ router.post('/login', validate(loginSchema), async (req: Request, res: Response)
     await query('UPDATE users SET last_login = NOW(), failed_attempts = 0, locked_until = NULL WHERE id = $1', [user.id]);
     const { deviceName, deviceId, ip } = getDeviceInfo(req);
     const sid = crypto.randomUUID();
-    if (!isSessionExempt(user.role)) {
+    if (!isSessionExempt(user.username)) {
       await query('UPDATE users SET active_session_sid = $1, session_expires_at = $2 WHERE id = $3', [
         sid,
         new Date(Date.now() + SESSION_DURATION_MS).toISOString(),
@@ -113,7 +113,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
     if (userRes.rows.length === 0 || userRes.rows[0].status !== 'active') {
       return res.status(403).json({ error: 'Account disabled' });
     }
-    if (!isSessionExempt(decoded.role)) {
+    if (!isSessionExempt(decoded.username)) {
       const session = await query('SELECT active_session_sid, session_expires_at FROM users WHERE id = $1', [decoded.id]);
       const row = session.rows[0];
       if (row?.active_session_sid && decoded.sid && row.active_session_sid !== decoded.sid) {
@@ -173,7 +173,7 @@ router.post('/logout', async (req: Request, res: Response) => {
         }
       } catch { /* refresh token already expired — ignore */ }
     }
-    if (decoded.sid && !isSessionExempt(decoded.role)) {
+    if (decoded.sid && !isSessionExempt(decoded.username)) {
       await query(
         'UPDATE users SET active_session_sid = NULL, session_expires_at = NULL WHERE id = $1 AND active_session_sid = $2',
         [decoded.id, decoded.sid]

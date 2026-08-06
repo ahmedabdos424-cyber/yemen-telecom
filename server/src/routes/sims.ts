@@ -4,6 +4,7 @@ import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination, paginatedQuery } from '../helpers';
 import { validate, createSimSchema, updateSimSchema, activateSimSchema, transferSimsSchema } from '../validation';
+import { createAlert } from '../services/alerts.service';
 
 const router = Router();
 
@@ -43,16 +44,13 @@ router.post('/activate', requireRole('manager', 'agent', 'seller'), validate(act
     }
 
     if (!inStock) {
-      await query(
-        `INSERT INTO alerts (title, description, priority, time, category, created_by)
-         VALUES ($1, $2, 'high', $3, 'مخزون', $4)`,
-        [
-          'محاولة تفعيل شريحة خارج المخزون المتاح',
-          `فشلت محاولة تفعيل الشريحة ${iccid} لأنها غير موجودة في المخزون المتاح للوكيل.`,
-          new Date().toLocaleString('ar-YE'),
-          requester?.id ?? null,
-        ]
-      );
+      await createAlert({
+        title: 'محاولة تفعيل شريحة خارج المخزون المتاح',
+        description: `فشلت محاولة تفعيل الشريحة ${iccid} لأنها غير موجودة في المخزون المتاح للوكيل.`,
+        priority: 'high',
+        category: 'مخزون',
+        userId: requester?.id ?? null,
+      });
       return res.status(400).json({ error: 'الرقم التسلسلي غير متوفر في مخزونك' });
     }
 
@@ -140,16 +138,13 @@ router.post('/transfer', requireRole('agent'), validate(transferSimsSchema), asy
       [seller_id, seller.name || `Seller #${seller_id}`, iccids, agentId]
     );
 
-    await query(
-      `INSERT INTO alerts (title, description, priority, time, category, created_by)
-       VALUES ($1, $2, 'low', $3, 'مخزون', $4)`,
-      [
-        `تم تحويل دفعة شرائح (${updated.rows.length} شريحة)`,
-        `حُوِّلت ${updated.rows.length} شريحة عبر النطاق ${from_iccid} → ${to_iccid} إلى البائع ${seller.name}.`,
-        new Date().toLocaleString('ar-YE'),
-        req.user?.id ?? null,
-      ]
-    );
+    await createAlert({
+      title: `تم تحويل دفعة شرائح (${updated.rows.length} شريحة)`,
+      description: `حُوِّلت ${updated.rows.length} شريحة عبر النطاق ${from_iccid} → ${to_iccid} إلى البائع ${seller.name}.`,
+      priority: 'low',
+      category: 'مخزون',
+      userId: req.user?.id ?? null,
+    });
 
     res.json({
       transferred: updated.rows.length,
