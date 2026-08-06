@@ -76,5 +76,8 @@
     "protobufjs@7.6.4": true,
     "sharp@0.34.5": true,
     "tesseract.js@7.0.0": true
+  },
+  "overrides": {
+    "semver": "^7.6.2"
   }
 }
