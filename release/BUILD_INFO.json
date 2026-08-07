@@ -1,11 +1,11 @@
 ﻿{
-  "versionCode": 14,
-  "versionName": "1.0.9",
-  "buildTimestamp": "2026-07-29T12:00:00Z",
+  "versionCode": 18,
+  "versionName": "1.0.13",
+  "buildTimestamp": "2026-08-07T23:55:03Z",
   "apk": {
     "filename": "yemen-telecom-release.apk",
-    "size": 27787749,
-    "sha256": "A012B3FC51FE8F0ABC5BD85280576435E03CBD3887AF2EDB254E49CC1AA0A634"
+    "size": 30282161,
+    "sha256": "5A9CD1D2033487B4DCD677E681A48696E6BF303133ED69CDCBA8104AEAFFD7E8"
   },
   "aab": {
     "filename": "yemen-telecom-release.aab",
