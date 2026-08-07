@@ -4,6 +4,7 @@ import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination } from '../helpers';
 import { validate, createDistributionSchema, approveDistributionSchema } from '../validation';
+import { broadcastEvent, broadcastToRoles } from '../services/realtime.service';
 
 const router = Router();
 
@@ -82,6 +83,10 @@ router.post('/', requireRole('agent'), validate(createDistributionSchema), async
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
       [requestId, agentId, sellerId, operator, count, notes || '']
     );
+    broadcastToRoles(
+      { type: 'distribution.created', entity: 'distribution', id: result.rows[0].id, request_id: requestId, agent_id: agentId, operator, count, status: 'pending' },
+      ['manager']
+    );
     res.status(201).json(result.rows[0]);
   } catch (err) {
     logger.error('Error creating distribution request:', err);
@@ -112,6 +117,7 @@ router.put('/:id/approve', requireRole('manager'), validate(approveDistributionS
         );
       }
     });
+    broadcastEvent({ type: 'distribution.updated', entity: 'distribution', id: req.params.id, status: decision, action: 'approve' });
     res.json({ message: `Request ${decision} successfully` });
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);

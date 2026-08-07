@@ -31,6 +31,11 @@ export default defineConfig({
     host: '0.0.0.0',
     allowedHosts: ['localhost', '127.0.0.1', '::1'],
      proxy: {
+       '/ws': {
+         target: 'https://yemen-telecom.onrender.com',
+         changeOrigin: true,
+         ws: true,
+       },
        '/api': {
          target: 'https://yemen-telecom.onrender.com',
          changeOrigin: true,

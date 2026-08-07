@@ -6,6 +6,7 @@ import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination } from '../helpers';
 import { validate, createSellerSchema, updateSellerSchema, updateSellerBalanceSchema } from '../validation';
+import { broadcastEvent } from '../services/realtime.service';
 
 const router = Router();
 
@@ -201,6 +202,7 @@ router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), 
       return { seller: mapSeller(finalResult.rows[0]) };
     });
 
+    broadcastEvent({ type: 'seller.created', entity: 'seller', id: createdSeller.id, name: createdSeller.name, agent_id: agentId });
     res.status(201).json({
       seller: createdSeller,
       credentials: {
@@ -247,6 +249,7 @@ router.put('/:id', requireRole('manager', 'agent'), validate(updateSellerSchema)
       `SELECT s.*, a.name as agent_name FROM sellers s LEFT JOIN agents a ON s.agent_id = a.id WHERE s.id = $1`,
       [id]
     );
+    broadcastEvent({ type: 'seller.updated', entity: 'seller', id, status, action: 'update' });
     res.json(mapSeller(updated.rows[0]));
   } catch (err) {
     logger.error('Error updating seller:', err);
@@ -294,6 +297,7 @@ router.put('/:id/balance', requireRole('manager', 'agent'), validate(updateSelle
       }
       return finalResult.rows[0];
     });
+    broadcastEvent({ type: 'seller.updated', entity: 'seller', id, action: 'balance', amount });
     res.json(mapSeller(result));
   } catch (err) {
     logger.error('Error updating seller balance:', err);
@@ -355,6 +359,7 @@ router.delete('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, 
     await query('UPDATE sims SET assigned_to = NULL, owner = $1 WHERE assigned_to = $2', ['المركز الرئيسي', id]);
     await query('DELETE FROM distribution_requests WHERE seller_id = $1', [id]);
     await query('UPDATE sellers SET status = $1 WHERE id = $2', ['deleted', id]);
+    broadcastEvent({ type: 'seller.deleted', entity: 'seller', id });
     res.json({ message: 'Seller deleted successfully' });
   } catch (err) {
     logger.error('Error deleting seller:', err);

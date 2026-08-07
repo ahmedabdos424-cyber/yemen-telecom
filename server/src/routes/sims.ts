@@ -5,6 +5,7 @@ import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination, paginatedQuery } from '../helpers';
 import { validate, createSimSchema, updateSimSchema, activateSimSchema, transferSimsSchema } from '../validation';
 import { createAlert } from '../services/alerts.service';
+import { broadcastEvent } from '../services/realtime.service';
 
 const router = Router();
 
@@ -62,6 +63,7 @@ router.post('/activate', requireRole('manager', 'agent', 'seller'), validate(act
        WHERE id = $5 RETURNING *`,
       [requester?.id ?? null, customerName, customerId, contractImage, sim.id]
     );
+    broadcastEvent({ type: 'sim.updated', entity: 'sim', id: sim.id, iccid, status: 'activated', action: 'activate' });
     res.json(updated.rows[0]);
   } catch (err) {
     logger.error('Error activating sim:', err);
@@ -146,6 +148,16 @@ router.post('/transfer', requireRole('agent'), validate(transferSimsSchema), asy
       userId: req.user?.id ?? null,
     });
 
+    broadcastEvent({
+      type: 'sim.batch_updated',
+      entity: 'sim',
+      action: 'transfer',
+      count: updated.rows.length,
+      seller_id,
+      from_iccid,
+      to_iccid,
+    });
+
     res.json({
       transferred: updated.rows.length,
       total: iccids.length,
@@ -199,9 +211,10 @@ router.post('/', requireRole('manager'), validate(createSimSchema), async (req: 
     const result = await query(
       `INSERT INTO sims (phone, iccid, provider, status, owner, date_added, package_type)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [phone || '', iccid, provider || 'Yemen Mobile', status || 'available', owner || 'المركز الرئيسي',
-       new Date().toLocaleDateString('ar-YE'), package_type || 'باقة مزايا الشهرية']
+       [phone || '', iccid, provider || 'Yemen Mobile', status || 'available', owner || 'المركز الرئيسي',
+        new Date().toLocaleDateString('ar-YE'), package_type || 'باقة مزايا الشهرية']
     );
+    broadcastEvent({ type: 'sim.created', entity: 'sim', id: result.rows[0].id, iccid, status: result.rows[0].status });
     res.status(201).json(result.rows[0]);
   } catch (err: unknown) {
     if (err && typeof err === 'object' && 'code' in err && (err as any).code === '23505') {
@@ -253,6 +266,7 @@ router.put('/:id', requireRole('manager', 'agent', 'seller'), validate(updateSim
          customer_name=$7, customer_id=$8, contract_image=$9 WHERE id=$10 RETURNING *`,
       [phone, iccid, provider, status, owner, package_type, customerName, customerId, contractImage, id]
     );
+    broadcastEvent({ type: 'sim.updated', entity: 'sim', id, iccid, status, action: 'update' });
     res.json(result.rows[0]);
   } catch (err) {
     logger.error('Error updating sim:', err);
@@ -264,6 +278,7 @@ router.delete('/:id', requireRole('manager'), async (req: Request, res: Response
   const { id } = req.params;
   try {
     await query('DELETE FROM sims WHERE id = $1', [id]);
+    broadcastEvent({ type: 'sim.deleted', entity: 'sim', id });
     res.json({ success: true });
   } catch (err) {
     logger.error('Error deleting sim:', err);
