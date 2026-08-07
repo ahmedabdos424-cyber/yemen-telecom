@@ -21,6 +21,10 @@ interface AgentProfileViewProps {
   onConfirmLogout?: () => void;
   darkMode: boolean;
   setDarkMode: (dark: boolean) => void;
+  biometricAvailable?: boolean;
+  biometricEnabled?: boolean;
+  onEnableBiometric?: () => Promise<boolean>;
+  onDisableBiometric?: () => Promise<void>;
 }
 
 export default function AgentProfileView({
@@ -31,7 +35,11 @@ export default function AgentProfileView({
   onLogout,
   onConfirmLogout,
   darkMode,
-  setDarkMode
+  setDarkMode,
+  biometricAvailable = false,
+  biometricEnabled = false,
+  onEnableBiometric,
+  onDisableBiometric
 }: AgentProfileViewProps) {
   const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
@@ -49,9 +57,6 @@ export default function AgentProfileView({
   });
   const [lowStockNotifications, setLowStockNotifications] = useState<boolean>(() => {
     return localStorage.getItem('tele_low_stock_notifications') !== 'false';
-  });
-  const [biometricEnabled, setBiometricEnabled] = useState<boolean>(() => {
-    return localStorage.getItem('tele_biometric_enabled') === 'true';
   });
 
   const setFontSize = (size: 'sm' | 'base' | 'lg') => {
@@ -71,10 +76,21 @@ export default function AgentProfileView({
     localStorage.setItem('tele_low_stock_notifications', String(val));
   };
 
-  const handleToggleBiometric = () => {
+  const handleToggleBiometric = async () => {
     const val = !biometricEnabled;
-    setBiometricEnabled(val);
-    localStorage.setItem('tele_biometric_enabled', String(val));
+    if (val) {
+      if (!onEnableBiometric) return;
+      const ok = await onEnableBiometric();
+      if (!ok) {
+        toastWarning('لم يتم التفعيل. تحقق من توفر مستشعر بصمة أو أعد المحاولة');
+        return;
+      }
+      toastSuccess('تم تفعيل الدخول السريع بالبصمة');
+    } else {
+      if (!onDisableBiometric) return;
+      await onDisableBiometric();
+      toastSuccess('تم إيقاف الدخول السريع بالبصمة');
+    }
   };
 
   const [currentPassword, setCurrentPassword] = useState('');

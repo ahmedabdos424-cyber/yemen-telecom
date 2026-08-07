@@ -231,8 +231,13 @@ ALTER TABLE alerts ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(
 ALTER TABLE distribution_requests ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
 
--- Add UNIQUE constraint on customers.id_number
-ALTER TABLE customers ADD CONSTRAINT IF NOT EXISTS customers_id_number_unique UNIQUE (id_number);
+-- Add UNIQUE constraint on customers.id_number (PostgreSQL has no ADD CONSTRAINT IF NOT EXISTS)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'customers_id_number_unique') THEN
+    ALTER TABLE customers ADD CONSTRAINT customers_id_number_unique UNIQUE (id_number);
+  END IF;
+END $$;
 
 -- Add created_at to transactions if missing
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
@@ -345,7 +350,7 @@ INSERT INTO operations (op_id, type, target, operator, date, time, status) VALUE
   ('op1', 'activate', '0504938210', 'yemen_mobile', '2026/05/31', '١٠:٤٥ ص', 'success'),
   ('op2', 'recharge', '#INV-8821', 'you', '2026/05/31', '٠٩:١٢ ص', 'success'),
   ('op3', 'activate', '0504938255', 'sabafon', '2026/05/31', '٠٨:٥٠ ص', 'failed')
-ON CONFLICT (op_id) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 INSERT INTO inventories (operator, available, remaining, period_days) VALUES
   ('yemen_mobile', 542, 48, 12),

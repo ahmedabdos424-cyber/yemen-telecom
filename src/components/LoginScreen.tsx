@@ -6,6 +6,8 @@ import { useToast, ToastContainer } from '../hooks/useToast';
 
 interface LoginScreenProps {
   onLogin: (role: Role, username: string, password: string) => Promise<{ role: Role; commit: () => void } | null>;
+  onBiometricLogin?: () => Promise<{ role: Role; commit: () => void } | null>;
+  biometricAvailable?: boolean;
   darkMode: boolean;
   setDarkMode: (dark: boolean) => void;
 }
@@ -29,7 +31,7 @@ function removeUsername(u: string) {
   localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(list));
 }
 
-export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScreenProps) {
+export default function LoginScreen({ onLogin, onBiometricLogin, biometricAvailable, darkMode, setDarkMode }: LoginScreenProps) {
   const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -109,6 +111,33 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
     setErrorMsg('');
     setFieldError(null);
     setTimeout(() => passwordRef.current?.focus(), 200);
+  };
+
+  const [biometricLoading, setBiometricLoading] = useState(false);
+
+  const handleBiometric = async () => {
+    if (biometricLoading || !onBiometricLogin) return;
+    setBiometricLoading(true);
+    setErrorMsg('');
+    setFieldError(null);
+    try {
+      const result = await onBiometricLogin();
+      if (abortRef.current) return;
+      if (result) {
+        setSuccess(true);
+        setBiometricLoading(false);
+        setTimeout(() => {
+          if (!abortRef.current) result.commit();
+        }, 450);
+      } else {
+        setBiometricLoading(false);
+        setErrorMsg('لم يتم التحقق من بصمتك أو لا يوجد دخول سريع محفوظ. سجّل الدخول بكلمة المرور');
+      }
+    } catch (err) {
+      if (abortRef.current) return;
+      setBiometricLoading(false);
+      setErrorMsg('تعذر التحقق البيومتري. حاول مجدداً أو استخدم كلمة المرور');
+    }
   };
 
   const removeRecent = (e: MouseEvent, u: string) => {
@@ -433,6 +462,27 @@ export default function LoginScreen({ onLogin, darkMode, setDarkMode }: LoginScr
                 )}
               </AnimatePresence>
             </motion.button>
+
+            {/* ===== BIOMETRIC QUICK LOGIN ===== */}
+            {onBiometricLogin && biometricAvailable && (
+              <button
+                type="button"
+                onClick={handleBiometric}
+                disabled={biometricLoading || isLoading || success}
+                className={`w-full py-3.5 rounded-2xl font-bold text-sm tracking-wide transition-all duration-200 flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed border ${
+                  darkMode
+                    ? 'border-white/10 text-white/70 hover:bg-white/5 active:bg-white/10'
+                    : 'border-gray-200 text-gray-600 hover:bg-gray-50 active:bg-gray-100'
+                }`}
+              >
+                {biometricLoading ? (
+                  <span className="w-4 h-4 rounded-full border-2 border-current border-t-transparent" style={{ animation: 'spin 0.8s linear infinite' }} />
+                ) : (
+                  <Smartphone size={17} />
+                )}
+                <span>{biometricLoading ? 'جاري التحقق...' : 'الدخول السريع بالبصمة'}</span>
+              </button>
+            )}
           </form>
         </motion.div>
         </div>{/* end card wrapper */}

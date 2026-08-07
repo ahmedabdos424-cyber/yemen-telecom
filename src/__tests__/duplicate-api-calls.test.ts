@@ -51,8 +51,11 @@ describe('P0-04 Duplicate API Call Regression Tests', () => {
     });
 
     it('useAgentSellerState handleSimActivationForSeller calls api.createOperation exactly once', () => {
-      const handlerBody = hookSrc.split('const handleSimActivationForSeller')[1]?.split('\n').slice(0, 30).join('\n');
-      const createOpCalls = handlerBody?.match(/createOperation/g);
+      // The offline fast path is prepended to the handler; scan the full
+      // handler body (up to the next top-level const) for createOperation.
+      const after = hookSrc.split('const handleSimActivationForSeller')[1] ?? '';
+      const handlerBody = after.split('\n  const ')[0];
+      const createOpCalls = handlerBody?.match(/api\.createOperation/g);
       expect(createOpCalls?.length).toBe(1);
     });
   });

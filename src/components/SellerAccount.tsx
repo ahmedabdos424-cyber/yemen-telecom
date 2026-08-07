@@ -18,11 +18,19 @@ interface SellerAccountProps {
   onPasswordChanged: (newPass: string) => void;
   onConfirmLogout: () => void;
   onLogout: () => void;
+  biometricAvailable?: boolean;
+  biometricEnabled?: boolean;
+  onEnableBiometric?: () => Promise<boolean>;
+  onDisableBiometric?: () => Promise<void>;
 }
 
 export default function SellerAccount({
   sellerData, darkMode, setDarkMode,
-  onPasswordChanged, onConfirmLogout, onLogout
+  onPasswordChanged, onConfirmLogout, onLogout,
+  biometricAvailable = false,
+  biometricEnabled = false,
+  onEnableBiometric,
+  onDisableBiometric
 }: SellerAccountProps) {
   const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
@@ -44,9 +52,6 @@ export default function SellerAccount({
   const [lowStockNotifications, setLowStockNotifications] = useState<boolean>(() => {
     return localStorage.getItem('tele_low_stock_notifications') !== 'false';
   });
-  const [biometricEnabled, setBiometricEnabled] = useState<boolean>(() => {
-    return localStorage.getItem('tele_biometric_enabled') === 'true';
-  });
 
   const setFontSize = (size: 'sm' | 'base' | 'lg') => {
     setFontSizeState(size);
@@ -65,10 +70,21 @@ export default function SellerAccount({
     localStorage.setItem('tele_low_stock_notifications', String(val));
   };
 
-  const handleToggleBiometric = () => {
+  const handleToggleBiometric = async () => {
     const val = !biometricEnabled;
-    setBiometricEnabled(val);
-    localStorage.setItem('tele_biometric_enabled', String(val));
+    if (val) {
+      if (!onEnableBiometric) return;
+      const ok = await onEnableBiometric();
+      if (!ok) {
+        toastWarning('لم يتم التفعيل. تحقق من توفر مستشعر بصمة أو أعد المحاولة');
+        return;
+      }
+      toastSuccess('تم تفعيل الدخول السريع بالبصمة');
+    } else {
+      if (!onDisableBiometric) return;
+      await onDisableBiometric();
+      toastSuccess('تم إيقاف الدخول السريع بالبصمة');
+    }
   };
 
   const [sellerPhoto, setSellerPhoto] = useState(

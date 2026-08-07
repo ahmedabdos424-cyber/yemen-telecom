@@ -413,6 +413,18 @@ export const api = {
   resolveAlert: (id: number) =>
     request<{ message: string }>(`/alerts/${id}`, { method: 'DELETE' }),
 
+  // Push notifications (FCM)
+  registerDeviceToken: (token: string, platform: string = 'android') =>
+    request<{ success: boolean }>('/notifications/device-token', {
+      method: 'POST',
+      body: JSON.stringify({ token, platform }),
+    }),
+  unregisterDeviceToken: (token: string) =>
+    request<{ success: boolean }>('/notifications/device-token', {
+      method: 'DELETE',
+      body: JSON.stringify({ token }),
+    }),
+
   // Admin
   getStats: () => request<StatsResponse>('/stats'),
   getSettings: () => request<AdminSettingsResponse>('/admin/settings'),
