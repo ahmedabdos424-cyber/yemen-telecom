@@ -2,6 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { Role } from '../types';
 import { api, setToken, setRefreshToken, clearTokens, fetchCsrfToken, loadTokens, getLoadedTokens, waitForServerAwake } from '../api/client';
 import { setFrontendSentryUser } from '../lib/sentry';
+import {
+  isNativeBiometrics, isBiometricAvailable, authenticateBiometric,
+  getBiometricCredential, hasBiometricCredential, clearBiometricCredential,
+  saveBiometricCredential,
+} from '../services/biometricAuth';
 
 export function useAuth() {
   const [role, setRole] = useState<Role | null>(() => {
@@ -11,6 +16,19 @@ export function useAuth() {
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('tele_dark') === 'true');
   const [token, setAppToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+
+  useEffect(() => {
+    if (isNativeBiometrics()) {
+      isBiometricAvailable().then(ok => {
+        if (ok) setBiometricAvailable(true);
+      }).catch(() => {});
+      hasBiometricCredential().then(ok => {
+        if (ok) setBiometricEnabled(true);
+      }).catch(() => {});
+    }
+  }, []);
 
   const setTokenWrapper = useCallback((t: string | null) => {
     setAppToken(t);
@@ -23,6 +41,8 @@ export function useAuth() {
     localStorage.removeItem('tele_username');
     localStorage.removeItem('tele_role_tab');
     localStorage.removeItem('tele_manager_view');
+    clearBiometricCredential().catch(() => {});
+    setBiometricEnabled(false);
     setRole(null);
     setUsername('');
     setTokenWrapper(null);
@@ -115,9 +135,60 @@ export function useAuth() {
     clearSession();
   }, [clearSession]);
 
+  const enableBiometricLogin = useCallback(async (usernameToSave: string): Promise<boolean> => {
+    if (!isNativeBiometrics()) return false;
+    const authed = await authenticateBiometric('تأكيد بصمتك لتفعيل الدخول السريع');
+    if (!authed) return false;
+    const { refreshToken: rt } = getLoadedTokens();
+    if (!rt) return false;
+    await saveBiometricCredential({ username: usernameToSave, refreshToken: rt, savedAt: Date.now() });
+    setBiometricEnabled(true);
+    return true;
+  }, []);
+
+  const disableBiometricLogin = useCallback(async (): Promise<void> => {
+    await clearBiometricCredential();
+    setBiometricEnabled(false);
+  }, []);
+
+  const handleBiometricLogin = useCallback(async (): Promise<{ role: Role; commit: () => void } | null> => {
+    if (!isNativeBiometrics()) return null;
+    const authed = await authenticateBiometric('استخدم بصمتك للدخول السريع');
+    if (!authed) return null;
+    const credential = await getBiometricCredential();
+    if (!credential) return null;
+    // Rotate the stored refresh token into a fresh session.
+    setRefreshToken(credential.refreshToken);
+    const newToken = await api.refresh();
+    if (!newToken) {
+      await clearBiometricCredential();
+      setBiometricEnabled(false);
+      return null;
+    }
+    setTokenWrapper(newToken);
+    const user = await api.getMe().catch(() => null);
+    if (!user) {
+      clearSession();
+      return null;
+    }
+    setFrontendSentryUser({ id: user.id, username: user.displayName, role: user.role });
+    const userRole = user.role as Role;
+    return {
+      role: userRole,
+      commit: () => {
+        setRole(userRole);
+        setUsername(user.displayName);
+        localStorage.setItem('tele_role', userRole);
+        localStorage.setItem('tele_username', user.displayName);
+        fetchCsrfToken();
+      },
+    };
+  }, [clearSession, setTokenWrapper]);
+
   return {
     role, setRole, username, setUsername,
     darkMode, setDarkMode, token, setTokenWrapper,
     isLoading, handleLogin, handleLogout, clearSession,
+    biometricAvailable, biometricEnabled, enableBiometricLogin, disableBiometricLogin, handleBiometricLogin,
   };
 }

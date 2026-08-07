@@ -37,3 +37,47 @@ self.addEventListener('activate', (event) => {
     )).then(() => clients.claim())
   );
 });
+
+// ===== Push notifications (FCM data messages) =====
+// The native app receives push natively via @capacitor-firebase/messaging;
+// this handler covers web fallback and background data messages.
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch {
+    payload = { body: event.data.text() };
+  }
+
+  const notification = payload.notification || {
+    title: payload.title || 'يمن تليكوم',
+    body: payload.body || 'لديك إشعار جديد',
+  };
+  const options = {
+    body: notification.body || notification.title,
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    data: payload.data || {},
+    tag: payload.data?.alertId ? `alert-${payload.data.alertId}` : undefined,
+    requireInteraction: false,
+    vibrate: [100, 50, 100],
+  };
+  event.waitUntil(self.registration.showNotification(notification.title || 'يمن تليكوم', options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || '/';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      for (const client of windowClients) {
+        if ('focus' in client) {
+          client.navigate(url);
+          return client.focus();
+        }
+      }
+      return clients.openWindow(url);
+    })
+  );
+});

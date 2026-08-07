@@ -1,16 +1,13 @@
 import { useState, useEffect } from 'react';
+import { onNetworkChange } from '../services/offlineQueue';
 
 export function useNetworkStatus() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
-    const goOnline = () => setIsOnline(true);
-    const goOffline = () => setIsOnline(false);
-    window.addEventListener('online', goOnline);
-    window.addEventListener('offline', goOffline);
+    const off = onNetworkChange((online) => setIsOnline(online));
     return () => {
-      window.removeEventListener('online', goOnline);
-      window.removeEventListener('offline', goOffline);
+      off();
     };
   }, []);
 
