@@ -60,6 +60,42 @@ export function requireRole(...roles: string[]) {
   };
 }
 
+export type ResolvedUser = { id: number; username: string; role: string };
+
+// Shared token resolution used by both the Express middleware and the
+// realtime WebSocket gateway. Returns the authenticated user or null.
+export async function resolveTokenUser(token: string): Promise<ResolvedUser | null> {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET, {
+      issuer: 'yemen-telecom',
+      algorithms: ['HS256'],
+    }) as TokenPayload;
+    const blacklisted = await isTokenBlacklisted(token);
+    if (blacklisted) {
+      return null;
+    }
+    const userCheck = await query('SELECT status FROM users WHERE id = $1', [decoded.id]);
+    if (userCheck.rows.length === 0 || userCheck.rows[0].status !== 'active') {
+      return null;
+    }
+    if (!isSessionExempt(decoded.username)) {
+      const session = await query('SELECT active_session_sid, session_expires_at FROM users WHERE id = $1', [decoded.id]);
+      const row = session.rows[0];
+      if (row) {
+        if (row.session_expires_at && new Date(row.session_expires_at) < new Date()) {
+          return null;
+        }
+        if (row.active_session_sid && (!decoded.sid || decoded.sid !== row.active_session_sid)) {
+          return null;
+        }
+      }
+    }
+    return { id: decoded.id, username: decoded.username, role: decoded.role };
+  } catch {
+    return null;
+  }
+}
+
 export async function authenticateToken(req: AuthRequest, res: Response, next: NextFunction) {
   const cookieToken = req.cookies?.token;
   const auth = req.headers.authorization;
@@ -68,35 +104,11 @@ export async function authenticateToken(req: AuthRequest, res: Response, next: N
   if (!token) {
     return res.status(401).json({ error: 'No token provided' });
   }
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET, {
-      issuer: 'yemen-telecom',
-      algorithms: ['HS256'],
-    }) as TokenPayload;
-    const blacklisted = await isTokenBlacklisted(token);
-    if (blacklisted) {
-      return res.status(401).json({ error: 'Token has been revoked' });
-    }
-    const userCheck = await query('SELECT status FROM users WHERE id = $1', [decoded.id]);
-    if (userCheck.rows.length === 0 || userCheck.rows[0].status !== 'active') {
-      return res.status(401).json({ error: 'Account is not active' });
-    }
-    if (!isSessionExempt(decoded.username)) {
-      const session = await query('SELECT active_session_sid, session_expires_at FROM users WHERE id = $1', [decoded.id]);
-      const row = session.rows[0];
-      if (row) {
-        if (row.session_expires_at && new Date(row.session_expires_at) < new Date()) {
-          return res.status(401).json({ error: 'Session has expired', code: 'SESSION_EXPIRED' });
-        }
-        if (row.active_session_sid && (!decoded.sid || decoded.sid !== row.active_session_sid)) {
-          return res.status(401).json({ error: 'Session terminated by a new login from another device', code: 'SESSION_TERMINATED' });
-        }
-      }
-    }
-    req.user = { id: decoded.id, username: decoded.username, role: decoded.role };
-    setSentryUser(req.user);
-    next();
-  } catch {
+  const user = await resolveTokenUser(token);
+  if (!user) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
+  req.user = user;
+  setSentryUser(user);
+  next();
 }

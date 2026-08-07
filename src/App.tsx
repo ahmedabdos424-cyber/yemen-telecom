@@ -11,6 +11,8 @@ import ErrorBoundary from './components/shared/ErrorBoundary';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
 import { useToast, ToastContainer } from './hooks/useToast';
 import { SESSION_EXPIRED_EVENT, ensureServerIsAwake } from './api/client';
+import { initPushNotifications } from './services/pushNotifications';
+import { connectRealtime, disconnectRealtime, onRealtimeEvent } from './services/realtime';
 const DashboardView = lazy(() => import('./components/DashboardView'));
 const SIMsView = lazy(() => import('./components/SIMsView'));
 const AgentsView = lazy(() => import('./components/AgentsView'));
@@ -45,12 +47,67 @@ function AuthenticatedApp() {
   const agt = useAgentSellerState(auth.role, auth.username);
 
   const [dashboardSearch, setDashboardSearch] = useState('');
-  const { role, username, darkMode, setDarkMode, isLoading, handleLogin, handleLogout, clearSession } = auth;
+  const { role, username, darkMode, setDarkMode, isLoading, handleLogin, handleLogout, clearSession, biometricAvailable, biometricEnabled, enableBiometricLogin, disableBiometricLogin, handleBiometricLogin } = auth;
   const { setTokenWrapper } = auth;
   const isOnline = useNetworkStatus();
-  const { toasts, dismissToast, toastWarning } = useToast();
+  const { toasts, dismissToast, toastWarning, toastInfo } = useToast();
   const roleRef = useRef(role);
   useEffect(() => { roleRef.current = role; }, [role]);
+  const mgrRef = useRef(mgr);
+  useEffect(() => { mgrRef.current = mgr; });
+  const agtRef = useRef(agt);
+  useEffect(() => { agtRef.current = agt; });
+
+  // Register this device for FCM push notifications once a user is logged in.
+  // Foreground messages are surfaced as in-app toasts; background messages are
+  // handled by the OS/service worker.
+  useEffect(() => {
+    if (!role) return;
+    let cancelled = false;
+    initPushNotifications((payload) => {
+      if (cancelled) return;
+      if (payload.title || payload.body) {
+        toastInfo(payload.title || 'إشعار جديد', payload.body);
+      }
+    }).then((ok) => {
+      if (ok) toastInfo('الإشعارات مفعلة', 'ستصلك تنبيهات النظام المهمة فورياً');
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [role, toastInfo]);
+
+  // Realtime live updates: keep the WebSocket connected while logged in and
+  // refresh role-scoped data whenever a remote change arrives (SIM activation
+  // on another device, distribution approval, inventory edits…). New alerts
+  // are surfaced immediately as in-app toasts.
+  useEffect(() => {
+    if (!role) return;
+    connectRealtime();
+    const unsub = onRealtimeEvent((event) => {
+      const isSimChange = event.type.startsWith('sim.');
+      const isSellerChange = event.type.startsWith('seller.');
+      const isInventoryChange = event.type === 'inventory.updated';
+      const isDistributionChange = event.type.startsWith('distribution.');
+      const isAlertCreated = event.type === 'alert.created';
+      const mgrState = mgrRef.current;
+      const agtState = agtRef.current;
+      if (role === 'manager') {
+        if (isSimChange || isSellerChange || isInventoryChange || isDistributionChange || isAlertCreated) {
+          mgrState.refreshData().catch(() => {});
+        }
+      } else {
+        if (isSimChange || isSellerChange || isInventoryChange || isDistributionChange) {
+          agtState.refreshRoleData().catch(() => {});
+        }
+      }
+      if (isAlertCreated) {
+        toastInfo(String(event.title ?? 'تنبيه جديد'), String(event.description ?? ''));
+      }
+    });
+    return () => {
+      unsub();
+      disconnectRealtime();
+    };
+  }, [role, toastInfo]);
 
   useEffect(() => {
     const onSessionExpired = () => {
@@ -90,7 +147,7 @@ function AuthenticatedApp() {
     return (
       <>
         <ErrorBoundary>
-          <LoginScreen onLogin={handleLogin} darkMode={darkMode} setDarkMode={setDarkMode} />
+          <LoginScreen onLogin={handleLogin} onBiometricLogin={auth.handleBiometricLogin} biometricAvailable={auth.biometricAvailable} darkMode={darkMode} setDarkMode={setDarkMode} />
         </ErrorBoundary>
         <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       </>
@@ -102,8 +159,20 @@ function AuthenticatedApp() {
       <div className="fixed top-0 left-0 right-0 z-[60] bg-red-600 text-white text-center py-1.5 text-[11px] font-bold shadow-lg flex items-center justify-center gap-2" role="alert" aria-live="assertive">
         <span className="material-symbols-outlined text-xs">wifi_off</span>
         لا يوجد اتصال بالإنترنت
+        {agt.offlinePending > 0 ? (
+          <span className="bg-white/20 rounded-full px-2 py-0.5">
+            {agt.offlinePending} عملية بانتظار المزامنة
+          </span>
+        ) : null}
       </div>
-    ) : null
+    ) : (
+      agt.offlinePending > 0 ? (
+        <div className="fixed top-0 left-0 right-0 z-[60] bg-amber-500 text-white text-center py-1.5 text-[11px] font-bold shadow-lg flex items-center justify-center gap-2" role="status" aria-live="polite">
+          <span className="material-symbols-outlined text-xs">sync</span>
+          {agt.offlinePending} عملية تنتظر المزامنة عند عودة الاتصال
+        </div>
+      ) : null
+    )
   );
 
   const ToastNotifications = () => (
@@ -196,7 +265,7 @@ function AuthenticatedApp() {
           <Route path="/agent/my-sims" element={<AgentDashboard {...sharedProps} />} />
           <Route path="/agent/activate" element={<ActivateSimForm onSimActivated={agt.handleSimActivationForSeller} />} />
           <Route path="/agent/add-seller" element={<AddSellerForm onSellerAdded={agt.handleAddSellerForAgent} agentName={username} />} />
-          <Route path="/agent/account" element={<AgentProfileView username={username} role={role} sellersCount={agentSellers.length} inventories={agt.inventories} onLogout={() => {}} onConfirmLogout={handleLogout} darkMode={darkMode} setDarkMode={setDarkMode} />} />
+          <Route path="/agent/account" element={<AgentProfileView username={username} role={role} sellersCount={agentSellers.length} inventories={agt.inventories} onLogout={() => {}} onConfirmLogout={handleLogout} darkMode={darkMode} setDarkMode={setDarkMode} biometricAvailable={biometricAvailable} biometricEnabled={biometricEnabled} onEnableBiometric={() => enableBiometricLogin(username)} onDisableBiometric={disableBiometricLogin} />} />
           <Route path="*" element={<Navigate to="/agent/home" replace />} />
         </Routes>
       );
@@ -204,10 +273,10 @@ function AuthenticatedApp() {
       const sellerOnUpdateSims = (updated: any[]) => agt.handleUpdateSimsForSeller(updated as any);
       return (
         <Routes>
-          <Route path="/seller/home" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? []).filter(s => s.status === 'available')} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={handleLogout} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} onUpdateSims={sellerOnUpdateSims} />} />
+          <Route path="/seller/home" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? []).filter(s => s.status === 'available')} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={handleLogout} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} onUpdateSims={sellerOnUpdateSims} biometricAvailable={biometricAvailable} biometricEnabled={biometricEnabled} onEnableBiometric={() => enableBiometricLogin(username)} onDisableBiometric={disableBiometricLogin} />} />
           <Route path="/seller/activate" element={<ActivateSimForm onSimActivated={agt.handleSimActivationForSeller} />} />
-          <Route path="/seller/my-sims" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? [])} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={handleLogout} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} onUpdateSims={sellerOnUpdateSims} />} />
-          <Route path="/seller/account" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? [])} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={handleLogout} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} onUpdateSims={sellerOnUpdateSims} />} />
+          <Route path="/seller/my-sims" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? [])} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={handleLogout} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} onUpdateSims={sellerOnUpdateSims} biometricAvailable={biometricAvailable} biometricEnabled={biometricEnabled} onEnableBiometric={() => enableBiometricLogin(username)} onDisableBiometric={disableBiometricLogin} />} />
+          <Route path="/seller/account" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? [])} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={handleLogout} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} onUpdateSims={sellerOnUpdateSims} biometricAvailable={biometricAvailable} biometricEnabled={biometricEnabled} onEnableBiometric={() => enableBiometricLogin(username)} onDisableBiometric={disableBiometricLogin} />} />
           <Route path="*" element={<Navigate to="/seller/home" replace />} />
         </Routes>
       );

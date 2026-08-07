@@ -3,6 +3,7 @@ import { query } from '../db';
 import { logger } from '../logger';
 import { requireRole } from '../middleware/auth';
 import { validate, updateInventoriesSchema } from '../validation';
+import { broadcastEvent } from '../services/realtime.service';
 
 const router = Router();
 
@@ -31,6 +32,7 @@ router.put('/', requireRole('manager'), validate(updateInventoriesSchema), async
       );
     }
     const result = await query('SELECT * FROM inventories ORDER BY id');
+    broadcastEvent({ type: 'inventory.updated', entity: 'inventory', action: 'update', operators: updates.map(u => u.operator) });
     res.json(result.rows.map((r: { operator: string; available: number; remaining: number; period_days: number }) => ({
       operator: r.operator,
       available: r.available,

@@ -1,8 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Seller, Sim, Operation, OperatorInventory, Operator } from '../types';
 import { api } from '../api/client';
 import { captureError } from '../lib/monitor.ts';
 import { useMountedRef } from './useMountedRef';
+import {
+  enqueueOffline, getNetworkStatus, getQueueStats, onNetworkChange, onQueueChanged,
+  registerSyncHandlers, syncNow, OfflineQueueItem,
+} from '../services/offlineQueue';
 
 function loadFromStorage<T>(key: string, fallback: T): T {
   const saved = localStorage.getItem(key);
@@ -21,6 +25,49 @@ function dataUrlToFile(dataUrl: string, filename: string): File {
   return new File([bytes], filename, { type: mime });
 }
 
+function isNetworkError(err: unknown): boolean {
+  if (err instanceof TypeError) return true;
+  if (err instanceof Error) {
+    const m = err.message.toLowerCase();
+    return m.includes('failed to fetch') || m.includes('network request failed') || m.includes('networkerror') || m.includes('load failed');
+  }
+  return false;
+}
+
+interface QueuedActivation {
+  fullName: string;
+  idNumber: string;
+  iccid: string;
+  phoneNumber: string;
+  operator: Operator;
+  contractImage?: string | null;
+  role?: string | null;
+}
+
+async function syncActivationItem(item: OfflineQueueItem): Promise<void> {
+  const q = item.payload as QueuedActivation;
+  let contractImage = q.contractImage || null;
+  if (contractImage && contractImage.startsWith('data:')) {
+    const file = dataUrlToFile(contractImage, `contract_${Date.now()}.jpg`);
+    const uploaded = await api.uploadFile(file, 'image');
+    contractImage = uploaded.url;
+  }
+  if (q.role === 'agent') {
+    await api.activateSim({ iccid: q.iccid, customerName: q.fullName, customerId: q.idNumber, contractImage: contractImage || undefined });
+  }
+  await api.createOperation({ type: 'activate', target: q.phoneNumber, operator: q.operator, status: 'success', customerName: q.fullName, customerId: q.idNumber, contractImage: contractImage || undefined, iccid: q.iccid });
+  await api.createCustomer({ fullName: q.fullName, idNumber: q.idNumber, phone: q.phoneNumber }).catch(err => { captureError(err, 'createCustomerOnActivation'); });
+  const allSims = (await api.getSims()) ?? [];
+  const target = allSims.find((s: any) => s.iccid === q.iccid);
+  if (target) {
+    await api.updateSim(target.id, { status: 'activated', customerName: q.fullName, customerId: q.idNumber, contractImage: contractImage || undefined });
+  } else {
+    try {
+      await api.createSim({ iccid: q.iccid, phone: q.phoneNumber, provider: q.operator === 'yemen_mobile' ? 'Yemen Mobile' : q.operator === 'sabafon' ? 'Sabafon' : 'YOU', status: 'activated' });
+    } catch { /* sim may already exist */ }
+  }
+}
+
 export function useAgentSellerState(role: string | null, username: string) {
   const mountedRef = useMountedRef();
   const [sellers, setSellers] = useState<Seller[]>(() => loadFromStorage('tele_sellers', []));
@@ -29,6 +76,34 @@ export function useAgentSellerState(role: string | null, username: string) {
   const [inventories, setInventories] = useState<OperatorInventory[]>(() => loadFromStorage('tele_inventories', []));
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('tele_role_tab') || 'home');
   const [sellerCredentials, setSellerCredentials] = useState<{ username: string; password: string; sellerName: string; mode?: 'create' | 'reset' } | null>(null);
+  const [offlinePending, setOfflinePending] = useState(0);
+  const [isOnline, setIsOnline] = useState(true);
+
+  // Offline queue: register the activation sync handler and react to
+  // connectivity changes so queued activations flush once the network returns.
+  useEffect(() => {
+    registerSyncHandlers({ activate: syncActivationItem });
+    const refreshStats = async () => {
+      const stats = await getQueueStats();
+      if (!mountedRef.current) return;
+      setOfflinePending(stats.pending + stats.failed);
+      setIsOnline(stats.online);
+    };
+    refreshStats();
+    const offQueue = onQueueChanged(refreshStats);
+    const offNet = onNetworkChange((online) => {
+      if (!mountedRef.current) return;
+      setIsOnline(online);
+      if (online) {
+        syncNow().catch(err => captureError(err, 'syncNowOnReconnect'));
+      }
+    });
+    return () => {
+      offQueue();
+      offNet();
+      registerSyncHandlers({});
+    };
+  }, [mountedRef]);
 
   // Persist
   useEffect(() => { localStorage.setItem('tele_sellers', JSON.stringify(sellers)); }, [sellers]);
@@ -79,6 +154,30 @@ export function useAgentSellerState(role: string | null, username: string) {
   };
 
   const handleSimActivationForSeller = async (simData: { fullName: string; idNumber: string; iccid: string; phoneNumber: string; operator: Operator; contractImage?: string | null }) => {
+    // Fast path: when the device is known to be offline, queue the activation
+    // immediately instead of letting the API client burn its retry budget.
+    if (!(await getNetworkStatus())) {
+      try {
+        await enqueueOffline('activate', { ...simData, role } satisfies QueuedActivation);
+      } catch (qe) {
+        captureError(qe, 'enqueueActivationOffline');
+      }
+      if (mountedRef.current) {
+        setOperations(prev => [{
+          id: `op_act_${Date.now()}`, type: 'activate', target: simData.phoneNumber,
+          operator: simData.operator, date: new Date().toISOString().split('T')[0].replace(/-/g, '/'),
+          time: 'الآن', status: 'success'
+        }, ...prev]);
+        setSims(prev => {
+          const match = prev.find(s => s.iccid === simData.iccid);
+          if (match) return prev.map(s => s.iccid === simData.iccid ? { ...s, status: 'activated' as const } : s);
+          const toProvider = (o: Operator): 'Yemen Mobile' | 'Sabafon' | 'YOU' =>
+            o === 'yemen_mobile' ? 'Yemen Mobile' : o === 'sabafon' ? 'Sabafon' : 'YOU';
+          return [{ id: `sim_act_${Date.now()}`, iccid: simData.iccid, provider: toProvider(simData.operator), category: 'Prepaid Mobile SIM', status: 'activated', dateAdded: new Date().toISOString().split('T')[0].replace(/-/g, '/') }, ...prev];
+        });
+      }
+      return;
+    }
     try {
       // Upload the contract image (if captured) so it is persisted as
       // evidence and appears in the manager's activations report.
@@ -89,6 +188,7 @@ export function useAgentSellerState(role: string | null, username: string) {
           const uploaded = await api.uploadFile(file, 'image');
           contractImage = uploaded.url;
         } catch (err) {
+          if (isNetworkError(err)) throw err;
           captureError(err, 'uploadContractImage');
           contractImage = null;
         }
@@ -116,8 +216,19 @@ export function useAgentSellerState(role: string | null, username: string) {
         } catch { /* sim may already exist */ }
       }
     } catch (err) {
-      captureError(err, 'handleSimActivationForSeller');
-      throw err;
+      if (isNetworkError(err)) {
+        // Offline: persist the activation to the queue so it syncs when the
+        // network returns. The optimistic local update below still runs, so
+        // the seller sees the activation as done immediately.
+        try {
+          await enqueueOffline('activate', { ...simData, role } satisfies QueuedActivation);
+        } catch (qe) {
+          captureError(qe, 'enqueueActivationOffline');
+        }
+      } else {
+        captureError(err, 'handleSimActivationForSeller');
+        throw err;
+      }
     }
 
     if (mountedRef.current) setOperations(prev => [{
@@ -218,6 +329,22 @@ export function useAgentSellerState(role: string | null, username: string) {
     }
   };
 
+  // Realtime refresh: re-pull the role-scoped lists after a remote change
+  // (activation on another device, distribution approval, inventory edits…).
+  const refreshRoleData = useCallback(async () => {
+    const results = await Promise.allSettled([
+      api.getSellers(),
+      api.getSims(),
+      api.getInventories(),
+      api.getOperations(),
+    ]);
+    if (!mountedRef.current) return;
+    if (results[0].status === 'fulfilled') setSellers((results[0].value as any) ?? []);
+    if (results[1].status === 'fulfilled') setSims((results[1].value as any) ?? []);
+    if (results[2].status === 'fulfilled') setInventories((results[2].value as any) ?? []);
+    if (results[3].status === 'fulfilled') setOperations((results[3].value as any) ?? []);
+  }, [mountedRef]);
+
   // Self seller data for seller role — starts empty for new accounts
   const selfSellerData: Seller = sellers.find(s => s.username === username || s.name === username || s.id === '99283') || {
     id: '', name: username, storeName: '', idNumber: '',
@@ -228,8 +355,10 @@ export function useAgentSellerState(role: string | null, username: string) {
 
   return {
     sellers, sims, operations, inventories, activeTab, sellerCredentials, selfSellerData,
+    offlinePending, isOnline,
     handleSetRoleTab, setSellerCredentials, setSims, setSellers,
     handleAddSellerForAgent, handleTransferSimsForAgent, handleSimActivationForSeller,
     handleUpdateSellerStatusForAgent, handleResetSellerPasswordForAgent, handleEditSellerForAgent, handleDeleteSellerForAgent, handleUpdateInventories, handleUpdateSimsForSeller,
+    refreshRoleData,
   };
 }

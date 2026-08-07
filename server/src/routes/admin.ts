@@ -4,6 +4,7 @@ import { Router, Request, Response } from 'express';
 import { query, transaction } from '../db';
 import { logger } from '../logger';
 import { cacheStats } from '../cache';
+import { realtimeStats } from '../services/realtime.service';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination, formatDbTimestamp } from '../helpers';
 import { validate, updateSettingsSchema, createSimBatchSchema, resetDataSchema } from '../validation';
@@ -579,6 +580,7 @@ router.get('/monitoring', requireRole('manager'), async (_req: Request, res: Res
       platform: process.platform,
       env: process.env.NODE_ENV || 'development',
       cache: cacheStats(),
+      realtime: realtimeStats(),
       timestamp: new Date().toISOString(),
     });
   } catch (err) {

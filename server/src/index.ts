@@ -25,7 +25,9 @@ import usersRoutes from './routes/users';
 import customersRoutes from './routes/customers';
 import distributionsRoutes from './routes/distributions';
 import reportsRoutes from './routes/reports';
+import notificationsRoutes from './routes/notifications';
 import appUpdateRoutes from './routes/app-update';
+import { attachRealtimeServer, realtimeStats } from './services/realtime.service';
 
 import { logger, setLogContext, clearLogContext } from './logger';
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
@@ -84,7 +86,7 @@ app.use((req, res, next) => {
     `style-src 'self' 'nonce-${nonce}' https://fonts.googleapis.com`,
     `font-src 'self' https://fonts.gstatic.com`,
     `img-src 'self' data: blob:`,
-    `connect-src 'self'`,
+    `connect-src 'self' wss://yemen-telecom.onrender.com`,
     `frame-src 'none'`,
     `object-src 'none'`,
     `form-action 'self'`,
@@ -341,6 +343,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api/customers', customersRoutes);
 app.use('/api/distributions', distributionsRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 
 
@@ -440,7 +443,7 @@ if (process.env.NODE_ENV !== 'production') {
     res.json({ routes: listRoutes() });
   });
   app.get('/api/cache-stats', (_req, res) => {
-    res.json(cacheStats());
+    res.json({ ...cacheStats(), realtime: realtimeStats() });
   });
 }
 
@@ -501,6 +504,9 @@ const server = app.listen(PORT, '0.0.0.0', () => {
     logger.info(`  ${r.method.padEnd(6)} ${r.path}`);
   }
 });
+
+// Realtime WebSocket gateway (live updates for SIMs, alerts, distributions…)
+attachRealtimeServer(server);
 
 // Periodic cleanup of expired blacklisted tokens (every hour)
 setInterval(async () => {
