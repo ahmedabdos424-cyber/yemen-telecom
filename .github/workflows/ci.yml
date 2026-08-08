@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: write
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -215,6 +218,17 @@ jobs:
           path: /tmp/initdb.log
           retention-days: 7
           if-no-files-found: warn
+
+      - name: Publish init-db diagnostics to ci-diagnostics branch
+        if: failure()
+        run: |
+          git config user.email "ci@yemen-telecom.local"
+          git config user.name "CI Diagnostics"
+          git checkout -b ci-diagnostics 2>/dev/null || git checkout ci-diagnostics
+          cp /tmp/initdb.log initdb-failure.log
+          git add initdb-failure.log
+          git commit -m "ci: init-db failure diagnostics" --allow-empty
+          git push origin ci-diagnostics --force
 
       - name: Seed demo passwords
         run: npx tsx server/src/seed.ts
