@@ -194,7 +194,18 @@ jobs:
         run: npm ci
 
       - name: Initialize database (schema + migrations)
-        run: npx tsx server/src/init-db.ts
+        run: |
+          set -o pipefail
+          npx tsx server/src/init-db.ts 2>&1 | tee /tmp/initdb.log
+
+      - name: Upload init-db diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: initdb-log
+          path: /tmp/initdb.log
+          retention-days: 7
+          if-no-files-found: warn
 
       - name: Seed demo passwords
         run: npx tsx server/src/seed.ts
