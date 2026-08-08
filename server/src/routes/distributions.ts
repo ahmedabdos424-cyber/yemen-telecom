@@ -138,10 +138,13 @@ router.put('/:id/approve', requireRole('manager'), validate(approveDistributionS
         [decision, req.user!.id, notes || null, req.params.id]
       );
       if (decision === 'approved') {
-        await client.query(
-          'UPDATE inventories SET available=GREATEST(available-$1, 0), remaining=remaining+$1 WHERE operator=$2',
-          [dr.count, dr.operator]
+        const invRes = await client.query(
+          'UPDATE inventories SET available = available - $1, remaining = remaining + $1 WHERE operator = $2 AND available >= $3 RETURNING id',
+          [dr.count, dr.operator, dr.count]
         );
+        if (invRes.rowCount === 0) {
+          throw new Error('INSUFFICIENT_INVENTORY');
+        }
       }
     });
     broadcastEvent({ type: 'distribution.updated', entity: 'distribution', id: req.params.id, status: decision, action: 'approve' });
@@ -157,6 +160,9 @@ router.put('/:id/approve', requireRole('manager'), validate(approveDistributionS
     if (errMsg.startsWith('DISTRIBUTION_ALREADY_')) {
       const status = errMsg.replace('DISTRIBUTION_ALREADY_', '').toLowerCase();
       return res.status(400).json({ error: `Request is already ${status}` });
+    }
+    if (errMsg === 'INSUFFICIENT_INVENTORY') {
+      return res.status(400).json({ error: 'المخزون المتاح غير كافٍ لاعتماد هذا الطلب' });
     }
     logger.error('Error approving distribution request:', err);
     res.status(500).json({ error: 'Internal server error' });
