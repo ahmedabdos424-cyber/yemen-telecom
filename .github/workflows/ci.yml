@@ -222,13 +222,11 @@ jobs:
       - name: Publish init-db diagnostics to ci-diagnostics branch
         if: failure()
         run: |
-          git config user.email "ci@yemen-telecom.local"
-          git config user.name "CI Diagnostics"
-          git checkout -b ci-diagnostics 2>/dev/null || git checkout ci-diagnostics
-          cp /tmp/initdb.log initdb-failure.log
-          git add initdb-failure.log
-          git commit -m "ci: init-db failure diagnostics" --allow-empty
-          git push origin ci-diagnostics --force
+          base64 -w0 /tmp/initdb.log > /tmp/initdb.b64
+          gh api --method PUT repos/${{ github.repository }}/contents/initdb-failure.log \
+            -f message="ci: init-db failure diagnostics" \
+            -f content="$(cat /tmp/initdb.b64)" \
+            -f branch="ci-diagnostics" 2>&1 || echo "PUBLISH_FAILED exit=$?"
 
       - name: Seed demo passwords
         run: npx tsx server/src/seed.ts
