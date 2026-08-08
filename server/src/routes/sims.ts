@@ -60,9 +60,12 @@ router.post('/activate', requireRole('manager', 'agent', 'seller'), validate(act
          customer_name = COALESCE($2, customer_name),
          customer_id = COALESCE($3, customer_id),
          contract_image = COALESCE($4, contract_image)
-       WHERE id = $5 RETURNING *`,
+       WHERE id = $5 AND status = 'available' RETURNING *`,
       [requester?.id ?? null, customerName, customerId, contractImage, sim.id]
     );
+    if (updated.rowCount === 0) {
+      return res.status(409).json({ error: 'تعذر التفعيل: الشريحة تم تفعيلها مسبقاً أو لم تعد متاحة' });
+    }
     broadcastEvent({ type: 'sim.updated', entity: 'sim', id: sim.id, iccid, status: 'activated', action: 'activate' });
     res.json(updated.rows[0]);
   } catch (err) {
