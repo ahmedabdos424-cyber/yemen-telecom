@@ -31,14 +31,23 @@ async function runMigrations(client: any) {
     }
     const filePath = path.join(migrationsDir, file);
     const sql = fs.readFileSync(filePath, 'utf-8');
+    // Some migration files manage their own BEGIN/COMMIT (they were authored
+    // for psql). Wrapping them again in a transaction would break the outer
+    // COMMIT (no transaction in progress), so run those without a wrapper.
+    const managesOwnTx = /(?:^|\n)\s*(?:BEGIN|START TRANSACTION|COMMIT|ROLLBACK)\s*;/i.test(sql);
     try {
-      await client.query('BEGIN');
-      await client.query(sql);
-      await client.query('INSERT INTO schema_migrations (filename) VALUES ($1)', [file]);
-      await client.query('COMMIT');
+      if (!managesOwnTx) {
+        await client.query('BEGIN');
+        await client.query(sql);
+        await client.query('INSERT INTO schema_migrations (filename) VALUES ($1)', [file]);
+        await client.query('COMMIT');
+      } else {
+        await client.query(sql);
+        await client.query('INSERT INTO schema_migrations (filename) VALUES ($1)', [file]);
+      }
       logger.info(`Migration ${file} applied successfully`);
     } catch (err: unknown) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => undefined);
       logger.error(`Migration ${file} failed:`, err instanceof Error ? err.message : String(err));
       throw err;
     }
