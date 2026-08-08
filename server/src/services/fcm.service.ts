@@ -134,3 +134,62 @@ export async function getAgentAndManagerTokens(): Promise<string[]> {
 export function fcmDebugState(): { initialized: boolean; failed: boolean } {
   return { initialized: firebaseInitialized, failed: firebaseFailed };
 }
+
+// ---------------------------------------------------------------------------
+// Event dispatchers — best-effort, never throw. Each resolves the recipient
+// user ids -> device tokens -> sends. Unknown tokens are pruned by the
+// underlying sendPushToTokens call.
+// ---------------------------------------------------------------------------
+
+export interface NotificationEvent {
+  eventType: string;
+  title: string;
+  body: string;
+  data?: Record<string, string>;
+}
+
+export async function sendNotificationToUsers(userIds: number[], ev: NotificationEvent): Promise<{ sent: number; failed: string[] }> {
+  if (userIds.length === 0) return { sent: 0, failed: [] };
+  const tokens = await getTokensForUsers(userIds);
+  if (tokens.length === 0) return { sent: 0, failed: [] };
+  return sendPushToTokens(tokens, {
+    title: ev.title,
+    body: ev.body,
+    data: ev.data ?? {},
+  });
+}
+
+// Notify an agent/seller that a new SIM batch was assigned to their stock.
+export async function notifyBatchAssigned(
+  recipientUserIds: number[],
+  data: { count: number; provider: string; iccidRange: string }
+): Promise<void> {
+  await sendNotificationToUsers(recipientUserIds, {
+    eventType: 'BATCH_ASSIGNED',
+    title: 'تعيين دفعة شرائح جديدة',
+    body: `تم تعيين ${data.count} شريحة ${data.provider} (${data.iccidRange}) إلى مخزنك.`,
+    data: {
+      eventType: 'BATCH_ASSIGNED',
+      count: String(data.count),
+      provider: data.provider,
+    },
+  });
+}
+
+// Notify the requester/agent that a distribution request was approved.
+export async function notifyDistributionApproved(
+  recipientUserIds: number[],
+  data: { requestId: string; operator: string; count: number }
+): Promise<void> {
+  await sendNotificationToUsers(recipientUserIds, {
+    eventType: 'DISTRIBUTION_APPROVED',
+    title: 'تمت الموافقة على طلب التوزيع',
+    body: `تمت الموافقة على طلب ${data.requestId} لـ ${data.count} شريحة ${data.operator}.`,
+    data: {
+      eventType: 'DISTRIBUTION_APPROVED',
+      requestId: data.requestId,
+      count: String(data.count),
+      operator: data.operator,
+    },
+  });
+}
