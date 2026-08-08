@@ -219,14 +219,13 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
-      - name: Publish init-db diagnostics to ci-diagnostics branch
+      - name: Publish init-db diagnostics directly to main
         if: failure()
         run: |
           base64 -w0 /tmp/initdb.log > /tmp/initdb.b64
-          gh api --method PUT repos/${{ github.repository }}/contents/initdb-failure.log \
-            -f message="ci: init-db failure diagnostics" \
-            -f content="$(cat /tmp/initdb.b64)" \
-            -f branch="ci-diagnostics" 2>&1 || echo "PUBLISH_FAILED exit=$?"
+          gh api --method PUT repos/${{ github.repository }}/contents/initdb-failure-${{ github.sha }}.log \
+            -f message="ci: init-db failure diagnostics ${{ github.sha }} [skip ci]" \
+            -f content="$(cat /tmp/initdb.b64)"
 
       - name: Seed demo passwords
         run: npx tsx server/src/seed.ts
