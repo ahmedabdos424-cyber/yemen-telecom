@@ -42,8 +42,9 @@ BEGIN
     -- Detach the id sequence so it survives the old table being dropped
     ALTER SEQUENCE operations_id_seq OWNED BY NONE;
 
-    -- Normalize created_at so every row routes into a partition
-    UPDATE operations SET created_at = COALESCE(occurred_at, NOW()) WHERE created_at IS NULL;
+    -- Normalize created_at so every row routes into a partition.
+    -- NOTE: occurred_at is not present in every environment, so default to NOW().
+    UPDATE operations SET created_at = NOW() WHERE created_at IS NULL;
 
     -- New partitioned parent table (same columns as the legacy table)
     CREATE TABLE operations_new (
@@ -62,7 +63,6 @@ BEGIN
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       provider_id INTEGER,
-      occurred_at TIMESTAMP,
       created_by INTEGER,
       PRIMARY KEY (id, created_at),
       UNIQUE (op_id, created_at)
@@ -81,11 +81,11 @@ BEGIN
     INSERT INTO operations_new
       (id, op_id, type, target, operator, date, time, status,
        customer_name, customer_id, contract_image, iccid,
-       created_at, updated_at, provider_id, occurred_at, created_by)
+       created_at, updated_at, provider_id, created_by)
     SELECT
       id, op_id, type, target, operator, date, time, status,
       customer_name, customer_id, contract_image, iccid,
-      created_at, updated_at, provider_id, occurred_at, created_by
+      created_at, updated_at, provider_id, created_by
     FROM operations;
 
     -- Swap: drop legacy table (sequence survives via OWNED BY NONE), rename new

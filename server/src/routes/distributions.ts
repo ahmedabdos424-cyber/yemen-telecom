@@ -5,8 +5,35 @@ import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination } from '../helpers';
 import { validate, createDistributionSchema, approveDistributionSchema } from '../validation';
 import { broadcastEvent, broadcastToRoles } from '../services/realtime.service';
+import { notifyDistributionApproved } from '../services/fcm.service';
 
 const router = Router();
+
+// Resolve a distribution request's buyer/agent to user ids for push routing.
+// Reads fresh from the DB to stay decoupled from the transaction scope.
+async function notifyRecipients(requestId: number | string): Promise<void> {
+  const drResult = await query(
+    'SELECT seller_id, agent_id, operator FROM distribution_requests WHERE id = $1',
+    [requestId]
+  );
+  const dr = drResult.rows[0];
+  if (!dr) return;
+  const userIds: number[] = [];
+  if (dr.seller_id) {
+    const u = await query('SELECT user_id AS id FROM sellers WHERE id = $1 AND user_id IS NOT NULL', [dr.seller_id]);
+    if (u.rows[0]?.id) userIds.push(u.rows[0].id);
+  }
+  if (dr.agent_id) {
+    const u = await query('SELECT user_id AS id FROM agents WHERE id = $1 AND user_id IS NOT NULL', [dr.agent_id]);
+    if (u.rows[0]?.id) userIds.push(u.rows[0].id);
+  }
+  if (userIds.length === 0) return;
+  await notifyDistributionApproved(userIds, {
+    requestId: `DIST-${dr.seller_id ?? dr.agent_id ?? 'NA'}`,
+    operator: dr.operator,
+    count: 0,
+  });
+}
 
 router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
   try {
@@ -118,6 +145,9 @@ router.put('/:id/approve', requireRole('manager'), validate(approveDistributionS
       }
     });
     broadcastEvent({ type: 'distribution.updated', entity: 'distribution', id: req.params.id, status: decision, action: 'approve' });
+    // Best-effort push: notify the buyer (seller) and the submitting agent that
+    // their distribution request was approved. Never blocks the HTTP response.
+    notifyRecipients(req.params.id).catch((err) => logger.warn('[FCM] distribution approval notify failed:', err));
     res.json({ message: `Request ${decision} successfully` });
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);

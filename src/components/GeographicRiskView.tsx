@@ -71,6 +71,7 @@ export default function GeographicRiskView() {
 
   const svgRef = useRef<SVGSVGElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const highRiskNotifiedRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
@@ -94,9 +95,23 @@ export default function GeographicRiskView() {
         if (mounted) setLoading(false);
       }
     }
-    fetchData();
+     fetchData();
     return () => { mounted = false; };
   }, []);
+
+  // تنبيه أمني فوري عند رؤية هوية خطر عالٍ جداً بعد تحميل البيانات
+  useEffect(() => {
+    if (loading || highRiskNotifiedRef.current) return;
+    const highRisk = identities.filter((i: any) => i.risk === 'مرتفع جداً');
+    if (highRisk.length > 0) {
+      highRiskNotifiedRef.current = true;
+      const names = highRisk.slice(0, 3).map((i: any) => i.name).join('، ');
+      toastWarning(
+        'تحذير أمني فوري',
+        `${highRisk.length} هوية مرتبطة بخطر عالٍ جداً في الشبكة (${names}${highRisk.length > 3 ? ' …' : ''}). تم توجيهها إلى مراجعة فورية.`
+      );
+    }
+  }, [loading, identities, toastWarning]);
 
   const summaryStats = useMemo(() => {
     const total = identities.length;

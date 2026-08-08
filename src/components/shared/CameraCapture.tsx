@@ -89,17 +89,41 @@ async function compressImage(blob: Blob, maxDim: number, quality = JPEG_QUALITY)
   });
 }
 
+async function requestNativeCameraPermission(): Promise<'granted' | 'denied'> {
+  try {
+    const { Camera } = await import('@capacitor/camera');
+    if (typeof Camera.checkPermissions !== 'function') return 'denied';
+    const status = await Camera.checkPermissions();
+    if (status.camera === 'granted') return 'granted';
+    if (status.camera === 'denied' || status.camera === 'limited') return 'denied';
+    const requested = await Camera.requestPermissions({ permissions: ['camera'] });
+    return requested.camera === 'granted' ? 'granted' : 'denied';
+  } catch {
+    return 'denied';
+  }
+}
+
 async function captureWithCapacitorCamera(): Promise<string> {
+  const perm = await requestNativeCameraPermission();
+  if (perm === 'denied') {
+    throw new Error('permission denied permanently');
+  }
+
   const { Camera, CameraResultType, CameraDirection, CameraSource } = await import('@capacitor/camera');
   const { Filesystem, Directory } = await import('@capacitor/filesystem');
 
-  const photo = await Camera.getPhoto({
-    quality: 95,
-    allowEditing: false,
-    resultType: CameraResultType.Uri,
-    direction: CameraDirection.Rear,
-    source: CameraSource.Camera,
-  });
+  const photo = await Promise.race([
+    Camera.getPhoto({
+      quality: 95,
+      allowEditing: false,
+      resultType: CameraResultType.Uri,
+      direction: CameraDirection.Rear,
+      source: CameraSource.Camera,
+    }),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('الكاميرا لم تستجب خلال 15 ثانية. يرجى المحاولة مرة أخرى.')), 15000)
+    ),
+  ]) as Awaited<ReturnType<typeof Camera.getPhoto>>;
 
   if (!photo.webPath) throw new Error('فشل التقاط الصورة');
 

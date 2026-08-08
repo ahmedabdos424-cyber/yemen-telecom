@@ -4,6 +4,7 @@ import { ViewType } from '../types';
 import { useToast, ToastContainer } from '../hooks/useToast';
 import { api } from '../api/client';
 import AuditLogsView from './AuditLogsView';
+import AgentSellerTreeModal from './AgentSellerTreeModal';
 
 interface AdminMoreDrawerProps {
   isMoreOpen: boolean;
@@ -15,6 +16,8 @@ interface AdminMoreDrawerProps {
 export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, onLogout }: AdminMoreDrawerProps) {
   const [activeSubScreen, setActiveSubScreen] = useState<string | null>(null);
   const [showLogOutDialog, setShowLogOutDialog] = useState(false);
+  const [showAuditLogs, setShowAuditLogs] = useState(false);
+  const [showAgentTree, setShowAgentTree] = useState(false);
 
   const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
 
@@ -59,6 +62,8 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
   return (
     <>
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+      {!showAuditLogs && !showAgentTree && (
+        <>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -105,13 +110,21 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
                 </div>
                 <span className="text-[9px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full font-bold">أمني</span>
               </button>
-              <button onClick={() => { setActiveSubScreen('audit-logs'); }}
+              <button onClick={() => setShowAuditLogs(true)}
                 className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
                 <div className="flex items-center gap-2.5">
                   <span className="material-symbols-outlined text-slate-400 group-hover:text-sf text-lg">list_alt</span>
                   <span className="text-xs font-bold text-slate-200">سجلات التدقيق الأمني</span>
                 </div>
                 <span className="material-symbols-outlined text-slate-600 text-sm group-hover:-translate-x-0.5 transition-transform">arrow_back</span>
+              </button>
+              <button onClick={() => setShowAgentTree(true)}
+                className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
+                <div className="flex items-center gap-2.5">
+                  <span className="material-symbols-outlined text-slate-400 group-hover:text-sf text-lg">account_tree</span>
+                  <span className="text-xs font-bold text-slate-200">شجرة البائعين والمخزون الميداني</span>
+                </div>
+                <span className="material-symbols-outlined text-slate-600 text-sm">arrow_back</span>
               </button>
             </div>
           </div>
@@ -187,14 +200,12 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
             <div className="bottom-sheet-header">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="material-symbols-outlined text-ym text-lg shrink-0">
-                  {activeSubScreen === 'audit-logs' && 'policy'}
                   {activeSubScreen === 'backup-restore' && 'backup'}
                   {activeSubScreen === 'support-center' && 'contact_support'}
                   {activeSubScreen === 'help-guide' && 'help_outline'}
                   {activeSubScreen === 'about-system' && 'info'}
                 </span>
                 <span className="font-bold text-xs truncate">
-                  {activeSubScreen === 'audit-logs' && 'سجلات التدقيق الأمني'}
                   {activeSubScreen === 'backup-restore' && 'النسخ الاحتياطي'}
                   {activeSubScreen === 'support-center' && 'مركز الدعم الفني'}
                   {activeSubScreen === 'help-guide' && 'دليل الاستخدام'}
@@ -208,10 +219,6 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
             </div>
 
             <div className="bottom-sheet-body space-y-3 select-text">
-              {activeSubScreen === 'audit-logs' && (
-                <AuditLogsView />
-              )}
-
               {activeSubScreen === 'backup-restore' && (
                 <div className="space-y-4">
                   <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-3">
@@ -293,6 +300,49 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
           </motion.div>
         )}
       </AnimatePresence>
+        </>
+      )}
+
+      {/* نافذة سجلات التدقيق الأمنية — خلفية محورية واحدة خفيفة (بدون ضباب)، وتُغلق صندوق الخيارات الإدارية تلقائياً */}
+      {showAuditLogs && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 bg-black/25 z-[110]"
+            onClick={() => setShowAuditLogs(false)}
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 z-[111] flex flex-col md:inset-4 md:max-w-4xl md:mx-auto md:max-h-[85vh] md:rounded-2xl md:border md:border-slate-800 md:bg-slate-900 md:backdrop-blur-sm"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="سجلات التدقيق الأمني"
+          >
+            <header className="bottom-sheet-header border-b border-slate-800 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <span className="material-symbols-outlined text-ym text-lg shrink-0">policy</span>
+                <div>
+                  <h3 className="font-bold text-sm">سجلات التدقيق الأمني</h3>
+                  <p className="text-[10px] text-slate-500">مراجعة أحداث الأمان والهوية على الخادم</p>
+                </div>
+              </div>
+              <button onClick={() => setShowAuditLogs(false)}
+                className="touch-target flex items-center justify-center p-2 hover:bg-slate-800/50 rounded-xl text-slate-400 hover:text-white transition-colors cursor-pointer">
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </header>
+            <main className="flex-1 overflow-y-auto">
+              <AuditLogsView />
+            </main>
+          </motion.div>
+        </>
+      )}
+      <AgentSellerTreeModal open={showAgentTree} onClose={() => setShowAgentTree(false)} />
 
       {showLogOutDialog && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[120] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="تأكيد تسجيل الخروج">

@@ -5,6 +5,7 @@ import { query, transaction } from '../db';
 import { logger } from '../logger';
 import { cacheStats } from '../cache';
 import { realtimeStats } from '../services/realtime.service';
+import { notifyBatchAssigned } from '../services/fcm.service';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination, formatDbTimestamp } from '../helpers';
 import { validate, updateSettingsSchema, createSimBatchSchema, resetDataSchema } from '../validation';
@@ -418,6 +419,24 @@ router.post('/sims/batch', requireRole('manager'), validate(createSimBatchSchema
       return inserted;
     });
     const skipped = iccids.length - created;
+
+    // Best-effort push: when the batch was assigned to a specific agent/seller,
+    // notify that user that new SIMs landed in their stock. Never blocks the
+    // response; a failure only logs.
+    if (created > 0 && owner_id && owner_role) {
+      const table = owner_role === 'agent' ? 'agents' : 'sellers';
+      query(`SELECT user_id AS id FROM ${table} WHERE id = $1 AND user_id IS NOT NULL`, [owner_id])
+        .then((u) => {
+          if (u.rows[0]?.id) {
+            void notifyBatchAssigned([u.rows[0].id], {
+              count: created,
+              provider,
+              iccidRange: `${from_iccid} → ${to_iccid}`,
+            });
+          }
+        })
+        .catch((err) => logger.warn('[FCM] batch assignment notify failed:', err));
+    }
 
     res.status(201).json({
       created,
