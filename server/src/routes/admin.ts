@@ -110,14 +110,14 @@ router.get('/duplicate-identities', requireRole('manager'), async (req: Request,
     const { page, limit, offset } = getPagination(req);
     const paginate = req.query.page || req.query.limit;
     const queryText = paginate
-      ? `SELECT id_number AS id_no, name,
+      ? `SELECT id_number AS id_no, name, agent_name, created_at,
               COUNT(*) OVER (PARTITION BY id_number) AS duplicates_count,
               SUM(COALESCE(sims_count, 0)) OVER (PARTITION BY id_number) AS sims_count,
               region
        FROM sellers
        WHERE id_number != ''
        ORDER BY duplicates_count DESC LIMIT $1 OFFSET $2`
-      : `SELECT id_number AS id_no, name,
+      : `SELECT id_number AS id_no, name, agent_name, created_at,
               COUNT(*) OVER (PARTITION BY id_number) AS duplicates_count,
               SUM(COALESCE(sims_count, 0)) OVER (PARTITION BY id_number) AS sims_count,
               region
@@ -132,6 +132,15 @@ router.get('/duplicate-identities', requireRole('manager'), async (req: Request,
       seen.add(r.id_no);
       return true;
     });
+    // Aggregate involved agents/sellers and last activity per id_no (across all rows).
+    const aggMap = new Map<string, { agents: Set<string>; last: Date | null }>();
+    for (const r of result.rows) {
+      const entry = aggMap.get(r.id_no) || { agents: new Set<string>(), last: null };
+      if (r.agent_name) entry.agents.add(r.agent_name);
+      const t = r.created_at ? new Date(r.created_at) : null;
+      if (t && (!entry.last || t.getTime() > entry.last.getTime())) entry.last = t;
+      aggMap.set(r.id_no, entry);
+    }
     // Pull current flag/block status per id_no (may be empty for new ids).
     const idNos = deduped.map((r: any) => r.id_no);
     const statusRows = idNos.length
@@ -144,6 +153,7 @@ router.get('/duplicate-identities', requireRole('manager'), async (req: Request,
       const risk = count >= 5 ? 'مرتفع جداً' : count >= 3 ? 'مرتفع' : 'متوسط';
       const initials = r.name ? r.name.split(' ').slice(0, 2).map((s: string) => s[0]).join(' ') : '';
       const st = statusMap.get(r.id_no);
+      const agg = aggMap.get(r.id_no);
       return {
         idNo: r.id_no,
         name: r.name,
@@ -155,6 +165,8 @@ router.get('/duplicate-identities', requireRole('manager'), async (req: Request,
         flagged: st?.flagged || false,
         blocked: st?.blocked || false,
         reviewStatus: st?.review_status || 'pending',
+        agentNames: agg ? Array.from(agg.agents) : [],
+        lastActivity: agg?.last?.toISOString() || null,
       };
     }));
   } catch (err) {

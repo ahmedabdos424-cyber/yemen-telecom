@@ -13,7 +13,18 @@ export interface OcrResult {
 }
 
 const OCR_TIMEOUT_MS = 30_000;
+const INIT_TIMEOUT_MS = 45_000;
+const IMAGE_PROCESS_TIMEOUT_MS = 10_000;
 const MAX_RETRIES = 2;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('TIMEOUT')), ms)
+    ),
+  ]);
+}
 
 const stages: Record<string, { label: string; range: [number, number] }> = {
   'loading tesseract core':        { label: 'فتح الكاميرا',     range: [0, 10] },
@@ -228,7 +239,7 @@ export function useOcr() {
     const startTime = performance.now();
     if (mountedRef.current) setProgress({ visible: true, progress: 10, stage: 'معالجة الصورة' });
     const maxDim = 1200;
-    const processed = await new Promise<string>((resolve) => {
+    const processed = await withTimeout(new Promise<string>((resolve) => {
       const img = new Image();
       img.onload = () => {
         let { width, height } = img;
@@ -247,11 +258,11 @@ export function useOcr() {
       };
       img.onerror = () => resolve(imageData);
       img.src = imageData;
-    });
+    }), IMAGE_PROCESS_TIMEOUT_MS).catch(() => imageData);
     if (mountedRef.current) setProgress(prev => ({ ...prev, progress: 50, stage: 'تشغيل OCR' }));
-    await initWorker();
-    const worker = await getWorker(loggerRef.current);
     try {
+      await withTimeout(initWorker(), INIT_TIMEOUT_MS);
+      const worker = await getWorker(loggerRef.current);
       const { data } = await recognizeWithTimeout(worker, processed, OCR_TIMEOUT_MS);
       const cleaned = (data?.text ?? '')
         .split('\n')
@@ -289,7 +300,7 @@ export function useOcr() {
     }
 
     const maxDim = 1200;
-    const preprocessed = await new Promise<string>((resolve) => {
+    const preprocessed = await withTimeout(new Promise<string>((resolve) => {
       const img = new Image();
       img.onload = () => {
         let { width, height } = img;
@@ -320,10 +331,16 @@ export function useOcr() {
       };
       img.onerror = () => resolve(imageData);
       img.src = imageData;
-    });
+    }), IMAGE_PROCESS_TIMEOUT_MS).catch(() => imageData);
 
     if (mountedRef.current) setProgress(prev => ({ ...prev, progress: stageProgress('recognizing text', 0), stage: stages['recognizing text'].label }));
-    await initWorker();
+    try {
+      await withTimeout(initWorker(), INIT_TIMEOUT_MS);
+    } catch {
+      if (mountedRef.current) setProgress({ visible: false, progress: 0, stage: '' });
+      totalOcrTime += performance.now() - startTime;
+      return '';
+    }
 
     const worker = await getWorker(loggerRef.current);
 

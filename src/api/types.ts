@@ -342,6 +342,8 @@ export interface DuplicateIdentityRow {
   flagged: boolean;
   blocked: boolean;
   reviewStatus: string;
+  agentNames?: string[];
+  lastActivity?: string | null;
 }
 
 export interface AuditLogEntry {

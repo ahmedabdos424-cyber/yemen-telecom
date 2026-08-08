@@ -26,6 +26,7 @@ interface SellerRow {
   id: string;
   name: string;
   storeName: string;
+  phone: string;
   region: string;
   status: string;
   currentStock: number;
@@ -245,7 +246,11 @@ export default function AgentSellerTreeModal({ open, onClose }: { open: boolean;
                                         <div className="flex-1 min-w-0 text-right">
                                           <span className="text-xs font-bold text-slate-200 block truncate">{s.name}</span>
                                           <span className="text-[9px] text-slate-600 block truncate">{s.storeName || s.name}</span>
+                                          {s.phone && <span className="text-[9px] font-mono text-slate-500 block truncate" dir="ltr">{s.phone}</span>}
                                         </div>
+                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${statusColor(s.status)}`}>
+                                          {s.status}
+                                        </span>
                                         <span className={`text-[9px] font-mono text-slate-400 bg-slate-800/50 px-1.5 py-0.5 rounded`} title={`مخزون ${s.name}: ${s.currentStock}`}>
                                           مخزون: {s.currentStock}
                                         </span>
