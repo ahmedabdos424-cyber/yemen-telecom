@@ -255,7 +255,7 @@ Runs in order: **Validate** (tsc frontend + server, build) → **Tests** (vitest
 - **Canonical env file**: `server/.env` — the server reads this (dotenv path resolves `../.env`). Root `.env` is for reference only.
 - **Vite proxy**: proxies `/api` to `https://yemen-telecom.onrender.com` by default. Change target to `http://localhost:4000` for local API dev.
 - **CORS**: Comma-separated origins in `CORS_ORIGIN`. Dev mode allows all origins. Capacitor origins (`https://localhost`, `capacitor://localhost`) are always allowed.
-- **Node**: `>=22.0.0` enforced via `engine-strict=true` in `.npmrc`.
+- **Node**: Node 24 LTS (`>=24.0.0`) enforced via `engine-strict=true` in `.npmrc`. CI must use `node-version: 24` (matches `.nvmrc` and the Docker base image).
 - **CSRF**: Every state-changing POST/PUT/DELETE needs `X-CSRF-Token` + `X-CSRF-Hash` headers (fetched from `GET /api/csrf-token`).
 - **No ESLint, no Prettier**: Code quality relies on tsc. Do not add lint/formatter tooling unless asked.
 
