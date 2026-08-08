@@ -56,6 +56,13 @@ const NODE_OPERATIONS_MAP: Record<string, OperationLogItem[]> = {
   ]
 };
 
+function formatLastActivity(iso?: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleString('ar', { dateStyle: 'short', timeStyle: 'short' });
+}
+
 export default function GeographicRiskView() {
   const [identities, setIdentities] = useState<any[]>([]);
   const [logs, setLogs] = useState<AuditLog[]>([]);
@@ -534,6 +541,8 @@ export default function GeographicRiskView() {
                 <th className="px-6 py-4 font-bold">اسم العميل المسجّل</th>
                 <th className="px-6 py-4 font-bold">الشرائح النشطة معه</th>
                 <th className="px-6 py-4 font-bold">عدد عقود التكرار</th>
+                <th className="px-6 py-4 font-bold">الوكيل/البائع المسجّل</th>
+                <th className="px-6 py-4 font-bold">آخر نشاط</th>
                 <th className="px-6 py-4 font-bold">مستوى الخطورة الإحصائي</th>
                 <th className="px-6 py-4 font-bold">منطقة التوزيع</th>
                 <th className="px-6 py-4 font-bold text-left">الإجراءات والتحقيق</th>
@@ -553,6 +562,12 @@ export default function GeographicRiskView() {
                   </td>
                   <td className="px-6 py-4 font-mono text-gray-600">{item.simsCount} شرائح</td>
                   <td className="px-6 py-4 font-mono font-bold text-secondary">{item.duplicatesCount} سجلات</td>
+                  <td className="px-6 py-4">
+                    {(item.agentNames && item.agentNames.length > 0)
+                      ? item.agentNames.join('، ')
+                      : <span className="text-gray-400">غير مسجّل</span>}
+                  </td>
+                  <td className="px-6 py-4 text-[11px] text-gray-600">{formatLastActivity(item.lastActivity)}</td>
                   <td className="px-6 py-4">
                     <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
                       item.risk === 'مرتفع جداً'

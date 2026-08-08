@@ -110,7 +110,7 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
                 </div>
                 <span className="text-[9px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full font-bold">أمني</span>
               </button>
-              <button onClick={() => setShowAuditLogs(true)}
+              <button onClick={() => { setShowAuditLogs(true); setIsMoreOpen(false); }}
                 className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
                 <div className="flex items-center gap-2.5">
                   <span className="material-symbols-outlined text-slate-400 group-hover:text-sf text-lg">list_alt</span>
@@ -118,7 +118,7 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
                 </div>
                 <span className="material-symbols-outlined text-slate-600 text-sm group-hover:-translate-x-0.5 transition-transform">arrow_back</span>
               </button>
-              <button onClick={() => setShowAgentTree(true)}
+              <button onClick={() => { setShowAgentTree(true); setIsMoreOpen(false); }}
                 className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
                 <div className="flex items-center gap-2.5">
                   <span className="material-symbols-outlined text-slate-400 group-hover:text-sf text-lg">account_tree</span>
@@ -317,7 +317,7 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-[111] flex flex-col md:inset-4 md:max-w-4xl md:mx-auto md:max-h-[85vh] md:rounded-2xl md:border md:border-slate-800 md:bg-slate-900 md:backdrop-blur-sm"
+            className="fixed inset-0 z-[111] flex flex-col bg-slate-950 md:inset-4 md:max-w-4xl md:mx-auto md:max-h-[85vh] md:rounded-2xl md:border md:border-slate-800 md:bg-slate-900"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
