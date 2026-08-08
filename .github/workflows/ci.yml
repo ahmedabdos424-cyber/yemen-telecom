@@ -219,10 +219,10 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
-      - name: Publish init-db diagnostics to KVDB
+      - name: Publish init-db diagnostics to ntfy.sh
         if: failure()
         run: |
-          curl -X PUT -H "Content-Type: text/plain" -d "$(< /tmp/initdb.log)" "https://kvdb.io/YemenTelecomCIDiagnosticsInitDBLog_${{ github.sha }}"
+          curl -d "$(< /tmp/initdb.log)" "https://ntfy.sh/YemenTelecomCIDiagnosticsInitDBLog_${{ github.sha }}"
 
       - name: Seed demo passwords
         run: npx tsx server/src/seed.ts
