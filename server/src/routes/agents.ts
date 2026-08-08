@@ -9,11 +9,14 @@ import { validate, createAgentSchema, updateAgentSchema } from '../validation';
 
 const router = Router();
 
-function isPhoneUniqueViolation(err: unknown): boolean {
-  if (!err || typeof err !== 'object') return false;
+function getUniqueViolationKind(err: unknown): 'phone' | 'username' | null {
+  if (!err || typeof err !== 'object') return null;
   const e = err as { code?: string; message?: string };
+  if (e.code !== '23505') return null;
   const msg = e.message ?? '';
-  return e.code === '23505' && (msg.includes('idx_agents_phone_unique') || msg.includes('agents_phone_key'));
+  if (msg.includes('idx_agents_phone_unique') || msg.includes('agents_phone_key')) return 'phone';
+  if (msg.includes('users_username_key') || msg.includes('idx_users_username') || msg.includes('users_pkey')) return 'username';
+  return null;
 }
 
 router.get('/', requireRole('manager', 'agent'), async (req: Request, res: Response) => {
@@ -72,9 +75,13 @@ router.post('/', requireRole('manager'), validate(createAgentSchema), async (req
         password: agentPassword
       }
     });
-  } catch (err) {
-    if (isPhoneUniqueViolation(err)) {
+   } catch (err) {
+    const kind = getUniqueViolationKind(err);
+    if (kind === 'phone') {
       return res.status(409).json({ error: 'رقم الهاتف مستخدم بالفعل لوكيل آخر، يرجى استخدام رقم مختلف' });
+    }
+    if (kind === 'username') {
+      return res.status(409).json({ error: 'اسم المستخدم غير متاح؛ يرجى إعادة المحاولة أو اختيار اسم مستخدم آخر' });
     }
     logger.error('Error creating agent:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -141,9 +148,13 @@ router.put('/:id', requireRole('manager'), validate(updateAgentSchema), async (r
       [name, region, phone, sellers_count, sims_count, status, agentId]
     );
     res.json(result.rows[0]);
-  } catch (err) {
-    if (isPhoneUniqueViolation(err)) {
+   } catch (err) {
+    const kind = getUniqueViolationKind(err);
+    if (kind === 'phone') {
       return res.status(409).json({ error: 'رقم الهاتف مستخدم بالفعل لوكيل آخر، يرجى استخدام رقم مختلف' });
+    }
+    if (kind === 'username') {
+      return res.status(409).json({ error: 'اسم المستخدم غير متاح؛ يرجى اختيار اسم مستخدم آخر' });
     }
     logger.error('Error updating agent:', err);
     res.status(500).json({ error: 'Internal server error' });
