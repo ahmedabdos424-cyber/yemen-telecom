@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
 
+const proxyTarget = process.env.VITE_PROXY_TARGET || 'https://yemen-telecom.onrender.com';
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
@@ -32,12 +34,12 @@ export default defineConfig({
     allowedHosts: ['localhost', '127.0.0.1', '::1'],
      proxy: {
        '/ws': {
-         target: 'https://yemen-telecom.onrender.com',
+         target: proxyTarget,
          changeOrigin: true,
          ws: true,
        },
        '/api': {
-         target: 'https://yemen-telecom.onrender.com',
+         target: proxyTarget,
          changeOrigin: true,
          configure: (proxy) => {
            proxy.on('proxyReq', (proxyReq, req) => {

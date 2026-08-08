@@ -6,6 +6,7 @@ import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination, paginatedQuery } from '../helpers';
 import { validate, createAgentSchema, updateAgentSchema } from '../validation';
+import { notifyNewMember } from '../services/fcm.service';
 
 const router = Router();
 
@@ -38,7 +39,7 @@ router.get('/', requireRole('manager', 'agent'), async (req: Request, res: Respo
   }
 });
 
-router.post('/', requireRole('manager'), validate(createAgentSchema), async (req: Request, res: Response) => {
+router.post('/', requireRole('manager'), validate(createAgentSchema), async (req: AuthRequest, res: Response) => {
   const { name, full_name, region, phone, sellers_count, sims_count, status, username, password } = req.body;
   try {
     const agentUsername = (username || phone || `agent_${Date.now()}`).trim().toLowerCase();
@@ -67,6 +68,15 @@ router.post('/', requireRole('manager'), validate(createAgentSchema), async (req
       );
       return { userId: uid, agent: agentRes.rows[0] };
     });
+
+    // Best-effort push: notify managers a new agent was registered. Never
+    // blocks the HTTP response.
+    void notifyNewMember({
+      memberType: 'agent',
+      name,
+      region,
+      createdBy: req.user?.username || 'مدير النظام',
+    }).catch((err) => logger.warn('[FCM] new agent notify failed:', err));
 
     res.status(201).json({
       agent,

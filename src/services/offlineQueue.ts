@@ -127,8 +127,8 @@ async function updateItem(id: number, patch: Partial<OfflineQueueItem>): Promise
 }
 
 let syncHandlers: SyncHandlers = {};
-export function registerSyncHandlers(handlers: SyncHandlers): void {
-  syncHandlers = handlers;
+export function registerSyncHandlers(handlers: SyncHandlers, merge = false): void {
+  syncHandlers = merge ? { ...syncHandlers, ...handlers } : handlers;
 }
 
 export function unregisterSyncHandlers(): void {

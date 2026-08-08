@@ -7,6 +7,7 @@ import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination } from '../helpers';
 import { validate, createSellerSchema, updateSellerSchema, updateSellerBalanceSchema } from '../validation';
 import { broadcastEvent } from '../services/realtime.service';
+import { notifyNewMember } from '../services/fcm.service';
 
 const router = Router();
 
@@ -141,7 +142,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), async (req: Request, res: Response) => {
+router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), async (req: AuthRequest, res: Response) => {
   const {
     name, store_name, id_number, phone, region, region_code, status,
     username, password, agent_name
@@ -203,6 +204,16 @@ router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), 
     });
 
     broadcastEvent({ type: 'seller.created', entity: 'seller', id: createdSeller.id, name: createdSeller.name, agent_id: agentId });
+
+    // Best-effort push: notify managers a new seller was registered. Never
+    // blocks the HTTP response.
+    void notifyNewMember({
+      memberType: 'seller',
+      name,
+      region,
+      createdBy: req.user?.username || 'مستخدم النظام',
+    }).catch((err) => logger.warn('[FCM] new seller notify failed:', err));
+
     res.status(201).json({
       seller: createdSeller,
       credentials: {

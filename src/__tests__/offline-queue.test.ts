@@ -136,6 +136,19 @@ describe('offlineQueue', () => {
     expect(await getQueue()).toHaveLength(1);
   });
 
+  it('registerSyncHandlers merges handlers when the merge flag is set', async () => {
+    const activate = vi.fn(async () => { /* ok */ });
+    const createSim = vi.fn(async () => { /* ok */ });
+    registerSyncHandlers({ activate });
+    registerSyncHandlers({ createSim }, true);
+    await enqueueOffline('activate', { iccid: '1' });
+    await enqueueOffline('createSim', { iccid: '2' });
+    const result = await syncNow();
+    expect(result.synced).toBe(2);
+    expect(activate).toHaveBeenCalledOnce();
+    expect(createSim).toHaveBeenCalledOnce();
+  });
+
   it('does not run two syncs concurrently', async () => {
     const handler = vi.fn(async () => { /* each activation is quick */ });
     registerSyncHandlers({ activate: handler });

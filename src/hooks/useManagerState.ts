@@ -4,6 +4,40 @@ import { api } from '../api/client';
 import type { CreateSimBatchRequest, SimBatchResult } from '../api/types';
 import { captureError } from '../lib/monitor.ts';
 import { useMountedRef } from './useMountedRef';
+import {
+  enqueueOffline, getNetworkStatus, getQueueStats, onNetworkChange, onQueueChanged,
+  registerSyncHandlers, syncNow, OfflineQueueItem,
+} from '../services/offlineQueue';
+
+function isNetworkError(err: unknown): boolean {
+  if (err instanceof TypeError) return true;
+  if (err instanceof Error) {
+    const m = err.message.toLowerCase();
+    return m.includes('failed to fetch') || m.includes('network request failed') || m.includes('networkerror') || m.includes('load failed');
+  }
+  return false;
+}
+
+interface QueuedSimWrite {
+  batch?: boolean;
+  payload?: CreateSimBatchRequest;
+  sim?: Partial<SIM>;
+  id?: number;
+  fields?: Partial<SIM>;
+}
+
+async function syncManagerSimItem(item: OfflineQueueItem): Promise<void> {
+  const q = item.payload as QueuedSimWrite;
+  if (item.kind === 'createSim') {
+    if (q.batch && q.payload) {
+      await api.createSimBatch(q.payload);
+    } else if (q.sim) {
+      await api.createSim(q.sim as any);
+    }
+  } else if (item.kind === 'updateSim' && q.id != null && q.fields) {
+    await api.updateSim(q.id, q.fields);
+  }
+}
 
 function loadFromStorage<T>(key: string, fallback: T): T {
   const saved = localStorage.getItem(key);
@@ -50,6 +84,34 @@ export function useManagerState(role: string | null) {
   const [apiError, setApiError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Array<{ id: string; title: string; message: string; identityNo: string; duplicatesCount: number }>>([]);
   const dismissToast = (id: string) => setToasts(prev => prev.filter(t => t.id !== id));
+  const [offlinePending, setOfflinePending] = useState(0);
+  const [isOnline, setIsOnline] = useState(true);
+
+  // Offline queue: register the manager's SIM write handlers (createSim /
+  // updateSim — batch or single) and flush queued writes once connectivity
+  // returns. Merged so the agent/seller activation handler stays registered.
+  useEffect(() => {
+    registerSyncHandlers({ createSim: syncManagerSimItem, updateSim: syncManagerSimItem }, true);
+    const refreshStats = async () => {
+      const stats = await getQueueStats();
+      if (!mountedRef.current) return;
+      setOfflinePending(stats.pending + stats.failed);
+      setIsOnline(stats.online);
+    };
+    refreshStats();
+    const offQueue = onQueueChanged(refreshStats);
+    const offNet = onNetworkChange((online) => {
+      if (!mountedRef.current) return;
+      setIsOnline(online);
+      if (online) {
+        syncNow().catch(err => captureError(err, 'syncNowOnReconnect'));
+      }
+    });
+    return () => {
+      offQueue();
+      offNet();
+    };
+  }, [mountedRef]);
 
   // Persist
   useEffect(() => { localStorage.setItem('admin_sims', JSON.stringify(sims)); }, [sims]);
@@ -107,22 +169,60 @@ export function useManagerState(role: string | null) {
 
   // Handlers
   const handleAddSIM = async (newSIM: Partial<SIM>) => {
+    if (!(await getNetworkStatus())) {
+      try {
+        await enqueueOffline('createSim', { sim: newSIM } satisfies QueuedSimWrite);
+      } catch (qe) {
+        captureError(qe, 'enqueueCreateSimOffline');
+      }
+      if (mountedRef.current) setSims(prev => [newSIM as SIM, ...prev]);
+      return;
+    }
     try {
       const created: any = await api.createSim(newSIM as any);
       if (mountedRef.current) setSims(prev => [created, ...prev]);
     } catch (err) {
-      captureError(err, 'handleAddSIM');
+      if (isNetworkError(err)) {
+        try {
+          await enqueueOffline('createSim', { sim: newSIM } satisfies QueuedSimWrite);
+        } catch (qe) {
+          captureError(qe, 'enqueueCreateSimOffline');
+        }
+        if (mountedRef.current) setSims(prev => [newSIM as SIM, ...prev]);
+      } else {
+        captureError(err, 'handleAddSIM');
+      }
     }
   };
 
   const handleAddSimBatch = async (payload: CreateSimBatchRequest): Promise<SimBatchResult | void> => {
-    const created: any = await api.createSimBatch(payload);
-    if (mountedRef.current) {
-      api.getSims()
-        .then((data: any) => { if (mountedRef.current) setSims(data ?? []); })
-        .catch((err) => captureError(err, 'handleAddSimBatch:refresh'));
+    if (!(await getNetworkStatus())) {
+      try {
+        await enqueueOffline('createSim', { batch: true, payload } satisfies QueuedSimWrite);
+      } catch (qe) {
+        captureError(qe, 'enqueueBatchOffline');
+      }
+      return;
     }
-    return created;
+    try {
+      const created: any = await api.createSimBatch(payload);
+      if (mountedRef.current) {
+        api.getSims()
+          .then((data: any) => { if (mountedRef.current) setSims(data ?? []); })
+          .catch((err) => captureError(err, 'handleAddSimBatch:refresh'));
+      }
+      return created;
+    } catch (err) {
+      if (isNetworkError(err)) {
+        try {
+          await enqueueOffline('createSim', { batch: true, payload } satisfies QueuedSimWrite);
+        } catch (qe) {
+          captureError(qe, 'enqueueBatchOffline');
+        }
+        return;
+      }
+      throw err;
+    }
   };
 
   const handleAddAgent = async (newAgent: Partial<Agent> & { username?: string; password?: string }) => {
@@ -169,15 +269,36 @@ export function useManagerState(role: string | null) {
     }).catch((err) => captureError(err, 'handleResolveAlert'));
   };
 
-  const handleUpdateSIM = (id: string, fields: Partial<SIM>) => {
-    api.updateSim(Number(id), fields).then(() => {
+  const handleUpdateSIM = async (id: string, fields: Partial<SIM>) => {
+    if (!(await getNetworkStatus())) {
+      try {
+        await enqueueOffline('updateSim', { id: Number(id), fields } satisfies QueuedSimWrite);
+      } catch (qe) {
+        captureError(qe, 'enqueueUpdateSimOffline');
+      }
       if (mountedRef.current) setSims(prev => prev.map(s => s.id === id ? { ...s, ...fields } : s));
-    }).catch((err) => captureError(err, 'handleUpdateSIM'));
+      return;
+    }
+    try {
+      await api.updateSim(Number(id), fields);
+      if (mountedRef.current) setSims(prev => prev.map(s => s.id === id ? { ...s, ...fields } : s));
+    } catch (err) {
+      if (isNetworkError(err)) {
+        try {
+          await enqueueOffline('updateSim', { id: Number(id), fields } satisfies QueuedSimWrite);
+        } catch (qe) {
+          captureError(qe, 'enqueueUpdateSimOffline');
+        }
+        if (mountedRef.current) setSims(prev => prev.map(s => s.id === id ? { ...s, ...fields } : s));
+      } else {
+        captureError(err, 'handleUpdateSIM');
+      }
+    }
   };
 
   return {
     sims, agents, sellers, alerts, transactions, stats, settings, currentView,
-    loading, apiError, toasts,
+    loading, apiError, toasts, offlinePending, isOnline,
     setView, setSettings, setSims, dismissToast,
     handleAddSIM, handleAddAgent, handleUpdateAgent,
     handleUpdateSeller, handleAddBalance, handleResolveAlert,

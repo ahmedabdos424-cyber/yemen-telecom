@@ -129,7 +129,7 @@ function AuthenticatedApp() {
     }
     const viewFromUrl = pathParts[1].replace(/-/g, '_');
     if (role === 'manager') {
-      const validViews: string[] = ['dashboard', 'sims', 'agents', 'sellers', 'alerts', 'duplicate-identities', 'duplicate_identities', 'reports', 'settings', 'add-agent'];
+      const validViews: string[] = ['dashboard', 'sims', 'agents', 'sellers', 'alerts', 'duplicate-identities', 'duplicate_identities', 'reports', 'settings', 'add-agent', 'activate'];
       if (validViews.includes(viewFromUrl) && viewFromUrl !== mgr.currentView) {
         mgr.setView(viewFromUrl as ViewType);
       }
@@ -154,26 +154,27 @@ function AuthenticatedApp() {
     );
   }
 
-  const SharedOfflineBanner = () => (
-    !isOnline ? (
+  const SharedOfflineBanner = () => {
+    const pendingTotal = (agt.offlinePending ?? 0) + (mgr.offlinePending ?? 0);
+    return !isOnline ? (
       <div className="fixed top-0 left-0 right-0 z-[60] bg-red-600 text-white text-center py-1.5 text-[11px] font-bold shadow-lg flex items-center justify-center gap-2" role="alert" aria-live="assertive">
         <span className="material-symbols-outlined text-xs">wifi_off</span>
         لا يوجد اتصال بالإنترنت
-        {agt.offlinePending > 0 ? (
+        {pendingTotal > 0 ? (
           <span className="bg-white/20 rounded-full px-2 py-0.5">
-            {agt.offlinePending} عملية بانتظار المزامنة
+            {pendingTotal} عملية بانتظار المزامنة
           </span>
         ) : null}
       </div>
     ) : (
-      agt.offlinePending > 0 ? (
+      pendingTotal > 0 ? (
         <div className="fixed top-0 left-0 right-0 z-[60] bg-amber-500 text-white text-center py-1.5 text-[11px] font-bold shadow-lg flex items-center justify-center gap-2" role="status" aria-live="polite">
           <span className="material-symbols-outlined text-xs">sync</span>
-          {agt.offlinePending} عملية تنتظر المزامنة عند عودة الاتصال
+          {pendingTotal} عملية تنتظر المزامنة عند عودة الاتصال
         </div>
       ) : null
-    )
-  );
+    );
+  };
 
   const ToastNotifications = () => (
     <div className="fixed top-20 left-4 z-40 w-full max-w-sm flex flex-col gap-3 pointer-events-none">
@@ -223,6 +224,7 @@ function AuthenticatedApp() {
                     <Route path="/manager/alerts" element={<AlertsView alerts={mgr.alerts} onResolveAlert={mgr.handleResolveAlert} settings={mgr.settings} onUpdateSettings={mgr.setSettings} />} />
                     <Route path="/manager/duplicate-identities" element={<GeographicRiskView />} />
                     <Route path="/manager/reports" element={<ReportsView />} />
+                    <Route path="/manager/activate" element={<ActivateSimForm onSimActivated={agt.handleSimActivationForSeller} />} />
                     <Route path="/manager/settings" element={<SettingsView settings={mgr.settings} onUpdateSettings={mgr.setSettings} />} />
                     <Route path="/manager/add-agent" element={<AddAgentView onAddAgent={mgr.handleAddAgent} setView={(v) => { mgr.setView(v); navigate(`/manager/${v}`); }} />} />
                     <Route path="*" element={<Navigate to="/manager/dashboard" replace />} />

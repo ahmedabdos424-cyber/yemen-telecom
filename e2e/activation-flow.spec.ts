@@ -67,7 +67,9 @@ test.describe('تدفق تفعيل الشريحة الكامل (Login → SIM �
   // 2. Navigate to SIM inventory
   // ---------------------------------------------------------------------------
   test('الخطوة 2: الانتقال إلى صفحة مخزون الشرائح', async () => {
-    await page.getByRole('button', { name: /الشرائح|شرائح الاتصال/ }).click();
+    // Navigate directly: on desktop viewports (Playwright Chrome = 1280px) the
+    // manager BottomNav is hidden (lg:hidden) and TopBar has no SIMs button.
+    await page.goto('/manager/sims');
     await page.waitForURL('**/manager/sims', { timeout: 15_000 });
     await expect(page).toHaveURL(/\/manager\/sims/);
 
@@ -81,7 +83,6 @@ test.describe('تدفق تفعيل الشريحة الكامل (Login → SIM �
   test('الخطوة 3: العثور على شريحة متاحة للتفعيل', async () => {
     // Filter the status dropdown to "available" (متاح).
     await page.locator('label:text("حالة الشريحة") + select').selectOption('available');
-    await page.locator('select').selectOption('available');
 
     // Wait until at least one SIM card row renders.
     await page.locator('[class*="card"]').filter({ hasText: 'متاح' }).first().waitFor({
@@ -104,8 +105,8 @@ test.describe('تدفق تفعيل الشريحة الكامل (Login → SIM �
   test('الخطوة 4: تفعيل الشريحة المتاحة', async () => {
     const iccid = (page as any).__e2eIccid as string;
 
-    // Open the activation route directly.
-    await page.goto('/agent/activate');
+    // Open the activation route directly (managers can activate admin-owned stock).
+    await page.goto('/manager/activate');
     await page.waitForSelector('text=تفعيل شريحة جديدة', { timeout: 15_000 });
 
     // Fill customer details.
@@ -123,7 +124,7 @@ test.describe('تدفق تفعيل الشريحة الكامل (Login → SIM �
 
     // Assert success banner appears.
     await expect(page.locator('.bg-emerald-950/40')).toContainText('تم التفعيل بنجاح', { timeout: 20_000 });
-    await expect(page).toHaveURL(/\/agent\/activate/);
+    await expect(page).toHaveURL(/\/manager\/activate/);
   });
 
   // ---------------------------------------------------------------------------
