@@ -81,8 +81,9 @@ export function useAgentSellerState(role: string | null, username: string) {
 
   // Offline queue: register the activation sync handler and react to
   // connectivity changes so queued activations flush once the network returns.
+  // Merged so the manager's createSim/updateSim handlers stay registered.
   useEffect(() => {
-    registerSyncHandlers({ activate: syncActivationItem });
+    registerSyncHandlers({ activate: syncActivationItem }, true);
     const refreshStats = async () => {
       const stats = await getQueueStats();
       if (!mountedRef.current) return;

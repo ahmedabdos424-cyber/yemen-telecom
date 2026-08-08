@@ -193,3 +193,22 @@ export async function notifyDistributionApproved(
     },
   });
 }
+
+// Notify all managers that a new agent or seller was registered.
+export async function notifyNewMember(
+  data: { memberType: 'agent' | 'seller'; name: string; region?: string; createdBy: string }
+): Promise<void> {
+  const tokens = await getManagerTokens();
+  if (tokens.length === 0) return;
+  const label = data.memberType === 'agent' ? 'وكيل' : 'بائع';
+  const region = data.region ? ` في منطقة ${data.region}` : '';
+  await sendPushToTokens(tokens, {
+    title: `تسجيل ${label} جديد`,
+    body: `تم تسجيل ${label} جديد «${data.name}»${region} بواسطة ${data.createdBy}.`,
+    data: {
+      eventType: 'NEW_MEMBER',
+      memberType: data.memberType,
+      name: data.name,
+    },
+  });
+}

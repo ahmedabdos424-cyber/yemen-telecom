@@ -17,6 +17,7 @@ import {
   getManagerTokens,
   getAgentAndManagerTokens,
   fcmDebugState,
+  notifyNewMember,
 } from '../services/fcm.service';
 
 describe('fcm.service', () => {
@@ -68,5 +69,16 @@ describe('fcm.service', () => {
     const state = fcmDebugState();
     expect(state.initialized).toBe(true);
     expect(state.failed).toBe(false);
+  });
+
+  it('notifyNewMember resolves tokens for managers and never throws without Firebase env', async () => {
+    dbQuery.mockResolvedValue({ rows: [{ token: 'mgr-token' }] });
+    await expect(
+      notifyNewMember({ memberType: 'agent', name: 'علي أحمد', region: 'صنعاء', createdBy: 'manager' })
+    ).resolves.toBeUndefined();
+    expect(dbQuery).toHaveBeenCalled();
+    const sql = String(dbQuery.mock.calls[0][0]);
+    expect(sql).toContain('device_tokens');
+    expect(sql).toContain("u.role = 'manager'");
   });
 });
