@@ -3,6 +3,15 @@ import { query } from '../db';
 import { logger } from '../logger';
 import { cacheGet, cacheSet } from '../cache';
 import { requireRole, AuthRequest } from '../middleware/auth';
+import {
+  DailySalesRow,
+  AgentPerformanceRow,
+  OperatorDistributionRow,
+  SellerPerformanceRow,
+  ActivationsReportRow,
+  SellersRegistryRow,
+  AgentIdRow,
+} from '../types/reports';
 
 const router = Router();
 
@@ -10,7 +19,7 @@ router.get('/daily-sales', requireRole('manager'), async (_req: Request, res: Re
   const cached = cacheGet('report:daily-sales');
   if (cached) return res.json(cached);
   try {
-    const result = await query(`
+    const result = await query<DailySalesRow>(`
       SELECT
         DATE(created_at) AS day,
         COUNT(*) AS activations,
@@ -33,7 +42,7 @@ router.get('/agent-performance', requireRole('manager'), async (_req: Request, r
   const cached = cacheGet('report:agent-performance');
   if (cached) return res.json(cached);
   try {
-    const result = await query(`
+    const result = await query<AgentPerformanceRow>(`
       SELECT
         a.id, a.name AS agent_name, a.region,
         COUNT(DISTINCT s.id) AS seller_count,
@@ -57,11 +66,11 @@ router.get('/operator-distribution', requireRole('manager'), async (_req: Reques
   const cached = cacheGet('report:operator-distribution');
   if (cached) return res.json(cached);
   try {
-    const sims = await query(`
+    const sims = await query<OperatorDistributionRow>(`
       SELECT provider AS operator, COUNT(*) AS count, status
       FROM sims GROUP BY provider, status ORDER BY provider
     `);
-    const ops = await query(`
+    const ops = await query<OperatorDistributionRow>(`
       SELECT operator, COUNT(*) AS count, status
       FROM operations GROUP BY operator, status ORDER BY operator
     `);
@@ -82,14 +91,14 @@ router.get('/seller-performance', requireRole('manager', 'agent'), async (req: A
     let whereClause = '';
     let params: any[] | undefined;
     if (req.user?.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
+      const agentRes = await query<AgentIdRow>('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
       if (agentRes.rows.length === 0) {
         return res.json([]);
       }
       whereClause = ' WHERE s.agent_id = $1';
       params = [agentRes.rows[0].id];
     }
-    const result = await query(`
+    const result = await query<SellerPerformanceRow>(`
       SELECT
         s.id, s.name, s.store_name, s.region,
         s.sims_count, s.sales_30_days, s.sales_growth,
@@ -121,7 +130,7 @@ router.get('/activations', requireRole('manager', 'agent'), async (req: AuthRequ
     let whereClause = 'WHERE o.type = $1';
     let params: any[] = ['activate'];
     if (req.user?.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
+      const agentRes = await query<AgentIdRow>('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
       if (agentRes.rows.length === 0) {
         return res.json([]);
       }
@@ -132,7 +141,7 @@ router.get('/activations', requireRole('manager', 'agent'), async (req: AuthRequ
       )`;
       params = ['activate', agentId];
     }
-    const result = await query(`
+    const result = await query<ActivationsReportRow>(`
       SELECT
         o.op_id, o.type, o.target, o.operator, o.date, o.time, o.status,
         o.customer_name, o.customer_id, o.contract_image, o.iccid, o.created_at,
@@ -162,14 +171,14 @@ router.get('/sellers', requireRole('manager', 'agent'), async (req: AuthRequest,
     let whereClause = '';
     let params: any[] | undefined;
     if (req.user?.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
+      const agentRes = await query<AgentIdRow>('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
       if (agentRes.rows.length === 0) {
         return res.json([]);
       }
       whereClause = ' WHERE s.agent_id = $1';
       params = [agentRes.rows[0].id];
     }
-    const result = await query(`
+    const result = await query<SellersRegistryRow>(`
       SELECT
         s.id, s.seller_id, s.name, s.store_name, s.id_number, s.phone,
         s.region, s.region_code, s.status, s.avatar, s.creation_date, s.last_login,

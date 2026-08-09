@@ -60,7 +60,7 @@ pool.on('error', (err) => {
 
 let slowQueryThreshold = parseInt(process.env.DB_SLOW_QUERY_MS || '500', 10);
 
-export async function query(text: string, params?: any[]) {
+export async function query<T extends import('pg').QueryResultRow = any>(text: string, params?: any[]): Promise<import('pg').QueryResult<T>> {
   const start = Date.now();
   const res = await pool.query(text, params);
   const duration = Date.now() - start;
