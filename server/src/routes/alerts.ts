@@ -19,8 +19,8 @@ router.get('/', requireRole('manager'), async (req: Request, res: Response) => {
     const result = await query(sql, params);
     res.json(result.rows);
   } catch (err) {
-    logger.error('Error fetching alerts:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
   }
 });
 
@@ -30,8 +30,8 @@ router.delete('/:id', requireRole('manager'), async (req: Request, res: Response
     await query('DELETE FROM alerts WHERE id = $1', [id]);
     res.json({ success: true });
   } catch (err) {
-    logger.error('Error deleting alert:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
   }
 });
 

@@ -44,8 +44,8 @@ router.get('/settings', requireRole('manager'), async (_req: Request, res: Respo
       identityRemindersFrequency: s.identity_reminders_frequency,
     });
   } catch (err) {
-    logger.error('Error fetching settings:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
   }
 });
 
@@ -100,8 +100,8 @@ router.get('/transactions', requireRole('manager'), async (req: Request, res: Re
       relativeTime: r.relative_time,
     })));
   } catch (err) {
-    logger.error('Error fetching transactions:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
   }
 });
 
@@ -170,8 +170,8 @@ router.get('/duplicate-identities', requireRole('manager'), async (req: Request,
       };
     }));
   } catch (err) {
-    logger.error('Error fetching duplicate identities:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
   }
 });
 
@@ -217,8 +217,8 @@ router.post('/duplicate-identities/:idNo/flag', requireRole('manager'), async (r
     await logIdentityAction(idNo, name, 'flag', performedBy);
     res.json({ success: true, idNo, flagged: true, reviewStatus: 'flagged' });
   } catch (err) {
-    logger.error('Error flagging duplicate identity:', err);
-    res.status(500).json({ error: 'Failed to flag identity' });
+    logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
   }
 });
 
@@ -250,8 +250,8 @@ router.post('/duplicate-identities/:idNo/block', requireRole('manager'), async (
     await logIdentityAction(idNo, name, 'block', performedBy);
     res.json({ success: true, idNo, blocked: true, reviewStatus: 'blocked' });
   } catch (err) {
-    logger.error('Error blocking duplicate identity:', err);
-    res.status(500).json({ error: 'Failed to block identity' });
+    logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
   }
 });
 
@@ -278,8 +278,8 @@ router.post('/duplicate-identities/:idNo/unblock', requireRole('manager'), async
     await logIdentityAction(idNo, name, 'unblock', performedBy);
     res.json({ success: true, idNo, blocked: false, reviewStatus: 'resolved' });
   } catch (err) {
-    logger.error('Error unblocking duplicate identity:', err);
-    res.status(500).json({ error: 'Failed to unblock identity' });
+    logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
   }
 });
 
@@ -314,8 +314,8 @@ router.get('/audit-logs', requireRole('manager'), async (req: Request, res: Resp
       res.json(logs);
     }
   } catch (err) {
-    logger.error('Error fetching audit logs:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
   }
 });
 
@@ -461,8 +461,8 @@ router.post('/sims/batch', requireRole('manager'), validate(createSimBatchSchema
       owner: ownerText,
     });
   } catch (err) {
-    logger.error('Error creating sim batch:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
   }
 });
 
@@ -485,8 +485,8 @@ router.post('/reset', requireRole('manager'), validate(resetDataSchema), async (
     });
     res.json({ success: true, message: 'System data reset completed', deleted: summary.deleted });
   } catch (err) {
-    logger.error('Error resetting system data:', err);
-    res.status(500).json({ error: 'Failed to reset system data' });
+    logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
   }
 });
 
@@ -531,8 +531,8 @@ router.post('/system/backup', requireRole('manager'), async (_req: Request, res:
       downloadUrl: result.url,
     });
   } catch (err) {
-    logger.error('Error creating backup:', err);
-    res.status(500).json({ error: 'Failed to create backup' });
+    logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
   }
 });
 
@@ -552,8 +552,8 @@ router.get('/system/backup/download/:filename', requireRole('manager'), async (r
     }
     res.redirect(url);
   } catch (err) {
-    logger.error('Error downloading backup:', err);
-    res.status(500).json({ error: 'Failed to download backup' });
+    logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
   }
 });
 
@@ -579,8 +579,8 @@ router.post('/system/lockdown', requireRole('manager'), async (_req: Request, re
       message: newStatus ? 'Emergency lockdown activated. All seller accounts suspended.' : 'Lockdown deactivated. All seller accounts restored.',
     });
   } catch (err) {
-    logger.error('Error toggling lockdown:', err);
-    res.status(500).json({ error: 'Failed to toggle lockdown' });
+    logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
   }
 });
 
@@ -589,8 +589,8 @@ router.get('/system/lockdown/status', requireRole('manager'), async (_req: Reque
     const result = await query('SELECT maintenance_mode FROM system_settings WHERE id = 1');
     res.json({ locked: result.rows[0]?.maintenance_mode || false });
   } catch (err) {
-    logger.error('Error checking lockdown status:', err);
-    res.status(500).json({ error: 'Failed to check lockdown status' });
+    logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
   }
 });
 
@@ -615,8 +615,8 @@ router.get('/monitoring', requireRole('manager'), async (_req: Request, res: Res
       timestamp: new Date().toISOString(),
     });
   } catch (err) {
-    logger.error('Error fetching monitoring data:', err);
-    res.status(500).json({ error: 'Failed to fetch monitoring data' });
+    logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
   }
 });
 
