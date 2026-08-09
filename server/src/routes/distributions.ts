@@ -104,7 +104,7 @@ router.post('/', requireRole('agent'), validate(createDistributionSchema), async
       const s = await query('SELECT id FROM sellers WHERE name = $1', [seller_name]);
       if (s.rows.length > 0) sellerId = s.rows[0].id;
     }
-    const requestId = `DIST-${Date.now()}`;
+    const requestId = `DIST-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
     const result = await query(
       `INSERT INTO distribution_requests (request_id, agent_id, seller_id, operator, count, notes)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
