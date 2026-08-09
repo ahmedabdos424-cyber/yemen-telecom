@@ -86,18 +86,24 @@ export function createRealtimeGateway(server: http.Server, deps: RealtimeDeps = 
         ws.close(4001, 'Authentication required');
         return;
       }
-      void deps.resolveUser(msg.token).then((user) => {
-        if (ws.readyState !== WebSocket.OPEN) return;
-        if (!user) {
-          sendJson(ws, { type: 'auth_error', reason: 'invalid_token' });
-          ws.close(4001, 'Unauthorized');
-          return;
-        }
-        clearTimeout(authTimer);
-        client.user = user;
-        logger.info(`[REALTIME] client authenticated: ${user.username} (${user.role})`);
-        sendJson(ws, { type: 'auth_ok' });
-      });
+      void deps.resolveUser(msg.token)
+        .then((user) => {
+          if (ws.readyState !== WebSocket.OPEN) return;
+          if (!user) {
+            sendJson(ws, { type: 'auth_error', reason: 'invalid_token' });
+            ws.close(4001, 'Unauthorized');
+            return;
+          }
+          clearTimeout(authTimer);
+          client.user = user;
+          logger.info(`[REALTIME] client authenticated: ${user.username} (${user.role})`);
+          sendJson(ws, { type: 'auth_ok' });
+        })
+        .catch((err) => {
+          logger.error('[REALTIME] auth resolution failed:', err);
+          sendJson(ws, { type: 'auth_error', reason: 'auth_failed' });
+          ws.close(4001, 'Authentication failed');
+        });
     });
 
     ws.on('close', () => {
@@ -121,9 +127,14 @@ export function createRealtimeGateway(server: http.Server, deps: RealtimeDeps = 
       socket.destroy();
       return;
     }
-    wss.handleUpgrade(req, socket, head, (ws) => {
-      attachHandlers(ws);
-    });
+    try {
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        attachHandlers(ws);
+      });
+    } catch (err) {
+      logger.warn('[REALTIME] upgrade failed:', err);
+      socket.destroy();
+    }
   });
 
   const heartbeatTimer = setInterval(() => {

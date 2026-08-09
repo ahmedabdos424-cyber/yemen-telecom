@@ -49,7 +49,7 @@ router.post('/', requireRole('manager', 'agent', 'seller'), validate(createOpera
   const contractImage = req.body.contract_image ?? req.body.contractImage ?? null;
   const iccid = req.body.iccid ?? null;
   try {
-    const opId = `op_${Date.now()}`;
+    const opId = `op_${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
     const now = new Date();
     const date = now.toISOString().split('T')[0].replace(/-/g, '/');
     const time = 'الآن';

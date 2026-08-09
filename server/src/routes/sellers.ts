@@ -288,6 +288,9 @@ router.put('/:id/balance', requireRole('manager', 'agent'), validate(updateSelle
       const lock = await client.query('SELECT sales_30_days, total_sales FROM sellers WHERE id = $1 FOR UPDATE', [id]);
       const lockedRow = lock.rows[0];
       const updatedSales = (lockedRow.sales_30_days || 0) + amount;
+      if (updatedSales < 0) {
+        throw new Error('INSUFFICIENT_BALANCE');
+      }
       const updateResult = await client.query(
         `UPDATE sellers SET sales_30_days=$1, total_sales=COALESCE(total_sales,0)+$2 WHERE id=$3 RETURNING *`,
         [updatedSales, amount, id]
@@ -311,6 +314,9 @@ router.put('/:id/balance', requireRole('manager', 'agent'), validate(updateSelle
     broadcastEvent({ type: 'seller.updated', entity: 'seller', id, action: 'balance', amount });
     res.json(mapSeller(result));
   } catch (err) {
+    if (err instanceof Error && err.message === 'INSUFFICIENT_BALANCE') {
+      return res.status(400).json({ error: 'الرصيد الحالي غير كافٍ لهذه العملية' });
+    }
     logger.error('Error updating seller balance:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -364,12 +370,14 @@ router.delete('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, 
       }
     }
     const seller = existing.rows[0];
-    if (seller.user_id) {
-      await query('UPDATE users SET status = $1 WHERE id = $2', ['inactive', seller.user_id]);
-    }
-    await query('UPDATE sims SET assigned_to = NULL, owner = $1 WHERE assigned_to = $2', ['المركز الرئيسي', id]);
-    await query('DELETE FROM distribution_requests WHERE seller_id = $1', [id]);
-    await query('UPDATE sellers SET status = $1 WHERE id = $2', ['deleted', id]);
+    await transaction(async (client) => {
+      if (seller.user_id) {
+        await client.query('UPDATE users SET status = $1 WHERE id = $2', ['inactive', seller.user_id]);
+      }
+      await client.query('UPDATE sims SET assigned_to = NULL, owner = $1 WHERE assigned_to = $2', ['المركز الرئيسي', id]);
+      await client.query('DELETE FROM distribution_requests WHERE seller_id = $1', [id]);
+      await client.query('UPDATE sellers SET status = $1 WHERE id = $2', ['deleted', id]);
+    });
     broadcastEvent({ type: 'seller.deleted', entity: 'seller', id });
     res.json({ message: 'Seller deleted successfully' });
   } catch (err) {

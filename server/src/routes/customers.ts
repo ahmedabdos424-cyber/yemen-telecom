@@ -89,20 +89,17 @@ router.post('/', requireRole('manager', 'agent', 'seller'), validate(createCusto
   const { phone, region } = body;
   const activated_by = body.activated_by || body.activatedBy;
   try {
-    const existing = await query('SELECT id FROM customers WHERE id_number = $1', [id_number]);
-    if (existing.rows.length > 0) {
-      const updated = await query(
-        `UPDATE customers SET sims_count = sims_count + 1, last_activation = NOW(),
-         phone = COALESCE(NULLIF($2, ''), phone), region = COALESCE(NULLIF($3, ''), region),
-         id_type = COALESCE(NULLIF($4, ''), id_type), id_issue_date = COALESCE(NULLIF($5, ''), id_issue_date)
-         WHERE id = $1 RETURNING *`,
-        [existing.rows[0].id, phone, region, id_type, id_issue_date]
-      );
-      return res.json(updated.rows[0]);
-    }
     const result = await query(
       `INSERT INTO customers (full_name, id_number, id_type, id_issue_date, phone, region, first_activation, last_activation, activated_by, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW(), $7, $8) RETURNING *`,
+       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW(), $7, $8)
+       ON CONFLICT (id_number) DO UPDATE SET
+         sims_count = customers.sims_count + 1,
+         last_activation = NOW(),
+         phone = COALESCE(NULLIF(EXCLUDED.phone, ''), customers.phone),
+         region = COALESCE(NULLIF(EXCLUDED.region, ''), customers.region),
+         id_type = COALESCE(NULLIF(EXCLUDED.id_type, ''), customers.id_type),
+         id_issue_date = COALESCE(NULLIF(EXCLUDED.id_issue_date, ''), customers.id_issue_date)
+       RETURNING *`,
       [full_name, id_number, id_type, id_issue_date, phone || '', region || '', activated_by || null, req.user?.id]
     );
     res.status(201).json(result.rows[0]);
