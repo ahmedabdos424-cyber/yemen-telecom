@@ -9,6 +9,7 @@ import crypto from 'crypto';
 import { logger } from '../logger';
 import { query } from '../db';
 import { hashToken, isTokenBlacklisted, isSessionExempt, TokenPayload } from '../middleware/auth';
+import { authRateLimiter } from '../middleware/rateLimiter';
 import { getDeviceInfo } from '../helpers';
 import { validate, loginSchema } from '../validation';
 
@@ -20,7 +21,7 @@ const JWT_SECRET: string = process.env.JWT_SECRET;
 const REFRESH_SECRET: string = process.env.REFRESH_SECRET;
 const SESSION_DURATION_MS = 2 * 60 * 60 * 1000;
 
-router.post('/login', validate(loginSchema), async (req: Request, res: Response) => {
+router.post('/login', authRateLimiter, validate(loginSchema), async (req: Request, res: Response) => {
   const { username, password } = req.body;
   try {
     const result = await query('SELECT * FROM users WHERE username = $1', [username]);
