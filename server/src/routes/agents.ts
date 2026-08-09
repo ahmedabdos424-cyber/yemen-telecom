@@ -7,18 +7,9 @@ import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination, paginatedQuery } from '../helpers';
 import { validate, createAgentSchema, updateAgentSchema } from '../validation';
 import { notifyNewMember } from '../services/fcm.service';
+import { getUniqueViolationKind } from '../helpers/dbErrors';
 
 const router = Router();
-
-function getUniqueViolationKind(err: unknown): 'phone' | 'username' | null {
-  if (!err || typeof err !== 'object') return null;
-  const e = err as { code?: string; message?: string };
-  if (e.code !== '23505') return null;
-  const msg = e.message ?? '';
-  if (msg.includes('idx_agents_phone_unique') || msg.includes('agents_phone_key')) return 'phone';
-  if (msg.includes('users_username_key') || msg.includes('idx_users_username') || msg.includes('users_pkey')) return 'username';
-  return null;
-}
 
 router.get('/', requireRole('manager', 'agent'), async (req: Request, res: Response) => {
   try {
