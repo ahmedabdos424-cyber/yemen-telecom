@@ -18,6 +18,7 @@ export function useAuth() {
   const [isLoading, setIsLoading] = useState(true);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [showBiometricPrompt, setShowBiometricPrompt] = useState(false);
 
   useEffect(() => {
     if (isNativeBiometrics()) {
@@ -112,6 +113,9 @@ export function useAuth() {
       if (result.refreshToken) setRefreshToken(result.refreshToken);
       const userRole = result.user.role as Role;
       setFrontendSentryUser({ id: result.user.id, username: result.user.displayName, role: userRole });
+      if (isNativeBiometrics() && biometricAvailable && !biometricEnabled && localStorage.getItem('tele_biometric_prompt_dismissed') !== '1') {
+        setShowBiometricPrompt(true);
+      }
       return {
         role: userRole,
         commit: () => apply(userRole, result.user.displayName),
@@ -149,6 +153,11 @@ export function useAuth() {
   const disableBiometricLogin = useCallback(async (): Promise<void> => {
     await clearBiometricCredential();
     setBiometricEnabled(false);
+  }, []);
+
+  const dismissBiometricPrompt = useCallback(() => {
+    setShowBiometricPrompt(false);
+    try { localStorage.setItem('tele_biometric_prompt_dismissed', '1'); } catch {}
   }, []);
 
   const handleBiometricLogin = useCallback(async (): Promise<{ role: Role; commit: () => void } | null> => {
@@ -190,5 +199,6 @@ export function useAuth() {
     darkMode, setDarkMode, token, setTokenWrapper,
     isLoading, handleLogin, handleLogout, clearSession,
     biometricAvailable, biometricEnabled, enableBiometricLogin, disableBiometricLogin, handleBiometricLogin,
+    showBiometricPrompt, dismissBiometricPrompt,
   };
 }

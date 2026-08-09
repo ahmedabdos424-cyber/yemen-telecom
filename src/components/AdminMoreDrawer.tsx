@@ -5,6 +5,7 @@ import { useToast, ToastContainer } from '../hooks/useToast';
 import { api } from '../api/client';
 import AuditLogsView from './AuditLogsView';
 import AgentSellerTreeModal from './AgentSellerTreeModal';
+import SellerPosManagementView from './SellerPosManagementView';
 
 interface AdminMoreDrawerProps {
   isMoreOpen: boolean;
@@ -18,6 +19,7 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
   const [showLogOutDialog, setShowLogOutDialog] = useState(false);
   const [showAuditLogs, setShowAuditLogs] = useState(false);
   const [showAgentTree, setShowAgentTree] = useState(false);
+  const [showSellerManagement, setShowSellerManagement] = useState(false);
 
   const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
 
@@ -62,7 +64,7 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
   return (
     <>
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-      {!showAuditLogs && !showAgentTree && (
+      {!showAuditLogs && !showAgentTree && !showSellerManagement && (
         <>
       <motion.div
         initial={{ opacity: 0 }}
@@ -105,7 +107,9 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
               <button onClick={() => { setView('duplicate-identities'); setIsMoreOpen(false); }}
                 className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
                 <div className="flex items-center gap-2.5">
-                  <span className="material-symbols-outlined text-slate-400 group-hover:text-red-500 text-lg">policy</span>
+                  <span className="w-8 h-8 rounded-lg bg-slate-800/60 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-slate-400 group-hover:text-red-500 text-lg">policy</span>
+                  </span>
                   <span className="text-xs font-bold text-slate-200">المراقبة ومكافحة التسييل</span>
                 </div>
                 <span className="text-[9px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full font-bold">أمني</span>
@@ -113,10 +117,22 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
               <button onClick={() => { setShowAuditLogs(true); setIsMoreOpen(false); }}
                 className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
                 <div className="flex items-center gap-2.5">
-                  <span className="material-symbols-outlined text-slate-400 group-hover:text-sf text-lg">list_alt</span>
+                  <span className="w-8 h-8 rounded-lg bg-slate-800/60 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-slate-400 group-hover:text-red-500 text-lg">list_alt</span>
+                  </span>
                   <span className="text-xs font-bold text-slate-200">سجلات التدقيق الأمني</span>
                 </div>
-                <span className="material-symbols-outlined text-slate-600 text-sm group-hover:-translate-x-0.5 transition-transform">arrow_back</span>
+                <span className="text-[9px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full font-bold">أمني</span>
+              </button>
+              <button onClick={() => { setShowSellerManagement(true); setIsMoreOpen(false); }}
+                className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-8 h-8 rounded-lg bg-slate-800/60 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-slate-400 group-hover:text-red-500 text-lg">storefront</span>
+                  </span>
+                  <span className="text-xs font-bold text-slate-200">إدارة البائعين ونقاط البيع</span>
+                </div>
+                <span className="material-symbols-outlined text-slate-600 text-sm">arrow_back</span>
               </button>
               <button onClick={() => { setShowAgentTree(true); setIsMoreOpen(false); }}
                 className="w-full text-right p-3 card-enhanced hover:border-slate-600 flex items-center justify-between group cursor-pointer">
@@ -343,6 +359,7 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
         </>
       )}
       <AgentSellerTreeModal open={showAgentTree} onClose={() => setShowAgentTree(false)} />
+      <SellerPosManagementView open={showSellerManagement} onClose={() => setShowSellerManagement(false)} />
 
       {showLogOutDialog && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[120] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="تأكيد تسجيل الخروج">

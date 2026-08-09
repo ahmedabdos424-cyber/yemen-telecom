@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, type FormEvent, type MouseEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Role } from '../types';
-import { Shield, User, Lock, Eye, EyeOff, ChevronLeft, Smartphone, Check } from 'lucide-react';
+import { Shield, User, Lock, Eye, EyeOff, ChevronLeft, Smartphone, Check, Fingerprint } from 'lucide-react';
 import { useToast, ToastContainer } from '../hooks/useToast';
 
 interface LoginScreenProps {
@@ -99,6 +99,8 @@ export default function LoginScreen({ onLogin, onBiometricLogin, biometricAvaila
          setErrorMsg('تعذر الاتصال: مشكلة في شهادة الأمان. تأكد من تاريخ ووقت جهازك مضبوطين بشكل صحيح');
        } else if (msg.includes('cors')) {
          setErrorMsg('تعذر الاتصال بالخادم. يرجى تحديث التطبيق إلى أحدث نسخة من متجر التوزيع');
+       } else if (msg.includes('429') || msg.includes('تجاوز الحد') || msg.includes('محاولات الدخول') || msg.includes('temporarily locked') || msg.includes('too many requests')) {
+         setErrorMsg(raw);
        } else {
          setErrorMsg('تعذر الاتصال بالخادم. يرجى التأكد من اتصال الإنترنت وإعادة المحاولة، أو تحديث التطبيق');
        }
@@ -402,87 +404,88 @@ export default function LoginScreen({ onLogin, onBiometricLogin, biometricAvaila
               )}
             </AnimatePresence>
 
-            {/* ===== SUBMIT BUTTON ===== */}
-            <motion.button
-              type="submit"
-              disabled={isLoading || success}
-              whileTap={{ scale: 0.97 }}
-              animate={success ? { backgroundColor: 'rgb(16, 185, 129)' } : {}}
-              transition={{ duration: 0.25 }}
-              className={`relative w-full py-4 rounded-2xl font-bold text-sm tracking-wide shadow-lg transition-all duration-200 flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-90 disabled:cursor-not-allowed overflow-hidden bg-gradient-to-l from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white shadow-red-600/25`}
-            >
-              <AnimatePresence mode="wait" initial={false}>
-                {success ? (
-                  <motion.div
-                    key="success"
-                    initial={{ opacity: 0, scale: 0.7 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.7 }}
-                    transition={{ duration: 0.22 }}
-                    className="flex items-center justify-center gap-2"
-                  >
-                    <motion.div
-                      initial={{ scale: 0, rotate: -90 }}
-                      animate={{ scale: 1, rotate: 0 }}
-                      transition={{ type: 'spring', stiffness: 380, damping: 16, delay: 0.05 }}
-                      className="bg-white/25 rounded-full p-1"
-                    >
-                      <Check size={16} strokeWidth={3} />
-                    </motion.div>
-                    <span>تم تسجيل الدخول بنجاح</span>
-                  </motion.div>
-                ) : isLoading ? (
-                  <motion.div
-                    key="loading"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15 }}
-                    className="flex items-center justify-center gap-1.5"
-                    dir="ltr"
-                  >
-                    <span className="w-2 h-2 rounded-full bg-current" style={{ animation: 'dot-pulse 1.2s ease-in-out infinite', animationDelay: '0ms' }} />
-                    <span className="w-2 h-2 rounded-full bg-current" style={{ animation: 'dot-pulse 1.2s ease-in-out infinite', animationDelay: '200ms' }} />
-                    <span className="w-2 h-2 rounded-full bg-current" style={{ animation: 'dot-pulse 1.2s ease-in-out infinite', animationDelay: '400ms' }} />
-                    <span className="mr-2.5 text-xs font-medium opacity-95" dir="rtl">جاري تسجيل الدخول...</span>
-                  </motion.div>
-                ) : (
-                  <motion.span
-                    key="idle"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15 }}
-                    className="flex items-center justify-center gap-2.5"
-                  >
-                    <Shield size={18} />
-                    <span>تسجيل الدخول</span>
-                    <ChevronLeft size={16} className="opacity-60" />
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </motion.button>
-
-            {/* ===== BIOMETRIC QUICK LOGIN ===== */}
-            {onBiometricLogin && biometricAvailable && (
-              <button
-                type="button"
-                onClick={handleBiometric}
-                disabled={biometricLoading || isLoading || success}
-                className={`w-full py-3.5 rounded-2xl font-bold text-sm tracking-wide transition-all duration-200 flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed border ${
-                  darkMode
-                    ? 'border-white/10 text-white/70 hover:bg-white/5 active:bg-white/10'
-                    : 'border-gray-200 text-gray-600 hover:bg-gray-50 active:bg-gray-100'
-                }`}
+            {/* ===== SUBMIT + BIOMETRIC QUICK LOGIN ===== */}
+            <div className="flex items-stretch gap-2.5">
+              <motion.button
+                type="submit"
+                disabled={isLoading || success}
+                whileTap={{ scale: 0.97 }}
+                animate={success ? { backgroundColor: 'rgb(16, 185, 129)' } : {}}
+                transition={{ duration: 0.25 }}
+                className={`relative flex-1 py-4 rounded-2xl font-bold text-sm tracking-wide shadow-lg transition-all duration-200 flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-90 disabled:cursor-not-allowed overflow-hidden bg-gradient-to-l from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white shadow-red-600/25`}
               >
-                {biometricLoading ? (
-                  <span className="w-4 h-4 rounded-full border-2 border-current border-t-transparent" style={{ animation: 'spin 0.8s linear infinite' }} />
-                ) : (
-                  <Smartphone size={17} />
-                )}
-                <span>{biometricLoading ? 'جاري التحقق...' : 'الدخول السريع بالبصمة'}</span>
-              </button>
-            )}
+                <AnimatePresence mode="wait" initial={false}>
+                  {success ? (
+                    <motion.div
+                      key="success"
+                      initial={{ opacity: 0, scale: 0.7 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.7 }}
+                      transition={{ duration: 0.22 }}
+                      className="flex items-center justify-center gap-2"
+                    >
+                      <motion.div
+                        initial={{ scale: 0, rotate: -90 }}
+                        animate={{ scale: 1, rotate: 0 }}
+                        transition={{ type: 'spring', stiffness: 380, damping: 16, delay: 0.05 }}
+                        className="bg-white/25 rounded-full p-1"
+                      >
+                        <Check size={16} strokeWidth={3} />
+                      </motion.div>
+                      <span>تم تسجيل الدخول بنجاح</span>
+                    </motion.div>
+                  ) : isLoading ? (
+                    <motion.div
+                      key="loading"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="flex items-center justify-center gap-1.5"
+                      dir="ltr"
+                    >
+                      <span className="w-2 h-2 rounded-full bg-current" style={{ animation: 'dot-pulse 1.2s ease-in-out infinite', animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 rounded-full bg-current" style={{ animation: 'dot-pulse 1.2s ease-in-out infinite', animationDelay: '200ms' }} />
+                      <span className="w-2 h-2 rounded-full bg-current" style={{ animation: 'dot-pulse 1.2s ease-in-out infinite', animationDelay: '400ms' }} />
+                      <span className="mr-2.5 text-xs font-medium opacity-95" dir="rtl">جاري تسجيل الدخول...</span>
+                    </motion.div>
+                  ) : (
+                    <motion.span
+                      key="idle"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="flex items-center justify-center gap-2.5"
+                    >
+                      <Shield size={18} />
+                      <span>تسجيل الدخول</span>
+                      <ChevronLeft size={16} className="opacity-60" />
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </motion.button>
+
+              {onBiometricLogin && biometricAvailable && (
+                <button
+                  type="button"
+                  onClick={handleBiometric}
+                  disabled={biometricLoading || isLoading || success}
+                  aria-label="الدخول السريع بالبصمة"
+                  className={`w-14 shrink-0 rounded-2xl border transition-all duration-200 flex items-center justify-center cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
+                    darkMode
+                      ? 'border-white/10 text-white/70 hover:bg-white/5 active:bg-white/10'
+                      : 'border-gray-200 text-gray-600 hover:bg-gray-50 active:bg-gray-100'
+                  }`}
+                >
+                  {biometricLoading ? (
+                    <span className="w-5 h-5 rounded-full border-2 border-current border-t-transparent" style={{ animation: 'spin 0.8s linear infinite' }} />
+                  ) : (
+                    <Fingerprint size={22} />
+                  )}
+                </button>
+              )}
+            </div>
           </form>
         </motion.div>
         </div>{/* end card wrapper */}

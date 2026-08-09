@@ -1,0 +1,32 @@
+{
+  "mcpServers": {
+    "Memory": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-memory"],
+      "env": {
+        "MEMORY_FILE_PATH": "C:\\Dev\\yemen-telecom\\.opencode\\memory.json"
+      },
+      "timeout": 10000
+    },
+    "AST-CodeAnalysis": {
+      "type": "local",
+      "command": ["npx", "-y", "codedev-mcp"],
+      "timeout": 120000
+    },
+    "Sequential-Thinking": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "timeout": 60000
+    },
+    "Git": {
+      "type": "local",
+      "command": ["mcp-server-git", "--repository", "C:\\Dev\\yemen-telecom"],
+      "timeout": 15000
+    },
+    "Fetch": {
+      "type": "local",
+      "command": ["npx", "-y", "mcp-fetch"],
+      "timeout": 30000
+    }
+  }
+}

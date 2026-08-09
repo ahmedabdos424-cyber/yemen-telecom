@@ -5,6 +5,7 @@ import type {
   SimRow, CreateSimRequest, UpdateSimRequest, CreateSimBatchRequest, SimBatchResult,
   AgentRow, CreateAgentRequest, CreateAgentResponse, UpdateAgentRequest,
   MappedSeller, CreateSellerRequest, CreateSellerResponse, UpdateSellerRequest, UpdateSellerBalanceRequest,
+  AdminSellerRow,
   MappedOperation, CreateOperationRequest,
   MappedInventory, UpdateInventoryItem,
   AlertRow,
@@ -450,6 +451,17 @@ export const api = {
   getAuditLogs: () => request<AuditLogEntry[]>('/admin/audit-logs'),
   getAuditLogsPaged: (page: number, limit = 20) =>
     request<AuditLogPageResponse>(`/admin/audit-logs?page=${page}&limit=${limit}`),
+
+  // Admin: Seller & POS management
+  getAdminSellers: () =>
+    request<AdminSellerRow[]>('/admin/sellers'),
+  updateSellerStatus: (id: number, status: 'active' | 'inactive') =>
+    request<AdminSellerRow>(`/admin/sellers/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    }),
+  getSellerSessions: (id: number, page: number, limit = 15) =>
+    request<AuditLogPageResponse>(`/admin/sellers/${id}/sessions?page=${page}&limit=${limit}`),
 
   // System: Backup
   createBackup: () =>

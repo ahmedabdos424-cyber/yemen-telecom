@@ -11,6 +11,7 @@ import dotenv from 'dotenv';
 import { query } from './db';
 import { cacheGet, cacheSet, cacheStats } from './cache';
 import { authenticateToken, requireRole } from './middleware/auth';
+import { clearExpiredLoginLocks } from './middleware/rateLimiter';
 import { initSentry, Sentry } from './sentry';
 import authRoutes from './routes/auth';
 import simsRoutes from './routes/sims';
@@ -518,6 +519,7 @@ setInterval(async () => {
   } catch (err) {
     logger.error('[CLEANUP] Token cleanup failed:', err);
   }
+  clearExpiredLoginLocks();
 }, 60 * 60 * 1000);
 
 // Graceful shutdown

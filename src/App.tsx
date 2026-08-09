@@ -37,7 +37,7 @@ const SellerDashboard = lazy(() => import('./components/SellerDashboard'));
 const BottomNav = lazy(() => import('./components/BottomNav'));
 
 import { AnimatePresence, motion } from 'motion/react';
-import { Check, Copy, X } from 'lucide-react';
+import { Check, Copy, Fingerprint, X } from 'lucide-react';
 
 function AuthenticatedApp() {
   const navigate = useNavigate();
@@ -47,7 +47,7 @@ function AuthenticatedApp() {
   const agt = useAgentSellerState(auth.role, auth.username);
 
   const [dashboardSearch, setDashboardSearch] = useState('');
-  const { role, username, darkMode, setDarkMode, isLoading, handleLogin, handleLogout, clearSession, biometricAvailable, biometricEnabled, enableBiometricLogin, disableBiometricLogin, handleBiometricLogin } = auth;
+  const { role, username, darkMode, setDarkMode, isLoading, handleLogin, handleLogout, clearSession, biometricAvailable, biometricEnabled, enableBiometricLogin, disableBiometricLogin, handleBiometricLogin, showBiometricPrompt, dismissBiometricPrompt } = auth;
   const { setTokenWrapper } = auth;
   const isOnline = useNetworkStatus();
   const { toasts, dismissToast, toastWarning, toastInfo } = useToast();
@@ -334,6 +334,45 @@ function AuthenticatedApp() {
                   </div>
                 </div>
                 <button onClick={() => agt.setSellerCredentials(null)} className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm transition-all active:scale-[0.98] cursor-pointer min-h-[48px]">إغلاق</button>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showBiometricPrompt && (
+            <>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onClick={dismissBiometricPrompt} />
+              <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+                className="fixed bottom-0 left-0 right-0 z-50 sm:relative sm:max-w-sm sm:mx-auto sm:my-auto sm:rounded-3xl card-enhanced rounded-t-3xl p-5 pb-8 max-h-[90dvh] overflow-y-auto">
+                <div className="bottom-sheet-drag sm:hidden mx-auto mb-2" />
+                <div className="flex flex-col items-center text-center pt-2 pb-4">
+                  <div className="w-16 h-16 rounded-2xl bg-red-500/15 border border-red-500/25 flex items-center justify-center mb-4">
+                    <Fingerprint size={32} className="text-red-500" />
+                  </div>
+                  <h3 className="text-base font-bold text-slate-100">تفعيل الدخول السريع بالبصمة؟</h3>
+                  <p className="text-xs text-slate-400 leading-relaxed mt-2 max-w-[280px]">
+                    وفّر وقتك في كل مرة تدخل فيها إلى التطبيق: افتح التطبيق واضغط على أيقونة البصمة لتسجيل الدخول دون إدخال اسم المستخدم وكلمة المرور.
+                  </p>
+                </div>
+                <div className="space-y-2.5">
+                  <button
+                    onClick={async () => {
+                      const ok = await enableBiometricLogin(username);
+                      if (ok) dismissBiometricPrompt();
+                    }}
+                    className="w-full py-3.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-sm transition-all active:scale-[0.98] cursor-pointer min-h-[48px] flex items-center justify-center gap-2"
+                  >
+                    <Fingerprint size={17} />
+                    تفعيل الدخول بالبصمة
+                  </button>
+                  <button
+                    onClick={dismissBiometricPrompt}
+                    className="w-full py-3.5 bg-slate-800/70 hover:bg-slate-800 text-slate-200 font-bold rounded-xl text-sm transition-all active:scale-[0.98] cursor-pointer min-h-[48px]"
+                  >
+                    ليس الآن
+                  </button>
+                </div>
               </motion.div>
             </>
           )}

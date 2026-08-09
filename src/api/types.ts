@@ -217,6 +217,26 @@ export interface UpdateSellerRequest {
   idDocument?: string;
 }
 
+// صف بائع موسع للوحة إدارة المدير (نقاط البيع والجلسات)
+export interface AdminSellerRow {
+  id: string;
+  sellerId: string;
+  name: string;
+  storeName: string;
+  phone: string;
+  region: string;
+  status: string;
+  agentId: string | null;
+  agentName: string;
+  username: string;
+  userStatus: string;
+  balance: number;
+  currentStock: number;
+  totalSales: number;
+  activationsCount: number;
+  lastLogin: string;
+}
+
 export interface UpdateSellerBalanceRequest {
   amount: number;
   invoiceImage?: string;

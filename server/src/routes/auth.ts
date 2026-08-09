@@ -9,7 +9,7 @@ import crypto from 'crypto';
 import { logger } from '../logger';
 import { query } from '../db';
 import { hashToken, isTokenBlacklisted, isSessionExempt, TokenPayload } from '../middleware/auth';
-import { authRateLimiter } from '../middleware/rateLimiter';
+import { authRateLimiter, isLoginLocked, getLoginLockRemaining, recordLoginFailure, recordLoginSuccess } from '../middleware/rateLimiter';
 import { getDeviceInfo } from '../helpers';
 import { validate, loginSchema } from '../validation';
 
@@ -21,32 +21,58 @@ const JWT_SECRET: string = process.env.JWT_SECRET;
 const REFRESH_SECRET: string = process.env.REFRESH_SECRET;
 const SESSION_DURATION_MS = 2 * 60 * 60 * 1000;
 
+// رسالة خطأ موحدة لا تكشف ما إذا كان اسم المستخدم موجوداً أو كلمة المرور خاطئة
+const GENERIC_LOGIN_ERROR = 'اسم المستخدم أو كلمة المرور غير صحيحة.';
+
+function lockoutMessage(remainingMs: number): string {
+  const minutes = Math.max(1, Math.ceil(remainingMs / 60000));
+  return `تم تجاوز الحد الأقصى لمحاولات الدخول. حاول مرة أخرى بعد ${minutes} دقيقة.`;
+}
+
+// توثيق محاولة الدخول الفاشلة في سجل التدقيق (نوع login_failed)
+async function logFailedLogin(username: string, deviceName: string, ip: string, deviceId: string): Promise<void> {
+  const logId = `LOGIN-FAIL-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+  try {
+    await query(
+      `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
+       VALUES ($1, 'login_failed', $2, $3, NOW()::text, 'failed', $4, $5, $6, NOW(), 'failed')`,
+      [logId, `محاولة دخول فاشلة: ${username}`, username, deviceName, ip, deviceId]
+    );
+  } catch (err) {
+    logger.warn('[AUDIT] Failed to record failed login:', err);
+  }
+}
+
 router.post('/login', authRateLimiter, validate(loginSchema), async (req: Request, res: Response) => {
   const { username, password } = req.body;
   try {
+    const { deviceName, deviceId, ip } = getDeviceInfo(req);
+    // قفل تصاعدي في الذاكرة: (اسم المستخدم + عنوان IP)
+    if (isLoginLocked(username, ip)) {
+      return res.status(429).json({ error: lockoutMessage(getLoginLockRemaining(username, ip)) });
+    }
     const result = await query('SELECT * FROM users WHERE username = $1', [username]);
     if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid username or password' });
+      recordLoginFailure(username, ip);
+      await logFailedLogin(username, deviceName, ip, deviceId);
+      return res.status(401).json({ error: GENERIC_LOGIN_ERROR });
     }
     const user = result.rows[0];
     if (user.status !== 'active') {
       return res.status(403).json({ error: 'Account disabled' });
     }
-    const threshold = (await query('SELECT max_failed_logins_threshold FROM system_settings WHERE id = 1')).rows[0]?.max_failed_logins_threshold ?? 5;
-    if (user.locked_until && new Date(user.locked_until) > new Date()) {
-      return res.status(429).json({ error: 'Account temporarily locked. Try again later.' });
-    }
-    if (user.failed_attempts >= threshold) {
-      await query('UPDATE users SET locked_until = NOW() + INTERVAL \'15 minutes\' WHERE id = $1', [user.id]);
-      return res.status(429).json({ error: 'Account temporarily locked. Try again later.' });
-    }
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
       await query('UPDATE users SET failed_attempts = COALESCE(failed_attempts, 0) + 1 WHERE id = $1', [user.id]);
-      return res.status(401).json({ error: 'Invalid username or password' });
+      const lockedMs = recordLoginFailure(username, ip);
+      await logFailedLogin(username, deviceName, ip, deviceId);
+      if (lockedMs > 0) {
+        return res.status(429).json({ error: lockoutMessage(lockedMs) });
+      }
+      return res.status(401).json({ error: GENERIC_LOGIN_ERROR });
     }
+    recordLoginSuccess(username, ip);
     await query('UPDATE users SET last_login = NOW(), failed_attempts = 0, locked_until = NULL WHERE id = $1', [user.id]);
-    const { deviceName, deviceId, ip } = getDeviceInfo(req);
     const sid = crypto.randomUUID();
     if (!isSessionExempt(user.username)) {
       await query('UPDATE users SET active_session_sid = $1, session_expires_at = $2 WHERE id = $3', [
