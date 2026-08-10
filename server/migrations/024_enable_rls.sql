@@ -15,6 +15,12 @@
 -- NOTE: Do NOT use FORCE ROW LEVEL SECURITY — table owners (postgres) must
 -- keep bypassing RLS so the backend keeps working.
 
+-- Ensure the role exists so the policies below can reference it. On Supabase
+-- `service_role` already exists (BYPASSRLS, used by Edge Functions); in plain
+-- Postgres (local dev, CI container) it is created as an inert role: NOLOGIN,
+-- no grants — it cannot log in or access anything.
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN CREATE ROLE service_role NOLOGIN; END IF; END $$;
+
 DROP POLICY IF EXISTS users_backend_full_access ON public.users;
 CREATE POLICY users_backend_full_access ON public.users FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;

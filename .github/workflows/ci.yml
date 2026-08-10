@@ -212,6 +212,7 @@ jobs:
 
       - name: Collect DB diagnostics on failure
         if: failure()
+        working-directory: server
         run: |
           {
             echo "===== initdb.log ====="
