@@ -538,6 +538,16 @@ router.post('/sims/batch', requireRole('manager'), validate(createSimBatchSchema
         params
       );
       const inserted = insertResult.rows.length;
+      // Stock counters: the batch lands in the owner's inventory, so their
+      // available stock must reflect it atomically with the insert.
+      if (inserted > 0 && owner_role === 'agent' && assignedToAgent != null) {
+        await client.query('UPDATE agents SET sims_count = sims_count + $1 WHERE id = $2', [inserted, assignedToAgent]);
+      } else if (inserted > 0 && owner_role === 'seller' && assignedToSeller != null) {
+        await client.query(
+          'UPDATE sellers SET current_stock = current_stock + $1, sims_count = sims_count + $1 WHERE id = $2',
+          [inserted, assignedToSeller]
+        );
+      }
       if (inserted > 0) {
         await createAlert(
           {

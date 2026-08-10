@@ -7,13 +7,13 @@ import React, { useState, useCallback } from 'react';
 import { Agent, ViewType } from '../types';
 import { useToast, ToastContainer } from '../hooks/useToast';
 import { api } from '../api/client';
-import { RefreshCw, Check } from 'lucide-react';
+import { RefreshCw, Check, Copy } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import CameraCapture from './shared/CameraCapture';
 import { useOcr } from '../hooks/useOcr';
 
 interface AddAgentViewProps {
-  onAddAgent: (agent: Partial<Agent> & { username?: string; password?: string }) => void;
+  onAddAgent: (agent: Partial<Agent> & { username?: string; password?: string }) => Promise<any>;
   setView: (view: ViewType) => void;
 }
 
@@ -28,6 +28,7 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
   const [showPassword, setShowPassword] = useState(false);
   const [nameCaptured, setNameCaptured] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createdResult, setCreatedResult] = useState<{ username: string; password: string } | null>(null);
   const { recognize, progress: ocrProgress } = useOcr();
 
   const handleFullNameCapture = useCallback(async (imageData: string) => {
@@ -44,6 +45,10 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
       toastWarning('الرجاء إدخال الاسم التجاري والاسم الكامل ورقم الجوال وبيانات تسجيل الدخول لتسجيل وكيل التوزيع المعتمد.');
       return;
     }
+    if (!nameCaptured) {
+      toastWarning('الرجاء التقاط صورة الهوية للوكيل — صورة الهوية إلزامية لتسجيل الوكيل.');
+      return;
+    }
     if (loginPassword.length < 8 || !/[A-Z]/.test(loginPassword) || !/[a-z]/.test(loginPassword) || !/[0-9]/.test(loginPassword)) {
       toastWarning('كلمة المرور يجب أن تتكون من 8 أحرف على الأقل وتحتوي حرفاً كبيراً وحرفاً صغيراً ورقماً.');
       return;
@@ -51,7 +56,7 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
 
     setIsSubmitting(true);
     try {
-      await onAddAgent({
+      const res = await onAddAgent({
         name,
         fullName,
         region,
@@ -61,14 +66,16 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
         password: loginPassword,
       });
 
-      toastSuccess(`تم تسجيل الوكيل الموزع: "${fullName}" بنجاح في النظام وتخصيص العقدة الأمانية له.`);
-      setView('agents');
+      const creds = (res as any)?.credentials || { username: loginUsername.trim().toLowerCase(), password: loginPassword };
+      setCreatedResult({ username: creds.username, password: creds.password });
     } catch (err: unknown) {
       toastError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const formValid = Boolean(name && fullName && phone && loginUsername.trim() && loginPassword && nameCaptured);
 
   return (
     <div className="max-w-xl mx-auto card p-4 md:p-6">
@@ -229,8 +236,8 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
             </button>
             <button
                 type="submit"
-                disabled={isSubmitting}
-                className="btn btn-primary flex items-center gap-2"
+                disabled={isSubmitting || !formValid}
+                className="btn btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
              >
                {isSubmitting ? (
                  <><RefreshCw size={14} className="animate-spin" /> جاري التسجيل...</>
@@ -238,6 +245,95 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
              </button>
          </div>
        </form>
+
+       {/* Agent credentials success dialog */}
+       <AnimatePresence>
+         {createdResult && (
+           <motion.div
+             initial={{ opacity: 0 }}
+             animate={{ opacity: 1 }}
+             exit={{ opacity: 0 }}
+             onClick={() => setCreatedResult(null)}
+             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-950/40 backdrop-blur-sm"
+           >
+             <motion.div
+               initial={{ scale: 0.95, y: 15 }}
+               animate={{ scale: 1, y: 0 }}
+               exit={{ scale: 0.95, y: 15 }}
+               onClick={(e) => e.stopPropagation()}
+               className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-100 p-6 text-right overflow-y-auto max-h-[90vh]"
+             >
+               <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-100">
+                 <div className="w-10 h-10 rounded-xl bg-emerald-600/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600">
+                   <Check size={20} />
+                 </div>
+                 <div>
+                   <h3 className="font-bold text-sm text-gray-900">تم تسجيل الوكيل الموزع بنجاح</h3>
+                   <p className="text-[10px] text-gray-500">يرجى حفظ بيانات الاعتماد أدناه وتسليمها للوكيل</p>
+                 </div>
+               </div>
+
+               <div className="space-y-3 mb-4">
+                 <div className="bg-gray-50 border border-gray-150 rounded-xl p-3">
+                   <span className="block text-[11px] font-bold text-gray-500 mb-1">اسم المستخدم</span>
+                   <div className="flex items-center justify-between gap-2">
+                     <code className="text-sm font-mono text-gray-900 bg-white border border-gray-200 px-3 py-1.5 rounded-lg flex-1 text-left" dir="ltr">{createdResult.username}</code>
+                     <button
+                       type="button"
+                       onClick={() => navigator.clipboard.writeText(createdResult.username)}
+                       className="p-2 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer touch-target"
+                       title="نسخ اسم المستخدم"
+                     >
+                       <Copy size={14} />
+                     </button>
+                   </div>
+                 </div>
+                 <div className="bg-gray-50 border border-gray-150 rounded-xl p-3">
+                   <span className="block text-[11px] font-bold text-gray-500 mb-1">كلمة المرور</span>
+                   <div className="flex items-center justify-between gap-2">
+                     <code className="text-sm font-mono text-amber-700 bg-white border border-gray-200 px-3 py-1.5 rounded-lg flex-1 text-left" dir="ltr">{createdResult.password}</code>
+                     <button
+                       type="button"
+                       onClick={() => navigator.clipboard.writeText(createdResult.password)}
+                       className="p-2 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer touch-target"
+                       title="نسخ كلمة المرور"
+                     >
+                       <Copy size={14} />
+                     </button>
+                   </div>
+                 </div>
+               </div>
+
+               <div className="flex flex-col gap-2">
+                 <button
+                   type="button"
+                   onClick={async () => {
+                     try {
+                       await navigator.clipboard.writeText(
+                         `اسم المستخدم: ${createdResult.username}\nكلمة المرور: ${createdResult.password}`
+                       );
+                       toastSuccess('تم نسخ بيانات الدخول بنجاح');
+                     } catch {
+                       toastError('تعذر النسخ - الرجاء نسخ البيانات يدوياً');
+                     }
+                   }}
+                   className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
+                 >
+                   <Copy size={14} />
+                   نسخ جميع بيانات الدخول
+                 </button>
+                 <button
+                   type="button"
+                   onClick={() => { setCreatedResult(null); setView('agents'); }}
+                   className="w-full py-3 border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                 >
+                   إغلاق والانتقال للوكلاء
+                 </button>
+               </div>
+             </motion.div>
+           </motion.div>
+         )}
+       </AnimatePresence>
      </div>
    );
 }

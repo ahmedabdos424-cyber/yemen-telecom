@@ -109,6 +109,21 @@ export interface SimBatchResult {
   owner: string;
 }
 
+export interface TransferSimsRequest {
+  seller_id: string;
+  from_iccid: string;
+  to_iccid: string;
+}
+
+export interface TransferSimsResult {
+  transferred: number;
+  total: number;
+  from_iccid: string;
+  to_iccid: string;
+  seller_id: string;
+  status: string;
+}
+
 // ==================== Agents ====================
 export interface AgentRow {
   id: number;

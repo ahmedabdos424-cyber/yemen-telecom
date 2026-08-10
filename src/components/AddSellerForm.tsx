@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Seller } from '../types';
-import { Check, Camera, RefreshCw, Lock, MapPin, Phone, CreditCard, ShoppingBag, User, X, Eye, EyeOff, Copy, CircleCheck } from 'lucide-react';
+import { Check, Camera, RefreshCw, Lock, MapPin, Phone, CreditCard, ShoppingBag, User, Eye, EyeOff } from 'lucide-react';
 import CameraCapture from './shared/CameraCapture';
 import { useOcr } from '../hooks/useOcr';
 import { useToast, ToastContainer } from '../hooks/useToast';
@@ -32,13 +32,10 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
   const [phone, setPhone] = useState('');
   const [region, setRegion] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [successInfo, setSuccessInfo] = useState('');
-  const [showCredentials, setShowCredentials] = useState(false);
-  const [credentialsData, setCredentialsData] = useState<{ username: string; password: string } | null>(null);
   const [progressStage, setProgressStage] = useState<'idle' | 25 | 50 | 75 | 100>('idle');
   const [idPhoto, setIdPhoto] = useState<string | null>(null);
   const { recognize, progress: ocrProgress } = useOcr();
-  const { toasts, dismissToast, toastSuccess, toastError, toastWarning } = useToast();
+  const { toasts, dismissToast, toastError, toastWarning } = useToast();
 
   const handleNameCapture = useCallback(async (imageData: string) => {
     const name = await recognize(imageData);
@@ -54,6 +51,10 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
 
     if (!fullName.trim()) {
       toastWarning('الرجاء كتابة الاسم الكامل للبائع');
+      return;
+    }
+    if (!nameCaptured) {
+      toastWarning('الرجاء التقاط صورة الهوية للبائع — صورة الهوية إلزامية لتسجيل البائع.');
       return;
     }
     if (!username.trim()) {
@@ -110,11 +111,6 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
         avatar,
         id_document: avatar,
       });
-
-      const creds = result.credentials || { username, password };
-      setShowCredentials(true);
-      setCredentialsData(creds);
-      setSuccessInfo(`تم إنشاء حساب البائع "${fullName}" بنجاح.`);
 
       onSellerAdded(result);
 
@@ -342,8 +338,8 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
         {/* Form Submit Button */}
         <button
           type="submit"
-          disabled={isSubmitting}
-          className="btn btn-primary w-full flex items-center justify-center gap-2 text-sm"
+          disabled={isSubmitting || !nameCaptured}
+          className="btn btn-primary w-full flex items-center justify-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           id="add-seller-submit-btn"
         >
           {isSubmitting ? (
@@ -359,79 +355,6 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
           )}
         </button>
       </form>
-
-      {/* Credentials Success Dialog */}
-      <AnimatePresence>
-        {showCredentials && credentialsData && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: 15 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 15 }}
-              className="relative w-full max-w-sm md:max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-right max-h-[90vh] overflow-y-auto"
-            >
-              <div className="flex items-center gap-3 mb-4 pb-3 border-b border-slate-800">
-                <div className="w-10 h-10 rounded-xl bg-emerald-600/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-                  <CircleCheck size={20} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-slate-100">تم إنشاء الحساب بنجاح</h3>
-                  <p className="text-[10px] text-slate-400">يرجى حفظ بيانات الاعتماد أدناه</p>
-                </div>
-              </div>
-
-              <div className="space-y-3 mb-6">
-                <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[11px] text-slate-400">اسم المستخدم</span>
-                    <span className="text-xs font-bold text-slate-100 font-mono" dir="ltr">{credentialsData.username}</span>
-                  </div>
-                  <div className="flex justify-between items-center pt-2 border-t border-slate-800/40">
-                    <span className="text-[11px] text-slate-400">كلمة المرور</span>
-                    <span className="text-xs font-bold text-amber-400 font-mono" dir="ltr">{credentialsData.password}</span>
-                  </div>
-                </div>
-                <p className="text-[9px] text-amber-500/80 flex items-center gap-1">
-                  <span className="material-symbols-outlined text-xs">info</span>
-                  يرجى تسليم بيانات الدخول هذه للبائع الجديد وحفظها بشكل آمن
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(
-                        `اسم المستخدم: ${credentialsData.username}\nكلمة المرور: ${credentialsData.password}`
-                      );
-                      toastSuccess('تم نسخ بيانات الدخول بنجاح');
-                    } catch {
-                      toastError('تعذر النسخ - الرجاء نسخ البيانات يدوياً');
-                    }
-                  }}
-                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <Copy size={14} />
-                  نسخ البيانات
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setShowCredentials(false); setProgressStage('idle'); }}
-                  className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition-all cursor-pointer"
-                >
-                  إغلاق
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { query } from '../db';
+import { query, transaction } from '../db';
 import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination, paginatedQuery } from '../helpers';
@@ -136,12 +136,27 @@ router.post('/transfer', requireRole('agent'), validate(transferSimsSchema), asy
       return res.status(400).json({ error: 'الرقم التسلسلي غير متوفر في مخزونك' });
     }
 
-    const updated = await query(
-      `UPDATE sims SET owner_role = 'seller', assigned_to = $1, assigned_to_agent = NULL, owner = $2, status = 'available'
-       WHERE iccid = ANY($3) AND owner_role = 'agent' AND assigned_to_agent = $4
-       RETURNING id`,
-      [seller_id, seller.name || `Seller #${seller_id}`, iccids, agentId]
-    );
+    // Strict deduction: ownership move and both stock counters are updated
+    // atomically so a transfer can never leave inventories out of sync.
+    const updated = await transaction(async (client) => {
+      const res = await client.query(
+        `UPDATE sims SET owner_role = 'seller', assigned_to = $1, assigned_to_agent = NULL, owner = $2, status = 'available'
+         WHERE iccid = ANY($3) AND owner_role = 'agent' AND assigned_to_agent = $4
+         RETURNING id`,
+        [seller_id, seller.name || `Seller #${seller_id}`, iccids, agentId]
+      );
+      if (res.rows.length > 0) {
+        await client.query(
+          'UPDATE sellers SET current_stock = current_stock + $1, sims_count = sims_count + $1 WHERE id = $2',
+          [res.rows.length, seller_id]
+        );
+        await client.query(
+          'UPDATE agents SET sims_count = GREATEST(sims_count - $1, 0) WHERE id = $2',
+          [res.rows.length, agentId]
+        );
+      }
+      return res;
+    });
 
     await createAlert({
       title: `تم تحويل دفعة شرائح (${updated.rows.length} شريحة)`,

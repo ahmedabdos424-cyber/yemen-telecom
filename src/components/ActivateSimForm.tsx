@@ -103,6 +103,10 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
       toastWarning('الرجاء إدخال رقم هاتف صحيح مكون من 9 أرقام');
       return;
     }
+    if (!contractPhoto) {
+      toastWarning('الرجاء التقاط صورة العقد / المستند الثبوتي الموقع — الصورة إلزامية قبل تفعيل الشريحة.');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -393,8 +397,8 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
             
             <button
               type="submit"
-              disabled={isSubmitting}
-              className={`btn w-full md:w-auto text-xs shadow-md ${brand.bgClass} flex items-center justify-center gap-2`}
+              disabled={isSubmitting || !contractPhoto}
+              className={`btn w-full md:w-auto text-xs shadow-md ${brand.bgClass} flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {isSubmitting ? (
                 <>

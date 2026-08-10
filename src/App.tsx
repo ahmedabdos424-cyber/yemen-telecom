@@ -333,6 +333,14 @@ function AuthenticatedApp() {
                     </div>
                   </div>
                 </div>
+                <button
+                  onClick={() => navigator.clipboard.writeText(
+                    `حساب البائع: ${agt.sellerCredentials!.sellerName}\nاسم المستخدم: ${agt.sellerCredentials!.username}\nكلمة المرور: ${agt.sellerCredentials!.password}`
+                  )}
+                  className="w-full py-3.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition-all active:scale-[0.98] cursor-pointer min-h-[48px] flex items-center justify-center gap-2 mb-2"
+                >
+                  <Copy size={16} /> نسخ جميع بيانات الدخول
+                </button>
                 <button onClick={() => agt.setSellerCredentials(null)} className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm transition-all active:scale-[0.98] cursor-pointer min-h-[48px]">إغلاق</button>
               </motion.div>
             </>

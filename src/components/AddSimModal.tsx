@@ -194,7 +194,7 @@ function AddSimModal({ agents, sellers, onClose, onSubmit }: AddSimModalProps) {
             <button
               type="submit"
               disabled={!canSubmit}
-              className="px-5 py-2.5 bg-primary text-white rounded-xl text-xs font-bold hover:brightness-110 shadow-md active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed w-full flex items-center justify-center gap-2 min-h-[44px]"
+              className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-md active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed w-full flex items-center justify-center gap-2 min-h-[44px]"
             >
               {submitting && (
                 <span className="w-4 h-4 border-2 border-white/60 border-t-white rounded-full animate-spin" />

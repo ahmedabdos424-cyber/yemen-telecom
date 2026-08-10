@@ -136,25 +136,31 @@ export function useAgentSellerState(role: string | null, username: string) {
   };
 
   const handleTransferSimsForAgent = async (op: Operator, count: number, startSerial: string, endSerial: string, recipientName: string) => {
+    const recipient = sellers.find(s => s.name === recipientName);
+    if (!recipient) {
+      throw new Error('لم يتم العثور على البائع المستلم');
+    }
     try {
-      await api.createOperation({
-        type: 'recharge', target: `#TRSF-${Date.now()}`, operator: op, status: 'success',
+      // Server-side strict transfer: ownership moves atomically with the
+      // agent's and seller's stock counters.
+      const res = await api.transferSims({
+        seller_id: String(recipient.id),
+        from_iccid: startSerial,
+        to_iccid: endSerial,
       });
-      const updatedInv: any = await api.updateInventories([
-        { operator: op, available: 0, remaining: 0 }
-      ]);
-      if (mountedRef.current) setInventories(updatedInv);
-    } catch (err) { captureError(err, 'handleTransferSimsForAgent'); }
-
-    if (mountedRef.current) setSellers(prev => prev.map(s => {
-      if (s.name === recipientName) {
-        return { ...s, currentStock: (s.currentStock ?? 0) + count, simsCount: (s.simsCount ?? 0) + count, efficiency: Math.min(100, (s.efficiency ?? 0) + 3) };
-      }
-      return s;
-    }));
+      await refreshRoleData();
+      return res;
+    } catch (err) {
+      captureError(err, 'handleTransferSimsForAgent');
+      throw err;
+    }
   };
 
   const handleSimActivationForSeller = async (simData: { fullName: string; idNumber: string; iccid: string; phoneNumber: string; operator: Operator; contractImage?: string | null }) => {
+    // Activation lock: a seller with an empty stock cannot activate SIMs.
+    if (role === 'seller' && (selfSellerData.currentStock ?? 0) <= 0) {
+      throw new Error('لا يمكن تفعيل الشرائح: مخزونك الحالي فارغ. اطلب من الوكيل تحويل شرائح إليك أولاً.');
+    }
     // Fast path: when the device is known to be offline, queue the activation
     // immediately instead of letting the API client burn its retry budget.
     if (!(await getNetworkStatus())) {

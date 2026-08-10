@@ -3,6 +3,7 @@ import { captureTiming } from '../lib/monitor.ts';
 import type {
   ApiLoginResponse, ApiMeResponse, ApiBackupResponse, ApiLockdownResponse, ApiResetPasswordResponse,
   SimRow, CreateSimRequest, UpdateSimRequest, CreateSimBatchRequest, SimBatchResult,
+  TransferSimsRequest, TransferSimsResult,
   AgentRow, CreateAgentRequest, CreateAgentResponse, UpdateAgentRequest,
   MappedSeller, CreateSellerRequest, CreateSellerResponse, UpdateSellerRequest, UpdateSellerBalanceRequest,
   AdminSellerRow,
@@ -367,6 +368,8 @@ export const api = {
     request<{ message: string }>(`/sims/${id}`, { method: 'DELETE' }),
   createSimBatch: (data: CreateSimBatchRequest) =>
     request<SimBatchResult>('/admin/sims/batch', { method: 'POST', body: JSON.stringify(data) }),
+  transferSims: (data: TransferSimsRequest) =>
+    request<TransferSimsResult>('/sims/transfer', { method: 'POST', body: JSON.stringify(data) }),
   activateSim: (data: { iccid: string; customerName?: string; customerId?: string; contractImage?: string }) =>
     request<SimRow>('/sims/activate', { method: 'POST', body: JSON.stringify(data) }),
 

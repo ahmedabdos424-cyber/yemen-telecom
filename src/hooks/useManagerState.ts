@@ -210,6 +210,16 @@ export function useManagerState(role: string | null) {
         api.getSims()
           .then((data: any) => { if (mountedRef.current) setSims(data ?? []); })
           .catch((err) => captureError(err, 'handleAddSimBatch:refresh'));
+        // Realtime stock: the batch may have been assigned to an agent/seller,
+        // so their counters must reflect the new allocation immediately.
+        if (payload.owner_role && payload.owner_role !== 'admin') {
+          api.getAgents()
+            .then((data: any) => { if (mountedRef.current) setAgents(data ?? []); })
+            .catch((err) => captureError(err, 'handleAddSimBatch:refreshAgents'));
+          api.getSellers()
+            .then((data: any) => { if (mountedRef.current) setSellers(data ?? []); })
+            .catch((err) => captureError(err, 'handleAddSimBatch:refreshSellers'));
+        }
       }
       return created;
     } catch (err) {
@@ -239,6 +249,7 @@ export function useManagerState(role: string | null) {
         password: newAgent.password,
       });
       if (mountedRef.current) setAgents(prev => [created?.agent ?? created, ...prev]);
+      return created;
     } catch (err) {
       captureError(err, 'handleAddAgent');
       throw err;

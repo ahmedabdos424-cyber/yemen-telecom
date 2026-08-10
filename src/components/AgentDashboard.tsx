@@ -18,7 +18,7 @@ interface AgentDashboardProps {
   inventories: OperatorInventory[];
   onAddSeller: () => void; // Redirects active tab to 'add_seller'
   onActivateSim?: () => void; // Redirects active tab to 'activate'
-  onTransferSims: (operator: Operator, count: number, startSerial: string, endSerial: string, recipientName: string) => void;
+  onTransferSims: (operator: Operator, count: number, startSerial: string, endSerial: string, recipientName: string) => Promise<unknown>;
   onUpdateSellerStatus: (sellerId: string, status: 'active' | 'inactive') => void;
   onResetSellerPassword: (sellerId: string) => void;
   onEditSeller: (seller: Seller) => void;
@@ -134,7 +134,7 @@ export default function AgentDashboard({
   }, [startRange, endRange]);
 
   // Handle simulated range transfer
-  const handleTransferSubmit = (e: React.FormEvent) => {
+  const handleTransferSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!transferOp) { toastWarning('الرجاء اختيار شركة الاتصالات'); return; }
@@ -145,9 +145,17 @@ export default function AgentDashboard({
     const recipient = sellers.find(s => s.id === targetSellerId);
     if (!recipient) return;
 
+    // Stock guard: the requested quantity must not exceed the agent's
+    // available stock for that operator.
+    const inv = inventories.find(i => i.operator === transferOp);
+    if (inv && calculatedQty > inv.available) {
+      toastWarning(`الكمية المطلوبة (${calculatedQty}) تتجاوز المخزون المتاح لمشغل ${transferOp === 'yemen_mobile' ? 'يمن موبايل' : transferOp === 'you' ? 'YOU' : 'سبأفون'} (${inv.available} شريحة).`);
+      return;
+    }
+
     setIsTransferring(true);
     try {
-      onTransferSims(transferOp, calculatedQty, startRange, endRange, recipient.name);
+      await onTransferSims(transferOp, calculatedQty, startRange, endRange, recipient.name);
       setStartRange('');
       setEndRange('');
       setTargetSellerId('');
