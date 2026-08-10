@@ -210,6 +210,35 @@ jobs:
           set -o pipefail
           npx tsx server/src/init-db.ts 2>&1 | tee /tmp/initdb.log
 
+      - name: Collect DB diagnostics on failure
+        if: failure()
+        run: |
+          {
+            echo "===== initdb.log ====="
+            cat /tmp/initdb.log 2>/dev/null || echo "(no log)"
+            echo ""
+            echo "===== pg connection probe (same env) ====="
+            node -e "
+              const { Pool } = require('pg');
+              const pool = new Pool({
+                host: process.env.DB_HOST,
+                port: Number(process.env.DB_PORT || 5432),
+                user: process.env.DB_USER,
+                password: process.env.DB_PASSWORD,
+                database: process.env.DB_NAME,
+                ssl: false,
+                connectionTimeoutMillis: 5000,
+              });
+              pool.query('select 1')
+                .then(() => { console.log('CONNECT OK'); return pool.end(); })
+                .catch((e) => {
+                  console.log('CONNECT FAIL code=' + e.code);
+                  console.log(String(e.message).slice(0, 400));
+                  return pool.end().then(() => process.exit(1));
+                });
+            "
+          } > /tmp/diag.txt 2>&1
+
       - name: Upload init-db diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
@@ -219,10 +248,10 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
-      - name: Publish init-db diagnostics to ntfy.sh
+      - name: Publish diagnostics to ntfy.sh
         if: failure()
         run: |
-          curl -d "$(< /tmp/initdb.log)" "https://ntfy.sh/YemenTelecomCIDiagnosticsInitDBLog_${{ github.sha }}"
+          curl -s -d "$(< /tmp/diag.txt)" "https://ntfy.sh/yt_ci_diag_${GITHUB_SHA:0:7}" || true
 
       - name: Seed demo passwords
         run: npx tsx server/src/seed.ts
