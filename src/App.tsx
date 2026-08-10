@@ -48,7 +48,7 @@ function AuthenticatedApp() {
   const agt = useAgentSellerState(auth.role, auth.username);
 
   const [dashboardSearch, setDashboardSearch] = useState('');
-  const { role, username, darkMode, setDarkMode, isLoading, handleLogin, handleLogout, clearSession, biometricAvailable, biometricEnabled, enableBiometricLogin, disableBiometricLogin, handleBiometricLogin, showBiometricPrompt, dismissBiometricPrompt } = auth;
+  const { role, username, darkMode, setDarkMode, isLoading, handleLogin, handleLogout, clearSession, biometricAvailable, biometricEnrolled, biometricEnabled, enableBiometricLogin, disableBiometricLogin, handleBiometricLogin, showBiometricPrompt, dismissBiometricPrompt } = auth;
   const { setTokenWrapper } = auth;
   const isOnline = useNetworkStatus();
   const { toasts, dismissToast, toastWarning, toastInfo } = useToast();
@@ -229,7 +229,7 @@ function AuthenticatedApp() {
                     <Route path="/manager/duplicate-identities" element={<GeographicRiskView />} />
                     <Route path="/manager/reports" element={<ReportsView />} />
                     <Route path="/manager/activate" element={<ActivateSimForm onSimActivated={agt.handleSimActivationForSeller} />} />
-                    <Route path="/manager/settings" element={<SettingsView settings={mgr.settings} onUpdateSettings={mgr.setSettings} />} />
+                    <Route path="/manager/settings" element={<SettingsView settings={mgr.settings} onUpdateSettings={mgr.setSettings} biometricAvailable={biometricAvailable} biometricEnrolled={biometricEnrolled} biometricEnabled={biometricEnabled} onEnableBiometric={() => enableBiometricLogin(username)} onDisableBiometric={disableBiometricLogin} />} />
                     <Route path="/manager/add-agent" element={<AddAgentView onAddAgent={mgr.handleAddAgent} setView={(v) => { mgr.setView(v); navigate(`/manager/${v}`); }} />} />
                     <Route path="*" element={<Navigate to="/manager/dashboard" replace />} />
                   </Routes>
@@ -370,8 +370,12 @@ function AuthenticatedApp() {
                 <div className="space-y-2.5">
                   <button
                     onClick={async () => {
-                      const ok = await enableBiometricLogin(username);
-                      if (ok) dismissBiometricPrompt();
+                      try {
+                        const ok = await enableBiometricLogin(username);
+                        if (ok) dismissBiometricPrompt();
+                      } catch (err) {
+                        toastWarning(err instanceof Error && err.message ? err.message : 'لم يتم التفعيل. تحقق من توفر مستشعر بصمة أو أعد المحاولة');
+                      }
                     }}
                     className="w-full py-3.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-sm transition-all active:scale-[0.98] cursor-pointer min-h-[48px] flex items-center justify-center gap-2"
                   >

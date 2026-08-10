@@ -9,21 +9,35 @@ import ConfirmModal from './shared/ConfirmModal';
 import { captureError } from '../lib/monitor.ts';
 import * as Sentry from '@sentry/react';
 import { api } from '../api/client';
-import { Trash2 } from 'lucide-react';
+import { Fingerprint, Trash2 } from 'lucide-react';
 import { useToast, ToastContainer } from '../hooks/useToast';
 
 interface SettingsViewProps {
   settings: SystemSettings;
   onUpdateSettings: (updated: SystemSettings) => void;
+  biometricAvailable?: boolean;
+  biometricEnrolled?: boolean;
+  biometricEnabled?: boolean;
+  onEnableBiometric?: () => Promise<boolean>;
+  onDisableBiometric?: () => Promise<void>;
 }
 
-export default function SettingsView({ settings, onUpdateSettings }: SettingsViewProps) {
+export default function SettingsView({
+  settings,
+  onUpdateSettings,
+  biometricAvailable = false,
+  biometricEnrolled = false,
+  biometricEnabled = false,
+  onEnableBiometric,
+  onDisableBiometric,
+}: SettingsViewProps) {
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [localThreshold, setLocalThreshold] = useState(settings.highRiskDuplicatesThreshold ?? 5);
   const [lockdownConfirm, setLockdownConfirm] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const { toasts, dismissToast, toastError } = useToast();
+  const [biometricBusy, setBiometricBusy] = useState(false);
+  const { toasts, dismissToast, toastError, toastSuccess, toastWarning } = useToast();
 
   useEffect(() => {
     setLocalThreshold(settings.highRiskDuplicatesThreshold ?? 5);
@@ -83,6 +97,31 @@ export default function SettingsView({ settings, onUpdateSettings }: SettingsVie
     });
   };
 
+  const handleToggleBiometric = async () => {
+    if (biometricBusy) return;
+    const val = !biometricEnabled;
+    setBiometricBusy(true);
+    try {
+      if (val) {
+        if (!onEnableBiometric) return;
+        const ok = await onEnableBiometric();
+        if (!ok) {
+          toastWarning('لم يتم تأكيد بصمتك. أعد المحاولة أو سجّل الدخول بكلمة المرور');
+          return;
+        }
+        toastSuccess('تم تفعيل الدخول السريع بالبصمة');
+      } else {
+        if (!onDisableBiometric) return;
+        await onDisableBiometric();
+        toastSuccess('تم إيقاف الدخول السريع بالبصمة');
+      }
+    } catch (err) {
+      toastWarning(err instanceof Error && err.message ? err.message : 'لم يتم التفعيل. تحقق من توفر مستشعر بصمة أو أعد المحاولة');
+    } finally {
+      setBiometricBusy(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Settings list dashboard split */}
@@ -128,6 +167,37 @@ export default function SettingsView({ settings, onUpdateSettings }: SettingsVie
                   />
                   <div className={`w-12 h-7 bg-gray-200 peer-focus:outline-none rounded-full transition-colors relative after:content-[''] after:absolute after:top-[4px] after:right-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${
                     settings.email2FAEnabled ? 'bg-primary border-primary after:-translate-x-5' : 'after:translate-x-0'
+                  }`}></div>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-between py-2 border-t border-gray-100 pt-3">
+                <div className="flex items-center gap-3">
+                  <Fingerprint size={18} className="text-secondary shrink-0" />
+                  <div>
+                    <span className="text-xs font-semibold text-gray-900 block">الدخول السريع بالبصمة</span>
+                    <span className="text-[11px] text-gray-500">
+                      {!biometricAvailable
+                        ? 'هذا الجهاز لا يدعم التحقق بالبصمة أو لا توجد بصمة مسجلة'
+                        : biometricEnabled
+                          ? 'يتم تسجيل الدخول ببصمة الإصبع بدلاً من كلمة المرور'
+                          : 'تفعيل تسجيل الدخول ببصمة الإصبع بدلاً من كلمة المرور'}
+                    </span>
+                    {biometricAvailable && !biometricEnrolled && (
+                      <span className="text-[10px] text-amber-600 block mt-0.5">سجّل بصمتك من إعدادات جهازك أولاً لتتمكن من التفعيل</span>
+                    )}
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={biometricEnabled}
+                    onChange={handleToggleBiometric}
+                    disabled={!biometricAvailable || biometricBusy}
+                    className="sr-only peer"
+                  />
+                  <div className={`w-12 h-7 bg-gray-200 peer-focus:outline-none rounded-full transition-colors relative after:content-[''] after:absolute after:top-[4px] after:right-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all disabled:opacity-40 ${
+                    biometricEnabled ? 'bg-primary border-primary after:-translate-x-5' : 'after:translate-x-0'
                   }`}></div>
                 </label>
               </div>

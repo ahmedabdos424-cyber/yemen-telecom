@@ -133,7 +133,7 @@ export default function LoginScreen({ onLogin, onBiometricLogin, biometricAvaila
         }, 450);
       } else {
         setBiometricLoading(false);
-        setErrorMsg('لم يتم التحقق من بصمتك أو لا يوجد دخول سريع محفوظ. سجّل الدخول بكلمة المرور');
+        setErrorMsg('لا يوجد دخول سريع بالبصمة محفوظ لهذا الجهاز. سجّل الدخول بكلمة المرور ثم فعّل البصمة من إعدادات الحساب');
       }
     } catch (err) {
       if (abortRef.current) return;
@@ -471,8 +471,9 @@ export default function LoginScreen({ onLogin, onBiometricLogin, biometricAvaila
                   type="button"
                   onClick={handleBiometric}
                   disabled={biometricLoading || isLoading || success}
+                  title="الدخول السريع بالبصمة"
                   aria-label="الدخول السريع بالبصمة"
-                  className={`w-14 shrink-0 rounded-2xl border transition-all duration-200 flex items-center justify-center cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
+                  className={`w-16 shrink-0 rounded-2xl border transition-all duration-200 flex flex-col items-center justify-center gap-1 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
                     darkMode
                       ? 'border-white/10 text-white/70 hover:bg-white/5 active:bg-white/10'
                       : 'border-gray-200 text-gray-600 hover:bg-gray-50 active:bg-gray-100'
@@ -481,8 +482,9 @@ export default function LoginScreen({ onLogin, onBiometricLogin, biometricAvaila
                   {biometricLoading ? (
                     <span className="w-5 h-5 rounded-full border-2 border-current border-t-transparent" style={{ animation: 'spin 0.8s linear infinite' }} />
                   ) : (
-                    <Fingerprint size={22} />
+                    <Fingerprint size={24} />
                   )}
+                  <span className={`text-[9px] font-bold leading-none ${darkMode ? 'text-white/40' : 'text-gray-400'}`}>بصمة</span>
                 </button>
               )}
             </div>

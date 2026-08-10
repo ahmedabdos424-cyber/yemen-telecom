@@ -3,7 +3,7 @@ import { Role } from '../types';
 import { api, setToken, setRefreshToken, clearTokens, fetchCsrfToken, loadTokens, getLoadedTokens, waitForServerAwake } from '../api/client';
 import { setFrontendSentryUser } from '../lib/sentry';
 import {
-  isNativeBiometrics, isBiometricAvailable, authenticateBiometric,
+  isNativeBiometrics, isBiometricAvailable, isBiometricEnrolled, authenticateBiometric, getBiometricStatus,
   getBiometricCredential, hasBiometricCredential, clearBiometricCredential,
   saveBiometricCredential,
 } from '../services/biometricAuth';
@@ -17,6 +17,7 @@ export function useAuth() {
   const [token, setAppToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricEnrolled, setBiometricEnrolled] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [showBiometricPrompt, setShowBiometricPrompt] = useState(false);
 
@@ -24,6 +25,9 @@ export function useAuth() {
     if (isNativeBiometrics()) {
       isBiometricAvailable().then(ok => {
         if (ok) setBiometricAvailable(true);
+      }).catch(() => {});
+      isBiometricEnrolled().then(ok => {
+        if (ok) setBiometricEnrolled(true);
       }).catch(() => {});
       hasBiometricCredential().then(ok => {
         if (ok) setBiometricEnabled(true);
@@ -141,6 +145,13 @@ export function useAuth() {
 
   const enableBiometricLogin = useCallback(async (usernameToSave: string): Promise<boolean> => {
     if (!isNativeBiometrics()) return false;
+    const status = await getBiometricStatus();
+    if (!status.isAvailable) {
+      throw new Error(status.errorMessage || 'التحقق بالبصمة غير متاح على هذا الجهاز');
+    }
+    if (!status.isEnrolled) {
+      throw new Error('لا توجد بصمة مسجلة على هذا الجهاز. سجّل بصمتك من إعدادات جهازك أولاً');
+    }
     const authed = await authenticateBiometric('تأكيد بصمتك لتفعيل الدخول السريع');
     if (!authed) return false;
     const { refreshToken: rt } = getLoadedTokens();
@@ -163,7 +174,7 @@ export function useAuth() {
   const handleBiometricLogin = useCallback(async (): Promise<{ role: Role; commit: () => void } | null> => {
     if (!isNativeBiometrics()) return null;
     const authed = await authenticateBiometric('استخدم بصمتك للدخول السريع');
-    if (!authed) return null;
+    if (!authed) throw new Error('Biometric verification failed');
     const credential = await getBiometricCredential();
     if (!credential) return null;
     // Rotate the stored refresh token into a fresh session.
@@ -198,7 +209,7 @@ export function useAuth() {
     role, setRole, username, setUsername,
     darkMode, setDarkMode, token, setTokenWrapper,
     isLoading, handleLogin, handleLogout, clearSession,
-    biometricAvailable, biometricEnabled, enableBiometricLogin, disableBiometricLogin, handleBiometricLogin,
+    biometricAvailable, biometricEnrolled, biometricEnabled, enableBiometricLogin, disableBiometricLogin, handleBiometricLogin,
     showBiometricPrompt, dismissBiometricPrompt,
   };
 }

@@ -5,7 +5,7 @@ import {
   User, Cpu, Bell, ChevronLeft, LogOut, Lock, RefreshCw, Download, AlertCircle
 } from 'lucide-react';
 import { useAppUpdate } from '../../hooks/useAppUpdate';
-import { APP_VERSION } from '../../version';
+import { APP_VERSION, APP_VERSION_CODE } from '../../version';
 
 interface AccountInfoItem {
   label: string;
@@ -318,7 +318,7 @@ export default function SettingsPanel({
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-slate-400 font-medium">كود الإصدار</span>
-                      <span className="text-slate-200 font-mono font-bold bg-slate-900 px-2 py-0.5 rounded border border-slate-800">14</span>
+                      <span className="text-slate-200 font-mono font-bold bg-slate-900 px-2 py-0.5 rounded border border-slate-800">{APP_VERSION_CODE}</span>
                     </div>
 
                     {/*

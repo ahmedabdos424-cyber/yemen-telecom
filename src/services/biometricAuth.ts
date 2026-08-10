@@ -1,5 +1,4 @@
-import { BiometricAuth } from '@aparajita/capacitor-biometric-auth';
-import type { BiometryErrorType } from '@aparajita/capacitor-biometric-auth';
+import BiometricAuth, { type BiometryStatus } from '../plugins/BiometricAuth';
 import { captureError } from '../lib/monitor';
 
 const CREDENTIAL_KEY = 'tele_biometric_credential';
@@ -9,6 +8,8 @@ export interface BiometricCredential {
   refreshToken: string;
   savedAt: number;
 }
+
+export type { BiometryStatus };
 
 function detectCapacitor(): boolean {
   try {
@@ -63,31 +64,53 @@ export function isNativeBiometrics(): boolean {
   return detectCapacitor();
 }
 
-export async function isBiometricAvailable(): Promise<boolean> {
-  if (!detectCapacitor()) return false;
+const UNAVAILABLE_STATUS: BiometryStatus = {
+  isAvailable: false,
+  isEnrolled: false,
+  hardwarePresent: false,
+};
+
+/** Full device capability report from the native BiometricPrompt layer. */
+export async function getBiometricStatus(): Promise<BiometryStatus> {
+  if (!detectCapacitor()) return UNAVAILABLE_STATUS;
   try {
     const result = await BiometricAuth.checkBiometry();
-    return result.isAvailable;
+    return {
+      isAvailable: result?.isAvailable === true,
+      isEnrolled: result?.isEnrolled === true,
+      hardwarePresent: result?.hardwarePresent === true,
+      errorMessage: result?.errorMessage,
+    };
   } catch (err) {
-    captureError(err, 'isBiometricAvailable');
-    return false;
+    captureError(err, 'checkBiometry');
+    return UNAVAILABLE_STATUS;
   }
+}
+
+export async function isBiometricAvailable(): Promise<boolean> {
+  const status = await getBiometricStatus();
+  return status.isAvailable;
+}
+
+export async function isBiometricEnrolled(): Promise<boolean> {
+  const status = await getBiometricStatus();
+  return status.isEnrolled;
 }
 
 export async function authenticateBiometric(reason?: string): Promise<boolean> {
   if (!detectCapacitor()) return false;
   try {
-    await BiometricAuth.authenticate({
+    const result = await BiometricAuth.authenticate({
       reason: reason || 'التحقق من هويتك للدخول السريع',
       androidTitle: 'الدخول بالبصمة',
       androidSubtitle: 'استخدم بصمة إصبعك أو قفل الجهاز للدخول',
       cancelTitle: 'إلغاء',
       allowDeviceCredential: true,
     });
-    return true;
+    return result?.verified === true;
   } catch (err) {
-    const code = (err as { code?: BiometryErrorType })?.code;
-    if (code === 'userCancel' || code === 'systemCancel' || code === 'appCancel') {
+    const code = (err as { code?: string })?.code;
+    if (code === 'userCancel' || code === 'systemCancel' || code === 'appCancel' || code === 'canceled') {
       return false;
     }
     captureError(err, 'authenticateBiometric');

@@ -72,18 +72,22 @@ export default function SellerAccount({
 
   const handleToggleBiometric = async () => {
     const val = !biometricEnabled;
-    if (val) {
-      if (!onEnableBiometric) return;
-      const ok = await onEnableBiometric();
-      if (!ok) {
-        toastWarning('لم يتم التفعيل. تحقق من توفر مستشعر بصمة أو أعد المحاولة');
-        return;
+    try {
+      if (val) {
+        if (!onEnableBiometric) return;
+        const ok = await onEnableBiometric();
+        if (!ok) {
+          toastWarning('لم يتم تأكيد بصمتك. أعد المحاولة أو سجّل الدخول بكلمة المرور');
+          return;
+        }
+        toastSuccess('تم تفعيل الدخول السريع بالبصمة');
+      } else {
+        if (!onDisableBiometric) return;
+        await onDisableBiometric();
+        toastSuccess('تم إيقاف الدخول السريع بالبصمة');
       }
-      toastSuccess('تم تفعيل الدخول السريع بالبصمة');
-    } else {
-      if (!onDisableBiometric) return;
-      await onDisableBiometric();
-      toastSuccess('تم إيقاف الدخول السريع بالبصمة');
+    } catch (err) {
+      toastWarning(err instanceof Error && err.message ? err.message : 'لم يتم التفعيل. تحقق من توفر مستشعر بصمة أو أعد المحاولة');
     }
   };
 

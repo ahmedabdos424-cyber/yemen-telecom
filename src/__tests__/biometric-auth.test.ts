@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   isBiometricAvailable,
+  isBiometricEnrolled,
+  getBiometricStatus,
   authenticateBiometric,
   saveBiometricCredential,
   getBiometricCredential,
@@ -12,8 +14,8 @@ import {
 const mockCheckBiometry = vi.fn();
 const mockAuthenticate = vi.fn();
 
-vi.mock('@aparajita/capacitor-biometric-auth', () => ({
-  BiometricAuth: {
+vi.mock('../plugins/BiometricAuth', () => ({
+  default: {
     checkBiometry: (...args: unknown[]) => mockCheckBiometry(...args),
     authenticate: (...args: unknown[]) => mockAuthenticate(...args),
   },
@@ -28,8 +30,8 @@ const ORIGINAL_CAPACITOR = (window as unknown as { Capacitor?: unknown }).Capaci
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
-  mockCheckBiometry.mockResolvedValue({ isAvailable: true });
-  mockAuthenticate.mockResolvedValue(undefined);
+  mockCheckBiometry.mockResolvedValue({ isAvailable: true, isEnrolled: true, hardwarePresent: true });
+  mockAuthenticate.mockResolvedValue({ verified: true });
   (window as unknown as { Capacitor?: unknown }).Capacitor = { isNative: true };
 });
 
@@ -70,6 +72,34 @@ describe('biometricAuth', () => {
     expect(await isBiometricAvailable()).toBe(false);
   });
 
+  it('isBiometricEnrolled returns true when a fingerprint is enrolled', async () => {
+    setNative(true);
+    expect(await isBiometricEnrolled()).toBe(true);
+  });
+
+  it('isBiometricEnrolled returns false when no fingerprint enrolled', async () => {
+    setNative(true);
+    mockCheckBiometry.mockResolvedValue({ isAvailable: false, isEnrolled: false, hardwarePresent: true });
+    expect(await isBiometricEnrolled()).toBe(false);
+  });
+
+  it('getBiometricStatus reports no hardware', async () => {
+    setNative(true);
+    mockCheckBiometry.mockResolvedValue({ isAvailable: false, isEnrolled: false, hardwarePresent: false, errorMessage: 'هذا الجهاز لا يدعم التحقق بالبصمة' });
+    const status = await getBiometricStatus();
+    expect(status.isAvailable).toBe(false);
+    expect(status.isEnrolled).toBe(false);
+    expect(status.hardwarePresent).toBe(false);
+    expect(status.errorMessage).toContain('لا يدعم');
+  });
+
+  it('getBiometricStatus falls back to unavailable on web', async () => {
+    setNative(false);
+    const status = await getBiometricStatus();
+    expect(status.isAvailable).toBe(false);
+    expect(status.hardwarePresent).toBe(false);
+  });
+
   it('authenticateBiometric returns false when not native', async () => {
     setNative(false);
     expect(await authenticateBiometric()).toBe(false);
@@ -80,6 +110,12 @@ describe('biometricAuth', () => {
     setNative(true);
     expect(await authenticateBiometric('reason')).toBe(true);
     expect(mockAuthenticate).toHaveBeenCalledWith(expect.objectContaining({ reason: 'reason', allowDeviceCredential: true }));
+  });
+
+  it('authenticateBiometric returns false when native result is not verified', async () => {
+    setNative(true);
+    mockAuthenticate.mockResolvedValue(undefined);
+    expect(await authenticateBiometric()).toBe(false);
   });
 
   it('authenticateBiometric returns false on userCancel', async () => {
