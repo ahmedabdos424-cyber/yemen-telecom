@@ -121,9 +121,36 @@ export async function authenticateBiometric(reason?: string): Promise<boolean> {
 export async function saveBiometricCredential(credential: BiometricCredential): Promise<void> {
   try {
     const storage = await getStorage();
-    await storage.set(CREDENTIAL_KEY, JSON.stringify(credential));
+    const payload = JSON.stringify(credential);
+    const toStore = detectCapacitor() ? await encryptValue(payload) : payload;
+    await storage.set(CREDENTIAL_KEY, toStore);
   } catch (err) {
     captureError(err, 'saveBiometricCredential');
+  }
+}
+
+interface EncryptedEnvelope {
+  v: 1;
+  iv: string;
+  data: string;
+}
+
+async function encryptValue(plaintext: string): Promise<string> {
+  const { iv, ciphertext } = await BiometricAuth.encrypt(plaintext);
+  const envelope: EncryptedEnvelope = { v: 1, iv, data: ciphertext };
+  return JSON.stringify(envelope);
+}
+
+async function decryptValue(raw: string): Promise<string | null> {
+  try {
+    const envelope = JSON.parse(raw) as Partial<EncryptedEnvelope>;
+    if (envelope?.v !== 1 || typeof envelope.iv !== 'string' || typeof envelope.data !== 'string') {
+      return null;
+    }
+    const result = await BiometricAuth.decrypt(envelope.iv, envelope.data);
+    return result?.data ?? null;
+  } catch {
+    return null;
   }
 }
 
@@ -132,7 +159,16 @@ export async function getBiometricCredential(): Promise<BiometricCredential | nu
     const storage = await getStorage();
     const raw = await storage.get(CREDENTIAL_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as BiometricCredential;
+    let json = raw;
+    if (detectCapacitor()) {
+      const decrypted = await decryptValue(raw);
+      if (decrypted === null) {
+        await storage.remove(CREDENTIAL_KEY).catch(() => {});
+        return null;
+      }
+      json = decrypted;
+    }
+    const parsed = JSON.parse(json) as BiometricCredential;
     if (!parsed.username || !parsed.refreshToken) return null;
     return parsed;
   } catch {

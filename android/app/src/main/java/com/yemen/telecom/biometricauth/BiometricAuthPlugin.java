@@ -1,6 +1,9 @@
 package com.yemen.telecom.biometricauth;
 
 import android.app.Activity;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyProperties;
+import android.util.Base64;
 
 import androidx.biometric.BiometricManager;
 import androidx.biometric.BiometricPrompt;
@@ -13,7 +16,14 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
+import java.nio.charset.StandardCharsets;
+import java.security.KeyStore;
 import java.util.concurrent.Executor;
+
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
 
 /**
  * Official Android Biometric Authentication via androidx.biometric.BiometricPrompt.
@@ -32,6 +42,10 @@ public class BiometricAuthPlugin extends Plugin {
     private static final int AUTH_BIOMETRIC_OR_DEVICE_CREDENTIAL =
             BiometricManager.Authenticators.BIOMETRIC_STRONG
                     | BiometricManager.Authenticators.DEVICE_CREDENTIAL;
+
+    private static final String KEYSTORE_ALIAS = "tele_biometric_vault_key";
+    private static final String ANDROID_KEYSTORE = "AndroidKeyStore";
+    private static final String TRANSFORMATION = "AES/GCM/NoPadding";
 
     /**
      * Reports the device biometric capability WITHOUT opening any prompt.
@@ -127,6 +141,82 @@ public class BiometricAuthPlugin extends Plugin {
 
         BiometricPrompt.PromptInfo promptInfo = builder.build();
         activePrompt.authenticate(promptInfo);
+    }
+
+    /**
+     * Encrypts a string with an AES-256-GCM key held in the Android Keystore.
+     * The key is non-extractable and never leaves secure hardware-backed
+     * storage; we use it to protect the refresh token at rest inside
+     * Preferences. Biometric data itself is never read, stored or sent.
+     * Returns { iv, ciphertext } as base64.
+     */
+    @PluginMethod
+    public void encrypt(PluginCall call) {
+        String plaintext = call.getString("data");
+        if (plaintext == null) {
+            call.reject("Missing data", "invalidArgument");
+            return;
+        }
+        try {
+            SecretKey key = getOrCreateKey();
+            Cipher cipher = Cipher.getInstance(TRANSFORMATION);
+            cipher.init(Cipher.ENCRYPT_MODE, key);
+            byte[] ciphertext = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
+
+            JSObject ret = new JSObject();
+            ret.put("iv", Base64.encodeToString(cipher.getIV(), Base64.NO_WRAP));
+            ret.put("ciphertext", Base64.encodeToString(ciphertext, Base64.NO_WRAP));
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("Unable to secure data on this device", "encryptFailed");
+        }
+    }
+
+    /**
+     * Decrypts a value previously produced by encrypt(). Rejects with
+     * "decryptFailed" if the Keystore key is gone (factory reset, app data
+     * cleared, or device lock changed) so callers can safely drop the record.
+     */
+    @PluginMethod
+    public void decrypt(PluginCall call) {
+        String ivB64 = call.getString("iv");
+        String ciphertextB64 = call.getString("ciphertext");
+        if (ivB64 == null || ciphertextB64 == null) {
+            call.reject("Missing iv or ciphertext", "invalidArgument");
+            return;
+        }
+        try {
+            SecretKey key = getOrCreateKey();
+            Cipher cipher = Cipher.getInstance(TRANSFORMATION);
+            cipher.init(Cipher.DECRYPT_MODE, key,
+                    new GCMParameterSpec(128, Base64.decode(ivB64, Base64.NO_WRAP)));
+            byte[] plaintext = cipher.doFinal(Base64.decode(ciphertextB64, Base64.NO_WRAP));
+            JSObject ret = new JSObject();
+            ret.put("data", new String(plaintext, StandardCharsets.UTF_8));
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("Stored credentials are no longer accessible", "decryptFailed");
+        }
+    }
+
+    private static SecretKey getOrCreateKey() throws Exception {
+        KeyStore keyStore = KeyStore.getInstance(ANDROID_KEYSTORE);
+        keyStore.load(null);
+        KeyStore.SecretKeyEntry entry =
+                (KeyStore.SecretKeyEntry) keyStore.getEntry(KEYSTORE_ALIAS, null);
+        if (entry != null) {
+            return entry.getSecretKey();
+        }
+        KeyGenerator keyGenerator =
+                KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE);
+        keyGenerator.init(new KeyGenParameterSpec.Builder(
+                KEYSTORE_ALIAS,
+                KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setKeySize(256)
+                .build());
+        return keyGenerator.generateKey();
     }
 
     @Override

@@ -13,11 +13,15 @@ import {
 
 const mockCheckBiometry = vi.fn();
 const mockAuthenticate = vi.fn();
+const mockEncrypt = vi.fn();
+const mockDecrypt = vi.fn();
 
 vi.mock('../plugins/BiometricAuth', () => ({
   default: {
     checkBiometry: (...args: unknown[]) => mockCheckBiometry(...args),
     authenticate: (...args: unknown[]) => mockAuthenticate(...args),
+    encrypt: (...args: unknown[]) => mockEncrypt(...args),
+    decrypt: (...args: unknown[]) => mockDecrypt(...args),
   },
 }));
 
@@ -32,6 +36,13 @@ beforeEach(() => {
   localStorage.clear();
   mockCheckBiometry.mockResolvedValue({ isAvailable: true, isEnrolled: true, hardwarePresent: true });
   mockAuthenticate.mockResolvedValue({ verified: true });
+  mockEncrypt.mockImplementation(async (data: string) => ({
+    iv: 'aXZhbGlkLXZhbHVl',
+    ciphertext: btoa(data),
+  }));
+  mockDecrypt.mockImplementation(async (_iv: string, ciphertext: string) => ({
+    data: atob(ciphertext),
+  }));
   (window as unknown as { Capacitor?: unknown }).Capacitor = { isNative: true };
 });
 
@@ -173,5 +184,46 @@ describe('biometricAuth', () => {
     setNative(false);
     await fresh.saveBiometricCredential({ username: 'seller1', refreshToken: 'rt-abc', savedAt: 123 });
     expect(localStorage.getItem('tele_biometric_credential')).toContain('rt-abc');
+  });
+
+  it('native save stores an encrypted envelope, not the raw token', async () => {
+    setNative(true);
+    await saveBiometricCredential({ username: 'manager1', refreshToken: 'rt-secret-xyz', savedAt: 999 });
+    const raw = localStorage.getItem('CapacitorStorage.tele_biometric_credential');
+    expect(raw).toContain('"v":1');
+    expect(raw).not.toContain('rt-secret-xyz');
+    expect(raw).toContain('"data"');
+    expect(mockEncrypt).toHaveBeenCalledWith(expect.stringContaining('rt-secret-xyz'));
+  });
+
+  it('native get decrypts the envelope back to the credential', async () => {
+    setNative(true);
+    await saveBiometricCredential({ username: 'manager1', refreshToken: 'rt-secret-xyz', savedAt: 999 });
+    const cred = await getBiometricCredential();
+    expect(cred).toEqual({ username: 'manager1', refreshToken: 'rt-secret-xyz', savedAt: 999 });
+    expect(mockDecrypt).toHaveBeenCalledWith('aXZhbGlkLXZhbHVl', expect.any(String));
+  });
+
+  it('native get clears the record and returns null when decrypt fails', async () => {
+    setNative(true);
+    mockDecrypt.mockRejectedValue(new Error('decryptFailed'));
+    await saveBiometricCredential({ username: 'manager1', refreshToken: 'rt-secret-xyz', savedAt: 999 });
+    expect(await getBiometricCredential()).toBeNull();
+    expect(localStorage.getItem('tele_biometric_credential')).toBeNull();
+  });
+
+  it('native get treats legacy plaintext envelope as invalid and clears it', async () => {
+    setNative(true);
+    localStorage.setItem('CapacitorStorage.tele_biometric_credential', '{"username":"x","refreshToken":"rt-old","savedAt":1}');
+    expect(await getBiometricCredential()).toBeNull();
+    expect(localStorage.getItem('CapacitorStorage.tele_biometric_credential')).toBeNull();
+  });
+
+  it('native save falls back gracefully when encrypt is unavailable', async () => {
+    setNative(true);
+    mockEncrypt.mockRejectedValue(new Error('encryptFailed'));
+    await saveBiometricCredential({ username: 'manager1', refreshToken: 'rt-secret-xyz', savedAt: 999 });
+    expect(localStorage.getItem('tele_biometric_credential')).toBeNull();
+    expect(await getBiometricCredential()).toBeNull();
   });
 });

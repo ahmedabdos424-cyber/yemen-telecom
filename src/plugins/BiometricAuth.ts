@@ -18,6 +18,8 @@ export interface BiometricAuthOptions {
 export interface BiometricAuthPlugin {
   checkBiometry(): Promise<BiometryStatus>;
   authenticate(options: BiometricAuthOptions): Promise<{ verified: boolean }>;
+  encrypt(data: string): Promise<{ iv: string; ciphertext: string }>;
+  decrypt(iv: string, ciphertext: string): Promise<{ data: string }>;
 }
 
 const BiometricAuth = registerPlugin<BiometricAuthPlugin>('BiometricAuth');
