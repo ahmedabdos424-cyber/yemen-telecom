@@ -15,7 +15,7 @@ interface SellerAccountProps {
   sellerData: Seller;
   darkMode: boolean;
   setDarkMode: (dark: boolean) => void;
-  onPasswordChanged: (newPass: string) => void;
+  onPasswordChanged?: (newPass: string) => void;
   onConfirmLogout: () => void;
   onLogout: () => void;
   biometricAvailable?: boolean;
@@ -129,7 +129,7 @@ export default function SellerAccount({
     try {
       await api.updatePassword(currentPasswordInput, newPassword);
       setIsChangingPass(false);
-      onPasswordChanged(newPassword);
+      if (onPasswordChanged) onPasswordChanged(newPassword);
       setCurrentPasswordInput('');
       setNewPassword('');
       setConfirmPassword('');

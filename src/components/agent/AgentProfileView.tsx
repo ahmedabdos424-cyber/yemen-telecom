@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Role, OperatorInventory } from '../../types';
 import {
@@ -10,7 +10,7 @@ import {
 import AgentSettingsModal from './AgentSettingsModal';
 import ProfileAvatar from '../shared/ProfileAvatar';
 import { useToast, ToastContainer } from '../../hooks/useToast';
-import { api } from '../../api/client';
+import { api, type ApiMeResponse } from '../../api/client';
 
 interface AgentProfileViewProps {
   username: string;
@@ -104,6 +104,14 @@ export default function AgentProfileView({
   const [agentPhoto, setAgentPhoto] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Real profile data from /auth/me (region, phone, status, registration date)
+  const [profile, setProfile] = useState<ApiMeResponse | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    api.getMe().then((me) => { if (mounted) setProfile(me); }).catch(() => { /* non-fatal: keep placeholders */ });
+    return () => { mounted = false; };
+  }, []);
+
   const totalSimsReceived = inventories.reduce((acc, inv) => acc + inv.available + inv.remaining, 0);
   const totalRemaining = inventories.reduce((acc, inv) => acc + inv.remaining, 0);
 
@@ -193,11 +201,11 @@ export default function AgentProfileView({
           <h2 className="text-xl font-bold text-slate-100">{username}</h2>
           <div className="flex items-center justify-center gap-2 mt-2">
             <MapPin size={12} className="text-slate-500" />
-            <span className="text-xs text-slate-400">منطقة: عدن - كريتر</span>
+            <span className="text-xs text-slate-400">منطقة: {profile?.region || 'غير محددة'}</span>
           </div>
           <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-emerald-950/50 text-emerald-400 border border-emerald-900/40">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            نشط
+            {profile?.status === 'active' ? 'نشط' : profile?.status === 'inactive' ? 'غير نشط' : '—'}
           </div>
         </div>
       </div>
@@ -219,15 +227,15 @@ export default function AgentProfileView({
           </div>
           <div className="bg-slate-950/50 border border-slate-800/40 rounded-2xl p-3 sm:p-4">
             <span className="text-slate-500 text-[10px]">رقم التواصل</span>
-            <p className="text-slate-500 font-mono font-bold mt-1" dir="ltr">—</p>
+            <p className="text-slate-100 font-mono font-bold mt-1" dir="ltr">{profile?.phone || '—'}</p>
           </div>
           <div className="bg-slate-950/50 border border-slate-800/40 rounded-2xl p-3 sm:p-4">
             <span className="text-slate-500 text-[10px]">الموقع</span>
-            <p className="text-slate-500 font-bold mt-1">—</p>
+            <p className="text-slate-100 font-bold mt-1">{profile?.region || '—'}</p>
           </div>
           <div className="bg-slate-950/50 border border-slate-800/40 rounded-2xl p-3 sm:p-4">
             <span className="text-slate-500 text-[10px]">تاريخ التسجيل</span>
-            <p className="text-slate-500 font-bold mt-1">—</p>
+            <p className="text-slate-100 font-bold mt-1">{profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString('ar') : '—'}</p>
           </div>
           <div className="bg-slate-950/50 border border-slate-800/40 rounded-2xl p-3 sm:p-4">
             <span className="text-slate-500 text-[10px]">اسم المستخدم</span>

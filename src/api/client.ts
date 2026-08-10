@@ -17,6 +17,7 @@ import type {
   DistributionRequestRow, CreateDistributionRequest,
   AppVersionResponse,
   ActivationReportRow, SellerReportRow,
+  SystemHealthResponse,
 } from './types';
 
 const REQUEST_TIMEOUT_MS = 180000;
@@ -121,6 +122,19 @@ export function ensureServerIsAwake(): Promise<boolean> {
 // is safe to await at the start of the login flow even after app startup.
 export function waitForServerAwake(): Promise<boolean> {
   return ensureServerIsAwake();
+}
+
+// Public diagnostics endpoint — no auth, no retries (used by SystemHealthMonitor).
+export async function getSystemHealth(): Promise<SystemHealthResponse> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(`${API_BASE}/health`, { credentials: CREDENTIALS_MODE, signal: controller.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return (await res.json()) as SystemHealthResponse;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 let authToken: string | null = null;
@@ -335,7 +349,7 @@ async function uploadFile(file: File | Blob, fieldName = 'image'): Promise<{ url
   return res.json();
 }
 
-export type { ApiLoginResponse, ApiMeResponse, ApiBackupResponse, ApiLockdownResponse, ApiResetPasswordResponse } from './types';
+export type { ApiLoginResponse, ApiMeResponse, ApiBackupResponse, ApiLockdownResponse, ApiResetPasswordResponse, SystemHealthResponse } from './types';
 
 export const api = {
   // Auth

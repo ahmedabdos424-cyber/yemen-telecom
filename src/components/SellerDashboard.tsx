@@ -22,7 +22,7 @@ interface SellerDashboardProps {
   setActiveTab: (tab: string) => void;
   onLogout: () => void;
   onConfirmLogout?: () => void;
-  onPasswordChanged: (newPass: string) => void;
+  onPasswordChanged?: (newPass: string) => void;
   darkMode: boolean;
   setDarkMode: (dark: boolean) => void;
   onUpdateSims?: (updated: Sim[]) => void;
@@ -118,7 +118,7 @@ export default function SellerDashboard({
     setIsChangingPass(true);
     try {
       await api.updatePassword(currentPasswordEntry, newPassword);
-      onPasswordChanged(newPassword);
+      if (onPasswordChanged) onPasswordChanged(newPassword);
       setIdNumberEntry('');
       setNewPassword('');
       setConfirmPassword('');

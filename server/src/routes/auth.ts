@@ -251,7 +251,7 @@ router.get('/me', async (req: Request, res: Response) => {
     if (blacklisted) {
       return res.status(401).json({ error: 'Token has been revoked' });
     }
-    const result = await query('SELECT id, username, display_name, role, phone, region, last_login FROM users WHERE id = $1', [decoded.id]);
+    const result = await query('SELECT id, username, display_name, role, phone, region, last_login, status, created_at FROM users WHERE id = $1', [decoded.id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -264,6 +264,8 @@ router.get('/me', async (req: Request, res: Response) => {
       phone: u.phone,
       region: u.region,
       lastLogin: u.last_login,
+      status: u.status,
+      createdAt: u.created_at,
     });
   } catch (err: unknown) {
     if (err instanceof Error && (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError')) {

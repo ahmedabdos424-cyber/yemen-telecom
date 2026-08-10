@@ -35,6 +35,26 @@ export interface ApiMeResponse {
   phone: string;
   region: string;
   lastLogin: string;
+  status?: string;
+  createdAt?: string;
+}
+
+export interface SystemHealthResponse {
+  status: 'ok' | 'degraded' | 'error';
+  db: 'connected' | 'disconnected';
+  db_latency_ms: number | null;
+  uptime: number;
+  requests: number;
+  memory: {
+    rssMB: number;
+    heapUsedMB: number;
+    heapTotalMB: number;
+    heapUsedPercent: number;
+    osTotalMB: number;
+  };
+  node: string;
+  env: string;
+  timestamp: string;
 }
 
 export interface RefreshTokenRequest {

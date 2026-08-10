@@ -24,6 +24,7 @@ const SettingsView = lazy(() => import('./components/SettingsView'));
 const AddAgentView = lazy(() => import('./components/AddAgentView'));
 const AddSellerForm = lazy(() => import('./components/AddSellerForm'));
 const ActivateSimForm = lazy(() => import('./components/ActivateSimForm'));
+const SystemHealthMonitor = lazy(() => import('./components/SystemHealthMonitor'));
 
 import { useAuth } from './hooks/useAuth';
 import { useManagerState } from './hooks/useManagerState';
@@ -217,7 +218,10 @@ function AuthenticatedApp() {
               <ErrorBoundary>
                 <Suspense fallback={<div className="flex justify-center py-12"><span className="w-6 h-6 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" /></div>}>
                   <Routes>
-                    <Route path="/manager/dashboard" element={<DashboardView stats={mgr.stats} alerts={mgr.alerts} transactions={mgr.transactions} sims={mgr.sims} setView={(v) => { mgr.setView(v); navigate(`/manager/${v}`); }} onSearch={(q) => { setDashboardSearch(q); navigate('/manager/sims'); }} onRefresh={mgr.refreshData} />} />
+                    <Route path="/manager/dashboard" element={<>
+                      <SystemHealthMonitor role={role} />
+                      <DashboardView stats={mgr.stats} alerts={mgr.alerts} transactions={mgr.transactions} sims={mgr.sims} setView={(v) => { mgr.setView(v); navigate(`/manager/${v}`); }} onSearch={(q) => { setDashboardSearch(q); navigate('/manager/sims'); }} onRefresh={mgr.refreshData} />
+                    </>} />
                     <Route path="/manager/sims" element={<SIMsView sims={mgr.sims} onAddSIM={mgr.handleAddSIM} initialSearch={dashboardSearch} onUpdateSIM={mgr.handleUpdateSIM} onAddSimBatch={mgr.handleAddSimBatch} agents={mgr.agents} sellers={mgr.sellers} />} />
                     <Route path="/manager/agents" element={<AgentsView agents={mgr.agents} setView={(v) => { mgr.setView(v); navigate(`/manager/${v}`); }} onUpdateAgent={mgr.handleUpdateAgent} />} />
                     <Route path="/manager/sellers" element={<SellersView sellers={mgr.sellers} sims={mgr.sims} onUpdateSeller={mgr.handleUpdateSeller} onAddBalance={mgr.handleAddBalance} loading={mgr.loading} error={mgr.apiError} onRetry={mgr.refreshData} />} />
@@ -267,7 +271,7 @@ function AuthenticatedApp() {
           <Route path="/agent/my-sims" element={<AgentDashboard {...sharedProps} />} />
           <Route path="/agent/activate" element={<ActivateSimForm onSimActivated={agt.handleSimActivationForSeller} />} />
           <Route path="/agent/add-seller" element={<AddSellerForm onSellerAdded={agt.handleAddSellerForAgent} agentName={username} />} />
-          <Route path="/agent/account" element={<AgentProfileView username={username} role={role} sellersCount={agentSellers.length} inventories={agt.inventories} onLogout={() => {}} onConfirmLogout={handleLogout} darkMode={darkMode} setDarkMode={setDarkMode} biometricAvailable={biometricAvailable} biometricEnabled={biometricEnabled} onEnableBiometric={() => enableBiometricLogin(username)} onDisableBiometric={disableBiometricLogin} />} />
+          <Route path="/agent/account" element={<AgentProfileView username={username} role={role} sellersCount={agentSellers.length} inventories={agt.inventories} onLogout={handleLogout} onConfirmLogout={handleLogout} darkMode={darkMode} setDarkMode={setDarkMode} biometricAvailable={biometricAvailable} biometricEnabled={biometricEnabled} onEnableBiometric={() => enableBiometricLogin(username)} onDisableBiometric={disableBiometricLogin} />} />
           <Route path="*" element={<Navigate to="/agent/home" replace />} />
         </Routes>
       );
@@ -275,10 +279,10 @@ function AuthenticatedApp() {
       const sellerOnUpdateSims = (updated: any[]) => agt.handleUpdateSimsForSeller(updated as any);
       return (
         <Routes>
-          <Route path="/seller/home" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? []).filter(s => s.status === 'available')} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={handleLogout} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} onUpdateSims={sellerOnUpdateSims} biometricAvailable={biometricAvailable} biometricEnabled={biometricEnabled} onEnableBiometric={() => enableBiometricLogin(username)} onDisableBiometric={disableBiometricLogin} />} />
+          <Route path="/seller/home" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? []).filter(s => s.status === 'available')} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={handleLogout} onConfirmLogout={handleLogout} darkMode={darkMode} setDarkMode={setDarkMode} onUpdateSims={sellerOnUpdateSims} biometricAvailable={biometricAvailable} biometricEnabled={biometricEnabled} onEnableBiometric={() => enableBiometricLogin(username)} onDisableBiometric={disableBiometricLogin} />} />
           <Route path="/seller/activate" element={<ActivateSimForm onSimActivated={agt.handleSimActivationForSeller} />} />
-          <Route path="/seller/my-sims" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? [])} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={handleLogout} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} onUpdateSims={sellerOnUpdateSims} biometricAvailable={biometricAvailable} biometricEnabled={biometricEnabled} onEnableBiometric={() => enableBiometricLogin(username)} onDisableBiometric={disableBiometricLogin} />} />
-          <Route path="/seller/account" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? [])} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={handleLogout} onConfirmLogout={handleLogout} onPasswordChanged={() => {}} darkMode={darkMode} setDarkMode={setDarkMode} onUpdateSims={sellerOnUpdateSims} biometricAvailable={biometricAvailable} biometricEnabled={biometricEnabled} onEnableBiometric={() => enableBiometricLogin(username)} onDisableBiometric={disableBiometricLogin} />} />
+          <Route path="/seller/my-sims" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? [])} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={handleLogout} onConfirmLogout={handleLogout} darkMode={darkMode} setDarkMode={setDarkMode} onUpdateSims={sellerOnUpdateSims} biometricAvailable={biometricAvailable} biometricEnabled={biometricEnabled} onEnableBiometric={() => enableBiometricLogin(username)} onDisableBiometric={disableBiometricLogin} />} />
+          <Route path="/seller/account" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? [])} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={handleLogout} onConfirmLogout={handleLogout} darkMode={darkMode} setDarkMode={setDarkMode} onUpdateSims={sellerOnUpdateSims} biometricAvailable={biometricAvailable} biometricEnabled={biometricEnabled} onEnableBiometric={() => enableBiometricLogin(username)} onDisableBiometric={disableBiometricLogin} />} />
           <Route path="*" element={<Navigate to="/seller/home" replace />} />
         </Routes>
       );

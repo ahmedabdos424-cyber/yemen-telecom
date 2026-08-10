@@ -1,4 +1,5 @@
 import path from 'path';
+import os from 'os';
 import fs from 'fs';
 import express from 'express';
 import cors from 'cors';
@@ -237,22 +238,36 @@ app.use('/api', apiLimiter);
 // Reports "degraded" in JSON body when DB is unreachable.
 app.get('/api/health', async (_req, res) => {
   let dbOk = true;
+  let dbLatencyMs: number | null = null;
+  const latencyStart = Date.now();
   try {
     await Promise.race([
       query('SELECT 1'),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error('health-check-timeout')), 5000)),
     ]);
+    dbLatencyMs = Date.now() - latencyStart;
   } catch {
     dbOk = false;
   }
   const mem = process.memoryUsage();
+  const rssMB = Math.round(mem.rss / 1024 / 1024);
+  const heapUsedMB = Math.round(mem.heapUsed / 1024 / 1024);
+  const heapTotalMB = Math.round(mem.heapTotal / 1024 / 1024);
+  const osTotalMB = Math.round(os.totalmem() / 1024 / 1024);
   const status = dbOk ? 'ok' : 'degraded';
   res.status(200).json({
     status,
     db: dbOk ? 'connected' : 'disconnected',
+    db_latency_ms: dbLatencyMs,
     uptime: Math.floor((Date.now() - START_TIME) / 1000),
     requests: requestCount,
-    memory: { rss: Math.round(mem.rss / 1024 / 1024) + 'MB', heap: Math.round(mem.heapUsed / 1024 / 1024) + 'MB' },
+    memory: {
+      rssMB,
+      heapUsedMB,
+      heapTotalMB,
+      heapUsedPercent: heapTotalMB > 0 ? Math.min(100, Math.round((heapUsedMB / heapTotalMB) * 100)) : 0,
+      osTotalMB,
+    },
     node: process.version,
     env: process.env.NODE_ENV || 'development',
     timestamp: new Date().toISOString(),

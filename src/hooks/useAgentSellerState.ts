@@ -353,7 +353,7 @@ export function useAgentSellerState(role: string | null, username: string) {
   }, [mountedRef]);
 
   // Self seller data for seller role — starts empty for new accounts
-  const selfSellerData: Seller = sellers.find(s => s.username === username || s.name === username || s.id === '99283') || {
+  const selfSellerData: Seller = sellers.find(s => s.username === username || s.name === username) || {
     id: '', name: username, storeName: '', idNumber: '',
     phone: '', region: '', regionCode: '', status: 'active',
     totalSales: 0, currentStock: 0, efficiency: 0, creationDate: '',

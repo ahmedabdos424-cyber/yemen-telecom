@@ -37,24 +37,29 @@ interface OperationLogItem {
   details: string;
 }
 
-const NODE_OPERATIONS_MAP: Record<string, OperationLogItem[]> = {
-  'region-sanaa': [
-    { id: 'op-s1', action: 'تحديث خوادم محطة تفعيل صنعاء', time: 'الآن', status: 'success', details: 'ربط قاعدة بيانات صنعاء بالأمانة المركزية بنجاح بنسبة ١٠٠٪' },
-    { id: 'op-s2', action: 'تثبيت حظر هويات متلاعبة نشطة', time: 'منذ ساعات', status: 'warning', details: 'تجميد نشاط 14 شريحة مسجلة تحت هويات مشتتة جغرافياً' }
-  ],
-  'region-aden': [
-    { id: 'op-a1', action: 'تقرير نشاطات بائع التجزئة بساحل عدن', time: 'منذ ساعة', status: 'success', details: 'تسجيل 45 شريحة جديدة مع الالتزام بضوابط التحقق المالي المشفر' }
-  ],
-  'region-taiz': [
-    { id: 'op-t1', action: 'إنذار بؤرة تكرار نشط متسارع', time: 'منذ ٢٤ ساعة', status: 'warning', details: 'ارتفاع مؤشر المخاطر بنسبة 15% بمحيط تعز المدينة عبر نقاط مجهولة' }
-  ],
-  'region-mukalla': [
-    { id: 'op-m1', action: 'تدقيق شهادات حماية خوادم الهوية والمطابقة', time: 'أمس', status: 'success', details: 'إعادة تمكين خوادم التشفير ومزامنتها بنسبة تامة' }
-  ],
-  'telecom-backbone': [
-    { id: 'op-b1', action: 'مراقبة خط المزامنة الفيدرالي المستمر', time: 'الآن', status: 'success', details: 'جميع مسارات التحقق بين المدن آمنة والشهادات الرقمية سارية' }
-  ]
-};
+function toOperationStatus(status: string): OperationLogItem['status'] {
+  if (status === 'verified' || status === 'normal') return 'success';
+  return 'warning';
+}
+
+function downloadCsv(content: string, filename: string) {
+  const blob = new Blob(['\uFEFF' + content], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function identityCsvRows(rows: any[]): string[] {
+  const header = ['رقم الهوية', 'الاسم', 'عدد الشرائح', 'عدد التكرارات', 'مستوى الخطورة', 'المنطقة', 'الحالة'];
+  const body = rows.map((r) => [
+    r.idNo, r.name, r.simsCount, r.duplicatesCount, r.risk, r.region,
+    r.blocked ? 'محظور' : r.flagged ? 'مشتبه بها' : 'قيد المراقبة',
+  ].join(','));
+  return [header.join(','), ...body];
+}
 
 function formatLastActivity(iso?: string | null): string {
   if (!iso) return '—';
@@ -133,6 +138,35 @@ export default function GeographicRiskView() {
     const lowBarPct = total > 0 ? (lowRiskCount / total * 100) : 0;
     return { total, highRiskCount, mediumRiskCount, lowRiskCount, riskPct, underReview, underReviewPct, highBarPct, medBarPct, lowBarPct };
   }, [identities]);
+
+  const riskLevelText = summaryStats.riskPct >= 25 ? 'تحذير مرتفع' : summaryStats.highRiskCount > 0 ? 'تحذير' : 'مستقر';
+  const riskLevelClass = summaryStats.riskPct >= 25
+    ? 'bg-red-100 text-secondary border border-red-200'
+    : summaryStats.highRiskCount > 0
+      ? 'bg-orange-100 text-orange-700 border border-orange-200'
+      : 'bg-emerald-100 text-emerald-700 border border-emerald-200';
+  const distinctRegionsCount = new Set(identities.map((i: any) => i.region).filter(Boolean)).size;
+
+  // Real operations feed derived from the audit-log API (no hardcoded entries)
+  const activeLogs: OperationLogItem[] = useMemo(() => {
+    if (!selectedNode) return [];
+    const label = String(selectedNode.label ?? '');
+    const region = String(selectedNode.region ?? '');
+    const idNo = String(selectedNode.idNo ?? '');
+    return logs
+      .filter((log) => {
+        const hay = `${log.title} ${log.user} ${log.type}`;
+        return (label && hay.includes(label)) || (region && hay.includes(region)) || (idNo && hay.includes(idNo));
+      })
+      .slice(0, 20)
+      .map((log) => ({
+        id: String(log.id),
+        action: log.title,
+        time: log.time,
+        status: toOperationStatus(log.status),
+        details: `بواسطة: ${log.user}`,
+      }));
+  }, [selectedNode, logs]);
 
   // Auto-resize tracker for responsive canvas
   useEffect(() => {
@@ -420,9 +454,6 @@ export default function GeographicRiskView() {
     };
   }, [dimensions, identities]);
 
-  // Read associated operations for active interactive selection
-  const activeLogs = selectedNode ? (NODE_OPERATIONS_MAP[selectedNode.id] || []) : [];
-
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-slate-400">
@@ -463,17 +494,17 @@ export default function GeographicRiskView() {
           <div className="relative z-10">
             <div className="flex justify-between items-start mb-3">
               <span className="text-xs text-gray-500 font-bold">مستوى المخاطر التكرارية العالمي</span>
-              <span className="px-2.5 py-0.5 bg-red-100 text-secondary border border-red-200 rounded-full text-[11px] font-bold">تحذير مرتفع</span>
+              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${riskLevelClass}`}>{riskLevelText}</span>
             </div>
             <div className="flex items-end gap-3">
               <h3 className="text-4xl font-bold text-gray-900 leading-none">{summaryStats.riskPct.toFixed(1)}%</h3>
               <div className="flex items-center text-secondary text-xs font-bold pb-1 font-mono">
                 <span className="material-symbols-outlined text-sm">trending_up</span>
-                <span>+12.4%</span>
+                <span>{summaryStats.highRiskCount} حالة عالية</span>
               </div>
             </div>
             <p className="text-[11px] text-gray-500 mt-3 leading-relaxed max-w-[90%]">
-              تم اكتشاف زيادة ملحوظة في عمليات تسجيل الهويات المكررة خلال الـ 24 ساعة الماضية، معظمها يتركز في إقليم الأمانة.
+              إجمالي الهويات المكررة المكتشفة {summaryStats.total} هوية موزعة على {distinctRegionsCount} منطقة، منها {summaryStats.highRiskCount} هوية بمستوى خطورة مرتفع جداً تخضع للمراجعة الفورية.
             </p>
             <div className="mt-5 h-2 bg-gray-100 rounded-full overflow-hidden flex">
               <div className="bg-secondary h-full" style={{ width: `${summaryStats.highBarPct}%` }}></div>
@@ -525,7 +556,11 @@ export default function GeographicRiskView() {
             <span className="material-symbols-outlined absolute right-3 top-2 text-gray-450 text-sm">search</span>
           </div>
           <button 
-            onClick={() => { toastSuccess('تم تصدير تقرير تحليل الهويات كملف PDF لمراجعته مع الشؤون القانونية.'); }}
+            onClick={() => {
+              if (filteredIdentities.length === 0) { toastInfo('لا توجد بيانات مطابقة للتصدير حالياً'); return; }
+              downloadCsv(identityCsvRows(filteredIdentities).join('\n'), `تقرير_المخاطر_${new Date().toISOString().slice(0, 10)}.csv`);
+              toastSuccess('تم تصدير تقرير تحليل الهويات كملف CSV لمراجعته مع الشؤون القانونية.');
+            }}
              className="btn btn-sm w-full sm:w-auto flex items-center justify-center gap-2"
           >
             <Download size={14} />
@@ -603,7 +638,21 @@ export default function GeographicRiskView() {
                          <span className="material-symbols-outlined text-lg">account_tree</span>
                        </button>
                        <button 
-                          onClick={() => toastInfo(`تفاصيل الهوية: ${item.name}`)}
+                          onClick={() => {
+                            setSelectedNode({
+                              id: item.idNo,
+                              label: item.name,
+                              type: 'identity',
+                              region: item.region,
+                              idNo: item.idNo,
+                              sims: item.simsCount,
+                              risk: item.risk,
+                              flagged: item.flagged,
+                              blocked: item.blocked,
+                              reviewStatus: item.reviewStatus
+                            });
+                            document.getElementById('d3-section')?.scrollIntoView({ behavior: 'smooth' });
+                          }}
                          className="btn-icon hover:bg-gray-100 text-gray-500 hover:text-gray-900 border-gray-100" 
                          title="تفاصيل الهوية ومستنداتها"
                        >
@@ -685,7 +734,7 @@ export default function GeographicRiskView() {
               {/* View Status */}
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
-                <span className="text-[11px] text-slate-400 font-bold">محلل المزامنة المباشر نشط</span>
+                <span className="text-[11px] text-slate-400 font-bold">بيانات حية من قاعدة البيانات</span>
               </div>
             </div>
 
@@ -864,7 +913,14 @@ export default function GeographicRiskView() {
                     )
                   ) : (
                     <button
-                      onClick={() => toastInfo(`تنزيل كامل سجل تكرار المحطة الإقليمية لمدينة: ${selectedNode.label}`)}
+                      onClick={() => {
+                        const regionRows = identities.filter(
+                          (i: any) => (selectedNode.region && i.region === selectedNode.region) || i.region === selectedNode.label || i.idNo === selectedNode.label || i.name === selectedNode.label
+                        );
+                        if (regionRows.length === 0) { toastInfo('لا توجد هويات مسجلة لهذه العقدة للتصدير حالياً'); return; }
+                        downloadCsv(identityCsvRows(regionRows).join('\n'), `تقرير_منطقة_${selectedNode.label}_${new Date().toISOString().slice(0, 10)}.csv`);
+                        toastSuccess(`تم تصدير سجل تكرار الهويات لمنطقة: ${selectedNode.label}`);
+                      }}
                       className="w-full py-2.5 bg-primary text-white rounded-lg flex items-center justify-center gap-1.5 hover:opacity-90 shadow-sm transition-all cursor-pointer"
                     >
                       <FileText size={14} />
@@ -890,7 +946,7 @@ export default function GeographicRiskView() {
                   </div>
                   <div className="flex items-center gap-2 p-2.5 bg-gray-50 rounded-xl border border-gray-150 text-right">
                     <CheckCircle className="text-green-500 shrink-0" size={14} />
-                    <span>تتبع التفعيلات اللحظية في صنعاء، عدن، تعز والمكلا</span>
+                    <span>استعراض وتحليل الهويات المكررة عبر الشبكة لحظياً</span>
                   </div>
                 </div>
               </div>
@@ -922,10 +978,16 @@ export default function GeographicRiskView() {
           ))}
         </div>
         <button 
-          onClick={() => { toastInfo('سجل التحقيق الكامل يحتوي على 1,280 ملف مؤرشف للسنوات السابقة.'); }}
+          onClick={() => {
+            if (logs.length === 0) { toastInfo('لا توجد سجلات تدقيق للتصدير حالياً'); return; }
+            const header = ['النوع', 'العنوان', 'المستخدم', 'الوقت', 'الحالة'];
+            const body = logs.map((log) => [log.type, log.title, log.user, log.time, log.status].join(','));
+            downloadCsv([header.join(','), ...body].join('\n'), `سجل_التدقيق_${new Date().toISOString().slice(0, 10)}.csv`);
+            toastSuccess(`تم تصدير سجل التحقيق (${logs.length} سجلاً) كملف CSV.`);
+          }}
           className="btn btn-ghost btn-sm w-full mt-4 text-xs"
         >
-          مشاهدة الأرشيف الكامل للهويات
+          تصدير سجل التحقيق الكامل (CSV)
         </button>
       </div>
 
