@@ -39,11 +39,11 @@ async function runMigrations(client: any) {
       if (!managesOwnTx) {
         await client.query('BEGIN');
         await client.query(sql);
-        await client.query('INSERT INTO schema_migrations (filename) VALUES ($1)', [file]);
+        await client.query('INSERT INTO schema_migrations (filename) VALUES ($1) ON CONFLICT (filename) DO NOTHING', [file]);
         await client.query('COMMIT');
       } else {
         await client.query(sql);
-        await client.query('INSERT INTO schema_migrations (filename) VALUES ($1)', [file]);
+        await client.query('INSERT INTO schema_migrations (filename) VALUES ($1) ON CONFLICT (filename) DO NOTHING', [file]);
       }
       logger.info(`Migration ${file} applied successfully`);
     } catch (err: unknown) {
