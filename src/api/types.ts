@@ -235,6 +235,8 @@ export interface AdminSellerRow {
   totalSales: number;
   activationsCount: number;
   lastLogin: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface UpdateSellerBalanceRequest {

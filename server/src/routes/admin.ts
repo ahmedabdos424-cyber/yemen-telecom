@@ -336,6 +336,15 @@ const ADMIN_SELLERS_SELECT = `
   LEFT JOIN users u ON u.id = s.user_id
 `;
 
+function toCoord(v: unknown): number | undefined {
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  if (typeof v === 'string' && v.trim() !== '') {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  }
+  return undefined;
+}
+
 function mapAdminSeller(r: any) {
   return {
     id: String(r.id),
@@ -354,6 +363,8 @@ function mapAdminSeller(r: any) {
     totalSales: r.total_sales || 0,
     activationsCount: Number(r.activations_count) || 0,
     lastLogin: r.user_last_login || r.last_login || '',
+    latitude: toCoord(r.latitude),
+    longitude: toCoord(r.longitude),
   };
 }
 

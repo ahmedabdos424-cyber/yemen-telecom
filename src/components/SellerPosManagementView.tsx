@@ -1,9 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { MapPin } from 'lucide-react';
 import { api } from '../api/client';
 import type { AdminSellerRow, AuditLogEntry, AuditLogPageResponse } from '../api/types';
 
 const PAGE_SIZE = 15;
+const POLL_INTERVAL_MS = 30_000;
+
+function hasValidCoords(s: AdminSellerRow): boolean {
+  const { latitude, longitude } = s;
+  return (
+    typeof latitude === 'number' && typeof longitude === 'number' &&
+    Number.isFinite(latitude) && Number.isFinite(longitude) &&
+    Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180
+  );
+}
 
 function sellerStatusBadge(status: string): { label: string; cls: string } {
   switch (status) {
@@ -56,21 +67,36 @@ export default function SellerPosManagementView({ open, onClose }: SellerPosMana
   const [deleteFor, setDeleteFor] = useState<AdminSellerRow | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
 
-  const fetchSellers = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const [reactivateFor, setReactivateFor] = useState<AdminSellerRow | null>(null);
+  const [reactivateBusy, setReactivateBusy] = useState(false);
+
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  const fetchSellers = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent;
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const rows = await api.getAdminSellers();
       setSellers(rows || []);
+      setLastUpdated(new Date());
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      if (!silent) setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     if (open) fetchSellers();
+  }, [open, fetchSellers]);
+
+  useEffect(() => {
+    if (!open) return;
+    const id = setInterval(() => { fetchSellers({ silent: true }); }, POLL_INTERVAL_MS);
+    return () => clearInterval(id);
   }, [open, fetchSellers]);
 
   const fetchSessions = useCallback(async (seller: AdminSellerRow, p: number) => {
@@ -130,17 +156,41 @@ export default function SellerPosManagementView({ open, onClose }: SellerPosMana
     }
   };
 
-  const toggleStatus = async (seller: AdminSellerRow) => {
-    setActionBusy(true);
+  const toggleStatus = (seller: AdminSellerRow) => {
+    if (seller.status !== 'active') {
+      setReactivateFor(seller);
+      return;
+    }
+    void (async () => {
+      setActionBusy(true);
+      try {
+        await api.updateSellerStatus(Number(seller.id), 'inactive');
+        await fetchSellers();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setActionBusy(false);
+      }
+    })();
+  };
+
+  const confirmReactivate = async () => {
+    if (!reactivateFor) return;
+    setReactivateBusy(true);
     try {
-      const next: 'active' | 'inactive' = seller.status === 'active' ? 'inactive' : 'active';
-      await api.updateSellerStatus(Number(seller.id), next);
+      await api.updateSellerStatus(Number(reactivateFor.id), 'active');
+      setReactivateFor(null);
       await fetchSellers();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setActionBusy(false);
+      setReactivateBusy(false);
     }
+  };
+
+  const openMap = (seller: AdminSellerRow) => {
+    if (!hasValidCoords(seller)) return;
+    window.open(`https://www.google.com/maps?q=${seller.latitude},${seller.longitude}`, '_blank', 'noopener,noreferrer');
   };
 
   const confirmDelete = async () => {
@@ -191,6 +241,12 @@ export default function SellerPosManagementView({ open, onClose }: SellerPosMana
             <div>
               <h3 className="font-bold text-sm">إدارة البائعين ونقاط البيع</h3>
               <p className="text-[10px] text-slate-500">متابعة حسابات البائعين وحالة الجلسات</p>
+              {lastUpdated && (
+                <span className="inline-flex items-center gap-1 mt-1 text-[9px] font-bold text-emerald-400/90 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  تحديث تلقائي • {lastUpdated.toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </span>
+              )}
             </div>
           </div>
           <button onClick={onClose}
@@ -208,7 +264,7 @@ export default function SellerPosManagementView({ open, onClose }: SellerPosMana
             <div className="text-center py-8 space-y-2">
               <span className="material-symbols-outlined text-3xl text-red-500">error</span>
               <p className="text-xs text-red-400">{error}</p>
-              <button onClick={fetchSellers} className="text-ym hover:underline font-bold text-xs cursor-pointer">إعادة المحاولة</button>
+              <button onClick={() => fetchSellers()} className="text-ym hover:underline font-bold text-xs cursor-pointer">إعادة المحاولة</button>
             </div>
           )}
 
@@ -239,6 +295,19 @@ export default function SellerPosManagementView({ open, onClose }: SellerPosMana
                               </div>
                             </div>
                             <span className={`text-[9px] font-bold shrink-0 px-1.5 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
+                            <button
+                              onClick={() => openMap(seller)}
+                              disabled={!hasValidCoords(seller)}
+                              title={hasValidCoords(seller) ? 'فتح الموقع الجغرافي على الخريطة' : 'الموقع الجغرافي غير محدد'}
+                              aria-label={hasValidCoords(seller) ? 'فتح موقع البائع على الخريطة' : 'الموقع الجغرافي غير محدد'}
+                              className={`w-7 h-7 shrink-0 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
+                                hasValidCoords(seller)
+                                  ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
+                                  : 'bg-slate-800/50 text-slate-600 cursor-not-allowed'
+                              }`}
+                            >
+                              <MapPin size={13} />
+                            </button>
                           </div>
 
                           <div className="grid grid-cols-3 gap-2 text-[10px]">
@@ -491,6 +560,31 @@ export default function SellerPosManagementView({ open, onClose }: SellerPosMana
               </div>
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      {/* نافذة تأكيد إعادة التفعيل */}
+      <AnimatePresence>
+        {reactivateFor && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[130] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="تأكيد إعادة تفعيل البائع">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="card-enhanced max-w-sm w-full p-6 space-y-4">
+              <div className="flex items-center gap-2.5 text-emerald-500">
+                <span className="material-symbols-outlined text-2xl font-bold">verified_user</span>
+                <h4 className="font-extrabold text-sm">تأكيد إعادة تفعيل البائع</h4>
+              </div>
+              <p className="text-xs text-slate-400 leading-normal">
+                سيستعيد <strong className="text-slate-200">{reactivateFor.name}</strong> كامل صلاحيات النظام: تسجيل الدخول، تنفيذ عمليات البيع والتفعيل، والتعامل مع المخزون الميداني فوراً.
+              </p>
+              <div className="flex gap-2.5 pt-2">
+                <button onClick={confirmReactivate} disabled={reactivateBusy}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white font-bold text-xs py-3 rounded-xl transition-all cursor-pointer disabled:opacity-50 min-h-[48px]">
+                  {reactivateBusy ? 'جاري التفعيل...' : 'تأكيد إعادة التفعيل'}
+                </button>
+                <button onClick={() => setReactivateFor(null)}
+                  className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs py-3 rounded-xl transition-all cursor-pointer min-h-[48px]">إلغاء</button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
