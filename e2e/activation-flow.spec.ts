@@ -164,12 +164,12 @@ test.describe('تدفق تفعيل الشريحة الكامل (Login → SIM �
     await page.waitForSelector('text=تفعيل شريحة جديدة', { timeout: 15_000 });
 
     // Fill customer details.
-    const nameInput = page.locator('input[placeholder="اسم المشترك (اختياري)"]');
+    const nameInput = page.locator('input[placeholder="أدخل الاسم الثلاثي واللقب"]');
     try {
       await nameInput.waitFor({ state: 'visible', timeout: 10_000 });
     } catch {
       const diag = await page.evaluate(() => {
-        const el = document.querySelector('input[placeholder="اسم المشترك (اختياري)"]');
+        const el = document.querySelector('input[placeholder="أدخل الاسم الثلاثي واللقب"]');
         if (!el) return { found: false };
         const cs = getComputedStyle(el);
         const chain: string[] = [];
@@ -187,7 +187,6 @@ test.describe('تدفق تفعيل الشريحة الكامل (Login → SIM �
         }).map((d) => `#${d.id} .${String(d.className).slice(0, 60)} z=${getComputedStyle(d).zIndex} bg=${getComputedStyle(d).backgroundColor} op=${getComputedStyle(d).opacity}`);
         return { found: true, input: `display=${cs.display} vis=${cs.visibility} op=${cs.opacity}`, chain, overlays: overlays.slice(0, 10) };
       });
-      await page.screenshot({ path: 'C:/Users/Ahmed/AppData/Local/Temp/opencode/step4.png' });
       const bodyText = await page.evaluate(() => {
         const inputs = Array.from(document.querySelectorAll('input')).map((i) => `[ph="${i.placeholder}"][type=${i.type}][dir=${i.dir}]`);
         return JSON.stringify({ text: document.body.innerText.slice(0, 400), inputs });
@@ -207,8 +206,10 @@ test.describe('تدفق تفعيل الشريحة الكامل (Login → SIM �
 
     // Submit activation.
     await page.click('button:has-text("التقط صورة العقد")');
-    await page.getByRole('button', { name: 'التقاط صورة' }).click();
+    await page.getByRole('button', { name: 'التقاط الصورة' }).click();
     await page.waitForSelector('text=تم التقاط صورة العقد', { timeout: 15_000 });
+    await page.getByRole('button', { name: 'موافقة واستخدام الصورة' }).click();
+    await page.waitForSelector('text=تم التقاط صورة المستند', { timeout: 15_000 });
     await page.getByRole('button', { name: 'حفظ البيانات وتفعيل الشريحة' }).click();
 
     // Assert success banner appears.
