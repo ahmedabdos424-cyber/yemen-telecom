@@ -228,6 +228,70 @@ test.describe('تدفق تفعيل الشريحة الكامل (Login → SIM �
     await page.getByRole('button', { name: 'التقاط الصورة' }).click();
     await page.waitForSelector('text=تم التقاط صورة العقد', { timeout: 15_000 });
 
+    // The toast proves handleCaptureResult ran → previewImage was set → the
+    // preview mode must render the confirm button. If the modal UNMOUNTS
+    // right after capture (route guard, remount, session drop), the confirm
+    // never appears. Watch the modal in 250ms steps and snapshot the moment
+    // it disappears instead of burning 30s silently.
+    const disappearance = await page.evaluate(async () => {
+      interface Snapshot {
+        at: number;
+        url: string;
+        hasPreview: boolean;
+        hasModal: boolean;
+        navType: string;
+        visuallyComplete: boolean;
+      }
+      const snaps: Snapshot[] = [];
+      const navInfo = () => {
+        const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+        return nav ? nav.type : 'unknown';
+      };
+      const start = Date.now();
+      const deadline = start + 8000;
+      let everVisible = false;
+      let disappeared: (Snapshot & { bodyStart: string }) | null = null;
+      while (Date.now() < deadline) {
+        const hasPreview = !!document.querySelector('img[src^="data:image"]');
+        const hasModal = !!document.querySelector('[aria-label="التقاط الصورة"]');
+        // A full page reload wipes ALL state (no toast, no modal, empty form)
+        // while a React remount keeps the form but drops the modal. Track both.
+        const navType = navInfo();
+        const visuallyComplete = document.readyState === 'complete';
+        if (hasPreview || hasModal) {
+          everVisible = true;
+          if (disappeared) {
+            disappeared = null;
+            snaps.length = 0;
+          }
+        } else if (everVisible && !disappeared) {
+          disappeared = {
+            at: Date.now() - start,
+            url: location.href,
+            hasPreview,
+            hasModal,
+            navType,
+            visuallyComplete,
+            bodyStart: document.body.innerText.slice(0, 200),
+          };
+        }
+        snaps.push({ at: Date.now() - start, url: location.href, hasPreview, hasModal, navType, visuallyComplete });
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      return { everVisible, disappeared, lastSnapshots: snaps.slice(-4) };
+    });
+
+    if (disappearance.disappeared) {
+      const shot = await page.screenshot({ fullPage: false }).catch(() => null);
+      if (shot) {
+        await testInfo.attach('modal-disappeared-screenshot', { body: shot, contentType: 'image/png' });
+      }
+      const bodyText = await page.evaluate(() => document.body.innerText.slice(0, 400));
+      throw new Error(
+        `camera modal vanished after successful capture; everVisible=${disappearance.everVisible}; disappearedAt=${disappearance.disappeared.at}ms; urlAtDisappear=${disappearance.disappeared.url}; bodyAtDisappear=${disappearance.disappeared.bodyStart}; nowUrl=${page.url()}; bodyNow=${bodyText}; pageErrors=${JSON.stringify(pageErrors)}; consoleErrors=${JSON.stringify(consoleErrors)}; net=${JSON.stringify(netLog)}`
+      );
+    }
+
     // The confirm button only renders once the preview image is set — if it
     // never shows up, dump the DOM state to know why (page nav, modal closed,
     // React crash, etc.) instead of burning the full 90s silently.
