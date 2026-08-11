@@ -66,6 +66,11 @@ function detectCapacitor(): boolean {
 const PROD_API = 'https://yemen-telecom.onrender.com/api';
 function resolveApiBase(): string {
   if (import.meta.env.DEV) return '/api';
+  // E2E/CI builds run `vite preview` against a local API; when the build was
+  // produced with VITE_PROXY_TARGET set (ci.yml e2e job) the relative path is
+  // safe because the preview proxy forwards /api to the local server. The APK
+  // and production builds never set this var, so they keep the absolute URL.
+  if (import.meta.env.VITE_PROXY_TARGET) return '/api';
   if (detectCapacitor()) return PROD_API;
   if (isLocal) {
     // Inside the native WebView (androidScheme https) the origin is localhost but

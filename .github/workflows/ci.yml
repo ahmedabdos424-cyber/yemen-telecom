@@ -28,10 +28,11 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres -d yemen_telecom_test"
           --health-interval 10s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 10
+          --health-start-period 5s
 
     steps:
       - uses: actions/checkout@v4
@@ -97,10 +98,11 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres -d yemen_telecom_test"
           --health-interval 10s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 10
+          --health-start-period 5s
 
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/yemen_telecom_test
@@ -156,10 +158,11 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres -d yemen_telecom_test"
           --health-interval 10s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 10
+          --health-start-period 5s
 
     env:
       DB_HOST: 127.0.0.1
@@ -197,9 +200,23 @@ jobs:
         run: npm ci
 
       - name: Wait for Postgres to accept connections
+        working-directory: server
         run: |
           for i in $(seq 1 30); do
-            if node -e "const n=require('net');const s=n.connect(5432,'127.0.0.1');s.on('connect',()=>{console.log('postgres ready');process.exit(0)});s.on('error',()=>process.exit(1))"; then exit 0; fi
+            if node -e "
+              const { Pool } = require('pg');
+              const pool = new Pool({
+                host: process.env.DB_HOST || '127.0.0.1',
+                port: Number(process.env.DB_PORT || 5432),
+                user: process.env.DB_USER || 'postgres',
+                password: process.env.DB_PASSWORD || 'postgres',
+                database: process.env.DB_NAME || 'yemen_telecom_test',
+                connectionTimeoutMillis: 3000,
+              });
+              pool.query('SELECT 1')
+                .then(() => { console.log('postgres ready'); return pool.end().then(() => process.exit(0)); })
+                .catch((e) => { console.log('waiting (' + e.code + ')'); return pool.end().then(() => process.exit(1)); });
+            "; then exit 0; fi
             sleep 2
           done
           echo "Postgres did not become ready in time" >&2
@@ -252,7 +269,7 @@ jobs:
       - name: Publish diagnostics to ntfy.sh
         if: failure()
         run: |
-          curl -s -d "$(< /tmp/diag.txt)" "https://ntfy.sh/yt_ci_diag_${GITHUB_SHA:0:7}" || true
+          curl -s --max-time 15 -d "$(< /tmp/diag.txt)" "https://ntfy.sh/yt_telecom_ci_alerts" || true
 
       - name: Seed demo passwords
         run: npx tsx server/src/seed.ts
@@ -263,6 +280,8 @@ jobs:
 
       - name: Build frontend
         run: npm run build
+        env:
+          VITE_PROXY_TARGET: http://localhost:4000
 
       - name: Start API server
         run: |

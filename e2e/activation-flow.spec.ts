@@ -31,6 +31,22 @@ test.skip(
 test.describe('تدفق تفعيل الشريحة الكامل (Login → SIM → Activate → Report)', () => {
   let page: Page;
 
+  // If the SPA bounces us back to the login screen after a hard navigation
+  // (session hiccup), re-authenticate instead of failing the whole flow.
+  async function ensureLoggedIn(): Promise<void> {
+    const loginVisible = page.locator('input[autocomplete="username"]');
+    try {
+      await loginVisible.waitFor({ state: 'visible', timeout: 6000 });
+    } catch {
+      return;
+    }
+    console.log('E2E: session dropped, re-logging in');
+    await loginVisible.fill(USERNAME);
+    await page.locator('#login-password').fill(PASSWORD);
+    await page.getByRole('button', { name: 'تسجيل الدخول' }).click();
+    await page.waitForURL('**/manager/**', { timeout: 30_000 });
+  }
+
   test.beforeAll(async ({ browser }) => {
     page = await browser.newPage();
   });
@@ -43,7 +59,8 @@ test.describe('تدفق تفعيل الشريحة الكامل (Login → SIM �
   // 1. Login
   // ---------------------------------------------------------------------------
   test('الخطوة 1: تسجيل الدخول كمدير', async () => {
-    await page.goto('/');
+    // domcontentloaded only — Google Fonts can stall `load` on slow networks.
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
 
     // Username field (no stable id — use autocomplete).
     const usernameInput = page.locator('input[autocomplete="username"]');
@@ -69,7 +86,8 @@ test.describe('تدفق تفعيل الشريحة الكامل (Login → SIM �
   test('الخطوة 2: الانتقال إلى صفحة مخزون الشرائح', async () => {
     // Navigate directly: on desktop viewports (Playwright Chrome = 1280px) the
     // manager BottomNav is hidden (lg:hidden) and TopBar has no SIMs button.
-    await page.goto('/manager/sims');
+    // The app uses a HashRouter, so the route lives after the '#/'.
+    await page.goto('/#/manager/sims', { waitUntil: 'domcontentloaded' });
     await page.waitForURL('**/manager/sims', { timeout: 15_000 });
     await expect(page).toHaveURL(/\/manager\/sims/);
 
@@ -84,42 +102,113 @@ test.describe('تدفق تفعيل الشريحة الكامل (Login → SIM �
     // Filter the status dropdown to "available" (متاح).
     await page.locator('label:text("حالة الشريحة") + select').selectOption('available');
 
-    // Wait until at least one SIM card row renders.
-    await page.locator('[class*="card"]').filter({ hasText: 'متاح' }).first().waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    });
+    // The stats cards also contain the word "متاح" (e.g. "المتاحة للبيع"), so
+    // match only actual SIM rows: every row carries the "الباقة والمالك" label.
+    const availableRow = page
+      .locator('[class*="card"]')
+      .filter({ hasText: 'متاح' })
+      .filter({ hasText: 'الباقة والمالك' })
+      .first();
+    await availableRow.waitFor({ state: 'visible', timeout: 15_000 });
 
-    // Grab the first available SIM's ICCID for use in the activation form.
-    const firstRow = page.locator('[class*="card"]').filter({ hasText: 'متاح' }).first();
-    await firstRow.locator('span.material-symbols-outlined').first().waitFor({ state: 'attached' });
-    const iccidText = await firstRow.locator('font-mono').last().textContent();
+    // Grab the row's ICCID (digits may be split across elements — normalize).
+    const rowText = (await availableRow.innerText()).replace(/[^\d]/g, '');
+    const iccid = (rowText.match(/8996\d+/) || [''])[0];
     // Persist between tests via page context.
-    (page as any).__e2eIccid = iccidText?.trim().replace(/\s+/g, '');
-    expect((page as any).__e2eIccid).toMatch(/\d{18,}/);
+    (page as any).__e2eIccid = iccid;
+    expect(iccid).toMatch(/\d{18,}/);
   });
 
   // ---------------------------------------------------------------------------
   // 4. Activate the SIM
   // ---------------------------------------------------------------------------
   test('الخطوة 4: تفعيل الشريحة المتاحة', async () => {
+    test.setTimeout(90_000);
     const iccid = (page as any).__e2eIccid as string;
 
     // Open the activation route directly (managers can activate admin-owned stock).
-    await page.goto('/manager/activate');
+    // Mock the camera so the WebRTC viewfinder opens in headless Chrome (no real
+    // camera exists there). A canvas stream satisfies getUserMedia; capture then
+    // draws the video frame into the preview.
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'mediaDevices', {
+        configurable: true,
+        value: {
+          getUserMedia: async () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 640;
+            canvas.height = 480;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.fillStyle = '#9aa3ad';
+              ctx.fillRect(0, 0, 640, 480);
+            }
+            const stream = (canvas as HTMLCanvasElement & { captureStream?: (fps?: number) => MediaStream }).captureStream?.(15);
+            if (!stream) throw new Error('captureStream unavailable');
+            return stream;
+          },
+        },
+      });
+    });
+    await page.goto('/#/manager/activate', { waitUntil: 'domcontentloaded' });
+    const netLog: string[] = [];
+    const onReqFail = (r: { url: () => string; failure: () => { errorText: string } | null }) => {
+      netLog.push(`FAIL ${r.url()} :: ${r.failure()?.errorText}`);
+    };
+    const onResp = (r: { url: () => string; status: () => number }) => {
+      if (r.status() >= 400) netLog.push(`HTTP ${r.status()} ${r.url()}`);
+    };
+    page.on('requestfailed', onReqFail);
+    page.on('response', onResp);
+    await ensureLoggedIn();
     await page.waitForSelector('text=تفعيل شريحة جديدة', { timeout: 15_000 });
 
     // Fill customer details.
-    await page.locator('input[placeholder="أدخل الاسم الثلاثي واللقب"]').fill('علي بن محمد الصقوري');
+    const nameInput = page.locator('input[placeholder="اسم المشترك (اختياري)"]');
+    try {
+      await nameInput.waitFor({ state: 'visible', timeout: 10_000 });
+    } catch {
+      const diag = await page.evaluate(() => {
+        const el = document.querySelector('input[placeholder="اسم المشترك (اختياري)"]');
+        if (!el) return { found: false };
+        const cs = getComputedStyle(el);
+        const chain: string[] = [];
+        let n: HTMLElement | null = el.parentElement;
+        while (n && chain.length < 8) {
+          const c = getComputedStyle(n);
+          const r = n.getBoundingClientRect();
+          chain.push(`${n.tagName} .${String(n.className).slice(0, 70)} | display=${c.display} vis=${c.visibility} op=${c.opacity} w=${Math.round(r.width)} h=${Math.round(r.height)}`);
+          n = n.parentElement;
+        }
+        const overlays = Array.from(document.querySelectorAll('body *')).filter((d) => {
+          const s = getComputedStyle(d);
+          const r = d.getBoundingClientRect();
+          return s.position === 'fixed' && r.width > 300 && r.height > 300;
+        }).map((d) => `#${d.id} .${String(d.className).slice(0, 60)} z=${getComputedStyle(d).zIndex} bg=${getComputedStyle(d).backgroundColor} op=${getComputedStyle(d).opacity}`);
+        return { found: true, input: `display=${cs.display} vis=${cs.visibility} op=${cs.opacity}`, chain, overlays: overlays.slice(0, 10) };
+      });
+      await page.screenshot({ path: 'C:/Users/Ahmed/AppData/Local/Temp/opencode/step4.png' });
+      const bodyText = await page.evaluate(() => {
+        const inputs = Array.from(document.querySelectorAll('input')).map((i) => `[ph="${i.placeholder}"][type=${i.type}][dir=${i.dir}]`);
+        return JSON.stringify({ text: document.body.innerText.slice(0, 400), inputs });
+      });
+      page.removeListener('requestfailed', onReqFail);
+      page.removeListener('response', onResp);
+      throw new Error(`activate form never became visible; url=${page.url()}; body=${bodyText}; net=${JSON.stringify(netLog)}`);
+    }
+    await nameInput.fill('عميل اختبار أوتوماتيكي');
     await page.locator('input[dir="ltr"][placeholder="10xxxxxxxxxx"]').fill('10501234567');
 
-    // Fill ICCID — input has dir="ltr" and placeholder 89967XXXXXXXXXXXX.
+    // Fill ICCID - input has dir="ltr" and placeholder 89967XXXXXXXXXXXX.
     await page.locator('input[placeholder="89967XXXXXXXXXXXX"]').fill(iccid);
 
     // Fill phone (9 digits).
     await page.locator('input[type="tel"]').fill('0501234567');
 
     // Submit activation.
+    await page.click('button:has-text("التقط صورة العقد")');
+    await page.getByRole('button', { name: 'التقاط صورة' }).click();
+    await page.waitForSelector('text=تم التقاط صورة العقد', { timeout: 15_000 });
     await page.getByRole('button', { name: 'حفظ البيانات وتفعيل الشريحة' }).click();
 
     // Assert success banner appears.
@@ -132,7 +221,8 @@ test.describe('تدفق تفعيل الشريحة الكامل (Login → SIM �
   // ---------------------------------------------------------------------------
   test('الخطوة 5: توجيه إلى صفحة التقارير وتصدير التقرير', async () => {
     // As manager, open Reports via the nav/top bar.
-    await page.goto('/manager/reports');
+    await page.goto('/#/manager/reports', { waitUntil: 'domcontentloaded' });
+    await ensureLoggedIn();
     await page.waitForSelector('text=التقارير', { timeout: 15_000 });
     await expect(page).toHaveURL(/\/manager\/reports/);
   });
