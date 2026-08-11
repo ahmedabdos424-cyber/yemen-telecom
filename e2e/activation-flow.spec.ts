@@ -47,6 +47,23 @@ test.describe('تدفق تفعيل الشريحة الكامل (Login → SIM �
     await page.waitForURL('**/manager/**', { timeout: 30_000 });
   }
 
+  // Fetch the ICCID of an available SIM directly from the UI. Used by step 3
+  // and as a self-healing fallback inside step 4 (e.g. after a retry that
+  // re-ran step 4 on a fresh session without re-running step 3).
+  async function fetchAvailableIccid(): Promise<string> {
+    await page.goto('/#/manager/sims', { waitUntil: 'domcontentloaded' });
+    await ensureLoggedIn();
+    await page.locator('label:text("حالة الشريحة") + select').selectOption('available');
+    const availableRow = page
+      .locator('[class*="card"]')
+      .filter({ hasText: 'متاح' })
+      .filter({ hasText: 'الباقة والمالك' })
+      .first();
+    await availableRow.waitFor({ state: 'visible', timeout: 15_000 });
+    const rowText = (await availableRow.innerText()).replace(/[^\d]/g, '');
+    return (rowText.match(/8996\d+/) || [''])[0];
+  }
+
   test.beforeAll(async ({ browser }) => {
     page = await browser.newPage();
   });
@@ -99,22 +116,9 @@ test.describe('تدفق تفعيل الشريحة الكامل (Login → SIM �
   // 3. Locate an "available" SIM for activation
   // ---------------------------------------------------------------------------
   test('الخطوة 3: العثور على شريحة متاحة للتفعيل', async () => {
-    // Filter the status dropdown to "available" (متاح).
-    await page.locator('label:text("حالة الشريحة") + select').selectOption('available');
-
-    // The stats cards also contain the word "متاح" (e.g. "المتاحة للبيع"), so
-    // match only actual SIM rows: every row carries the "الباقة والمالك" label.
-    const availableRow = page
-      .locator('[class*="card"]')
-      .filter({ hasText: 'متاح' })
-      .filter({ hasText: 'الباقة والمالك' })
-      .first();
-    await availableRow.waitFor({ state: 'visible', timeout: 15_000 });
-
-    // Grab the row's ICCID (digits may be split across elements — normalize).
-    const rowText = (await availableRow.innerText()).replace(/[^\d]/g, '');
-    const iccid = (rowText.match(/8996\d+/) || [''])[0];
-    // Persist between tests via page context.
+    const iccid = await fetchAvailableIccid();
+    // Persist between tests via a page property — a retry re-runs only the
+    // failed test, so step 4 falls back to fetchAvailableIccid() if needed.
     (page as any).__e2eIccid = iccid;
     expect(iccid).toMatch(/\d{18,}/);
   });
@@ -122,9 +126,14 @@ test.describe('تدفق تفعيل الشريحة الكامل (Login → SIM �
   // ---------------------------------------------------------------------------
   // 4. Activate the SIM
   // ---------------------------------------------------------------------------
-  test('الخطوة 4: تفعيل الشريحة المتاحة', async () => {
+  test('الخطوة 4: تفعيل الشريحة المتاحة', async ({}, testInfo) => {
     test.setTimeout(90_000);
-    const iccid = (page as any).__e2eIccid as string;
+    let iccid = (page as any).__e2eIccid as string;
+    if (!iccid) {
+      // Retry safety net: a retry re-runs only this test in a fresh session,
+      // so step 3's captured value is gone. Re-derive it from the SIMs UI.
+      iccid = await fetchAvailableIccid();
+    }
 
     // Open the activation route directly (managers can activate admin-owned stock).
     // Mock the camera so the WebRTC viewfinder opens in headless Chrome (no real
@@ -152,6 +161,16 @@ test.describe('تدفق تفعيل الشريحة الكامل (Login → SIM �
     });
     await page.goto('/#/manager/activate', { waitUntil: 'domcontentloaded' });
     const netLog: string[] = [];
+    const pageErrors: string[] = [];
+    const consoleErrors: string[] = [];
+    const onPageError = (err: Error) => {
+      pageErrors.push(`PAGEERROR ${err.message}`);
+    };
+    const onConsole = (msg: { text: () => string; type: () => string }) => {
+      if (msg.type() === 'error') consoleErrors.push(`CONSOLE ${msg.text()}`);
+    };
+    page.on('pageerror', onPageError);
+    page.on('console', onConsole);
     const onReqFail = (r: { url: () => string; failure: () => { errorText: string } | null }) => {
       netLog.push(`FAIL ${r.url()} :: ${r.failure()?.errorText}`);
     };
@@ -208,7 +227,43 @@ test.describe('تدفق تفعيل الشريحة الكامل (Login → SIM �
     await page.click('button:has-text("التقط صورة العقد")');
     await page.getByRole('button', { name: 'التقاط الصورة' }).click();
     await page.waitForSelector('text=تم التقاط صورة العقد', { timeout: 15_000 });
-    await page.getByRole('button', { name: 'موافقة واستخدام الصورة' }).click();
+
+    // The confirm button only renders once the preview image is set — if it
+    // never shows up, dump the DOM state to know why (page nav, modal closed,
+    // React crash, etc.) instead of burning the full 90s silently.
+    const confirmBtn = page.getByRole('button', { name: 'موافقة واستخدام الصورة' });
+    try {
+      await confirmBtn.click({ timeout: 30_000 });
+    } catch (err) {
+      const diag = await page.evaluate(() => {
+        const previewImg = !!document.querySelector('img[src^="data:image"]');
+        const modalBtns = Array.from(document.querySelectorAll('button'))
+          .map((b) => b.textContent?.trim().slice(0, 60))
+          .filter(Boolean)
+          .slice(0, 30);
+        const fixedOverlays = Array.from(document.querySelectorAll('[class*="fixed"]'))
+          .map((d) => d.className.toString().slice(0, 80))
+          .slice(0, 10);
+        return {
+          url: location.href,
+          bodyStart: document.body.innerText.slice(0, 300),
+          previewImg,
+          modalBtns,
+          fixedOverlays,
+        };
+      });
+      const shot = await page.screenshot({ fullPage: false }).catch(() => null);
+      if (shot) {
+        await testInfo.attach('capture-failure-screenshot', { body: shot, contentType: 'image/png' });
+      }
+      page.removeListener('pageerror', onPageError);
+      page.removeListener('console', onConsole);
+      page.removeListener('requestfailed', onReqFail);
+      page.removeListener('response', onResp);
+      throw new Error(
+        `confirm button never appeared within 30s; url=${diag.url}; previewImg=${diag.previewImg}; modalBtns=${JSON.stringify(diag.modalBtns)}; overlays=${JSON.stringify(diag.fixedOverlays)}; body=${diag.bodyStart}; pageErrors=${JSON.stringify(pageErrors)}; consoleErrors=${JSON.stringify(consoleErrors)}; net=${JSON.stringify(netLog)}; original=${String(err)}`
+      );
+    }
     await page.waitForSelector('text=تم التقاط صورة المستند', { timeout: 15_000 });
     await page.getByRole('button', { name: 'حفظ البيانات وتفعيل الشريحة' }).click();
 
