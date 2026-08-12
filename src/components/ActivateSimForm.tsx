@@ -67,6 +67,13 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
           borderColor: 'border-op-you',
           label: 'YOU'
         };
+      default:
+        return {
+          bgClass: 'bg-op-ym hover:bg-op-ym/90',
+          ringClass: 'focus:border-op-ym focus:ring-op-ym',
+          borderColor: 'border-op-ym',
+          label: 'يمن موبايل'
+        };
     }
   };
 

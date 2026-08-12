@@ -44,7 +44,7 @@ export default function MobileBottomNav({ items = [], activeId, onChange, badgeC
               {Boolean(badgeCount && Number(badgeCount) > 0) && item.id === badgeOnId && (
                 <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }}
                   className="absolute top-0.5 right-1/2 translate-x-3 translate-y-0.5 bg-red-600 text-white font-mono text-[8px] font-bold w-[18px] h-[18px] rounded-full flex items-center justify-center border-2 border-white shadow-sm">
-                  {badgeCount > 9 ? '9+' : badgeCount}
+                  {Number(badgeCount) > 9 ? '9+' : String(badgeCount)}
                 </motion.span>
               )}
             </button>

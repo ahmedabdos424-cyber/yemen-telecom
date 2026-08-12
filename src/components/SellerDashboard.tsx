@@ -149,7 +149,7 @@ export default function SellerDashboard({
           darkMode={darkMode}
           setDarkMode={setDarkMode}
           onPasswordChanged={onPasswordChanged}
-          onConfirmLogout={onConfirmLogout}
+          onConfirmLogout={onConfirmLogout ?? (() => {})}
           onLogout={onLogout}
           biometricAvailable={biometricAvailable}
           biometricEnabled={biometricEnabled}

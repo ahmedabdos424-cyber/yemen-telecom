@@ -71,10 +71,10 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM, onAddSimBat
 
   const openEditModal = useCallback((sim: SIM) => {
     setSelectedSimEdit(sim);
-    setEditPhone(sim.phone);
+    setEditPhone(sim.phone ?? '');
     setEditProvider(sim.provider as 'Yemen Mobile' | 'Sabafon' | 'YOU');
-    setEditPackage(sim.packageType);
-    setEditOwner(sim.owner);
+    setEditPackage(sim.packageType ?? '');
+    setEditOwner(sim.owner ?? '');
     setEditStatus(sim.status as 'available' | 'assigned' | 'activated' | 'sold' | 'reserved' | 'inactive');
   }, []);
 
@@ -530,7 +530,7 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM, onAddSimBat
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                   <OperatorLogo provider={sim.provider} size="sm" />
                   <div className="min-w-0">
-                    <p className="text-[11px] md:text-xs font-bold text-gray-900 font-mono truncate">{highlightMatches(sim.phone, searchTerm)}</p>
+                    <p className="text-[11px] md:text-xs font-bold text-gray-900 font-mono truncate">{highlightMatches(sim.phone ?? '', searchTerm)}</p>
                     <p className="text-[10px] md:text-[11px] text-gray-500 font-mono mt-0.5 truncate">{highlightMatches(sim.iccid, searchTerm)}</p>
                   </div>
                 </div>
@@ -550,7 +550,7 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM, onAddSimBat
                 <div className="text-[10px] md:text-[11px] flex-1 min-w-0 pl-1 md:pl-2">
                   <p className="text-gray-400 font-semibold mb-0.5">الباقة والمالك</p>
                   <p className="font-bold text-gray-800 text-[10px] md:text-[11px] truncate">
-                    {highlightMatches(sim.packageType, searchTerm)} | {highlightMatches(sim.owner, searchTerm)}
+                    {highlightMatches(sim.packageType ?? '', searchTerm)} | {highlightMatches(sim.owner ?? '', searchTerm)}
                   </p>
                 </div>
                 <div className="flex gap-1.5 md:gap-2 shrink-0">

@@ -1,6 +1,6 @@
 # Yemen Telecom - Database Backup Script
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-$backupDir = "C:\Users\Ahmed\Desktop\yemen-telecom-backups"
+$backupDir = Join-Path $PSScriptRoot "backups"
 $env:PGPASSWORD = $env:DB_PASSWORD
 
 # Create backup directory if not exists

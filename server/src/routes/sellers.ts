@@ -159,9 +159,17 @@ router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), 
     const sellerPassword = password || crypto.randomBytes(16).toString('hex');
     const passwordHash = await bcrypt.hash(sellerPassword, 10);
 
-    // Look up agent_id if agent_name provided
+    // Resolve agent_id. Agents may ONLY create sellers under their own
+    // agency — any agent_name/agent_id sent in the request body is ignored to
+    // prevent cross-tenant (IDOR) assignment of sellers to another agency.
     let agentId: number | null = null;
-    if (agent_name) {
+    if (req.user?.role === 'agent') {
+      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
+      if (agentRes.rows.length === 0) {
+        return res.status(403).json({ error: 'Access denied: no agency is associated with your account' });
+      }
+      agentId = agentRes.rows[0].id;
+    } else if (agent_name) {
       const agentRes = await query('SELECT id FROM agents WHERE name = $1', [agent_name]);
       if (agentRes.rows.length > 0) {
         agentId = agentRes.rows[0].id;
@@ -217,8 +225,7 @@ router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), 
     res.status(201).json({
       seller: createdSeller,
       credentials: {
-        username: sellerUsername,
-        password: sellerPassword
+        username: sellerUsername
       }
     });
   } catch (err: unknown) {

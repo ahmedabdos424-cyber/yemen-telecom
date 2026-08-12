@@ -114,7 +114,7 @@ export default function ReportsView() {
       const s = String(v ?? '').replace(/"/g, '""');
       return /[",\n]/.test(s) ? `"${s}"` : s;
     };
-    const csv = '\uFEFF' + [headers.join(','), ...rows.map(r => headers.map(h => escape(r[h])).join(','))].join('\r\n');
+    const csv = '\uFEFF' + [headers.join(','), ...rows.map(r => headers.map(h => escape((r as Record<string, unknown>)[h])).join(','))].join('\r\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');

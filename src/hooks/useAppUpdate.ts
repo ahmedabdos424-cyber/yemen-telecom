@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import AppUpdater from '../plugins/AppUpdater';
 import { api } from '../api/client';
@@ -11,6 +11,7 @@ export function useAppUpdate() {
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const listenerRef = useRef<{ remove: () => void } | null>(null);
 
   const checkForUpdates = useCallback(async (manual = false) => {
     if (checking) return;
@@ -59,6 +60,7 @@ export function useAppUpdate() {
       const listener = await AppUpdater.addListener('progress', (data) => {
         setProgress(data.progress);
       });
+      listenerRef.current = listener;
 
       // 3. Download and Install
       await AppUpdater.downloadApk({
@@ -75,11 +77,20 @@ export function useAppUpdate() {
 
     } catch (err: any) {
       console.error('Update failed:', err);
+      listenerRef.current?.remove();
+      listenerRef.current = null;
       setError(err.message || 'فشل تنزيل أو تثبيت التحديث.');
     } finally {
       setDownloading(false);
     }
   }, [updateInfo, downloading]);
+
+  useEffect(() => {
+    return () => {
+      listenerRef.current?.remove();
+      listenerRef.current = null;
+    };
+  }, []);
 
   return {
     checking,
