@@ -86,6 +86,8 @@
   "overrides": {
     "semver": "^7.6.2",
     "body-parser": "^1.20.3",
-    "uuid": "^11.1.1"
+    "uuid": "^11.1.1",
+    "extract-zip": "^2.0.1",
+    "sharp": "^0.33.5"
   }
 }
