@@ -47,7 +47,7 @@ function emitStatus(connected: boolean): void {
   }
 }
 
-function emitEvent(event: RealtimeEvent): void {
+export function emitEvent(event: RealtimeEvent): void {
   try {
     window.dispatchEvent(new CustomEvent(REALTIME_EVENT_NAME, { detail: event }));
   } catch {
@@ -180,4 +180,27 @@ export function onRealtimeStatus(cb: (connected: boolean) => void): () => void {
   };
   window.addEventListener(REALTIME_STATUS_EVENT, handler);
   return () => window.removeEventListener(REALTIME_STATUS_EVENT, handler);
+}
+
+/**
+ * Emit a local `inventory.updated` realtime event. Used after a SIM batch is
+ * added or assigned to an agent/seller so the inventory overview cards, SIM
+ * tables and totals refresh immediately — without a manual page reload. The
+ * active session's `onRealtimeEvent` listener (see App.tsx) picks this up and
+ * re-pulls the role-scoped lists; the WebSocket gateway relays it to other
+ * devices for true cross-device realtime.
+ */
+export interface InventoryUpdateMeta {
+  ownerRole?: 'admin' | 'agent' | 'seller';
+  ownerId?: number;
+  operator?: string;
+  source?: 'batch-add' | 'transfer' | 'manual';
+}
+
+export function notifyInventoryUpdated(meta: InventoryUpdateMeta = {}): void {
+  emitEvent({
+    type: 'inventory.updated',
+    at: new Date().toISOString(),
+    ...meta,
+  });
 }

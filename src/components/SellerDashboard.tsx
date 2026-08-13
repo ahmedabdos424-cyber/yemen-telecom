@@ -171,6 +171,7 @@ export default function SellerDashboard({
         setFontSize={setFontSize}
         biometricEnabled={biometricEnabled}
         onToggleBiometric={handleToggleBiometric}
+        biometricInAppearance={true}
         onChangePassword={() => { setSettingsOpen(false); setPasswordOpen(true); }}
         accountInfo={[
           { label: 'اسم المستخدم', value: sellerData.name },

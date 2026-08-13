@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import type { CreateSimBatchRequest, SimBatchResult } from '../api/types';
 import { captureError } from '../lib/monitor.ts';
 import { useMountedRef } from './useMountedRef';
+import { notifyInventoryUpdated } from '../services/realtime';
 import {
   enqueueOffline, getNetworkStatus, getQueueStats, onNetworkChange, onQueueChanged,
   registerSyncHandlers, syncNow, OfflineQueueItem,
@@ -220,6 +221,14 @@ export function useManagerState(role: string | null) {
             .then((data: any) => { if (mountedRef.current) setSellers(data ?? []); })
             .catch((err) => captureError(err, 'handleAddSimBatch:refreshSellers'));
         }
+        // Realtime inventory: the agent/seller overview cards must reflect the
+        // new allocation immediately. Broadcast the change so every open view
+        // (this tab + other tabs via BroadcastChannel) can refresh its data.
+        notifyInventoryUpdated({
+          ownerRole: payload.owner_role,
+          ownerId: payload.owner_id,
+          source: 'batch-add',
+        });
       }
       return created;
     } catch (err) {

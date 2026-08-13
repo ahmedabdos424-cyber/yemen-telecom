@@ -499,6 +499,7 @@ export default function SellerAccount({
         setFontSize={setFontSize}
         biometricEnabled={biometricEnabled}
         onToggleBiometric={handleToggleBiometric}
+        biometricInAppearance={true}
         onChangePassword={() => { setSettingsOpen(false); setPasswordOpen(true); }}
         simNotifications={simNotifications}
         onToggleSimNotifications={handleToggleSimNotifications}

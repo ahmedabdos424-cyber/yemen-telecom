@@ -35,11 +35,22 @@ import { logger, setLogContext, clearLogContext } from './logger';
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 // Environment validation — fail fast on missing secrets
-const requiredEnv = ['JWT_SECRET', 'REFRESH_SECRET', 'CSRF_SECRET'];
+const requiredEnv = ['JWT_SECRET', 'REFRESH_SECRET', 'CSRF_SECRET', 'BLACKLIST_HMAC_SECRET'];
 const missingEnv = requiredEnv.filter(k => !process.env[k]);
 if (missingEnv.length > 0) {
   logger.error(`FATAL: Missing required environment variables: ${missingEnv.join(', ')}`);
   process.exit(1);
+}
+
+// APK self-update metadata — not fatal (the API still serves), but warn loudly
+// so a clean deploy that forgets these doesn't silently break the updater.
+const updateEnv = [
+  'APP_VERSION', 'APP_VERSION_CODE', 'APP_APK_URL', 'APP_APK_SHA256',
+  'APP_APK_SIZE', 'APP_UPDATE_NOTES', 'APP_UPDATE_REQUIRED', 'APP_APK_BUCKET', 'APP_APK_OBJECT',
+];
+const missingUpdateEnv = updateEnv.filter(k => !process.env[k]);
+if (missingUpdateEnv.length > 0) {
+  logger.warn(`[ENV] Missing APK self-update environment variables: ${missingUpdateEnv.join(', ')} — GET /api/app-version will serve empty values`);
 }
 
 const envMode = process.env.NODE_ENV || 'development';
@@ -285,8 +296,24 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-// Apply JWT auth to all /api routes except auth and the public self-updater endpoints.
-app.use(/^\/api\/(?!auth|app-version|app-update-installed).*/, authenticateToken);
+// Apply JWT auth to all /api routes EXCEPT an explicit allowlist of public
+// endpoints. Using exact paths (not a prefix regex) prevents future routes such
+// as /api/authorize-x or /api/app-version-admin from accidentally becoming
+// unauthenticated. /api/auth/refresh stays public so an expired access token can
+// still be renewed; /api/auth/me and /api/auth/logout perform their own JWT
+// verification and now also benefit from the shared session/status checks.
+const PUBLIC_API_PATHS = new Set<string>([
+  '/auth/login',
+  '/auth/refresh',
+  '/app-version',
+  '/app-update-installed',
+]);
+app.use('/api', (req, res, next) => {
+  if (PUBLIC_API_PATHS.has(req.path)) {
+    return next();
+  }
+  return authenticateToken(req, res, next);
+});
 
 // Maintenance mode middleware — block mutation requests when maintenance_mode is on
 app.use('/api', async (req: express.Request, res: express.Response, next: express.NextFunction) => {

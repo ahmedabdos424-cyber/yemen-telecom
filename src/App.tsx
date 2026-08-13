@@ -11,7 +11,7 @@ import ErrorBoundary from './components/shared/ErrorBoundary';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
 import { useToast, ToastContainer } from './hooks/useToast';
 import { SESSION_EXPIRED_EVENT, ensureServerIsAwake } from './api/client';
-import { initPushNotifications } from './services/pushNotifications';
+import { initPushNotifications, removePushListeners } from './services/pushNotifications';
 import { connectRealtime, disconnectRealtime, onRealtimeEvent } from './services/realtime';
 const DashboardView = lazy(() => import('./components/DashboardView'));
 const SIMsView = lazy(() => import('./components/SIMsView'));
@@ -73,7 +73,10 @@ function AuthenticatedApp() {
     }).then((ok) => {
       if (ok) toastInfo('الإشعارات مفعلة', 'ستصلك تنبيهات النظام المهمة فورياً');
     }).catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      void removePushListeners();
+    };
   }, [role, toastInfo]);
 
   // Realtime live updates: keep the WebSocket connected while logged in and

@@ -275,9 +275,9 @@ From `server/.env.example`:
 
 - `NODE_ENV`, `API_PORT`, `CORS_ORIGIN`
 - `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
-- `JWT_SECRET`, `REFRESH_SECRET`, `CSRF_SECRET` (64 hex chars each — generate with `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`)
+- `JWT_SECRET`, `REFRESH_SECRET`, `CSRF_SECRET`, `BLACKLIST_HMAC_SECRET` (64 hex chars each — generate with `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`)
 - `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `UPLOAD_BUCKET` for uploads
-- `APP_VERSION`, `APP_VERSION_CODE` for self-update endpoint
+- `APP_VERSION`, `APP_VERSION_CODE`, `APP_APK_URL`, `APP_APK_SHA256`, `APP_APK_SIZE`, `APP_UPDATE_NOTES`, `APP_UPDATE_REQUIRED`, `APP_APK_BUCKET`, `APP_APK_OBJECT` for the self-update endpoint — MUST match `android/app/build.gradle` (`versionName`/`versionCode`) and `server/.env.example`
 - `BACKUP_S3_*` for S3 backup storage (optional in dev)
 
 ## Available Skills

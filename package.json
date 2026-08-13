@@ -18,7 +18,7 @@
     "lint": "tsc --noEmit",
     "server": "tsx watch server/src/index.ts",
     "db:seed": "tsx server/src/seed.ts",
-    "tunnel": "node tunnel.js",
+    "tunnel": "powershell -File start-tunnel.ps1",
     "tunnel:ps": "powershell -File start-tunnel.ps1",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -64,8 +64,7 @@
     "@vitest/coverage-v8": "4.1.9",
     "esbuild": "^0.25.0",
     "jsdom": "^29.1.1",
-    "ngrok": "^5.0.0-beta.2",
-    "sharp": "^0.34.5",
+    "sharp": "0.35.3",
     "tailwindcss": "4.3.1",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
@@ -78,9 +77,8 @@
   "allowScripts": {
     "esbuild@0.25.12": true,
     "esbuild@0.28.1": true,
-    "ngrok@5.0.0-beta.2": true,
     "protobufjs@7.6.4": true,
-    "sharp@0.34.5": true,
+    "sharp@0.35.3": true,
     "tesseract.js@7.0.0": true
   },
   "overrides": {
@@ -88,6 +86,6 @@
     "body-parser": "^1.20.3",
     "uuid": "^11.1.1",
     "extract-zip": "^2.0.1",
-    "sharp": "^0.33.5"
+    "sharp": "0.35.3"
   }
 }

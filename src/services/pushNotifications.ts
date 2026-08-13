@@ -1,4 +1,4 @@
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
 import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { api } from '../api/client';
 import { captureError } from '../lib/monitor';
@@ -12,6 +12,7 @@ export interface PushNotificationPayload {
 }
 
 let messageHandler: ((payload: PushNotificationPayload) => void) | null = null;
+let notificationListenerHandle: PluginListenerHandle | null = null;
 
 function isNative(): boolean {
   return Capacitor.isNativePlatform();
@@ -71,7 +72,7 @@ export async function initPushNotifications(onMessage?: (payload: PushNotificati
       // login/startup when connectivity returns.
       captureError(err, 'registerDeviceToken');
     }
-    await FirebaseMessaging.addListener('notificationReceived', (event) => {
+    notificationListenerHandle = await FirebaseMessaging.addListener('notificationReceived', (event) => {
       const notif = event.notification as { title?: string; body?: string; data?: unknown } | undefined;
       const payload: PushNotificationPayload = {
         title: notif?.title ?? '',
@@ -87,8 +88,25 @@ export async function initPushNotifications(onMessage?: (payload: PushNotificati
   }
 }
 
+// Tear down the in-process notification listener and clear the message
+// handler. Call this on logout / role change so listeners don't accumulate
+// across repeated logins (Capacitor listeners are not auto-removed). It does
+// NOT unregister the device token from the server.
+export async function removePushListeners(): Promise<void> {
+  messageHandler = null;
+  if (notificationListenerHandle) {
+    try {
+      await notificationListenerHandle.remove();
+    } catch {
+      /* listener may already be detached */
+    }
+    notificationListenerHandle = null;
+  }
+}
+
 export async function unregisterPushNotifications(): Promise<void> {
   if (!isNative()) return;
+  await removePushListeners();
   const token = getStoredPushToken();
   if (token) {
     try {

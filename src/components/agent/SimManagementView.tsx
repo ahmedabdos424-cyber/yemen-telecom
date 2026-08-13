@@ -51,9 +51,6 @@ export default function SimManagementView({
     let matchesStatus = true;
     if (statusFilter === 'available') matchesStatus = sim.status === 'available';
     else if (statusFilter === 'sold') matchesStatus = sim.status === 'sold';
-    else if (statusFilter === 'reserved') matchesStatus = sim.status === 'reserved';
-    else if (statusFilter === 'allocated') matchesStatus = (sim.status as any) === 'allocated' || (sim.status as any) === 'suspended';
-    else if (statusFilter === 'damaged') matchesStatus = (sim.status as any) === 'damaged' || (sim.status as any) === 'inactive';
 
     return matchesSearch && matchesOperator && matchesStatus;
   });
@@ -151,10 +148,7 @@ export default function SimManagementView({
         {[
           { id: 'all', label: 'الكل' },
           { id: 'available', label: 'المتوفر' },
-          { id: 'sold', label: 'المباع' },
-          { id: 'reserved', label: 'المحجوز' },
-          { id: 'allocated', label: 'المخصص' },
-          { id: 'damaged', label: 'التالف' }
+          { id: 'sold', label: 'المباع' }
         ].map(tab => (
           <button
             key={tab.id}

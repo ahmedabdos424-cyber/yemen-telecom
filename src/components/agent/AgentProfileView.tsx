@@ -475,6 +475,7 @@ export default function AgentProfileView({
         username={username}
         biometricEnabled={biometricEnabled}
         handleToggleBiometric={handleToggleBiometric}
+        biometricInAppearance={true}
       />
 
       {/* Logout Confirmation Dialog */}

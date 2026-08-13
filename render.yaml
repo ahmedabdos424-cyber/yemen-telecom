@@ -41,6 +41,8 @@ services:
         sync: false
       - key: CSRF_SECRET
         sync: false
+      - key: BLACKLIST_HMAC_SECRET
+        sync: false
       - key: CORS_ORIGIN
         sync: false
       - key: UPLOAD_DIR
@@ -67,3 +69,24 @@ services:
         value: https://e26574aa3569ad8263215c8c58a3be4b@o4511821570310144.ingest.de.sentry.io/4511821594034256
       - key: VITE_SENTRY_DSN
         value: https://e26574aa3569ad8263215c8c58a3be4b@o4511821570310144.ingest.de.sentry.io/4511821594034256
+      # APK self-update metadata (consumed by GET /api/app-version).
+      # These MUST stay in sync with android/app/build.gradle (versionName / versionCode)
+      # and with server/.env.example. A mismatch silently breaks the updater (rule #2).
+      - key: APP_VERSION
+        sync: false
+      - key: APP_VERSION_CODE
+        sync: false
+      - key: APP_APK_URL
+        sync: false
+      - key: APP_APK_SHA256
+        sync: false
+      - key: APP_APK_SIZE
+        sync: false
+      - key: APP_UPDATE_NOTES
+        sync: false
+      - key: APP_UPDATE_REQUIRED
+        sync: false
+      - key: APP_APK_BUCKET
+        sync: false
+      - key: APP_APK_OBJECT
+        sync: false

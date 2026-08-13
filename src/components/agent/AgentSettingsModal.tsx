@@ -17,6 +17,7 @@ interface AgentSettingsModalProps {
   username: string;
   biometricEnabled?: boolean;
   handleToggleBiometric?: () => void;
+  biometricInAppearance?: boolean;
 }
 
 export default function AgentSettingsModal({
