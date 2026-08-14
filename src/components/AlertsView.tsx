@@ -235,18 +235,22 @@ export default function AlertsView({
                 <div className="flex items-center gap-3">
                   <span className="material-symbols-outlined text-gray-600 text-lg">sms</span>
                   <div>
-                    <span className="text-xs font-semibold text-gray-900 block">رسائل الجوال SMS</span>
+                    <span className="text-xs font-semibold text-gray-900 block flex items-center gap-2">رسائل الجوال SMS
+                      <span className="badge badge-pending">قريباً</span>
+                    </span>
                     <span className="text-[11px] text-gray-500">للحالات والتحذيرات الحرجة فقط</span>
+                    <span className="text-[10px] text-amber-600 block mt-1">⏳ قيد التطوير: يتطلب ربط بوابة رسائل SMS (SMS Gateway) في الخادم.</span>
                   </div>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
                     checked={settings.smsAlertsEnabled}
-                    onChange={(e) => onUpdateSettings({ ...settings, smsAlertsEnabled: e.target.checked })}
+                    onChange={(e) => Promise.resolve(onUpdateSettings({ ...settings, smsAlertsEnabled: e.target.checked })).catch(() => {})}
+                    disabled
                     className="sr-only peer"
                   />
-                  <div className={`w-12 h-7 bg-gray-200 peer-focus:outline-none rounded-full transition-colors relative after:content-[''] after:absolute after:top-[4px] after:right-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${
+                  <div className={`w-12 h-7 bg-gray-200 peer-focus:outline-none rounded-full transition-colors relative after:content-[''] after:absolute after:top-[4px] after:right-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all disabled:opacity-40 ${
                     settings.smsAlertsEnabled ? 'bg-primary border-primary after:-translate-x-5' : 'after:translate-x-0'
                   }`}></div>
                 </label>
@@ -256,18 +260,22 @@ export default function AlertsView({
                 <div className="flex items-center gap-3">
                   <span className="material-symbols-outlined text-gray-600 text-lg">mail</span>
                   <div>
-                    <span className="text-xs font-semibold text-gray-900 block">بريد نظام التقارير</span>
+                    <span className="text-xs font-semibold text-gray-900 block flex items-center gap-2">بريد نظام التقارير
+                      <span className="badge badge-pending">قريباً</span>
+                    </span>
                     <span className="text-[11px] text-gray-500">ملخص يومي ودوري لأداء العقد</span>
+                    <span className="text-[10px] text-amber-600 block mt-1">⏳ قيد التطوير: يتطلب ربط خادم بريد (SMTP) في الخادم.</span>
                   </div>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
                     checked={settings.emailAlertsEnabled}
-                    onChange={(e) => onUpdateSettings({ ...settings, emailAlertsEnabled: e.target.checked })}
+                    onChange={(e) => Promise.resolve(onUpdateSettings({ ...settings, emailAlertsEnabled: e.target.checked })).catch(() => {})}
+                    disabled
                     className="sr-only peer"
                   />
-                  <div className={`w-12 h-7 bg-gray-200 peer-focus:outline-none rounded-full transition-colors relative after:content-[''] after:absolute after:top-[4px] after:right-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${
+                  <div className={`w-12 h-7 bg-gray-200 peer-focus:outline-none rounded-full transition-colors relative after:content-[''] after:absolute after:top-[4px] after:right-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all disabled:opacity-40 ${
                     settings.emailAlertsEnabled ? 'bg-primary border-primary after:-translate-x-5' : 'after:translate-x-0'
                   }`}></div>
                 </label>
@@ -285,7 +293,7 @@ export default function AlertsView({
                   <input
                     type="checkbox"
                     checked={settings.appNotificationsEnabled}
-                    onChange={(e) => onUpdateSettings({ ...settings, appNotificationsEnabled: e.target.checked })}
+                    onChange={(e) => Promise.resolve(onUpdateSettings({ ...settings, appNotificationsEnabled: e.target.checked })).catch(() => {})}
                     className="sr-only peer"
                   />
                   <div className={`w-12 h-7 bg-gray-200 peer-focus:outline-none rounded-full transition-colors relative after:content-[''] after:absolute after:top-[4px] after:right-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${

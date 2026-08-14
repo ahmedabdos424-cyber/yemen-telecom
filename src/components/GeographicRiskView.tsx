@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import * as d3 from 'd3';
-import { AuditLog } from '../types';
+import type { AuditLogEntry, DuplicateIdentityRow } from '../api/types';
 import { api } from '../api/client';
 import ConfirmModal from './shared/ConfirmModal';
 import { 
@@ -37,6 +37,40 @@ interface OperationLogItem {
   details: string;
 }
 
+interface GraphNode {
+  id: string;
+  label: string;
+  type: 'city' | 'checkpoint' | 'identity';
+  color: string;
+  size: number;
+  risk: string;
+  region?: string;
+  idNo?: string;
+  sims?: number;
+  flagged?: boolean;
+  blocked?: boolean;
+  reviewStatus?: string;
+  x?: number;
+  y?: number;
+  fx?: number | null;
+  fy?: number | null;
+}
+
+interface SimLink {
+  source: string | GraphNode;
+  target: string | GraphNode;
+  value: number;
+}
+
+declare global {
+  interface Window {
+    zoomInGraph?: () => void;
+    zoomOutGraph?: () => void;
+    zoomResetGraph?: () => void;
+    zoomRestartPhysics?: () => void;
+  }
+}
+
 function toOperationStatus(status: string): OperationLogItem['status'] {
   if (status === 'verified' || status === 'normal') return 'success';
   return 'warning';
@@ -52,7 +86,7 @@ function downloadCsv(content: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-function identityCsvRows(rows: any[]): string[] {
+function identityCsvRows(rows: DuplicateIdentityRow[]): string[] {
   const header = ['رقم الهوية', 'الاسم', 'عدد الشرائح', 'عدد التكرارات', 'مستوى الخطورة', 'المنطقة', 'الحالة'];
   const body = rows.map((r) => [
     r.idNo, r.name, r.simsCount, r.duplicatesCount, r.risk, r.region,
@@ -69,12 +103,12 @@ function formatLastActivity(iso?: string | null): string {
 }
 
 export default function GeographicRiskView() {
-  const [identities, setIdentities] = useState<any[]>([]);
-  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [identities, setIdentities] = useState<DuplicateIdentityRow[]>([]);
+  const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [searchWord, setSearchWord] = useState('');
-  const [selectedNode, setSelectedNode] = useState<any>(null);
+  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [dimensions, setDimensions] = useState({ width: 320, height: 280 });
   const [blockConfirm, setBlockConfirm] = useState<{idNo: string; name: string} | null>(null);
   const [actionLoading, setActionLoading] = useState<{ [key: string]: boolean }>({});
@@ -97,7 +131,7 @@ export default function GeographicRiskView() {
         ]);
         if (!mounted) return;
         setIdentities(idents || []);
-        setLogs((auditLogs || []) as any);
+        setLogs(auditLogs || []);
       } catch (err: unknown) {
         if (!mounted) return;
         setFetchError(err instanceof Error ? err.message : String(err));
@@ -114,10 +148,10 @@ export default function GeographicRiskView() {
   // تنبيه أمني فوري عند رؤية هوية خطر عالٍ جداً بعد تحميل البيانات
   useEffect(() => {
     if (loading || highRiskNotifiedRef.current) return;
-    const highRisk = identities.filter((i: any) => i.risk === 'مرتفع جداً');
+    const highRisk = identities.filter((i) => i.risk === 'مرتفع جداً');
     if (highRisk.length > 0) {
       highRiskNotifiedRef.current = true;
-      const names = highRisk.slice(0, 3).map((i: any) => i.name).join('، ');
+      const names = highRisk.slice(0, 3).map((i) => i.name).join('، ');
       toastWarning(
         'تحذير أمني فوري',
         `${highRisk.length} هوية مرتبطة بخطر عالٍ جداً في الشبكة (${names}${highRisk.length > 3 ? ' …' : ''}). تم توجيهها إلى مراجعة فورية.`
@@ -127,11 +161,11 @@ export default function GeographicRiskView() {
 
   const summaryStats = useMemo(() => {
     const total = identities.length;
-    const highRiskCount = identities.filter((i: any) => i.risk === 'مرتفع جداً').length;
-    const mediumRiskCount = identities.filter((i: any) => i.risk === 'مرتفع').length;
-    const lowRiskCount = identities.filter((i: any) => i.risk === 'متوسط').length;
+    const highRiskCount = identities.filter((i) => i.risk === 'مرتفع جداً').length;
+    const mediumRiskCount = identities.filter((i) => i.risk === 'مرتفع').length;
+    const lowRiskCount = identities.filter((i) => i.risk === 'متوسط').length;
     const riskPct = total > 0 ? ((highRiskCount / total) * 100) : 0;
-    const underReview = identities.filter((i: any) => i.duplicatesCount >= 3).length;
+    const underReview = identities.filter((i) => i.duplicatesCount >= 3).length;
     const underReviewPct = total > 0 ? ((underReview / total) * 100) : 0;
     const highBarPct = total > 0 ? (highRiskCount / total * 100) : 0;
     const medBarPct = total > 0 ? (mediumRiskCount / total * 100) : 0;
@@ -145,7 +179,7 @@ export default function GeographicRiskView() {
     : summaryStats.highRiskCount > 0
       ? 'bg-orange-100 text-orange-700 border border-orange-200'
       : 'bg-emerald-100 text-emerald-700 border border-emerald-200';
-  const distinctRegionsCount = new Set(identities.map((i: any) => i.region).filter(Boolean)).size;
+  const distinctRegionsCount = new Set(identities.map((i) => i.region).filter(Boolean)).size;
 
   // Real operations feed derived from the audit-log API (no hardcoded entries)
   const activeLogs: OperationLogItem[] = useMemo(() => {
@@ -192,11 +226,11 @@ export default function GeographicRiskView() {
       await api.flagDuplicateIdentity(idNo, { name });
       toastSuccess(`تم إرسال بلاغ أمني لإشتباه الهوية: ${name} (ID: ${idNo}) إلى عقد المراجعة الفورية ورُفع بمستوى التحذير.`);
       // Reflect action in the local identities table.
-      setIdentities((prev) => prev.map((i: any) => i.idNo === idNo ? { ...i, flagged: true, reviewStatus: 'flagged' } : i));
+      setIdentities((prev) => prev.map((i) => i.idNo === idNo ? { ...i, flagged: true, reviewStatus: 'flagged' } : i));
       // Refresh audit log feed from server.
       try {
         const auditLogs = await api.getAuditLogs();
-        if (Array.isArray(auditLogs)) setLogs(auditLogs as any);
+        if (Array.isArray(auditLogs)) setLogs(auditLogs);
       } catch { /* non-fatal */ }
     } catch (err: unknown) {
       toastError(err instanceof Error ? err.message : String(err));
@@ -217,10 +251,10 @@ export default function GeographicRiskView() {
       await api.blockDuplicateIdentity(idNo, { name });
       toastSuccess(`تم تجميد وحظر الهوية رقم ${idNo} (${name}) وإيقاف جميع الشرائح المرتبطة بها مؤقتاً.`);
       // Reflect action in the local identities table.
-      setIdentities((prev) => prev.map((i: any) => i.idNo === idNo ? { ...i, blocked: true, flagged: true, reviewStatus: 'blocked' } : i));
+      setIdentities((prev) => prev.map((i) => i.idNo === idNo ? { ...i, blocked: true, flagged: true, reviewStatus: 'blocked' } : i));
       try {
         const auditLogs = await api.getAuditLogs();
-        if (Array.isArray(auditLogs)) setLogs(auditLogs as any);
+        if (Array.isArray(auditLogs)) setLogs(auditLogs);
       } catch { /* non-fatal */ }
     } catch (err: unknown) {
       toastError(err instanceof Error ? err.message : String(err));
@@ -243,15 +277,15 @@ export default function GeographicRiskView() {
     svg.selectAll('*').remove(); // clear contents before update
 
     // Map region names from API data to dynamic node IDs
-    const regionNames = [...new Set(identities.map((m: any) => m.region).filter(Boolean))];
+    const regionNames = [...new Set(identities.map((m) => m.region).filter(Boolean))];
     const regionsMap: Record<string, string> = {};
     regionNames.forEach((r: string, idx: number) => { regionsMap[r] = `region-${idx}`; });
 
     // 1. Build Nodes
-    const baseNodes = [
-      ...Object.entries(regionsMap).map(([regionName, regionId]) => {
-        const regionIdentities = identities.filter((m: any) => m.region === regionName);
-        const hrc = regionIdentities.filter((m: any) => m.risk === 'مرتفع جداً').length;
+    const baseNodes: GraphNode[] = [
+      ...Object.entries(regionsMap).map(([regionName, regionId]): GraphNode => {
+        const regionIdentities = identities.filter((m) => m.region === regionName);
+        const hrc = regionIdentities.filter((m) => m.risk === 'مرتفع جداً').length;
         const riskLevel: string = hrc > 2 ? 'مرتفع جداً' : hrc > 0 ? 'متوسط' : 'منخفض';
         const color = riskLevel === 'مرتفع جداً' ? '#ef4444' : riskLevel === 'متوسط' ? '#f59e0b' : '#3b82f6';
         return { id: regionId, label: regionName, type: 'city', color, size: 24, risk: riskLevel };
@@ -259,7 +293,7 @@ export default function GeographicRiskView() {
       { id: 'telecom-backbone', label: 'بوابة المراقبة والربط', type: 'checkpoint', color: '#64748b', size: 18, risk: 'آمن' }
     ];
 
-    const identityNodes = identities.map(m => {
+    const identityNodes: GraphNode[] = identities.map((m): GraphNode => {
       const parentId = regionsMap[m.region] || 'telecom-backbone';
       return {
         id: m.idNo,
@@ -277,7 +311,7 @@ export default function GeographicRiskView() {
     const graphNodes = [...baseNodes, ...identityNodes];
 
     // 2. Build Links representation
-    const graphLinks = [
+    const graphLinks: SimLink[] = [
       ...baseNodes.filter(n => n.id !== 'telecom-backbone').map(n => ({ source: 'telecom-backbone', target: n.id, value: 2 })),
       
       ...identities.map(m => ({
@@ -332,12 +366,12 @@ export default function GeographicRiskView() {
 
     // Draw Node components
     const node = mainGroup.append('g')
-      .selectAll('.node')
+      .selectAll<SVGGElement, GraphNode>('.node')
       .data(simNodes)
-      .join('g')
+      .join<SVGGElement>('g')
       .attr('class', 'node')
       .style('cursor', 'pointer')
-      .call(d3.drag<any, any>()
+      .call(d3.drag<SVGGElement, GraphNode, GraphNode>()
         .on('start', dragstarted)
         .on('drag', dragged)
         .on('end', dragended)
@@ -391,36 +425,36 @@ export default function GeographicRiskView() {
       .text(d => d.label);
 
     // Force simulation configurations
-    const simulation = d3.forceSimulation<any>(simNodes)
-      .force('link', d3.forceLink<any, any>(simLinks).id(d => d.id).distance(110))
+    const simulation = d3.forceSimulation<GraphNode>(simNodes)
+      .force('link', d3.forceLink<GraphNode, SimLink>(simLinks).id(d => d.id).distance(110))
       .force('charge', d3.forceManyBody().strength(-220))
       .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collision', d3.forceCollide<any>().radius(d => d.size + 24));
+      .force('collision', d3.forceCollide<GraphNode>().radius(d => d.size + 24));
 
     simulation.on('tick', () => {
       link
-        .attr('x1', d => (d.source as any).x)
-        .attr('y1', d => (d.source as any).y)
-        .attr('x2', d => (d.target as any).x)
-        .attr('y2', d => (d.target as any).y);
+        .attr('x1', d => (d.source as GraphNode).x ?? 0)
+        .attr('y1', d => (d.source as GraphNode).y ?? 0)
+        .attr('x2', d => (d.target as GraphNode).x ?? 0)
+        .attr('y2', d => (d.target as GraphNode).y ?? 0);
 
       node
-        .attr('transform', d => `translate(${(d as any).x},${(d as any).y})`);
+        .attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
     });
 
     // Drag simulation triggers
-    function dragstarted(event: any, d: any) {
+    function dragstarted(event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>, d: GraphNode) {
       if (!event.active) simulation.alphaTarget(0.2).restart();
       d.fx = d.x;
       d.fy = d.y;
     }
 
-    function dragged(event: any, d: any) {
+    function dragged(event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>, d: GraphNode) {
       d.fx = event.x;
       d.fy = event.y;
     }
 
-    function dragended(event: any, d: any) {
+    function dragended(event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>, d: GraphNode) {
       if (!event.active) simulation.alphaTarget(0);
       d.fx = null;
       d.fy = null;
@@ -436,16 +470,16 @@ export default function GeographicRiskView() {
     svg.call(d3Zoom);
 
     // Expose control API methods to windows context
-    (window as any).zoomInGraph = () => {
-      svg.transition().duration(250).call(d3Zoom.scaleBy as any, 1.35);
+    window.zoomInGraph = () => {
+      svg.transition().duration(250).call((sel) => d3Zoom.scaleBy(sel, 1.35));
     };
-    (window as any).zoomOutGraph = () => {
-      svg.transition().duration(250).call(d3Zoom.scaleBy as any, 0.75);
+    window.zoomOutGraph = () => {
+      svg.transition().duration(250).call((sel) => d3Zoom.scaleBy(sel, 0.75));
     };
-    (window as any).zoomResetGraph = () => {
-      svg.transition().duration(250).call(d3Zoom.transform as any, d3.zoomIdentity);
+    window.zoomResetGraph = () => {
+      svg.transition().duration(250).call((sel) => d3Zoom.transform(sel, d3.zoomIdentity));
     };
-    (window as any).zoomRestartPhysics = () => {
+    window.zoomRestartPhysics = () => {
       simulation.alpha(1).restart();
     };
 
@@ -622,6 +656,8 @@ export default function GeographicRiskView() {
                             id: item.idNo,
                             label: item.name,
                             type: 'identity',
+                            color: item.risk === 'مرتفع جداً' ? '#dc2626' : '#eab308',
+                            size: 15,
                             region: item.region,
                             idNo: item.idNo,
                             sims: item.simsCount,
@@ -643,6 +679,8 @@ export default function GeographicRiskView() {
                               id: item.idNo,
                               label: item.name,
                               type: 'identity',
+                              color: item.risk === 'مرتفع جداً' ? '#dc2626' : '#eab308',
+                              size: 15,
                               region: item.region,
                               idNo: item.idNo,
                               sims: item.simsCount,
@@ -754,7 +792,7 @@ export default function GeographicRiskView() {
               <div className="absolute left-3 bottom-3 flex flex-col gap-1.5 z-20">
                 <button
                   type="button"
-                  onClick={() => (window as any).zoomInGraph?.()}
+                  onClick={() => window.zoomInGraph?.()}
                   className="btn-icon rounded-lg bg-slate-900/90 hover:bg-slate-850 border-slate-800 text-white hover:scale-105"
                   title="تكبير"
                 >
@@ -762,7 +800,7 @@ export default function GeographicRiskView() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => (window as any).zoomOutGraph?.()}
+                  onClick={() => window.zoomOutGraph?.()}
                   className="btn-icon rounded-lg bg-slate-900/90 hover:bg-slate-850 border-slate-800 text-white hover:scale-105"
                   title="تصغير"
                 >
@@ -770,7 +808,7 @@ export default function GeographicRiskView() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => (window as any).zoomResetGraph?.()}
+                  onClick={() => window.zoomResetGraph?.()}
                   className="btn-icon rounded-lg bg-slate-900/90 hover:bg-slate-850 border-slate-800 text-white hover:scale-105"
                   title="إعادة التمركز"
                 >
@@ -778,7 +816,7 @@ export default function GeographicRiskView() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => (window as any).zoomRestartPhysics?.()}
+                  onClick={() => window.zoomRestartPhysics?.()}
                   className="btn-icon rounded-lg bg-slate-900/90 hover:bg-slate-850 border-slate-800 text-white hover:scale-105"
                   title="تنشيط الجاذبية"
                 >
@@ -895,7 +933,7 @@ export default function GeographicRiskView() {
                       <>
                         <button
                           disabled={actionLoading[`flag-${selectedNode.idNo}`]}
-                          onClick={() => handleFlagRow(selectedNode.idNo, selectedNode.label)}
+                          onClick={() => handleFlagRow(selectedNode.idNo ?? '', selectedNode.label)}
                           className="w-full py-2.5 bg-red-100/50 hover:bg-red-100 text-secondary border border-red-200 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
                         >
                           <ShieldAlert size={14} />
@@ -903,7 +941,7 @@ export default function GeographicRiskView() {
                         </button>
                         <button
                           disabled={actionLoading[`block-${selectedNode.idNo}`]}
-                          onClick={() => handleBlockRow(selectedNode.idNo, selectedNode.label)}
+                          onClick={() => handleBlockRow(selectedNode.idNo ?? '', selectedNode.label)}
                           className="w-full py-2.5 bg-[#e02928] text-white rounded-lg flex items-center justify-center gap-1.5 hover:bg-red-700 shadow-sm transition-all cursor-pointer disabled:opacity-50"
                         >
                           <AlertTriangle size={14} />
@@ -915,7 +953,7 @@ export default function GeographicRiskView() {
                     <button
                       onClick={() => {
                         const regionRows = identities.filter(
-                          (i: any) => (selectedNode.region && i.region === selectedNode.region) || i.region === selectedNode.label || i.idNo === selectedNode.label || i.name === selectedNode.label
+                          (i) => (selectedNode.region && i.region === selectedNode.region) || i.region === selectedNode.label || i.idNo === selectedNode.label || i.name === selectedNode.label
                         );
                         if (regionRows.length === 0) { toastInfo('لا توجد هويات مسجلة لهذه العقدة للتصدير حالياً'); return; }
                         downloadCsv(identityCsvRows(regionRows).join('\n'), `تقرير_منطقة_${selectedNode.label}_${new Date().toISOString().slice(0, 10)}.csv`);

@@ -34,8 +34,6 @@ export default function SettingsView({
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [localThreshold, setLocalThreshold] = useState(settings.highRiskDuplicatesThreshold ?? 5);
   const [lockdownConfirm, setLockdownConfirm] = useState(false);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [biometricBusy, setBiometricBusy] = useState(false);
   const { toasts, dismissToast, toastError, toastSuccess, toastWarning } = useToast();
 
@@ -79,10 +77,10 @@ export default function SettingsView({
     try {
       const result = await api.toggleLockdown();
       setLockdownConfirm(false);
-      if (result.locked) {
-        onUpdateSettings({ ...settings, maintenanceMode: true });
-      } else {
-        onUpdateSettings({ ...settings, maintenanceMode: false });
+      try {
+        await onUpdateSettings({ ...settings, maintenanceMode: result.locked });
+      } catch {
+        setLockdownConfirm(false);
       }
     } catch (error) {
       captureError(error, 'handleLockdown');
@@ -90,11 +88,19 @@ export default function SettingsView({
     }
   };
 
+  const updateSetting = async (patch: Partial<SystemSettings>, silent = false) => {
+    const updated = { ...settings, ...patch };
+    try {
+      await onUpdateSettings(updated);
+      if (!silent) toastSuccess('تم حفظ الإعدادات بنجاح');
+    } catch (err) {
+      captureError(err, 'updateSetting');
+      toastError('تعذر حفظ الإعدادات، يرجى المحاولة لاحقاً');
+    }
+  };
+
   const handleToggle = (key: keyof SystemSettings) => {
-    onUpdateSettings({
-      ...settings,
-      [key]: !settings[key]
-    });
+    void updateSetting({ [key]: !settings[key] } as Partial<SystemSettings>);
   };
 
   const handleToggleBiometric = async () => {
@@ -137,17 +143,21 @@ export default function SettingsView({
             <div className="space-y-4">
               <div className="flex items-center justify-between py-2">
                 <div>
-                  <span className="text-xs font-semibold text-gray-900 block">المصادقة الثنائية الإلزامية (2FA)</span>
+                  <span className="text-xs font-semibold text-gray-900 block flex items-center gap-2">المصادقة الثنائية الإلزامية (2FA)
+                    <span className="badge badge-pending">قريباً</span>
+                  </span>
                   <span className="text-[11px] text-gray-500">إلزام جميع المدراء الإقليميين والموزعين بالرمز الإضافي عند الدخول.</span>
+                  <span className="text-[10px] text-amber-600 block mt-1">⏳ قيد التطوير: يتطلب ربط مزوّد مصادقة ثنائية (OTP/TOTP) في الخادم.</span>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
                     checked={settings.twoFAEnabled}
                     onChange={() => handleToggle('twoFAEnabled')}
+                    disabled
                     className="sr-only peer"
                   />
-                  <div className={`w-12 h-7 bg-gray-200 peer-focus:outline-none rounded-full transition-colors relative after:content-[''] after:absolute after:top-[4px] after:right-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${
+                  <div className={`w-12 h-7 bg-gray-200 peer-focus:outline-none rounded-full transition-colors relative after:content-[''] after:absolute after:top-[4px] after:right-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all disabled:opacity-40 ${
                     settings.twoFAEnabled ? 'bg-primary border-primary after:-translate-x-5' : 'after:translate-x-0'
                   }`}></div>
                 </label>
@@ -155,17 +165,21 @@ export default function SettingsView({
 
               <div className="flex items-center justify-between py-2 border-t border-gray-100 pt-3">
                 <div>
-                  <span className="text-xs font-semibold text-gray-900 block">تفعيل التحقق بخطوتين عبر البريد الإلكتروني</span>
+                  <span className="text-xs font-semibold text-gray-900 block flex items-center gap-2">تفعيل التحقق بخطوتين عبر البريد الإلكتروني
+                    <span className="badge badge-pending">قريباً</span>
+                  </span>
                   <span className="text-[11px] text-gray-500">إرسال رمز تحقق مؤقت للبريد الإلكتروني المعتمد عند تسجيل الدخول من جهاز جديد.</span>
+                  <span className="text-[10px] text-amber-600 block mt-1">⏳ قيد التطوير: يتطلب ربط خادم بريد (SMTP) لإرسال رموز التحقق.</span>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
                     checked={settings.email2FAEnabled}
                     onChange={() => handleToggle('email2FAEnabled')}
+                    disabled
                     className="sr-only peer"
                   />
-                  <div className={`w-12 h-7 bg-gray-200 peer-focus:outline-none rounded-full transition-colors relative after:content-[''] after:absolute after:top-[4px] after:right-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${
+                  <div className={`w-12 h-7 bg-gray-200 peer-focus:outline-none rounded-full transition-colors relative after:content-[''] after:absolute after:top-[4px] after:right-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all disabled:opacity-40 ${
                     settings.email2FAEnabled ? 'bg-primary border-primary after:-translate-x-5' : 'after:translate-x-0'
                   }`}></div>
                 </label>
@@ -204,17 +218,21 @@ export default function SettingsView({
 
               <div className="flex items-center justify-between py-2 border-t border-gray-100 pt-3">
                 <div>
-                  <span className="text-xs font-semibold text-gray-900 block">إدارة الأجهزة الموثوقة</span>
+                  <span className="text-xs font-semibold text-gray-900 block flex items-center gap-2">إدارة الأجهزة الموثوقة
+                    <span className="badge badge-pending">قريباً</span>
+                  </span>
                   <span className="text-[11px] text-gray-500">تمكين التعرف التلقائي على الأجهزة الموثوقة لتسهيل وتحصين عمليات الدخول السريعة.</span>
+                  <span className="text-[10px] text-amber-600 block mt-1">⏳ قيد التطوير: يتطلب آلية توقيع وتوثيق الأجهزة في الخادم.</span>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
                     checked={settings.trustedDevicesEnabled}
                     onChange={() => handleToggle('trustedDevicesEnabled')}
+                    disabled
                     className="sr-only peer"
                   />
-                  <div className={`w-12 h-7 bg-gray-200 peer-focus:outline-none rounded-full transition-colors relative after:content-[''] after:absolute after:top-[4px] after:right-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${
+                  <div className={`w-12 h-7 bg-gray-200 peer-focus:outline-none rounded-full transition-colors relative after:content-[''] after:absolute after:top-[4px] after:right-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all disabled:opacity-40 ${
                     settings.trustedDevicesEnabled ? 'bg-primary border-primary after:-translate-x-5' : 'after:translate-x-0'
                   }`}></div>
                 </label>
@@ -222,17 +240,21 @@ export default function SettingsView({
 
               <div className="flex items-center justify-between py-2 border-t border-gray-100 pt-3">
                 <div>
-                  <span className="text-xs font-semibold text-gray-900 block">إجبار الرموز والمحارف الخاصة</span>
+                  <span className="text-xs font-semibold text-gray-900 block flex items-center gap-2">إجبار الرموز والمحارف الخاصة
+                    <span className="badge badge-pending">قريباً</span>
+                  </span>
                   <span className="text-[11px] text-gray-500">تطلب كلمات مرور قوية من الوكلاء لتفادي التخمين والثغرات الهندسية.</span>
+                  <span className="text-[10px] text-amber-600 block mt-1">⏳ قيد التطوير: لا يُطبَّق حالياً على الخادم.</span>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
                     checked={settings.passwordSpecialRequired}
                     onChange={() => handleToggle('passwordSpecialRequired')}
+                    disabled
                     className="sr-only peer"
                   />
-                  <div className={`w-12 h-7 bg-gray-200 peer-focus:outline-none rounded-full transition-colors relative after:content-[''] after:absolute after:top-[4px] after:right-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${
+                  <div className={`w-12 h-7 bg-gray-200 peer-focus:outline-none rounded-full transition-colors relative after:content-[''] after:absolute after:top-[4px] after:right-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all disabled:opacity-40 ${
                     settings.passwordSpecialRequired ? 'bg-primary border-primary after:-translate-x-5' : 'after:translate-x-0'
                   }`}></div>
                 </label>
@@ -240,17 +262,21 @@ export default function SettingsView({
 
               <div className="flex items-center justify-between py-2 border-t border-gray-100 pt-3">
                 <div>
-                  <span className="text-xs font-semibold text-gray-900 block">إلغاء كلمات المرور تلقائياً كل 90 يوماً</span>
+                  <span className="text-xs font-semibold text-gray-900 block flex items-center gap-2">إلغاء كلمات المرور تلقائياً كل 90 يوماً
+                    <span className="badge badge-pending">قريباً</span>
+                  </span>
                   <span className="text-[11px] text-gray-500">إلزام الموزعين والمشترين بتحديث الرمز السري للوقاية من تسرب الحسابات.</span>
+                  <span className="text-[10px] text-amber-600 block mt-1">⏳ قيد التطوير: لا يُطبَّق حالياً على الخادم.</span>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
                     checked={settings.passwordExpiry90Days}
                     onChange={() => handleToggle('passwordExpiry90Days')}
+                    disabled
                     className="sr-only peer"
                   />
-                  <div className={`w-12 h-7 bg-gray-200 peer-focus:outline-none rounded-full transition-colors relative after:content-[''] after:absolute after:top-[4px] after:right-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${
+                  <div className={`w-12 h-7 bg-gray-200 peer-focus:outline-none rounded-full transition-colors relative after:content-[''] after:absolute after:top-[4px] after:right-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all disabled:opacity-40 ${
                     settings.passwordExpiry90Days ? 'bg-primary border-primary after:-translate-x-5' : 'after:translate-x-0'
                   }`}></div>
                 </label>
@@ -288,7 +314,7 @@ export default function SettingsView({
                       min="1"
                       max="30"
                       value={settings.stockShortageThreshold ?? 5}
-                      onChange={(e) => onUpdateSettings({ ...settings, stockShortageThreshold: Number(e.target.value) })}
+                      onChange={(e) => updateSetting({ stockShortageThreshold: Number(e.target.value) }, true)}
                       className="w-full sm:w-40 accent-primary h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer text-primary"
                     />
                     <span className="text-xs font-bold text-primary font-mono bg-white border border-gray-200 px-2 py-1 rounded min-w-[2.5rem] text-center">
@@ -313,7 +339,7 @@ export default function SettingsView({
                       type="button"
                       onClick={() => {
                         const val = Math.max(10, (settings.inactiveSimsThreshold ?? 90) - 5);
-                        onUpdateSettings({ ...settings, inactiveSimsThreshold: val });
+                        updateSetting({ inactiveSimsThreshold: val });
                       }}
                       className="w-10 h-10 flex items-center justify-center bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 text-sm font-bold font-mono transition-colors cursor-pointer"
                     >
@@ -324,14 +350,14 @@ export default function SettingsView({
                       min="10"
                       max="360"
                       value={settings.inactiveSimsThreshold ?? 90}
-                      onChange={(e) => onUpdateSettings({ ...settings, inactiveSimsThreshold: Math.max(1, Number(e.target.value)) })}
+                      onChange={(e) => updateSetting({ inactiveSimsThreshold: Math.max(1, Number(e.target.value)) }, true)}
                       className="w-20 px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-center text-xs font-bold font-mono outline-none"
                     />
                     <button
                       type="button"
                       onClick={() => {
                         const val = Math.min(365, (settings.inactiveSimsThreshold ?? 90) + 5);
-                        onUpdateSettings({ ...settings, inactiveSimsThreshold: val });
+                        updateSetting({ inactiveSimsThreshold: val });
                       }}
                       className="w-10 h-10 flex items-center justify-center bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 text-sm font-bold font-mono transition-colors cursor-pointer"
                     >
@@ -355,7 +381,7 @@ export default function SettingsView({
                   <div className="flex items-center gap-3">
                     <select
                       value={settings.maxFailedLoginsThreshold ?? 3}
-                      onChange={(e) => onUpdateSettings({ ...settings, maxFailedLoginsThreshold: Number(e.target.value) })}
+                      onChange={(e) => updateSetting({ maxFailedLoginsThreshold: Number(e.target.value) }, true)}
                       className="px-3 py-1 bg-white border border-gray-200 rounded text-xs font-bold font-mono outline-none cursor-pointer"
                     >
                       <option value="2">2 محاولات</option>
@@ -398,7 +424,7 @@ export default function SettingsView({
                   <button
                     type="button"
                     onClick={() => {
-                      onUpdateSettings({ ...settings, highRiskDuplicatesThreshold: localThreshold });
+                      updateSetting({ highRiskDuplicatesThreshold: localThreshold });
                     }}
                     className="btn btn-sm btn-primary"
                   >
@@ -443,7 +469,7 @@ export default function SettingsView({
                 <div className="flex bg-gray-100 p-0.5 rounded-lg border border-gray-200">
                   <button
                     type="button"
-                    onClick={() => onUpdateSettings({ ...settings, identityRemindersFrequency: 'daily' })}
+                    onClick={() => updateSetting({ identityRemindersFrequency: 'daily' })}
                     className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
                       settings.identityRemindersFrequency === 'daily'
                         ? 'bg-white text-primary shadow-sm'
@@ -454,7 +480,7 @@ export default function SettingsView({
                   </button>
                   <button
                     type="button"
-                    onClick={() => onUpdateSettings({ ...settings, identityRemindersFrequency: 'weekly' })}
+                    onClick={() => updateSetting({ identityRemindersFrequency: 'weekly' })}
                     className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
                       settings.identityRemindersFrequency === 'weekly'
                         ? 'bg-white text-primary shadow-sm'
@@ -492,7 +518,7 @@ export default function SettingsView({
                 <label className="block text-xs font-bold text-gray-600 mb-1.5">فترة انتهاء صلاحية الجلسة للمسؤولين</label>
                 <select
                   value={settings.sessionTimeout}
-                  onChange={(e) => onUpdateSettings({ ...settings, sessionTimeout: e.target.value })}
+                  onChange={(e) => updateSetting({ sessionTimeout: e.target.value })}
                   className="w-full sm:w-64 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none cursor-pointer"
                 >
                   <option>10 دقائق</option>
@@ -589,21 +615,24 @@ export default function SettingsView({
 
       {/* Delete Account Section */}
       <div className="mt-8 pt-6 border-t border-slate-800/40">
-        <button
-          type="button"
-          onClick={() => setDeleteConfirmOpen(true)}
-          className="w-full flex items-center justify-between p-4 bg-red-950/10 border border-red-900/20 rounded-2xl hover:bg-red-950/30 transition-all group"
-        >
+        <div className="w-full flex items-center justify-between gap-3 p-4 bg-red-950/10 border border-red-900/20 rounded-2xl">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-red-600/10 border border-red-500/20 flex items-center justify-center text-red-500 group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-xl bg-red-600/10 border border-red-500/20 flex items-center justify-center text-red-500">
               <Trash2 size={18} />
             </div>
             <div className="text-right">
               <p className="text-sm font-bold text-red-400">حذف الحساب</p>
-              <p className="text-[10px] text-slate-500 mt-0.5">حذف الحساب وجميع البيانات المرتبطة به</p>
+              <p className="text-[10px] text-slate-500 mt-0.5">حذف الحساب الذاتي معطّل لدواعٍ أمنية ومالية. يرجى التواصل مع إدارة النظام لتقديم طلب إغلاق الحساب وتصفية المستحقات.</p>
             </div>
           </div>
-        </button>
+          <button
+            type="button"
+            onClick={() => toastWarning('حذف الحساب الذاتي معطّل لدواعٍ أمنية ومالية. يرجى التواصل مع إدارة النظام لتقديم طلب إغلاق الحساب وتصفية المستحقات.')}
+            className="shrink-0 px-4 py-2 text-xs font-bold text-red-400 border border-red-900/30 rounded-xl hover:bg-red-950/30 transition-all cursor-pointer"
+          >
+            تقديم طلب
+          </button>
+        </div>
       </div>
 
       <ConfirmModal
@@ -617,58 +646,6 @@ export default function SettingsView({
         variant="danger"
       />
 
-      {/* Delete Account Confirmation Modal */}
-      {deleteConfirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/65 backdrop-blur-sm"
-            onClick={() => { if (!deleting) setDeleteConfirmOpen(false); }}
-          />
-          <div className="relative w-full max-w-sm md:max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-slate-200 z-10 text-right font-sans max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-800/60">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-red-600/10 border border-red-500/20 flex items-center justify-center text-red-500">
-                  <Trash2 size={14} />
-                </div>
-                <h3 className="text-sm font-bold text-red-400">حذف الحساب</h3>
-              </div>
-              <button
-                onClick={() => { if (!deleting) setDeleteConfirmOpen(false); }}
-                className="p-2.5 text-slate-500 hover:text-slate-100 rounded-full transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
-                disabled={deleting}
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
-            </div>
-            <div className="mb-6">
-              <p className="text-xs text-slate-300 leading-relaxed">هل أنت متأكد من حذف الحساب؟ سيتم حذف جميع البيانات المرتبطة بهذا الحساب نهائياً ولا يمكن التراجع عن هذا الإجراء.</p>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={async () => {
-                  setDeleting(true);
-                  try {
-                    await api.deleteAccount();
-                    localStorage.clear();
-                    window.location.href = '/';
-                  } catch {
-                    toastError('لا يمكن حذف الحساب الحالي.\nيرجى التواصل مع مدير النظام.');
-                    setDeleting(false);
-                    setDeleteConfirmOpen(false);
-                  }
-                }}
-                disabled={deleting}
-                className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer text-center disabled:opacity-50"
-              >{deleting ? 'جاري الحذف...' : 'حذف'}</button>
-              <button
-                onClick={() => setDeleteConfirmOpen(false)}
-                disabled={deleting}
-                className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl border border-slate-700 transition-all cursor-pointer text-center"
-              >إلغاء</button>
-            </div>
-          </div>
-        </div>
-      )}
       {import.meta.env.DEV && (
         <div className="mt-6 p-4 border border-dashed border-red-500/30 rounded-xl">
           <p className="text-xs text-red-400 mb-2">DEV: اختبار Sentry</p>

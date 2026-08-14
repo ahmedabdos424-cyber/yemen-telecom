@@ -1,0 +1,10 @@
+{
+  "[markdown]": {
+    "editor.textDirection": "rtl",
+    "editor.wordWrap": "on"
+  },
+  "editor.wordWrap": "on",
+  "markdown.styles": [".vscode/markdown-rtl.css"],
+  "notification.visibility": "visible",
+  "java.configuration.updateBuildConfiguration": "interactive"
+}

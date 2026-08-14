@@ -225,7 +225,8 @@ router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), 
     res.status(201).json({
       seller: createdSeller,
       credentials: {
-        username: sellerUsername
+        username: sellerUsername,
+        password: sellerPassword
       }
     });
   } catch (err: unknown) {

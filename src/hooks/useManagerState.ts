@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { SIM, Agent, Seller, SystemAlert, Transaction, SystemSettings, ViewType } from '../types';
 import { api } from '../api/client';
-import type { CreateSimBatchRequest, SimBatchResult } from '../api/types';
+import type {
+  CreateSimBatchRequest, SimBatchResult, AdminSettingsResponse, UpdateSettingsRequest,
+  StatsResponse, SimRow, AgentRow, MappedSeller, AlertRow, MappedTransaction, DuplicateIdentityRow,
+} from '../api/types';
 import { captureError } from '../lib/monitor.ts';
 import { useMountedRef } from './useMountedRef';
 import { notifyInventoryUpdated } from '../services/realtime';
@@ -33,7 +36,7 @@ async function syncManagerSimItem(item: OfflineQueueItem): Promise<void> {
     if (q.batch && q.payload) {
       await api.createSimBatch(q.payload);
     } else if (q.sim) {
-      await api.createSim(q.sim as any);
+      await api.createSim({ ...q.sim, iccid: q.sim.iccid as string });
     }
   } else if (item.kind === 'updateSim' && q.id != null && q.fields) {
     await api.updateSim(q.id, q.fields);
@@ -76,7 +79,7 @@ export function useManagerState(role: string | null) {
   const [sellers, setSellers] = useState<Seller[]>(() => loadFromStorage('admin_sellers', []));
   const [alerts, setAlerts] = useState<SystemAlert[]>(() => loadFromStorage('admin_alerts', []));
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [stats, setStats] = useState<any>({});
+  const [stats, setStats] = useState<StatsResponse>({} as StatsResponse);
   const [settings, setSettings] = useState<SystemSettings>(() => loadFromStorage('admin_settings', DEFAULT_SETTINGS));
   const [currentView, setCurrentView] = useState<ViewType>(() => {
     return (localStorage.getItem('tele_manager_view') as ViewType) || 'dashboard';
@@ -126,14 +129,36 @@ export function useManagerState(role: string | null) {
     localStorage.setItem('tele_manager_view', view);
   };
 
+  const handleUpdateSettings = useCallback(async (updated: SystemSettings): Promise<AdminSettingsResponse> => {
+    if (mountedRef.current) setSettings(updated);
+    try {
+      const saved = await api.updateSettings(updated as unknown as UpdateSettingsRequest);
+      const cleaned = Object.fromEntries(
+        Object.entries(saved ?? {}).filter(([, v]) => v != null)
+      ) as Partial<SystemSettings>;
+      if (mountedRef.current) setSettings({ ...DEFAULT_SETTINGS, ...cleaned });
+      return saved;
+    } catch (err) {
+      captureError(err, 'updateSettings');
+      throw err;
+    }
+  }, [mountedRef]);
+
   const refreshData = useCallback(() => Promise.all([
-    api.getSims().then((data: any) => { if (mountedRef.current) setSims(data ?? []); }).catch((err) => captureError(err, 'refresh:getSims')),
-    api.getAgents().then((data: any) => { if (mountedRef.current) setAgents(data ?? []); }).catch((err) => captureError(err, 'refresh:getAgents')),
-    api.getSellers().then((data: any) => { if (mountedRef.current) setSellers(data ?? []); }).catch((err) => captureError(err, 'refresh:getSellers')),
-    api.getAlerts().then((data: any) => { if (mountedRef.current) setAlerts(data ?? []); }).catch((err) => captureError(err, 'refresh:getAlerts')),
-    api.getSettings().then((data: any) => { if (mountedRef.current) setSettings(data ?? {}); }).catch((err) => captureError(err, 'refresh:getSettings')),
-    api.getTransactions().then((data: any) => { if (mountedRef.current) setTransactions(data ?? []); }).catch((err) => captureError(err, 'refresh:getTransactions')),
-    api.getStats().then((data: any) => { if (mountedRef.current) setStats(data ?? {}); }).catch((err) => captureError(err, 'refresh:getStats')),
+    api.getSims().then((data: SimRow[]) => { if (mountedRef.current) setSims((data ?? []) as unknown as SIM[]); }).catch((err) => captureError(err, 'refresh:getSims')),
+    api.getAgents().then((data: AgentRow[]) => { if (mountedRef.current) setAgents((data ?? []) as unknown as Agent[]); }).catch((err) => captureError(err, 'refresh:getAgents')),
+    api.getSellers().then((data: MappedSeller[]) => { if (mountedRef.current) setSellers((data ?? []) as unknown as Seller[]); }).catch((err) => captureError(err, 'refresh:getSellers')),
+    api.getAlerts().then((data: AlertRow[]) => { if (mountedRef.current) setAlerts((data ?? []) as unknown as SystemAlert[]); }).catch((err) => captureError(err, 'refresh:getAlerts')),
+    api.getSettings().then((data: AdminSettingsResponse) => {
+      if (mountedRef.current) {
+        const cleaned = Object.fromEntries(
+          Object.entries(data ?? {}).filter(([, v]) => v != null)
+        ) as Partial<SystemSettings>;
+        setSettings({ ...DEFAULT_SETTINGS, ...cleaned });
+      }
+    }).catch((err) => captureError(err, 'refresh:getSettings')),
+    api.getTransactions().then((data: MappedTransaction[]) => { if (mountedRef.current) setTransactions((data ?? []) as unknown as Transaction[]); }).catch((err) => captureError(err, 'refresh:getTransactions')),
+    api.getStats().then((data: StatsResponse) => { if (mountedRef.current) setStats(data ?? ({} as StatsResponse)); }).catch((err) => captureError(err, 'refresh:getStats')),
   ]), [mountedRef]);
 
   useEffect(() => {
@@ -154,10 +179,10 @@ export function useManagerState(role: string | null) {
   useEffect(() => {
     if (role !== 'manager') return;
     const threshold = settings?.highRiskDuplicatesThreshold ?? 5;
-    api.getDuplicateIdentities().then((identities: any[]) => {
+    api.getDuplicateIdentities().then((identities: DuplicateIdentityRow[]) => {
       if (!mountedRef.current) return;
       const list = Array.isArray(identities) ? identities : [];
-      const critical = list.filter((i: any) => i.duplicatesCount > threshold);
+      const critical = list.filter((i) => i.duplicatesCount > threshold);
       setToasts(critical.map(item => ({
         id: `${item.idNo}-${threshold}`,
         title: '🚨 تنبيه: تسييل هوية مشبوهة',
@@ -180,8 +205,8 @@ export function useManagerState(role: string | null) {
       return;
     }
     try {
-      const created: any = await api.createSim(newSIM as any);
-      if (mountedRef.current) setSims(prev => [created, ...prev]);
+      const created = await api.createSim({ ...newSIM, iccid: newSIM.iccid as string });
+      if (mountedRef.current) setSims(prev => [created as unknown as SIM, ...prev]);
     } catch (err) {
       if (isNetworkError(err)) {
         try {
@@ -206,19 +231,19 @@ export function useManagerState(role: string | null) {
       return;
     }
     try {
-      const created: any = await api.createSimBatch(payload);
+      const created = await api.createSimBatch(payload);
       if (mountedRef.current) {
         api.getSims()
-          .then((data: any) => { if (mountedRef.current) setSims(data ?? []); })
+          .then((data: SimRow[]) => { if (mountedRef.current) setSims((data ?? []) as unknown as SIM[]); })
           .catch((err) => captureError(err, 'handleAddSimBatch:refresh'));
         // Realtime stock: the batch may have been assigned to an agent/seller,
         // so their counters must reflect the new allocation immediately.
         if (payload.owner_role && payload.owner_role !== 'admin') {
           api.getAgents()
-            .then((data: any) => { if (mountedRef.current) setAgents(data ?? []); })
+            .then((data: AgentRow[]) => { if (mountedRef.current) setAgents((data ?? []) as unknown as Agent[]); })
             .catch((err) => captureError(err, 'handleAddSimBatch:refreshAgents'));
           api.getSellers()
-            .then((data: any) => { if (mountedRef.current) setSellers(data ?? []); })
+            .then((data: MappedSeller[]) => { if (mountedRef.current) setSellers((data ?? []) as unknown as Seller[]); })
             .catch((err) => captureError(err, 'handleAddSimBatch:refreshSellers'));
         }
         // Realtime inventory: the agent/seller overview cards must reflect the
@@ -246,7 +271,7 @@ export function useManagerState(role: string | null) {
 
   const handleAddAgent = async (newAgent: Partial<Agent> & { username?: string; password?: string }) => {
     try {
-      const created: any = await api.createAgent({
+      const created = await api.createAgent({
         name: newAgent.name ?? '',
         full_name: newAgent.fullName,
         region: newAgent.region,
@@ -257,7 +282,7 @@ export function useManagerState(role: string | null) {
         username: newAgent.username,
         password: newAgent.password,
       });
-      if (mountedRef.current) setAgents(prev => [created?.agent ?? created, ...prev]);
+      if (mountedRef.current) setAgents(prev => [(created?.agent ?? created) as unknown as Agent, ...prev]);
       return created;
     } catch (err) {
       captureError(err, 'handleAddAgent');
@@ -319,7 +344,7 @@ export function useManagerState(role: string | null) {
   return {
     sims, agents, sellers, alerts, transactions, stats, settings, currentView,
     loading, apiError, toasts, offlinePending, isOnline,
-    setView, setSettings, setSims, dismissToast,
+    setView, setSettings, setSims, dismissToast, handleUpdateSettings,
     handleAddSIM, handleAddAgent, handleUpdateAgent,
     handleUpdateSeller, handleAddBalance, handleResolveAlert,
     handleUpdateSIM, handleAddSimBatch, refreshData,

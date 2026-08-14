@@ -11,18 +11,21 @@ import { getUniqueViolationKind } from '../helpers/dbErrors';
 
 const router = Router();
 
-router.get('/', requireRole('manager', 'agent'), async (req: Request, res: Response) => {
+router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
   try {
     const { page, limit, offset } = getPagination(req);
+    const isAgent = req.user?.role === 'agent';
+    const whereClause = isAgent ? 'WHERE user_id = $1' : '';
+    const params = isAgent && req.user ? [req.user.id] : [];
     if (req.query.page || req.query.limit) {
       const result = await paginatedQuery<any>(
-        'SELECT * FROM agents ORDER BY id',
-        'SELECT COUNT(*) FROM agents',
-        [], page, limit, offset
+        `SELECT * FROM agents ${whereClause} ORDER BY id`,
+        `SELECT COUNT(*) FROM agents ${whereClause}`,
+        params, page, limit, offset
       );
       return res.json(result);
     }
-    const result = await query('SELECT * FROM agents ORDER BY id');
+    const result = await query(`SELECT * FROM agents ${whereClause} ORDER BY id`, params);
     res.json(result.rows);
   } catch (err) {
     logger.error('Error fetching agents:', err);
@@ -98,10 +101,16 @@ function parseId(id: string, res: Response): number | null {
   return num;
 }
 
-router.get('/:id', requireRole('manager', 'agent'), async (req: Request, res: Response) => {
+router.get('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
   const agentId = parseId(req.params.id, res);
   if (agentId === null) return;
   try {
+    if (req.user?.role === 'agent') {
+      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
+      if (agentRes.rows.length === 0 || agentRes.rows[0].id !== agentId) {
+        return res.status(403).json({ error: 'Access denied: this agent does not belong to your account' });
+      }
+    }
     const result = await query('SELECT * FROM agents WHERE id = $1', [agentId]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Agent not found' });
@@ -121,7 +130,16 @@ router.delete('/:id', requireRole('manager'), async (req: Request, res: Response
     if (existing.rows.length === 0) {
       return res.status(404).json({ error: 'Agent not found' });
     }
-    await query('DELETE FROM agents WHERE id = $1', [agentId]);
+    const agent = existing.rows[0];
+    await transaction(async (client) => {
+      if (agent.user_id) {
+        await client.query(
+          `UPDATE users SET status = 'inactive', active_session_sid = NULL, session_expires_at = NOW() WHERE id = $1`,
+          [agent.user_id]
+        );
+      }
+      await client.query('UPDATE agents SET status = $1 WHERE id = $2', ['deleted', agentId]);
+    });
     res.json({ message: 'Agent deleted successfully' });
   } catch (err) {
     logger.error('Error deleting agent:', err);

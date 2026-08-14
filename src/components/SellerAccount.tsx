@@ -37,8 +37,6 @@ export default function SellerAccount({
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [currentPasswordInput, setCurrentPasswordInput] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -316,7 +314,7 @@ export default function SellerAccount({
        {/* Delete Account Button */}
        <button
          type="button"
-         onClick={() => setDeleteConfirmOpen(true)}
+         onClick={() => toastWarning('حذف الحساب الذاتي معطّل لدواعٍ أمنية ومالية. يرجى التواصل مع إدارة النظام لتقديم طلب إغلاق الحساب وتصفية المستحقات.')}
          className="w-full flex items-center justify-between p-4 bg-red-950/10 border border-red-900/20 rounded-2xl hover:bg-red-950/30 transition-all group"
        >
          <div className="flex items-center gap-3">
@@ -325,7 +323,7 @@ export default function SellerAccount({
            </div>
            <div className="text-right">
              <p className="text-sm font-bold text-red-400">حذف الحساب</p>
-             <p className="text-[10px] text-slate-500 mt-0.5">حذف الحساب وجميع البيانات المرتبطة به</p>
+             <p className="text-[10px] text-slate-500 mt-0.5">حذف الحساب الذاتي معطّل لدواعٍ أمنية ومالية. يرجى التواصل مع إدارة النظام لتقديم طلب إغلاق الحساب وتصفية المستحقات.</p>
            </div>
          </div>
          <ChevronLeft size={16} className="text-slate-500 group-hover:text-slate-100 transition-colors" />
@@ -508,70 +506,6 @@ export default function SellerAccount({
         onLogout={() => { if (onConfirmLogout) onConfirmLogout(); else onLogout(); }}
       />
 
-      {/* Delete Account Confirmation */}
-      <AnimatePresence>
-        {deleteConfirmOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="حذف الحساب">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => { if (!deleting) setDeleteConfirmOpen(false); }}
-              className="absolute inset-0 bg-black/65 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ scale: 0.95, y: 15 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 15 }}
-              className="relative w-full max-w-sm md:max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-slate-200 z-10 text-right font-sans max-h-[90vh] overflow-y-auto"
-              dir="rtl"
-            >
-              <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-800/60">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-red-600/10 border border-red-500/20 flex items-center justify-center text-red-500">
-                    <Trash2 size={14} />
-                  </div>
-                  <h3 className="text-sm font-bold text-red-400">حذف الحساب</h3>
-                </div>
-                <button
-                  onClick={() => { if (!deleting) setDeleteConfirmOpen(false); }}
-                  className="p-2.5 text-slate-500 hover:text-slate-100 rounded-full transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
-                  disabled={deleting}
-                >
-                  <X size={15} />
-                </button>
-              </div>
-              <div className="mb-6">
-                <p className="text-xs text-slate-300 leading-relaxed">هل أنت متأكد من حذف الحساب؟ سيتم حذف جميع البيانات المرتبطة بهذا الحساب نهائياً ولا يمكن التراجع عن هذا الإجراء.</p>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={async () => {
-                    setDeleting(true);
-                    try {
-                      await api.deleteAccount();
-                      localStorage.clear();
-                      window.location.href = '/';
-                    } catch {
-                      toastError('لا يمكن حذف الحساب الحالي.\nيرجى التواصل مع مدير النظام.');
-                      setDeleting(false);
-                      setDeleteConfirmOpen(false);
-                    }
-                  }}
-                  disabled={deleting}
-                  className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer text-center disabled:opacity-50"
-                >{deleting ? 'جاري الحذف...' : 'حذف'}</button>
-                <button
-                  onClick={() => setDeleteConfirmOpen(false)}
-                  disabled={deleting}
-                  className="flex-1 py-3 bg-slate-800 hover:bg-slate-755 text-slate-300 font-medium rounded-xl border border-slate-700 transition-all cursor-pointer text-center"
-                >إلغاء</button>
-              </div>
-            </motion.div>
           </div>
-        )}
-      </AnimatePresence>
-
-    </div>
   );
 }

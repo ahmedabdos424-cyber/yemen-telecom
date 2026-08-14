@@ -1,0 +1,16 @@
+/* تخطيط معاينة Markdown: عربي RTL مع إبقاء الرموز البرمجية باتجاه LTR */
+body {
+  direction: rtl;
+  text-align: right;
+  font-family: "Segoe UI", "Tahoma", "Noto Sans Arabic", sans-serif;
+}
+
+/* الأكواد تبقى باتجاه من اليسار إلى اليمين لمنع كسر المحاذاة */
+code,
+pre,
+.hljs,
+.vscode-code-block {
+  direction: ltr;
+  text-align: left;
+  unicode-bidi: embed;
+}

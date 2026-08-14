@@ -1,0 +1,17 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "logLevel": "INFO",
+  "instructions": ["AGENTS.md", ".opencode/instructions/rtl-style.md"],
+  "permission": {
+    "bash": {
+      "git *": "allow",
+      "npm *": "allow",
+      "npx *": "allow",
+      "node *": "allow",
+      "cd *": "allow",
+      "ls *": "allow",
+      "*": "ask"
+    }
+  },
+  "plugin": ["./.opencode/plugin/notify.ts"]
+}

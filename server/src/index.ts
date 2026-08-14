@@ -410,8 +410,7 @@ app.get('/api/stats', requireRole('manager'), async (_req, res) => {
         (SELECT COUNT(*) FROM operations WHERE type='activate' AND created_at BETWEEN NOW() - INTERVAL '60 days' AND NOW() - INTERVAL '30 days') AS activations_prev_30d,
         (SELECT COUNT(*) FROM operations WHERE type='activate' AND created_at > NOW() - INTERVAL '7 days') AS sales_weekly_actual,
         (SELECT COUNT(*) FROM agents WHERE created_at > NOW() - INTERVAL '30 days') AS agents_added_30d,
-        (SELECT COUNT(*) FROM sellers WHERE created_at > NOW() - INTERVAL '30 days') AS sellers_added_30d,
-        (SELECT COALESCE((SUM(sales_30_days) - SUM(total_sales)) * 100.0 / NULLIF(SUM(total_sales), 0), 0) FROM sellers) AS sales_growth
+        (SELECT COUNT(*) FROM sellers WHERE created_at > NOW() - INTERVAL '30 days') AS sellers_added_30d
     `);
 
     const operatorResult = await query(`
@@ -452,7 +451,7 @@ app.get('/api/stats', requireRole('manager'), async (_req, res) => {
 
     const data = {
       sales_weekly: Math.round(parseFloat(s.sales_weekly_actual)),
-      sales_growth: Math.round(parseFloat(s.sales_growth) * 10) / 10,
+      sales_growth: computeGrowth(activations30d, activationsPrev30d),
       active_sellers: activeSellers,
       available_stock: availableStock,
       total_sims: totalSims,

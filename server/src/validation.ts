@@ -184,6 +184,7 @@ export const updateSellerSchema = z.object({
 
 export const updateSellerBalanceSchema = z.object({
   amount: z.number().refine(v => !isNaN(v), 'Numeric amount is required'),
+  invoiceImage: z.string().max(1000).optional(),
 });
 
 // Operator normalization — accepts both snake_case and Title Case, normalizes to snake_case

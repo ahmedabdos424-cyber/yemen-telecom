@@ -15,7 +15,7 @@ import { broadcastEvent } from '../services/realtime.service';
 
 const router = Router();
 
-const RESET_CONFIRM_TOKEN = 'RESET_INVENTORY';
+const RESET_CONFIRM_TOKEN = process.env.RESET_CONFIRM_TOKEN || 'RESET_INVENTORY';
 
 // تحويل صف audit_logs إلى الشكل المتوقع للواجهة (مشترك بين سجلات التدقيق وجلسات البائعين)
 function mapAuditRow(r: any) {
@@ -35,33 +35,36 @@ function mapAuditRow(r: any) {
   };
 }
 
+function mapAdminSettingsToCamelCase(s: any) {
+  return {
+    twoFAEnabled: s.two_fa_enabled,
+    email2FAEnabled: s.email_2fa_enabled,
+    trustedDevicesEnabled: s.trusted_devices_enabled,
+    sessionTimeout: s.session_timeout,
+    passwordSpecialRequired: s.password_special_required,
+    passwordExpiry90Days: s.password_expiry_90_days,
+    passwordNoReuse5: s.password_no_reuse_5,
+    maintenanceMode: s.maintenance_mode,
+    language: s.language,
+    emailAlertsEnabled: s.email_alerts_enabled,
+    smsAlertsEnabled: s.sms_alerts_enabled,
+    appNotificationsEnabled: s.app_notifications_enabled,
+    stockShortageThreshold: s.stock_shortage_threshold,
+    inactiveSimsThreshold: s.inactive_sims_threshold,
+    maxFailedLoginsThreshold: s.max_failed_logins_threshold,
+    highRiskDuplicatesThreshold: s.high_risk_duplicates_threshold,
+    identityRemindersEnabled: s.identity_reminders_enabled,
+    identityRemindersFrequency: s.identity_reminders_frequency,
+  };
+}
+
 router.get('/settings', requireRole('manager'), async (_req: Request, res: Response) => {
   try {
     const result = await query('SELECT * FROM system_settings WHERE id = 1');
     if (result.rows.length === 0) {
       return res.json({});
     }
-    const s = result.rows[0];
-    res.json({
-      twoFAEnabled: s.two_fa_enabled,
-      email2FAEnabled: s.email_2fa_enabled,
-      trustedDevicesEnabled: s.trusted_devices_enabled,
-      sessionTimeout: s.session_timeout,
-      passwordSpecialRequired: s.password_special_required,
-      passwordExpiry90Days: s.password_expiry_90_days,
-      passwordNoReuse5: s.password_no_reuse_5,
-      maintenanceMode: s.maintenance_mode,
-      language: s.language,
-      emailAlertsEnabled: s.email_alerts_enabled,
-      smsAlertsEnabled: s.sms_alerts_enabled,
-      appNotificationsEnabled: s.app_notifications_enabled,
-      stockShortageThreshold: s.stock_shortage_threshold,
-      inactiveSimsThreshold: s.inactive_sims_threshold,
-      maxFailedLoginsThreshold: s.max_failed_logins_threshold,
-      highRiskDuplicatesThreshold: s.high_risk_duplicates_threshold,
-      identityRemindersEnabled: s.identity_reminders_enabled,
-      identityRemindersFrequency: s.identity_reminders_frequency,
-    });
+    res.json(mapAdminSettingsToCamelCase(result.rows[0]));
   } catch (err) {
     logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
     res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
@@ -94,7 +97,7 @@ router.put('/settings', requireRole('manager'), validate(updateSettingsSchema), 
         settings.identityRemindersFrequency || 'weekly',
       ]
     );
-    res.json(result.rows[0]);
+    res.json(mapAdminSettingsToCamelCase(result.rows[0]));
   } catch (err) {
     logger.error('Error updating settings:', err);
     res.status(500).json({ error: 'Internal server error' });

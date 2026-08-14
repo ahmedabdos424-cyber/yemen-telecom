@@ -18,7 +18,7 @@ interface DashboardViewProps {
     total_sellers?: number;
     sales_growth?: number;
     sales_weekly?: number;
-    operators?: Array<{ provider: string; count: number; percentage: number }>;
+    operators?: Array<{ provider: string; count: string | number; percentage?: number }>;
     total_sims_growth?: number;
     sold_sims_growth?: number;
     active_sims_growth?: number;

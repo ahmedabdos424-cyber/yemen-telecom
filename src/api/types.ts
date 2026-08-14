@@ -456,8 +456,32 @@ export interface UpdateProfileRequest {
 }
 
 // ==================== Stats ====================
+export interface StatsOperator {
+  provider: string;
+  count: string;
+}
+
 export interface StatsResponse {
-  [key: string]: unknown;
+  sales_weekly: number;
+  sales_growth: number;
+  active_sellers: number;
+  available_stock: number;
+  total_sims: number;
+  sold_sims: number;
+  remaining_sims: number;
+  active_sims: number;
+  total_agents: number;
+  total_sellers: number;
+  operators: StatsOperator[];
+  total_sims_growth: number;
+  sold_sims_growth: number;
+  active_sims_growth: number;
+  agent_growth: number;
+  seller_growth: number;
+  sims_added_30d: number;
+  activations_30d: number;
+  agents_added_30d: number;
+  sellers_added_30d: number;
 }
 
 // ==================== Customers ====================
