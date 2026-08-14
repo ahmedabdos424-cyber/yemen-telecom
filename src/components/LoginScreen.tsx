@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, type FormEvent, type MouseEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Role } from '../types';
-import { Shield, User, Lock, Eye, EyeOff, ChevronLeft, Smartphone, Check, Fingerprint } from 'lucide-react';
+import { Shield, User, Lock, Eye, EyeOff, ChevronLeft, Smartphone, Check } from 'lucide-react';
 import { useToast, ToastContainer } from '../hooks/useToast';
+import { FingerprintScannerIcon } from './shared/FingerprintScannerIcon';
 
 interface LoginScreenProps {
   onLogin: (role: Role, username: string, password: string) => Promise<{ role: Role; commit: () => void } | null>;
@@ -405,7 +406,31 @@ export default function LoginScreen({ onLogin, onBiometricLogin, biometricAvaila
             </AnimatePresence>
 
             {/* ===== SUBMIT + BIOMETRIC QUICK LOGIN ===== */}
-            <div className="flex items-stretch gap-2.5">
+            <div className="flex flex-row items-center gap-3 w-full">
+              {onBiometricLogin && biometricAvailable && (
+                <motion.button
+                  type="button"
+                  onClick={handleBiometric}
+                  disabled={biometricLoading || isLoading || success}
+                  whileTap={{ scale: 0.95 }}
+                  transition={{ duration: 0.18 }}
+                  title="تسجيل الدخول بالبصمة"
+                  aria-label="تسجيل الدخول بالبصمة"
+                  className={`h-14 w-14 shrink-0 rounded-2xl border-2 border-[#E10600] shadow-sm transition-all duration-200 flex flex-col items-center justify-center gap-0.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed active:scale-95 hover:shadow-md ${
+                    darkMode
+                      ? 'bg-red-950/20 text-[#E10600] hover:bg-red-950/40'
+                      : 'bg-white text-[#E10600] hover:bg-red-50'
+                  }`}
+                >
+                  {biometricLoading ? (
+                    <span className="w-5 h-5 rounded-full border-2 border-current border-t-transparent" style={{ animation: 'spin 0.8s linear infinite' }} />
+                  ) : (
+                    <FingerprintScannerIcon className="w-7 h-7" />
+                  )}
+                  <span className={`text-[8px] font-bold leading-none ${darkMode ? 'text-[#E10600]/70' : 'text-[#E10600]/80'}`}>بصمة</span>
+                </motion.button>
+              )}
+
               <motion.button
                 type="submit"
                 disabled={isLoading || success}
@@ -465,28 +490,6 @@ export default function LoginScreen({ onLogin, onBiometricLogin, biometricAvaila
                   )}
                 </AnimatePresence>
               </motion.button>
-
-              {onBiometricLogin && biometricAvailable && (
-                <button
-                  type="button"
-                  onClick={handleBiometric}
-                  disabled={biometricLoading || isLoading || success}
-                  title="الدخول السريع بالبصمة"
-                  aria-label="الدخول السريع بالبصمة"
-                  className={`w-16 shrink-0 rounded-2xl border transition-all duration-200 flex flex-col items-center justify-center gap-1 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
-                    darkMode
-                      ? 'border-white/10 text-white/70 hover:bg-white/5 active:bg-white/10'
-                      : 'border-gray-200 text-gray-600 hover:bg-gray-50 active:bg-gray-100'
-                  }`}
-                >
-                  {biometricLoading ? (
-                    <span className="w-5 h-5 rounded-full border-2 border-current border-t-transparent" style={{ animation: 'spin 0.8s linear infinite' }} />
-                  ) : (
-                    <Fingerprint size={24} />
-                  )}
-                  <span className={`text-[9px] font-bold leading-none ${darkMode ? 'text-white/40' : 'text-gray-400'}`}>بصمة</span>
-                </button>
-              )}
             </div>
           </form>
         </motion.div>
