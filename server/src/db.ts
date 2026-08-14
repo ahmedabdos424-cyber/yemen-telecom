@@ -44,7 +44,7 @@ const poolConfig: PoolConfig = {
   max: parseInt(process.env.DB_MAX_CONNECTIONS || '30', 10),
   min: parseInt(process.env.DB_MIN_CONNECTIONS || '3', 10),
   connectionTimeoutMillis: 10000,
-  idleTimeoutMillis: 600000,
+  idleTimeoutMillis: 30000,
   keepAlive: true,
   keepAliveInitialDelayMillis: 15000,
   allowExitOnIdle: false,
@@ -54,7 +54,12 @@ if (process.env.DB_FAMILY) {
 }
 export const pool = new Pool(poolConfig);
 
-pool.on('error', (err) => {
+pool.on('error', (err: any) => {
+  // تجاهل هادئ لأخطاء إعادة ضبط الاتصال الخامل (PgBouncer) لتقليل ضجيج السجلات
+  if (err.code === 'ECONNRESET' || err.code === '57P01') {
+    logger.debug('[DB] idle client recycled:', err.code);
+    return;
+  }
   logger.error('[DB] Unexpected error on idle client', err);
 });
 
