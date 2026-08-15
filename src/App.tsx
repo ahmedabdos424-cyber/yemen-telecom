@@ -151,7 +151,7 @@ function AuthenticatedApp() {
     return (
       <>
         <ErrorBoundary>
-          <LoginScreen onLogin={handleLogin} onBiometricLogin={auth.handleBiometricLogin} biometricAvailable={auth.biometricAvailable} darkMode={darkMode} setDarkMode={setDarkMode} />
+          <LoginScreen onLogin={handleLogin} onBiometricLogin={auth.handleBiometricLogin} biometricAvailable={auth.biometricAvailable} biometricEnabled={auth.biometricEnabled} darkMode={darkMode} setDarkMode={setDarkMode} />
         </ErrorBoundary>
         <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       </>

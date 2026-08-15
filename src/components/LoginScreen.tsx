@@ -9,6 +9,7 @@ interface LoginScreenProps {
   onLogin: (role: Role, username: string, password: string) => Promise<{ role: Role; commit: () => void } | null>;
   onBiometricLogin?: () => Promise<{ role: Role; commit: () => void } | null>;
   biometricAvailable?: boolean;
+  biometricEnabled?: boolean;
   darkMode: boolean;
   setDarkMode: (dark: boolean) => void;
 }
@@ -32,7 +33,7 @@ function removeUsername(u: string) {
   localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(list));
 }
 
-export default function LoginScreen({ onLogin, onBiometricLogin, biometricAvailable, darkMode, setDarkMode }: LoginScreenProps) {
+export default function LoginScreen({ onLogin, onBiometricLogin, biometricAvailable, biometricEnabled, darkMode, setDarkMode }: LoginScreenProps) {
   const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -120,6 +121,10 @@ export default function LoginScreen({ onLogin, onBiometricLogin, biometricAvaila
 
   const handleBiometric = async () => {
     if (biometricLoading || !onBiometricLogin) return;
+    if (!biometricEnabled) {
+      toastInfo('لتفعيل الدخول بالبصمة، يرجى تسجيل الدخول باسم المستخدم وكلمة المرور للمرة الأولى، ثم تفعيل الخيار من إعدادات الحساب.');
+      return;
+    }
     setBiometricLoading(true);
     setErrorMsg('');
     setFieldError(null);
@@ -134,12 +139,12 @@ export default function LoginScreen({ onLogin, onBiometricLogin, biometricAvaila
         }, 450);
       } else {
         setBiometricLoading(false);
-        setErrorMsg('لا يوجد دخول سريع بالبصمة محفوظ لهذا الجهاز. سجّل الدخول بكلمة المرور ثم فعّل البصمة من إعدادات الحساب');
+        toastWarning('تعذر التحقق البيومتري. تأكد من تسجيل بصمتك على الجهاز وأعد المحاولة، أو استخدم كلمة المرور');
       }
     } catch (err) {
       if (abortRef.current) return;
       setBiometricLoading(false);
-      setErrorMsg('تعذر التحقق البيومتري. حاول مجدداً أو استخدم كلمة المرور');
+      toastError('تعذر التحقق البيومتري. حاول مجدداً أو استخدم كلمة المرور');
     }
   };
 
@@ -406,7 +411,7 @@ export default function LoginScreen({ onLogin, onBiometricLogin, biometricAvaila
             </AnimatePresence>
 
             {/* ===== SUBMIT + BIOMETRIC QUICK LOGIN ===== */}
-            <div className="flex flex-row items-center gap-3 w-full">
+            <div className="flex flex-row items-center gap-2 w-full" dir="rtl">
               {onBiometricLogin && biometricAvailable && (
                 <motion.button
                   type="button"
@@ -414,20 +419,23 @@ export default function LoginScreen({ onLogin, onBiometricLogin, biometricAvaila
                   disabled={biometricLoading || isLoading || success}
                   whileTap={{ scale: 0.95 }}
                   transition={{ duration: 0.18 }}
-                  title="تسجيل الدخول بالبصمة"
-                  aria-label="تسجيل الدخول بالبصمة"
-                  className={`h-14 w-14 shrink-0 rounded-2xl border-2 border-[#E10600] shadow-sm transition-all duration-200 flex flex-col items-center justify-center gap-0.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed active:scale-95 hover:shadow-md ${
-                    darkMode
-                      ? 'bg-red-950/20 text-[#E10600] hover:bg-red-950/40'
-                      : 'bg-white text-[#E10600] hover:bg-red-50'
+                  title={biometricEnabled ? 'تسجيل الدخول بالبصمة' : 'تفعيل الدخول بالبصمة'}
+                  aria-label={biometricEnabled ? 'تسجيل الدخول بالبصمة' : 'تفعيل الدخول بالبصمة'}
+                  className={`h-12 w-12 shrink-0 rounded-2xl border transition-all duration-200 flex items-center justify-center cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed active:scale-95 hover:shadow-md ${
+                    biometricEnabled
+                      ? darkMode
+                        ? 'border-red-500/50 bg-red-950/25 text-[#E10600] hover:bg-red-950/45'
+                        : 'border-red-300 bg-white text-[#E10600] hover:bg-red-50 shadow-red-100'
+                      : darkMode
+                        ? 'border-white/10 bg-white/5 text-white/35 hover:text-white/60 hover:bg-white/10'
+                        : 'border-gray-200 bg-gray-100 text-gray-400 hover:text-gray-600 hover:bg-gray-200/70'
                   }`}
                 >
                   {biometricLoading ? (
                     <span className="w-5 h-5 rounded-full border-2 border-current border-t-transparent" style={{ animation: 'spin 0.8s linear infinite' }} />
                   ) : (
-                    <FingerprintScannerIcon className="w-7 h-7" />
+                    <FingerprintScannerIcon className="w-6 h-6" />
                   )}
-                  <span className={`text-[8px] font-bold leading-none ${darkMode ? 'text-[#E10600]/70' : 'text-[#E10600]/80'}`}>بصمة</span>
                 </motion.button>
               )}
 
