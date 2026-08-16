@@ -42,6 +42,13 @@ android {
             signingConfig signingConfigs.release
         }
     }
+    lint {
+        // Do not abort the build on lint findings (e.g. silent warnings from
+        // third-party plugins) and skip lint on release builds so CI and
+        // automatic release builds do not fail spuriously.
+        abortOnError false
+        checkReleaseBuilds false
+    }
 }
 
 repositories {

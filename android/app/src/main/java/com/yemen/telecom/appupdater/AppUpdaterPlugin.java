@@ -13,6 +13,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.util.Log;
 
+import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
 import com.getcapacitor.JSArray;
@@ -116,7 +117,16 @@ public class AppUpdaterPlugin extends Plugin {
                 handleDownloadComplete(apkFile, expectedSha, expectedSize);
             }
         };
-        getContext().registerReceiver(downloadReceiver, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
+        // Android 14 (API 34) requires an explicit export flag when registering
+        // receivers for system broadcasts. ACTION_DOWNLOAD_COMPLETE is sent by the
+        // system DownloadManager (an external source), so RECEIVER_EXPORTED is the
+        // correct flag. ContextCompat.registerReceiver is backwards-compatible with
+        // older OS versions and applies the flag only where the OS understands it.
+        ContextCompat.registerReceiver(
+                getContext(),
+                downloadReceiver,
+                new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+                ContextCompat.RECEIVER_EXPORTED);
 
         emitProgress(0, 0, 0);
         startProgressPolling();
