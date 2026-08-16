@@ -5,7 +5,7 @@ import type {
   SimRow, CreateSimRequest, UpdateSimRequest, CreateSimBatchRequest, SimBatchResult,
   TransferSimsRequest, TransferSimsResult,
   AgentRow, CreateAgentRequest, CreateAgentResponse, UpdateAgentRequest,
-  MappedSeller, CreateSellerRequest, CreateSellerResponse, UpdateSellerRequest, UpdateSellerBalanceRequest,
+  MappedSeller, CreateSellerRequest, CreateSellerResponse, UpdateSellerRequest,
   AdminSellerRow,
   MappedOperation, CreateOperationRequest,
   MappedInventory, UpdateInventoryItem,
@@ -13,20 +13,18 @@ import type {
   AdminSettingsResponse, UpdateSettingsRequest, MappedTransaction, DuplicateIdentityRow, AuditLogEntry, AuditLogPageResponse,
   UpdateProfileRequest,
   StatsResponse,
-  CustomerRow,
-  DistributionRequestRow, CreateDistributionRequest,
   AppVersionResponse,
   ActivationReportRow, SellerReportRow,
   SystemHealthResponse,
 } from './types';
 
-const REQUEST_TIMEOUT_MS = 180000;
+const REQUEST_TIMEOUT_MS = 30000;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchWithTimeout(url: string, options: RequestInit = {}, retries = 5): Promise<Response> {
+async function fetchWithTimeout(url: string, options: RequestInit = {}, retries = 2): Promise<Response> {
   let lastErr: unknown;
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
@@ -36,7 +34,7 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, retries 
     } catch (err) {
       lastErr = err;
       if (attempt < retries) {
-        await delay(15000);
+        await delay(3000);
         continue;
       }
     } finally {
@@ -146,8 +144,6 @@ let authToken: string | null = null;
 let refreshToken: string | null = null;
 let csrfToken: string | null = null;
 let csrfHash: string | null = null;
-let isRefreshing = false;
-let pendingRequests: Array<(token: string) => void> = [];
 let tokensLoaded = false;
 let tokensLoadPromise: Promise<void> | null = null;
 

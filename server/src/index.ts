@@ -13,7 +13,7 @@ import { query } from './db';
 import { cacheGet, cacheSet, cacheStats } from './cache';
 import { authenticateToken, requireRole } from './middleware/auth';
 import { clearExpiredLoginLocks } from './middleware/rateLimiter';
-import { initSentry, Sentry } from './sentry';
+import { Sentry } from './sentry';
 import authRoutes from './routes/auth';
 import simsRoutes from './routes/sims';
 import agentsRoutes from './routes/agents';
@@ -89,7 +89,7 @@ app.use(helmet({
 }));
 
 // Nonce-based CSP middleware — per-request nonce replaces 'unsafe-inline'
-app.use((req, res, next) => {
+app.use((_req, res, next) => {
   const nonce = crypto.randomBytes(16).toString('base64');
   res.locals.cspNonce = nonce;
   const csp = [
@@ -148,7 +148,7 @@ try {
 }
 
 // Serve index.html with CSP nonce injection for SPA root (must be before general static)
-app.get('/', (req, res) => {
+app.get('/', (_req, res) => {
   let html: string;
   if (cachedIndexHtml) {
     html = cachedIndexHtml;
@@ -176,7 +176,7 @@ app.get('/', (req, res) => {
 app.use(express.static('dist', { maxAge: '1y', immutable: true, etag: true }));
 
 // CSRF token generation endpoint (must be after CORS middleware)
-app.get('/api/csrf-token', (req, res) => {
+app.get('/api/csrf-token', (_req, res) => {
   const token = crypto.randomBytes(32).toString('hex');
   const hash = crypto.createHmac('sha256', CSRF_SECRET).update(token).digest('hex');
   res.json({ token, hash });
@@ -285,9 +285,6 @@ app.get('/api/health', async (_req, res) => {
   });
 });
 
-// Self-updater endpoints (public, no auth): version check + install reporting.
-app.use('/api', appUpdateRoutes);
-
 // Apply write rate limiter to all POST/PUT/DELETE routes
 app.use('/api', (req, res, next) => {
   if (['POST', 'PUT', 'DELETE'].includes(req.method) && !req.path.startsWith('/auth/')) {
@@ -314,6 +311,11 @@ app.use('/api', (req, res, next) => {
   }
   return authenticateToken(req, res, next);
 });
+
+// Self-updater endpoints: /app-version and /app-update-installed are public
+// (allowlisted above); /app-update-stats now sits BEHIND the JWT auth wall so
+// install stats are no longer exposed without authentication.
+app.use('/api', appUpdateRoutes);
 
 // Maintenance mode middleware — block mutation requests when maintenance_mode is on
 app.use('/api', async (req: express.Request, res: express.Response, next: express.NextFunction) => {

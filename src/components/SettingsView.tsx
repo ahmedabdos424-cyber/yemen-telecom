@@ -7,7 +7,6 @@ import { useState, useEffect } from 'react';
 import { SystemSettings } from '../types';
 import ConfirmModal from './shared/ConfirmModal';
 import { captureError } from '../lib/monitor.ts';
-import * as Sentry from '@sentry/react';
 import { api } from '../api/client';
 import { Fingerprint, Trash2 } from 'lucide-react';
 import { useToast, ToastContainer } from '../hooks/useToast';

@@ -106,7 +106,7 @@ router.put('/settings', requireRole('manager'), validate(updateSettingsSchema), 
 
 router.get('/transactions', requireRole('manager'), async (req: Request, res: Response) => {
   try {
-    const { page, limit, offset } = getPagination(req);
+    const { limit, offset } = getPagination(req);
     const paginate = req.query.page || req.query.limit;
     const queryText = paginate
       ? 'SELECT * FROM transactions ORDER BY id LIMIT $1 OFFSET $2'
@@ -129,7 +129,7 @@ router.get('/transactions', requireRole('manager'), async (req: Request, res: Re
 
 router.get('/duplicate-identities', requireRole('manager'), async (req: Request, res: Response) => {
   try {
-    const { page, limit, offset } = getPagination(req);
+    const { limit, offset } = getPagination(req);
     const paginate = req.query.page || req.query.limit;
     const queryText = paginate
       ? `SELECT id_number AS id_no, name, agent_name, created_at,
@@ -200,7 +200,7 @@ router.get('/duplicate-identities', requireRole('manager'), async (req: Request,
 // ========================
 // Duplicate Identities: Flag / Block actions
 // ========================
-function logIdentityAction(idNo: string, name: string, action: string, performedBy: string) {
+function logIdentityAction(idNo: string, _name: string, action: string, performedBy: string) {
   const logId = `DUP-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
   const title =
     action === 'flag'
@@ -371,7 +371,7 @@ function mapAdminSeller(r: any) {
   };
 }
 
-router.get('/sellers', requireRole('manager'), async (req: Request, res: Response) => {
+router.get('/sellers', requireRole('manager'), async (_req: Request, res: Response) => {
   try {
     const result = await query(`${ADMIN_SELLERS_SELECT} ORDER BY s.id DESC`);
     res.json(result.rows.map(mapAdminSeller));

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ViewType } from '../types';
 import { useToast, ToastContainer } from '../hooks/useToast';
@@ -21,7 +21,7 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
   const [showAgentTree, setShowAgentTree] = useState(false);
   const [showSellerManagement, setShowSellerManagement] = useState(false);
 
-  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
+  const { toasts, dismissToast, toastSuccess, toastError } = useToast();
 
   const [backupsList, setBackupsList] = useState<any[]>([]);
   const [backupProgress, setBackupProgress] = useState<number | null>(null);

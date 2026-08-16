@@ -1,6 +1,6 @@
 import { Operation, Sim } from '../types';
 import {
-  Smartphone, Cpu, Award, TrendingUp, PlusCircle
+  Smartphone, Cpu, Award, PlusCircle
 } from 'lucide-react';
 
 interface SellerHomeProps {

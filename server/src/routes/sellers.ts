@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { query, transaction } from '../db';
@@ -38,7 +38,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  const { page, limit, offset } = getPagination(req);
+  const { limit, offset } = getPagination(req);
   try {
     const paginate = req.query.page || req.query.limit;
     let result;
@@ -260,7 +260,7 @@ router.put('/:id', requireRole('manager', 'agent'), validate(updateSellerSchema)
     const region_code = req.body.region_code ?? req.body.regionCode ?? cur.region_code;
     const status = req.body.status ?? cur.status;
     const avatar = req.body.avatar ?? req.body.id_document ?? req.body.idDocument ?? cur.avatar;
-    const result = await query(
+    await query(
       `UPDATE sellers SET name=$1, store_name=$2, id_number=$3, phone=$4, region=$5, region_code=$6, status=$7, avatar=$8 WHERE id=$9 RETURNING *`,
       [name, store_name, id_number, phone, region, region_code, status, avatar, id]
     );
@@ -290,8 +290,6 @@ router.put('/:id/balance', requireRole('manager', 'agent'), validate(updateSelle
         return res.status(403).json({ error: 'Access denied: this seller does not belong to your agency' });
       }
     }
-    const cur = existing.rows[0];
-    const newSales = (cur.sales_30_days || 0) + amount;
     const result = await transaction(async (client) => {
       const lock = await client.query('SELECT sales_30_days, total_sales FROM sellers WHERE id = $1 FOR UPDATE', [id]);
       const lockedRow = lock.rows[0];

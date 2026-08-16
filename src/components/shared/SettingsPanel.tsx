@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Settings, X, Palette, Sun, Moon, Type, Shield, ShieldAlert, Fingerprint,
@@ -54,7 +54,7 @@ export default function SettingsPanel({
   onLogout,
 }: SettingsPanelProps) {
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
-  const { checking, updateInfo, downloading, progress, error, checkForUpdates, startUpdate, resetError } = useAppUpdate();
+  const { checking, updateInfo, downloading, progress, error, checkForUpdates, startUpdate } = useAppUpdate();
 
   return (
     <>

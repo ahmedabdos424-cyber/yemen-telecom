@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { useState } from 'react';
 import { Search, Cpu, X, Smartphone } from 'lucide-react';
 import { Sim } from '../../types';
 import EmptyState from '../shared/EmptyState';
@@ -11,8 +10,7 @@ interface SimManagementViewProps {
 }
 
 export default function SimManagementView({
-  sims = [],
-  onUpdateSims
+  sims = []
 }: SimManagementViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [operatorFilter, setOperatorFilter] = useState('all');

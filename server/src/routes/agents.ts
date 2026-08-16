@@ -46,7 +46,7 @@ router.post('/', requireRole('manager'), validate(createAgentSchema), async (req
     const agentPassword = password || crypto.randomBytes(16).toString('hex');
     const passwordHash = await bcrypt.hash(agentPassword, 10);
 
-    const { userId, agent } = await transaction(async (client) => {
+    const { agent } = await transaction(async (client) => {
       const userRes = await client.query(
         `INSERT INTO users (username, password_hash, display_name, role, status, phone, region)
          VALUES ($1, $2, $3, 'agent', 'active', $4, $5)

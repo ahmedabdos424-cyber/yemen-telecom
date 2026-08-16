@@ -1,12 +1,11 @@
 import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Operator, simProvider } from '../types';
+import { Operator } from '../types';
 import { Check, Camera, RefreshCw, Save, Phone, User, CreditCard, Layers } from 'lucide-react';
 import CameraCapture, { DocumentCapture } from './shared/CameraCapture';
 import OperatorLogo from './shared/OperatorLogo';
 import { useOcr } from '../hooks/useOcr';
 import { useToast, ToastContainer } from '../hooks/useToast';
-import { api } from '../api/client';
 
 interface ActivateSimFormProps {
   onSimActivated: (simData: {
@@ -33,7 +32,7 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
   const [successMsg, setSuccessMsg] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const { recognize, progress: ocrProgress } = useOcr();
-  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
+  const { toasts, dismissToast, toastError, toastWarning } = useToast();
 
   const handleNameCapture = useCallback(async (imageData: string) => {
     const name = await recognize(imageData);

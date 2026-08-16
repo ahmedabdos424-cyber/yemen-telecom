@@ -1,6 +1,7 @@
 import { Router, type Response } from 'express';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { logger } from '../logger';
+import { requireRole } from '../middleware/auth';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
@@ -84,8 +85,9 @@ router.post('/app-update-installed', (req: any, res: Response) => {
   res.status(200).json({ ok: true });
 });
 
-// Optional: GET /api/app-update-stats (operator, dev-only) — counts per version.
-router.get('/app-update-stats', (_req, res: Response) => {
+// GET /api/app-update-stats (manager only) — counts per version.
+// Mounted behind JWT auth in index.ts; role guard is enforced here.
+router.get('/app-update-stats', requireRole('manager'), (_req, res: Response) => {
   const byVersion: Record<string, number> = {};
   for (const e of installLog) {
     byVersion[e.version] = (byVersion[e.version] || 0) + 1;

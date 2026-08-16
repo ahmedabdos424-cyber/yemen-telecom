@@ -17,7 +17,6 @@ interface CameraPreviewModalProps {
 export default function CameraPreviewModal({
   show,
   previewImage,
-  isViewfinder = false,
   videoRef,
   onCapture,
   onConfirm,

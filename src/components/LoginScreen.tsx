@@ -34,7 +34,7 @@ function removeUsername(u: string) {
 }
 
 export default function LoginScreen({ onLogin, onBiometricLogin, biometricAvailable, biometricEnabled, darkMode, setDarkMode }: LoginScreenProps) {
-  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
+  const { toasts, dismissToast, toastError, toastWarning, toastInfo } = useToast();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -81,7 +81,7 @@ export default function LoginScreen({ onLogin, onBiometricLogin, biometricAvaila
       if (result) {
         setSuccess(true);
         setIsLoading(false);
-        const commitTimer = setTimeout(() => {
+        setTimeout(() => {
           if (!abortRef.current) result.commit();
         }, 450);
       } else {

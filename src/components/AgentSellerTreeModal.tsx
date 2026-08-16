@@ -1,7 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
-  ChevronDown,
-  ChevronRight,
   Users,
   User,
   Store,

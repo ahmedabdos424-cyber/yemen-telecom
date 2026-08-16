@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { SIM, Agent, Seller, SystemAlert, Transaction, ViewType } from '../types';
+import { SIM, SystemAlert, Transaction, ViewType } from '../types';
 import OperatorLogo from './shared/OperatorLogo';
 
 interface DashboardViewProps {
@@ -51,9 +51,7 @@ export default function DashboardView({
   stats,
   alerts = [],
   transactions = [],
-  sims,
   setView,
-  setSelectedEntity,
   onSearch,
   onRefresh
 }: DashboardViewProps) {

@@ -9,7 +9,7 @@ const router = Router();
 
 router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
   try {
-    const { page, limit, offset } = getPagination(req);
+    const { limit, offset } = getPagination(req);
     const paginate = req.query.page || req.query.limit;
     let sql = 'SELECT * FROM operations';
     const conditions: string[] = [];

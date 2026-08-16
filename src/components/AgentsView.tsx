@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { Agent, ViewType } from '../types';
-import { safeArray, safeString } from '../lib/safe';
+import { safeString } from '../lib/safe';
 
 interface AgentsViewProps {
   agents: Agent[];
@@ -431,7 +431,7 @@ function AgentsView({ agents = [], setView, onUpdateAgent }: AgentsViewProps) {
     doc.write(htmlContent);
     doc.close();
 
-    const printTimer = setTimeout(() => {
+    setTimeout(() => {
       iframe.contentWindow?.focus();
       iframe.contentWindow?.print();
       const cleanupTimer = setTimeout(() => {

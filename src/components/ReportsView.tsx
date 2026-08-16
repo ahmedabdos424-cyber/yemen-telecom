@@ -17,7 +17,7 @@ function ReportField({ label, value, mono = false }: { label: string; value: str
 }
 
 export default function ReportsView() {
-  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
+  const { toasts, dismissToast, toastSuccess, toastWarning } = useToast();
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
   const [operator, setOperator] = useState('الكل');
   const [region, setRegion] = useState('كافة المناطق');

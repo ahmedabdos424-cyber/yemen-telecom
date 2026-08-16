@@ -151,7 +151,7 @@ async function captureWithCapacitorCamera(): Promise<string> {
   return dataUrl;
 }
 
-async function captureWithWebRTC(resolution: number, video: HTMLVideoElement, canvas: HTMLCanvasElement): Promise<string> {
+async function captureWithWebRTC(_resolution: number, video: HTMLVideoElement, canvas: HTMLCanvasElement): Promise<string> {
   const vw = video.videoWidth || 1280;
   const vh = video.videoHeight || 960;
   let w = vw, h = vh;
@@ -170,39 +170,6 @@ async function captureWithWebRTC(resolution: number, video: HTMLVideoElement, ca
   if (!blob) throw new Error('Failed to capture frame');
   const dataUrl = await blobToDataUrl(blob);
   return dataUrl;
-}
-
-function fixOrientationIfNeeded(blob: Blob): Promise<Blob> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    const url = URL.createObjectURL(blob);
-    img.onload = () => {
-      if (img.width > img.height) {
-        URL.revokeObjectURL(url);
-        resolve(blob);
-        return;
-      }
-      const canvas = document.createElement('canvas');
-      let { width, height } = img;
-      if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
-        const ratio = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
-        width = Math.round(width * ratio);
-        height = Math.round(height * ratio);
-      }
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) { URL.revokeObjectURL(url); resolve(blob); return; }
-      ctx.drawImage(img, 0, 0, width, height);
-      canvas.toBlob(
-        (b) => { resolve(b || blob); disposeCanvas(canvas); URL.revokeObjectURL(url); },
-        'image/jpeg',
-        JPEG_QUALITY
-      );
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); resolve(blob); };
-    img.src = url;
-  });
 }
 
 export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptureProps) {

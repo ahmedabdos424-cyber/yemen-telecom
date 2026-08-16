@@ -48,7 +48,6 @@ function otsuThreshold(pixels: Uint8ClampedArray): number {
   for (let i = 0; i < pixels.length; i += 4) {
     sum += 0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2];
   }
-  const mean = sum / (pixels.length / 4);
   let bestThresh = 128, bestVar = 0;
   for (let t = 1; t < 255; t++) {
     let w1 = 0, w2 = 0, s1 = 0, s2 = 0;

@@ -135,7 +135,7 @@ export function useAgentSellerState(role: string | null, username: string) {
     }
   };
 
-  const handleTransferSimsForAgent = async (op: Operator, count: number, startSerial: string, endSerial: string, recipientName: string) => {
+  const handleTransferSimsForAgent = async (_op: Operator, _count: number, startSerial: string, endSerial: string, recipientName: string) => {
     const recipient = sellers.find(s => s.name === recipientName);
     if (!recipient) {
       throw new Error('لم يتم العثور على البائع المستلم');

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   User, CheckCircle, AlertTriangle, TrendingUp, Search, X, Edit,
@@ -23,7 +23,6 @@ interface SellerListViewProps {
 
 export default function SellerListView({
   sellers = [],
-  onAddSeller,
   onUpdateSellerStatus,
   onResetSellerPassword,
   onEditSeller,
@@ -67,15 +66,6 @@ export default function SellerListView({
 
     return matchesSearch && matchesStatus;
   });
-
-  const handleResetPasswordClick = (seller: Seller) => {
-    if (onResetSellerPassword) onResetSellerPassword(seller.id);
-  };
-
-  const handleToggleStatusClick = (seller: Seller) => {
-    const newStatus = seller.status === 'inactive' ? 'active' : 'inactive';
-    if (onUpdateSellerStatus) onUpdateSellerStatus(seller.id, newStatus);
-  };
 
   const handleLockToggle = (seller: Seller, isLocked: boolean) => {
     const lockState = !isLocked;
@@ -547,7 +537,7 @@ export default function SellerListView({
                     if (!editModalSeller) return;
                     setEditSaving(true);
                     try {
-                      const updated = await api.updateSeller(Number(editModalSeller.id), {
+                      await api.updateSeller(Number(editModalSeller.id), {
                         name: editName.trim(),
                         phone: editPhone.trim(),
                         region: editRegion.trim(),

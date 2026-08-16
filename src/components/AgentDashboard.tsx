@@ -49,48 +49,14 @@ export default function AgentDashboard({
   onDeleteSeller,
   onUpdateInventories,
   operations = [],
-  username,
-  onLogout,
-  onConfirmLogout,
-  darkMode,
-  setDarkMode,
-  onUpdateSims,
-  onUpdateSellers
+  onUpdateSims
 }: AgentDashboardProps) {
   // Modals state
   const [transferModalOpen, setTransferModalOpen] = useState(false);
-  const [selectedSeller, setSelectedSeller] = useState<Seller | null>(null);
+  const [selectedSeller] = useState<Seller | null>(null);
   const [sellerActionsOpen, setSellerActionsOpen] = useState(false);
   const [sellerDetailsOpen, setSellerDetailsOpen] = useState(false);
 
-  // Redesigned Sellers and Mini Sim Portal states
-  const [sellerSearchQuery, setSellerSearchQuery] = useState('');
-  const [sellerRegionFilter, setSellerRegionFilter] = useState('all');
-  const [sellerStatusFilter, setSellerStatusFilter] = useState('all');
-  
-  // Custom interactive sub-modals
-  const [lockModalOpen, setLockModalOpen] = useState(false);
-  const [sellerLockedState, setSellerLockedState] = useState<Record<string, boolean>>({});
-  const [paymentsModalOpen, setPaymentsModalOpen] = useState(false);
-  const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentNotes, setPaymentNotes] = useState('');
-  const [historyModalOpen, setHistoryModalOpen] = useState(false);
-  const [editSellerModalOpen, setEditSellerModalOpen] = useState(false);
-  const [editSellerName, setEditSellerName] = useState('');
-  const [editSellerStore, setEditSellerStore] = useState('');
-  const [editSellerPhone, setEditSellerPhone] = useState('');
-  const [editSellerRegion, setEditSellerRegion] = useState('');
-  const [editSellerStatus, setEditSellerStatus] = useState<'active' | 'low_stock' | 'inactive'>('active');
-
-  // Mini SIMs Management overlay
-  const [sellerSimPortalOpen, setSellerSimPortalOpen] = useState(false);
-  const [selectedSellerForSims, setSelectedSellerForSims] = useState<Seller | null>(null);
-  const [miniSimSearchQuery, setMiniSimSearchQuery] = useState('');
-  const [miniSimOperatorFilter, setMiniSimOperatorFilter] = useState('all');
-  const [assignSimIccid, setAssignSimIccid] = useState('');
-
-  // New settings preferences loaded from localStorage
-  const [passwordOpen, setPasswordOpen] = useState(false);
   // Transfer Sim form state
   const [transferOp, setTransferOp] = useState<Operator>('yemen_mobile');
   const [startRange, setStartRange] = useState('');
@@ -283,7 +249,6 @@ export default function AgentDashboard({
               const isYou = inv.operator === 'you' || inv.operator === 'YOU';
               const colorBorder = isYm ? 'border-red-500' : isYou ? 'border-amber-400' : 'border-blue-500';
               const colorText = isYm ? 'text-red-400' : isYou ? 'text-amber-400' : 'text-blue-400';
-              const bgBadge = isYm ? 'bg-red-950/40' : isYou ? 'bg-amber-950/40' : 'bg-blue-950/40';
               const badgeText = isYm ? 'يمن موبايل' : isYou ? 'YOU' : 'سبأفون';
 
               return (

@@ -1,5 +1,3 @@
-import type { Operator } from '../types';
-
 // ==================== Common ====================
 export interface PaginatedResponse<T> {
   data: T[];

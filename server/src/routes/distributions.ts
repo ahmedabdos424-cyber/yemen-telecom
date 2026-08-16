@@ -37,7 +37,7 @@ async function notifyRecipients(requestId: number | string): Promise<void> {
 
 router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
   try {
-    const { page, limit, offset } = getPagination(req);
+    const { limit, offset } = getPagination(req);
     const paginate = req.query.page || req.query.limit;
     let result;
     if (req.user?.role === 'manager') {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Seller, Operation, Sim } from '../types';
 import { api } from '../api/client';
@@ -7,11 +7,8 @@ import SellerHome from './SellerHome';
 import SellerAccount from './SellerAccount';
 import SellerSimsView from './SellerSimsView';
 import SettingsPanel from './shared/SettingsPanel';
-import { 
-  ShieldAlert, Award, TrendingUp, Info, Smartphone, Layers, PlusCircle, Eye, 
-  RefreshCw, Check, X, Shield, Lock, Moon, Sun, LogOut, Palette, Type, Bell, User, Cpu, 
-  ChevronLeft, MoreVertical, Search, Filter, Trash2, Printer, Edit, ArrowRightLeft,
-  BookMarked, HelpCircle, AlertTriangle, Activity, Image, MapPin, Clock, Camera, Fingerprint
+import {
+  RefreshCw, Check, X
 } from 'lucide-react';
 
 interface SellerDashboardProps {
@@ -50,7 +47,7 @@ export default function SellerDashboard({
   onDisableBiometric
 }: SellerDashboardProps) {
   
-  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
+  const { toasts, dismissToast, toastSuccess, toastError, toastWarning } = useToast();
 
   // Settings & Change Password modal state
   const [settingsOpen, setSettingsOpen] = useState(false);

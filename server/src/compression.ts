@@ -15,7 +15,7 @@ function compressStream(
   raw: Buffer,
   encoding: string,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ) {
   res.setHeader('Content-Encoding', encoding);
   res.setHeader('Vary', 'Accept-Encoding');
@@ -55,7 +55,6 @@ export function compression() {
 
     const originalSend = res.send.bind(res);
     const originalJson = res.json.bind(res);
-    const originalEnd = res.end.bind(res);
 
     const shouldCompress = (body: Buffer | string | object): boolean => {
       if (!body) return false;

@@ -1,7 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Seller } from '../types';
-import { Check, Camera, RefreshCw, Lock, MapPin, Phone, CreditCard, ShoppingBag, User, Eye, EyeOff } from 'lucide-react';
+import { Check, RefreshCw, Lock, MapPin, Phone, CreditCard, ShoppingBag, User, Eye, EyeOff } from 'lucide-react';
 import CameraCapture from './shared/CameraCapture';
 import { useOcr } from '../hooks/useOcr';
 import { useToast, ToastContainer } from '../hooks/useToast';

@@ -1,4 +1,4 @@
-import { useState, useRef, type ChangeEvent, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Seller } from '../types';
 import ProfileAvatar from './shared/ProfileAvatar';
@@ -6,9 +6,8 @@ import { useToast, ToastContainer } from '../hooks/useToast';
 import { api } from '../api/client';
 import SettingsPanel from './shared/SettingsPanel';
 import {
-  User, MapPin, TrendingUp, Smartphone, Layers, Award, Activity, Lock, Camera,
-  LogOut, ChevronLeft, X, Image, Settings, Palette, Sun, Moon, Type, Shield,
-  ShieldAlert, Fingerprint, Bell, Cpu, Check, Trash2
+  User, MapPin, TrendingUp, Smartphone, Layers, Award, Activity, Lock,
+  LogOut, ChevronLeft, X, Settings, Trash2
 } from 'lucide-react';
 
 interface SellerAccountProps {
@@ -27,13 +26,12 @@ interface SellerAccountProps {
 export default function SellerAccount({
   sellerData, darkMode, setDarkMode,
   onPasswordChanged, onConfirmLogout, onLogout,
-  biometricAvailable = false,
   biometricEnabled = false,
   onEnableBiometric,
   onDisableBiometric
 }: SellerAccountProps) {
-  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
-  const [photoModalOpen, setPhotoModalOpen] = useState(false);
+  const { toasts, dismissToast, toastSuccess, toastError, toastWarning } = useToast();
+  const [, setPhotoModalOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -92,20 +90,6 @@ export default function SellerAccount({
   const [sellerPhoto, setSellerPhoto] = useState(
     sellerData.avatar || ''
   );
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleSellerPhotoChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      if (ev.target?.result) {
-        setSellerPhoto(ev.target.result as string);
-        setPhotoModalOpen(false);
-      }
-    };
-    reader.readAsDataURL(file);
-  };
 
   const handleDeleteSellerPhoto = () => {
     setSellerPhoto('');

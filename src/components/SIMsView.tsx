@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
+import { useState, useRef, useMemo, useCallback, memo } from 'react';
 import { SIM, Agent, Seller } from '../types';
 import type { CreateSimBatchRequest, SimBatchResult } from '../api/types';
 import { Upload } from 'lucide-react';
@@ -49,7 +49,7 @@ function statusLabel(status: string): string {
 }
 
 function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM, onAddSimBatch, agents = [], sellers = [] }: SIMsViewProps) {
-  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
+  const { toasts, dismissToast, toastSuccess, toastError, toastWarning } = useToast();
   const [searchTerm, setSearchTerm] = useState(initialSearch || '');
   const debouncedSearch = useDebounce(searchTerm, 300);
   const [selectedProvider, setSelectedProvider] = useState<string>('all');
@@ -800,4 +800,4 @@ function SIMsView({ sims = [], onAddSIM, initialSearch, onUpdateSIM, onAddSimBat
   );
 }
 
-export default React.memo(SIMsView);
+export default memo(SIMsView);

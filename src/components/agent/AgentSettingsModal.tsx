@@ -34,7 +34,6 @@ export default function AgentSettingsModal({
   onLogout,
   onConfirmLogout,
   handleConfirmLogout,
-  username,
   biometricEnabled,
   handleToggleBiometric
 }: AgentSettingsModalProps) {

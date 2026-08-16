@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 import { Request, Response, NextFunction } from 'express';
-import jwt, { VerifyOptions } from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { query } from '../db';
 import { setSentryUser } from '../sentry';

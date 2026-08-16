@@ -14,7 +14,7 @@ export const authRateLimiter = rateLimit({
   max: 5, // الحد الأقصى للمحاولات من نفس IP
   standardHeaders: true,
   legacyHeaders: false,
-  message: (req: Request, res: Response) => {
+  message: (_req: Request, res: Response) => {
     res.status(429).json({
       status: 429,
       error: 'Too Many Requests',
@@ -38,7 +38,7 @@ export const generalRateLimiter = rateLimit({
   max: 100, // 100 طلب في الدقيقة
   standardHeaders: true,
   legacyHeaders: false,
-  message: (req: Request, res: Response) => {
+  message: (_req: Request, res: Response) => {
     res.status(429).json({
       status: 429,
       error: 'Too Many Requests',
@@ -56,7 +56,7 @@ export const strictRateLimiter = rateLimit({
   max: 10, // 10 طلبات في الدقيقة فقط
   standardHeaders: true,
   legacyHeaders: false,
-  message: (req: Request, res: Response) => {
+  message: (_req: Request, res: Response) => {
     res.status(429).json({
       status: 429,
       error: 'Too Many Requests',

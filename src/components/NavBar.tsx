@@ -1,4 +1,3 @@
-import React from 'react';
 import { Role } from '../types';
 import { Home, PlusCircle, UserPlus, Users, Cpu, UserCircle, LogOut } from 'lucide-react';
 import MobileBottomNav from './shared/MobileBottomNav';

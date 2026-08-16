@@ -82,7 +82,6 @@ export const updateSimSchema = z.object({
 
 // SIM batch inventory — range-based ICCID insertion
 const ICCID_RANGE_REGEX = /^\d+$/;
-const MAX_BATCH_SIMS = 5000;
 
 export const createSimBatchSchema = z.object({
   from_iccid: z.string().min(1, 'from_iccid is required').max(30).regex(ICCID_RANGE_REGEX, 'from_iccid must be numeric'),

@@ -30,14 +30,6 @@ const STRINGIFIER_REPLACER = (_key: string, value: unknown): unknown => {
   return value;
 };
 
-function safeStringify(data: unknown): string {
-  try {
-    return JSON.stringify(data, STRINGIFIER_REPLACER);
-  } catch {
-    return String(data);
-  }
-}
-
 export type LogContext = {
   correlationId?: string;
   requestId?: string;

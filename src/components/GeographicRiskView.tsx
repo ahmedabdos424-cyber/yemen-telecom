@@ -17,7 +17,6 @@ import {
   User, 
   CheckCircle, 
   AlertTriangle, 
-  Search, 
   Download, 
   RefreshCw, 
   ZoomIn, 
@@ -294,7 +293,6 @@ export default function GeographicRiskView() {
     ];
 
     const identityNodes: GraphNode[] = identities.map((m): GraphNode => {
-      const parentId = regionsMap[m.region] || 'telecom-backbone';
       return {
         id: m.idNo,
         label: m.name,
@@ -376,7 +374,7 @@ export default function GeographicRiskView() {
         .on('drag', dragged)
         .on('end', dragended)
       )
-      .on('click', (event, d) => {
+      .on('click', (_event, d) => {
         setSelectedNode(d);
       });
 

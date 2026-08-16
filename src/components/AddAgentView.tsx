@@ -6,7 +6,6 @@
 import React, { useState, useCallback } from 'react';
 import { Agent, ViewType } from '../types';
 import { useToast, ToastContainer } from '../hooks/useToast';
-import { api } from '../api/client';
 import { RefreshCw, Check, Copy } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import CameraCapture from './shared/CameraCapture';
@@ -18,7 +17,7 @@ interface AddAgentViewProps {
 }
 
 export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps) {
-  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
+  const { toasts, dismissToast, toastSuccess, toastError, toastWarning } = useToast();
   const [name, setName] = useState('');
   const [fullName, setFullName] = useState('');
   const [region, setRegion] = useState('');

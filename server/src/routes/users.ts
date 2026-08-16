@@ -41,7 +41,7 @@ router.put('/profile', validate(updateProfileSchema), async (req: AuthRequest, r
   if (!req.user) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  const { displayName, phone, region, avatar } = req.body;
+  const { displayName, phone, region } = req.body;
   try {
     const result = await query(
       `UPDATE users SET display_name = COALESCE($1, display_name), phone = COALESCE($2, phone),

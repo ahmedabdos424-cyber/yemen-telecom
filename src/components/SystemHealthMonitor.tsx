@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Activity, Database, RefreshCw, Server, MemoryStick, ArrowDownUp } from 'lucide-react';
 import { Role } from '../types';
 import { getSystemHealth, type SystemHealthResponse } from '../api/client';

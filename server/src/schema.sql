@@ -231,6 +231,113 @@ ALTER TABLE alerts ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(
 ALTER TABLE distribution_requests ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
 
+-- ============================================================
+-- Schema additions from production migrations (drift sync)
+-- 006 (account lockout), 007 (updated_at), 009/037 (provider_id),
+-- 010 (timestamp companions), 026 (identity review), 028 (single-device
+-- sessions + session audit), 029 (agent full_name)
+-- ============================================================
+
+-- 006: account lockout counters
+ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_attempts INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP;
+
+-- 028: single-device session enforcement
+ALTER TABLE users ADD COLUMN IF NOT EXISTS active_session_sid VARCHAR(64);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS session_expires_at TIMESTAMP;
+
+-- 007: updated_at on all mutable tables (auto-triggered below)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE sellers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE sims ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE alerts ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE operations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE distribution_requests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+-- 009/037: provider_id FK (providers lookup table, see below)
+ALTER TABLE sims ADD COLUMN IF NOT EXISTS provider_id INTEGER REFERENCES providers(id) ON DELETE SET NULL;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS provider_id INTEGER REFERENCES providers(id) ON DELETE SET NULL;
+ALTER TABLE inventories ADD COLUMN IF NOT EXISTS provider_id INTEGER REFERENCES providers(id) ON DELETE SET NULL;
+ALTER TABLE operations ADD COLUMN IF NOT EXISTS provider_id INTEGER REFERENCES providers(id) ON DELETE SET NULL;
+ALTER TABLE distribution_requests ADD COLUMN IF NOT EXISTS provider_id INTEGER REFERENCES providers(id) ON DELETE SET NULL;
+
+-- 010: typed timestamp companions (legacy VARCHAR columns kept for compatibility)
+ALTER TABLE sellers ADD COLUMN IF NOT EXISTS creation_timestamp TIMESTAMP;
+ALTER TABLE sellers ADD COLUMN IF NOT EXISTS last_login_timestamp TIMESTAMP;
+ALTER TABLE sims ADD COLUMN IF NOT EXISTS date_added_timestamp TIMESTAMP;
+ALTER TABLE alerts ADD COLUMN IF NOT EXISTS created_timestamp TIMESTAMP;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS created_timestamp TIMESTAMP;
+ALTER TABLE operations ADD COLUMN IF NOT EXISTS occurred_at TIMESTAMP;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS created_timestamp TIMESTAMP;
+
+-- 026: identity review status on duplicate_identities
+ALTER TABLE duplicate_identities ADD COLUMN IF NOT EXISTS flagged BOOLEAN DEFAULT FALSE;
+ALTER TABLE duplicate_identities ADD COLUMN IF NOT EXISTS blocked BOOLEAN DEFAULT FALSE;
+ALTER TABLE duplicate_identities ADD COLUMN IF NOT EXISTS review_status VARCHAR(20) DEFAULT 'pending'
+  CHECK (review_status IN ('pending', 'flagged', 'blocked', 'resolved'));
+
+-- 028: session audit fields on audit_logs
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS device_name VARCHAR(200) DEFAULT '';
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS ip_address VARCHAR(64) DEFAULT '';
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS mac_address VARCHAR(128) DEFAULT '';
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS login_at TIMESTAMP;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS logout_at TIMESTAMP;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS session_status VARCHAR(20) DEFAULT 'active'
+  CHECK (session_status IN ('active', 'closed', 'expired'));
+
+-- 029: agent legal full name (OCR-captured from ID document)
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS full_name VARCHAR(200) DEFAULT '';
+
+-- 007: auto-update trigger function + triggers (idempotent)
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_users_updated_at ON users;
+DROP TRIGGER IF EXISTS trg_agents_updated_at ON agents;
+DROP TRIGGER IF EXISTS trg_sellers_updated_at ON sellers;
+DROP TRIGGER IF EXISTS trg_sims_updated_at ON sims;
+DROP TRIGGER IF EXISTS trg_alerts_updated_at ON alerts;
+DROP TRIGGER IF EXISTS trg_transactions_updated_at ON transactions;
+DROP TRIGGER IF EXISTS trg_operations_updated_at ON operations;
+DROP TRIGGER IF EXISTS trg_customers_updated_at ON customers;
+DROP TRIGGER IF EXISTS trg_distribution_requests_updated_at ON distribution_requests;
+
+CREATE TRIGGER trg_users_updated_at
+    BEFORE UPDATE ON users
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_agents_updated_at
+    BEFORE UPDATE ON agents
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_sellers_updated_at
+    BEFORE UPDATE ON sellers
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_sims_updated_at
+    BEFORE UPDATE ON sims
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_alerts_updated_at
+    BEFORE UPDATE ON alerts
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_transactions_updated_at
+    BEFORE UPDATE ON transactions
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_operations_updated_at
+    BEFORE UPDATE ON operations
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_customers_updated_at
+    BEFORE UPDATE ON customers
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_distribution_requests_updated_at
+    BEFORE UPDATE ON distribution_requests
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- Add UNIQUE constraint on customers.id_number (PostgreSQL has no ADD CONSTRAINT IF NOT EXISTS)
 DO $$
 BEGIN
@@ -263,6 +370,56 @@ CREATE INDEX IF NOT EXISTS idx_operations_type ON operations(type);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_type ON audit_logs(type);
 CREATE INDEX IF NOT EXISTS idx_duplicate_identities_region ON duplicate_identities(region);
 CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires ON token_blacklist(expires_at);
+
+-- Missing indexes from migrations 001/028/031/033/035/037 (drift sync)
+CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
+CREATE INDEX IF NOT EXISTS idx_users_role_username ON users(role, username);
+CREATE INDEX IF NOT EXISTS idx_sellers_region ON sellers(region);
+CREATE INDEX IF NOT EXISTS idx_sellers_region_code ON sellers(region_code);
+CREATE INDEX IF NOT EXISTS idx_sellers_id_number ON sellers(id_number);
+CREATE INDEX IF NOT EXISTS idx_sellers_created_at ON sellers(created_at);
+CREATE INDEX IF NOT EXISTS idx_sims_owner ON sims(owner);
+CREATE INDEX IF NOT EXISTS idx_sims_customer_name ON sims(customer_name);
+CREATE INDEX IF NOT EXISTS idx_sims_customer_id ON sims(customer_id);
+CREATE INDEX IF NOT EXISTS idx_sims_created_at ON sims(created_at);
+CREATE INDEX IF NOT EXISTS idx_sims_provider_id ON sims(provider_id);
+CREATE INDEX IF NOT EXISTS idx_sims_provider_status ON sims(provider, status);
+CREATE INDEX IF NOT EXISTS idx_sims_status_created ON sims(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_operations_status ON operations(status);
+CREATE INDEX IF NOT EXISTS idx_operations_target ON operations(target);
+CREATE INDEX IF NOT EXISTS idx_operations_operator ON operations(operator);
+CREATE INDEX IF NOT EXISTS idx_operations_customer_name ON operations(customer_name);
+CREATE INDEX IF NOT EXISTS idx_operations_customer_id ON operations(customer_id);
+CREATE INDEX IF NOT EXISTS idx_operations_created_at ON operations(created_at);
+CREATE INDEX IF NOT EXISTS idx_operations_iccid ON operations(iccid);
+CREATE INDEX IF NOT EXISTS idx_operations_created_by ON operations(created_by);
+CREATE INDEX IF NOT EXISTS idx_operations_agent_created ON operations(created_by, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_operations_type_created ON operations(type, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_operations_type_status ON operations(type, status);
+CREATE INDEX IF NOT EXISTS idx_alerts_priority ON alerts(priority);
+CREATE INDEX IF NOT EXISTS idx_alerts_category ON alerts(category);
+CREATE INDEX IF NOT EXISTS idx_alerts_time ON alerts(time);
+CREATE INDEX IF NOT EXISTS idx_alerts_created_at ON alerts(created_at);
+CREATE INDEX IF NOT EXISTS idx_alerts_read_priority_time ON alerts(is_read, priority, time);
+CREATE INDEX IF NOT EXISTS idx_agents_status ON agents(status);
+CREATE INDEX IF NOT EXISTS idx_agents_region ON agents(region);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_status ON audit_logs(status);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_time ON audit_logs(time);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_username_login ON audit_logs(username, login_at);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_session_status ON audit_logs(session_status);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user_session ON audit_logs(username, type, session_status, id DESC);
+CREATE INDEX IF NOT EXISTS idx_distribution_seller ON distribution_requests(seller_id);
+CREATE INDEX IF NOT EXISTS idx_distribution_created ON distribution_requests(created_at);
+CREATE INDEX IF NOT EXISTS idx_duplicate_identities_risk ON duplicate_identities(risk);
+CREATE INDEX IF NOT EXISTS idx_duplicate_identities_name ON duplicate_identities(name);
+CREATE INDEX IF NOT EXISTS idx_duplicate_identities_review ON duplicate_identities(review_status);
+CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(status);
+CREATE INDEX IF NOT EXISTS idx_transactions_provider ON transactions(provider);
+CREATE INDEX IF NOT EXISTS idx_transactions_client_name ON transactions(client_name);
+CREATE INDEX IF NOT EXISTS idx_inventories_available ON inventories(available);
+CREATE INDEX IF NOT EXISTS idx_customers_name_created ON customers(full_name, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_customers_phone_lookup ON customers(phone);
 
 -- Identity risk actions (production: flag/block/unblock decisions on identities)
 CREATE TABLE IF NOT EXISTS identity_risk_actions (
@@ -304,6 +461,20 @@ BEGIN
   DELETE FROM token_blacklist WHERE expires_at < NOW();
 END;
 $$ LANGUAGE plpgsql;
+
+-- 034: FCM device token registry for push notifications
+CREATE TABLE IF NOT EXISTS device_tokens (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token VARCHAR(512) NOT NULL UNIQUE,
+  platform VARCHAR(20) NOT NULL DEFAULT 'android'
+    CHECK (platform IN ('android', 'ios', 'web')),
+  last_used_at TIMESTAMP DEFAULT NOW(),
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_device_tokens_user_id ON device_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_device_tokens_last_used ON device_tokens(last_used_at);
 
 -- SEED DATA
 

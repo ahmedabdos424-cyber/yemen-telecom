@@ -56,7 +56,7 @@ export function getUniqueViolationKind(err: unknown): UniqueViolationKind {
  * @param fieldName - The field name in Arabic for user display
  * @returns Localized error message
  */
-export function formatUniqueViolationMessage(kind: UniqueViolationKind, fieldName: string = 'الحقل'): string {
+export function formatUniqueViolationMessage(kind: UniqueViolationKind, _fieldName: string = 'الحقل'): string {
   switch (kind) {
     case 'phone':
       return 'رقم الهاتف مستخدم بالفعل، يرجى استخدام رقم مختلف';

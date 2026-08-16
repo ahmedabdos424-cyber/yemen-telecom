@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Role, OperatorInventory } from '../../types';
 import {
-  User, Shield, MapPin,
-  Users, Layers, Package, TrendingUp, Target, Camera,
+  User, MapPin,
+  Users, Layers, Package, TrendingUp, Target,
   Lock, LogOut, X, ChevronLeft, Eye, EyeOff,
   Settings, Trash2
 } from 'lucide-react';
@@ -29,21 +29,19 @@ interface AgentProfileViewProps {
 
 export default function AgentProfileView({
   username,
-  role,
   sellersCount,
   inventories = [],
   onLogout,
   onConfirmLogout,
   darkMode,
   setDarkMode,
-  biometricAvailable = false,
   biometricEnabled = false,
   onEnableBiometric,
   onDisableBiometric
 }: AgentProfileViewProps) {
-  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
+  const { toasts, dismissToast, toastSuccess, toastWarning } = useToast();
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
-  const [photoModalOpen, setPhotoModalOpen] = useState(false);
+  const [, setPhotoModalOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -104,7 +102,6 @@ export default function AgentProfileView({
   const [passwordError, setPasswordError] = useState('');
 
   const [agentPhoto, setAgentPhoto] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Real profile data from /auth/me (region, phone, status, registration date)
   const [profile, setProfile] = useState<ApiMeResponse | null>(null);
@@ -136,19 +133,6 @@ export default function AgentProfileView({
     } catch (err: unknown) {
       setPasswordError(err instanceof Error ? err.message : String(err));
     }
-  };
-
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      if (ev.target?.result) {
-        setAgentPhoto(ev.target.result as string);
-        setPhotoModalOpen(false);
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleDeletePhoto = () => {

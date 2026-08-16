@@ -5,10 +5,8 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { Seller, SIM } from '../types';
-import { Check } from 'lucide-react';
 import profileImage from '../assets/profile.png';
 import { useToast, ToastContainer } from '../hooks/useToast';
-import { safeArray } from '../lib/safe';
 import { api } from '../api/client';
 import CameraCapture from './shared/CameraCapture';
 
@@ -51,7 +49,7 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
   const [invoiceImageUrl, setInvoiceImageUrl] = useState<string | null>(null);
   const [uploadingInvoice, setUploadingInvoice] = useState(false);
 
-  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
+  const { toasts, dismissToast, toastSuccess, toastError } = useToast();
 
   const handleInvoiceCapture = useCallback(async (imageData: string) => {
     setUploadingInvoice(true);

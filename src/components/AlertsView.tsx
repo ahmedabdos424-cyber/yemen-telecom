@@ -24,7 +24,7 @@ export default function AlertsView({
   const [priorityFilter, setPriorityFilter] = useState<'all' | 'high' | 'medium'>('all');
   const [isVerifyingSecurity, setIsVerifyingSecurity] = useState(false);
   const [reorderLoaders, setReorderLoaders] = useState<Record<string, boolean>>({});
-  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
+  const { toasts, dismissToast, toastSuccess, toastError } = useToast();
 
   const filteredAlerts = useMemo(() => alerts.filter((alert) => {
     if (priorityFilter === 'all') return true;

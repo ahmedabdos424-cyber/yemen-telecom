@@ -31,7 +31,7 @@ export default function SellerSimsView({ sims = [], onUpdateSims }: SellerSimsVi
   const [transferToSellerName, setTransferToSellerName] = useState('');
   const [deleteConfirmSimId, setDeleteConfirmSimId] = useState<string | null>(null);
 
-  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
+  const { toasts, dismissToast, toastWarning } = useToast();
 
   const computedStats = sims.reduce((acc, sim) => {
     const op = (sim.operator || 'yemen_mobile').toLowerCase();

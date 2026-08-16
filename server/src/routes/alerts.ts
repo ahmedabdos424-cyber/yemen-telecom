@@ -8,7 +8,7 @@ const router = Router();
 
 router.get('/', requireRole('manager'), async (req: Request, res: Response) => {
   try {
-    const { page, limit, offset } = getPagination(req);
+    const { limit, offset } = getPagination(req);
     const paginate = req.query.page || req.query.limit;
     let sql = 'SELECT * FROM alerts ORDER BY id DESC';
     const params: (string | number)[] = [];

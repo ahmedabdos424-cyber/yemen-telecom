@@ -1,6 +1,6 @@
-import React, { Suspense, lazy, useState, useCallback, useEffect, useRef } from 'react';
+import { Suspense, lazy, useState, useEffect, useRef } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { ViewType, Role, Operator } from './types';
+import { ViewType, Role } from './types';
 
 import SplashScreen from './components/SplashScreen';
 import LoginScreen from './components/LoginScreen';
@@ -48,8 +48,7 @@ function AuthenticatedApp() {
   const agt = useAgentSellerState(auth.role, auth.username);
 
   const [dashboardSearch, setDashboardSearch] = useState('');
-  const { role, username, darkMode, setDarkMode, isLoading, handleLogin, handleLogout, clearSession, biometricAvailable, biometricEnrolled, biometricEnabled, enableBiometricLogin, disableBiometricLogin, handleBiometricLogin, showBiometricPrompt, dismissBiometricPrompt } = auth;
-  const { setTokenWrapper } = auth;
+  const { role, username, darkMode, setDarkMode, isLoading, handleLogin, handleLogout, clearSession, biometricAvailable, biometricEnrolled, biometricEnabled, enableBiometricLogin, disableBiometricLogin, showBiometricPrompt, dismissBiometricPrompt } = auth;
   const isOnline = useNetworkStatus();
   const { toasts, dismissToast, toastWarning, toastInfo } = useToast();
   const roleRef = useRef(role);
