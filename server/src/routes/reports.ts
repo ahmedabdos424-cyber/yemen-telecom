@@ -89,7 +89,7 @@ router.get('/seller-performance', requireRole('manager', 'agent'), async (req: A
   if (cached) return res.json(cached);
   try {
     let whereClause = '';
-    let params: any[] | undefined;
+    let params: unknown[] | undefined;
     if (req.user?.role === 'agent') {
       const agentRes = await query<AgentIdRow>('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
       if (agentRes.rows.length === 0) {
@@ -128,7 +128,7 @@ router.get('/activations', requireRole('manager', 'agent'), async (req: AuthRequ
   if (cached) return res.json(cached);
   try {
     let whereClause = 'WHERE o.type = $1';
-    let params: any[] = ['activate'];
+    let params: unknown[] = ['activate'];
     if (req.user?.role === 'agent') {
       const agentRes = await query<AgentIdRow>('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
       if (agentRes.rows.length === 0) {
@@ -169,7 +169,7 @@ router.get('/activations', requireRole('manager', 'agent'), async (req: AuthRequ
 router.get('/sellers', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
   try {
     let whereClause = '';
-    let params: any[] | undefined;
+    let params: unknown[] | undefined;
     if (req.user?.role === 'agent') {
       const agentRes = await query<AgentIdRow>('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
       if (agentRes.rows.length === 0) {

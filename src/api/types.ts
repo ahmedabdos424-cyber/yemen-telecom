@@ -584,3 +584,46 @@ export interface SellerReportRow {
   activity_rate: number;
   agent_name: string | null;
 }
+
+// صفوف تقارير الأداء المُعاد استخدام أنواعها في الواجهة (تطابق استجابات api في client.ts)
+export interface AgentPerformanceRow {
+  id: number;
+  agent_name: string;
+  region: string;
+  seller_count: number;
+  total_sims: number;
+  sales_30_days: number;
+  avg_efficiency: number;
+}
+
+export interface DailySalesRow {
+  day: string;
+  activations: number;
+  unique_customers: number;
+  operator: string;
+}
+
+export interface SellerPerformanceRow {
+  id: number;
+  name: string;
+  store_name: string;
+  region: string;
+  sims_count: number;
+  sales_30_days: number;
+  sales_growth: number;
+  efficiency: number;
+  activity_rate: number;
+  status: string;
+  agent_name: string;
+}
+
+export interface OperatorDistributionRow {
+  operator: string;
+  count: number;
+  status: string;
+}
+
+export interface OperatorDistribution {
+  sims: OperatorDistributionRow[];
+  operations: OperatorDistributionRow[];
+}

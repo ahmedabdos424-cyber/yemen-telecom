@@ -24,7 +24,7 @@ function getClient(): S3Client {
   return client;
 }
 
-export async function uploadBackup(data: Record<string, any[]>): Promise<{ url: string; filename: string; size: number }> {
+export async function uploadBackup(data: Record<string, unknown[]>): Promise<{ url: string; filename: string; size: number }> {
   if (!configured) {
     throw new Error('S3-compatible backup storage not configured. Set BACKUP_S3_ENDPOINT, BACKUP_S3_ACCESS_KEY_ID, BACKUP_S3_SECRET_ACCESS_KEY, and BACKUP_S3_BUCKET.');
   }

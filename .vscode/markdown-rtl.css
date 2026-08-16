@@ -1,16 +1,37 @@
-/* تخطيط معاينة Markdown: عربي RTL مع إبقاء الرموز البرمجية باتجاه LTR */
+/* تخطيط معاينة Markdown: عربي RTL مع عزل الرموز البرمجية باتجاه LTR */
 body {
   direction: rtl;
   text-align: right;
   font-family: "Segoe UI", "Tahoma", "Noto Sans Arabic", sans-serif;
 }
 
-/* الأكواد تبقى باتجاه من اليسار إلى اليمين لمنع كسر المحاذاة */
+p,
+li,
+blockquote,
+td,
+th,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  direction: rtl;
+  text-align: right;
+}
+
+/* الأكواد معزولة الاتجاه: LTR نظيف داخل الفقرة العربية دون كسر العلامات */
 code,
 pre,
 .hljs,
 .vscode-code-block {
   direction: ltr;
   text-align: left;
-  unicode-bidi: embed;
+  unicode-bidi: isolate;
+  isolation: isolate;
+}
+
+/* الكلمات الإنجليزية المضمنة وسط الجملة العربية تبقى بترتيبها الصحيح */
+:not(code):not(pre):not(.hljs) {
+  unicode-bidi: plaintext;
 }

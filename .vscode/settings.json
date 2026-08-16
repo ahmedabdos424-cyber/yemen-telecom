@@ -6,5 +6,5 @@
   "editor.wordWrap": "on",
   "markdown.styles": [".vscode/markdown-rtl.css"],
   "notification.visibility": "visible",
-  "java.configuration.updateBuildConfiguration": "interactive"
+  "java.configuration.updateBuildConfiguration": "automatic"
 }

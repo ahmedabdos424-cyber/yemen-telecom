@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sim, Operator } from '../types';
+import { Sim, Operator, SimStatus } from '../types';
 import ConfirmModal from './shared/ConfirmModal';
 import EmptyState from './shared/EmptyState';
 import {
@@ -72,7 +72,7 @@ export default function SellerSimsView({ sims = [], onUpdateSims }: SellerSimsVi
 
   const handleStatusChange = (simId: string, newStatus: string) => {
     if (onUpdateSims) {
-      const updated = sims.map(s => s.id === simId ? { ...s, status: newStatus as any } : s);
+      const updated = sims.map(s => s.id === simId ? { ...s, status: newStatus as SimStatus } : s);
       onUpdateSims(updated);
     }
     setActiveMenuSimId(null);
@@ -175,7 +175,7 @@ export default function SellerSimsView({ sims = [], onUpdateSims }: SellerSimsVi
         {[
           { id: 'all', label: 'الكل' }, { id: 'available', label: 'المتوفر' }, { id: 'sold', label: 'المباع' }
         ].map(tab => (
-          <button key={tab.id} onClick={() => { setSimStatusFilter(tab.id as any); setSimCurrentPage(1); }}
+          <button key={tab.id} onClick={() => { setSimStatusFilter(tab.id as 'all' | 'available' | 'sold'); setSimCurrentPage(1); }}
             className={`px-5 py-3 text-xs font-bold transition-all relative whitespace-nowrap ${simStatusFilter === tab.id ? 'text-red-500 font-black border-b-2 border-red-600' : 'text-slate-400 hover:text-slate-100'}`}>{tab.label}</button>
         ))}
       </div>
@@ -209,8 +209,8 @@ export default function SellerSimsView({ sims = [], onUpdateSims }: SellerSimsVi
                           <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black ${sim.operator === 'yemen_mobile' ? 'bg-ym-light/20 text-ym border border-ym-light/30' : sim.operator === 'you' ? 'bg-amber-950/40 text-amber-500 border border-amber-900/40' : 'bg-blue-950/40 text-blue-400 border border-blue-900/40'}`}>{operatorLabel}</span>
                         </td>
                         <td className="p-4">
-                          <span className={`badge ${sim.status === 'available' ? 'badge-available' : sim.status === 'sold' ? 'badge-sold' : sim.status === 'reserved' ? 'badge-reserved' : (sim.status as any) === 'allocated' || (sim.status as any) === 'suspended' ? 'badge-pending' : 'badge-damaged'}`}>
-                            {sim.status === 'available' ? 'متوفر' : sim.status === 'sold' ? 'مباع' : sim.status === 'reserved' ? 'محجوز' : (sim.status as any) === 'allocated' || (sim.status as any) === 'suspended' ? 'مخصص' : 'تالف'}
+                          <span className={`badge ${sim.status === 'available' ? 'badge-available' : sim.status === 'sold' ? 'badge-sold' : sim.status === 'reserved' ? 'badge-reserved' : sim.status === 'allocated' || sim.status === 'suspended' ? 'badge-pending' : 'badge-damaged'}`}>
+                            {sim.status === 'available' ? 'متوفر' : sim.status === 'sold' ? 'مباع' : sim.status === 'reserved' ? 'محجوز' : sim.status === 'allocated' || sim.status === 'suspended' ? 'مخصص' : 'تالف'}
                           </span>
                         </td>
                         <td className="p-4 text-slate-500 font-sans">{sim.dateAdded}</td>
@@ -388,7 +388,7 @@ export default function SellerSimsView({ sims = [], onUpdateSims }: SellerSimsVi
                   <button type="button" onClick={() => {
                     if (!transferToSellerName) { toastWarning('يرجى تحديد المحل أو البائع المستلم'); return; }
                     if (onUpdateSims) {
-                      const updated = sims.map(s => s.id === transferSim.id ? { ...s, owner: transferToSellerName, status: 'allocated' as any } : s);
+                      const updated = sims.map(s => s.id === transferSim.id ? { ...s, owner: transferToSellerName, status: 'allocated' as SimStatus } : s);
                       onUpdateSims(updated);
                     }
                     setTransferToSellerName('');

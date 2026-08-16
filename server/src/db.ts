@@ -50,11 +50,11 @@ const poolConfig: PoolConfig = {
   allowExitOnIdle: false,
 };
 if (process.env.DB_FAMILY) {
-  (poolConfig as any).family = parseInt(process.env.DB_FAMILY, 10);
+  ((poolConfig as unknown) as { family?: number }).family = parseInt(process.env.DB_FAMILY, 10);
 }
 export const pool = new Pool(poolConfig);
 
-pool.on('error', (err: any) => {
+pool.on('error', (err: NodeJS.ErrnoException) => {
   // تجاهل هادئ لأخطاء إعادة ضبط الاتصال الخامل (PgBouncer) لتقليل ضجيج السجلات
   if (err.code === 'ECONNRESET' || err.code === '57P01') {
     logger.debug('[DB] idle client recycled:', err.code);
@@ -65,7 +65,7 @@ pool.on('error', (err: any) => {
 
 let slowQueryThreshold = parseInt(process.env.DB_SLOW_QUERY_MS || '500', 10);
 
-export async function query<T extends import('pg').QueryResultRow = any>(text: string, params?: any[]): Promise<import('pg').QueryResult<T>> {
+export async function query<T extends import('pg').QueryResultRow = any>(text: string, params?: unknown[]): Promise<import('pg').QueryResult<T>> {
   const start = Date.now();
   const res = await pool.query(text, params);
   const duration = Date.now() - start;

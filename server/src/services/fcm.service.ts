@@ -88,7 +88,7 @@ export async function sendPushToTokens(
       const code = (result.reason as { code?: string })?.code;
       // Unregistered/expired tokens should be pruned from the registry.
       if (code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token') {
-        query('DELETE FROM device_tokens WHERE token = $1', [tokens[i]]).catch(() => {});
+        query('DELETE FROM device_tokens WHERE token = $1', [tokens[i]]).catch((err) => logger.warn('[FCM] Failed to prune invalid device token:', err));
       } else {
         logger.warn(`[FCM] Send failed for token ${i}:`, result.reason);
       }

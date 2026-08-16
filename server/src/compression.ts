@@ -64,7 +64,7 @@ export function compression() {
     };
 
     res.send = function (body?: unknown): Response {
-      if (!shouldCompress(body as any)) {
+      if (!shouldCompress(body as Buffer | string | object)) {
         return originalSend(body);
       }
       const buf = Buffer.isBuffer(body) ? body : Buffer.from(String(body));

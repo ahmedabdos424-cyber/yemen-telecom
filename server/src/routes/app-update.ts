@@ -1,4 +1,4 @@
-import { Router, type Response } from 'express';
+import { Router, type Request, type Response } from 'express';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { logger } from '../logger';
 import { requireRole } from '../middleware/auth';
@@ -71,7 +71,7 @@ router.get('/app-version', async (_req, res: Response) => {
 
 // POST /api/app-update-installed — record a successful install.
 // deviceId + version + time let the operator know who updated and who didn't.
-router.post('/app-update-installed', (req: any, res: Response) => {
+router.post('/app-update-installed', (req: Request, res: Response) => {
   const deviceId = String(req.body?.deviceId || req.body?.device_id || 'unknown').slice(0, 128);
   const version = String(req.body?.version || '').slice(0, 32);
   const versionCode = parseInt(req.body?.versionCode, 10) || 0;

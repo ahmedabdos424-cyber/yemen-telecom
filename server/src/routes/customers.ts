@@ -13,7 +13,7 @@ router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: R
     const paginate = req.query.page || req.query.limit;
     let queryText = 'SELECT * FROM customers';
     const conditions: string[] = [];
-    const params: any[] = [];
+    const params: unknown[] = [];
     if (req.user?.role === 'agent') {
       conditions.push('created_by = $' + (params.length + 1));
       params.push(req.user.id);
@@ -41,7 +41,7 @@ router.get('/search', requireRole('manager', 'agent'), async (req: AuthRequest, 
   }
   try {
     let sql = 'SELECT * FROM customers WHERE (full_name ILIKE $1 OR id_number ILIKE $1 OR phone ILIKE $1)';
-    const params: any[] = [`%${q}%`];
+    const params: unknown[] = [`%${q}%`];
     if (req.user?.role === 'agent') {
       sql += ' AND created_by = $2';
       params.push(req.user.id);
@@ -61,7 +61,7 @@ router.get('/:id', requireRole('manager', 'agent', 'seller'), async (req: AuthRe
     if (req.user?.role === 'agent' || req.user?.role === 'seller') {
       sql += ' AND created_by = $2';
     }
-    const params: any[] = [req.params.id];
+    const params: unknown[] = [req.params.id];
     if (req.user?.role === 'agent' || req.user?.role === 'seller') {
       params.push(req.user.id);
     }

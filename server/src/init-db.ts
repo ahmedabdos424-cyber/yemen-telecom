@@ -7,7 +7,7 @@ import { logger } from './logger';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-async function ensureMigrationTable(client: any) {
+async function ensureMigrationTable(client: import('pg').PoolClient) {
   await client.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       filename VARCHAR(255) PRIMARY KEY,
@@ -16,7 +16,7 @@ async function ensureMigrationTable(client: any) {
   `);
 }
 
-async function runMigrations(client: any) {
+async function runMigrations(client: import('pg').PoolClient) {
   await ensureMigrationTable(client);
   const migrationsDir = path.join(__dirname, '../migrations');
   if (!fs.existsSync(migrationsDir)) return;

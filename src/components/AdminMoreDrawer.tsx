@@ -23,7 +23,7 @@ export default function AdminMoreDrawer({ isMoreOpen, setIsMoreOpen, setView, on
 
   const { toasts, dismissToast, toastSuccess, toastError } = useToast();
 
-  const [backupsList, setBackupsList] = useState<any[]>([]);
+  const [backupsList, setBackupsList] = useState<Array<{ name: string; size: string; date: string }>>([]);
   const [backupProgress, setBackupProgress] = useState<number | null>(null);
   const [backupStatus, setBackupStatus] = useState<'idle' | 'running' | 'completed'>('idle');
 

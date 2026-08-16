@@ -18,8 +18,84 @@ const router = Router();
 
 const RESET_CONFIRM_TOKEN = process.env.RESET_CONFIRM_TOKEN || 'RESET_INVENTORY';
 
+// ===== أنواع صفوف قاعدة البيانات (DB row types) =====
+interface DbAuditLogRow {
+  log_id: unknown;
+  type: string;
+  title: string;
+  username: string;
+  time: unknown;
+  status: string;
+  device_name?: string | null;
+  ip_address?: string | null;
+  mac_address?: string | null;
+  login_at?: string | Date | null;
+  logout_at?: string | Date | null;
+  session_status?: string | null;
+}
+
+interface DbSystemSettingsRow {
+  two_fa_enabled?: unknown;
+  email_2fa_enabled?: unknown;
+  trusted_devices_enabled?: unknown;
+  session_timeout?: unknown;
+  password_special_required?: unknown;
+  password_expiry_90_days?: unknown;
+  password_no_reuse_5?: unknown;
+  maintenance_mode?: unknown;
+  language?: unknown;
+  email_alerts_enabled?: unknown;
+  sms_alerts_enabled?: unknown;
+  app_notifications_enabled?: unknown;
+  stock_shortage_threshold?: unknown;
+  inactive_sims_threshold?: unknown;
+  max_failed_logins_threshold?: unknown;
+  high_risk_duplicates_threshold?: unknown;
+  identity_reminders_enabled?: unknown;
+  identity_reminders_frequency?: unknown;
+}
+
+interface DbDuplicateIdentityRow {
+  id_no: string;
+  name: string;
+  sims_count: string;
+  duplicates_count: string;
+  region: string;
+  agent_name?: string | null;
+  created_at?: unknown;
+}
+
+interface DbDuplicateStatusRow {
+  id_no: string;
+  flagged?: unknown;
+  blocked?: unknown;
+  review_status?: unknown;
+}
+
+interface DbAdminSellerRow {
+  id?: unknown;
+  seller_id?: unknown;
+  name?: unknown;
+  store_name?: unknown;
+  phone?: unknown;
+  region?: unknown;
+  status?: unknown;
+  agent_id?: unknown;
+  agent_name?: unknown;
+  user_username?: unknown;
+  user_status?: unknown;
+  sales_30_days?: unknown;
+  current_stock?: unknown;
+  total_sales?: unknown;
+  activations_count?: unknown;
+  user_last_login?: unknown;
+  last_login?: unknown;
+  latitude?: unknown;
+  longitude?: unknown;
+}
+
 // تحويل صف audit_logs إلى الشكل المتوقع للواجهة (مشترك بين سجلات التدقيق وجلسات البائعين)
-function mapAuditRow(r: any) {
+function mapAuditRow(r: DbAuditLogRow) {
   return {
     id: r.log_id,
     type: r.type,
@@ -36,7 +112,7 @@ function mapAuditRow(r: any) {
   };
 }
 
-function mapAdminSettingsToCamelCase(s: any) {
+function mapAdminSettingsToCamelCase(s: DbSystemSettingsRow) {
   return {
     twoFAEnabled: s.two_fa_enabled,
     email2FAEnabled: s.email_2fa_enabled,
@@ -151,7 +227,7 @@ router.get('/duplicate-identities', requireRole('manager'), async (req: Request,
     const params = paginate ? [limit, offset] : [];
     const result = await query(queryText, params);
     const seen = new Set<string>();
-    const deduped = result.rows.filter((r: any) => {
+    const deduped = result.rows.filter((r: DbDuplicateIdentityRow) => {
       if (seen.has(r.id_no)) return false;
       seen.add(r.id_no);
       return true;
@@ -166,11 +242,11 @@ router.get('/duplicate-identities', requireRole('manager'), async (req: Request,
       aggMap.set(r.id_no, entry);
     }
     // Pull current flag/block status per id_no (may be empty for new ids).
-    const idNos = deduped.map((r: any) => r.id_no);
+    const idNos = deduped.map((r: DbDuplicateIdentityRow) => r.id_no);
     const statusRows = idNos.length
       ? await query(`SELECT id_no, flagged, blocked, review_status FROM duplicate_identities WHERE id_no = ANY($1)`, [idNos])
-      : { rows: [] as any[] };
-    const statusMap = new Map<string, any>();
+      : { rows: [] as DbDuplicateStatusRow[] };
+    const statusMap = new Map<string, DbDuplicateStatusRow>();
     for (const s of statusRows.rows) statusMap.set(s.id_no, s);
     res.json(deduped.map((r: { id_no: string; name: string; sims_count: string; duplicates_count: string; region: string }) => {
       const count = parseInt(r.duplicates_count);
@@ -350,7 +426,7 @@ function toCoord(v: unknown): number | undefined {
   return undefined;
 }
 
-function mapAdminSeller(r: any) {
+function mapAdminSeller(r: DbAdminSellerRow) {
   return {
     id: String(r.id),
     sellerId: r.seller_id,
@@ -648,7 +724,7 @@ router.post('/system/backup', requireRole('manager'), async (_req: Request, res:
       customers: 'SELECT * FROM customers ORDER BY id',
       distribution_requests: 'SELECT * FROM distribution_requests ORDER BY id',
     };
-    const backup: Record<string, any[]> = {};
+    const backup: Record<string, unknown[]> = {};
     for (const [table, queryText] of Object.entries(allowedTables)) {
       const result = await query(queryText);
       backup[table] = result.rows;

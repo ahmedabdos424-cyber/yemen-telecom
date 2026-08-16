@@ -5,7 +5,7 @@ import { broadcastEvent } from './realtime.service';
 import { logger } from '../logger';
 
 export interface Queryable {
-  query(text: string, params?: any[]): Promise<QueryResult<any>>;
+  query(text: string, params?: unknown[]): Promise<QueryResult<any>>;
 }
 
 export type AlertPriority = 'high' | 'medium' | 'low';

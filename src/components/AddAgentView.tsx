@@ -12,7 +12,7 @@ import CameraCapture from './shared/CameraCapture';
 import { useOcr } from '../hooks/useOcr';
 
 interface AddAgentViewProps {
-  onAddAgent: (agent: Partial<Agent> & { username?: string; password?: string }) => Promise<any>;
+  onAddAgent: (agent: Partial<Agent> & { username?: string; password?: string }) => Promise<unknown>;
   setView: (view: ViewType) => void;
 }
 
@@ -65,7 +65,7 @@ export default function AddAgentView({ onAddAgent, setView }: AddAgentViewProps)
         password: loginPassword,
       });
 
-      const creds = (res as any)?.credentials || { username: loginUsername.trim().toLowerCase(), password: loginPassword };
+      const creds = (res as { credentials?: { username: string; password: string } } | null)?.credentials || { username: loginUsername.trim().toLowerCase(), password: loginPassword };
       setCreatedResult({ username: creds.username, password: creds.password });
     } catch (err: unknown) {
       toastError(err instanceof Error ? err.message : String(err));

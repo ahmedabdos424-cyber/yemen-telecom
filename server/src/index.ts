@@ -342,22 +342,28 @@ function extractMountPath(regexp: RegExp): string {
 }
 
 // Helper to extract registered routes
+type RouteLayer = {
+  route?: { methods?: Record<string, boolean>; path: string };
+  name?: string;
+  regexp?: RegExp;
+  handle?: { stack?: RouteLayer[] };
+};
 function listRoutes(): { method: string; path: string }[] {
   const routes: { method: string; path: string }[] = [];
-  const stack = (app as any)._router?.stack || [];
+  const stack: RouteLayer[] = (app as unknown as { _router?: { stack?: RouteLayer[] } })._router?.stack || [];
   for (const layer of stack) {
     if (layer.route) {
       const methods = Object.keys(layer.route.methods || {}).join(',').toUpperCase();
       routes.push({ method: methods, path: layer.route.path });
     } else if (layer.name === 'router' && layer.handle?.stack) {
-      const mountPath = extractMountPath(layer.regexp);
+      const mountPath = extractMountPath(layer.regexp as RegExp);
       for (const sub of layer.handle.stack) {
         if (sub.route) {
           const methods = Object.keys(sub.route.methods || {}).join(',').toUpperCase();
           const subPath = sub.route.path === '/' ? '' : sub.route.path;
           routes.push({ method: methods, path: mountPath + subPath });
         } else if (sub.name === 'router' && sub.handle?.stack) {
-          const subMountPath = extractMountPath(sub.regexp);
+          const subMountPath = extractMountPath(sub.regexp as RegExp);
           for (const inner of sub.handle.stack) {
             if (inner.route) {
               const methods = Object.keys(inner.route.methods || {}).join(',').toUpperCase();

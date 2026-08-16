@@ -599,7 +599,7 @@ export default function SellerListView({
                   <label className="text-[11px] font-bold text-slate-400">شركة الاتصالات</label>
                   <select
                     value={allocOp}
-                    onChange={(e) => setAllocOp(e.target.value as any)}
+                    onChange={(e) => setAllocOp(e.target.value as 'yemen_mobile' | 'sabafon' | 'you')}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs outline-none focus:border-red-600 transition-colors text-slate-200"
                   >
                     <option value="yemen_mobile">يمن موبايل</option>

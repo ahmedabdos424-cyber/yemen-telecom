@@ -33,7 +33,7 @@ interface DashboardViewProps {
   transactions: Transaction[];
   sims: SIM[];
   setView: (view: ViewType) => void;
-  setSelectedEntity?: (entity: any) => void;
+  setSelectedEntity?: (entity: unknown) => void;
   onSearch?: (query: string) => void;
   onRefresh?: () => void;
 }

@@ -18,7 +18,7 @@ router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: R
     const whereClause = isAgent ? 'WHERE user_id = $1' : '';
     const params = isAgent && req.user ? [req.user.id] : [];
     if (req.query.page || req.query.limit) {
-      const result = await paginatedQuery<any>(
+      const result = await paginatedQuery<Record<string, unknown>>(
         `SELECT * FROM agents ${whereClause} ORDER BY id`,
         `SELECT COUNT(*) FROM agents ${whereClause}`,
         params, page, limit, offset

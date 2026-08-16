@@ -187,13 +187,13 @@ export default function SimManagementView({
                         sim.status === 'available' ? 'badge-available' :
                         sim.status === 'sold' ? 'badge-sold' :
                         sim.status === 'reserved' ? 'badge-reserved' :
-                        (sim.status as any) === 'allocated' || (sim.status as any) === 'suspended' ? 'badge-pending' :
+                        sim.status === 'allocated' || sim.status === 'suspended' ? 'badge-pending' :
                         'badge-damaged'
                       }`}>
                         {sim.status === 'available' ? 'متوفر' :
                          sim.status === 'sold' ? 'مباع' :
                          sim.status === 'reserved' ? 'محجوز' :
-                         (sim.status as any) === 'allocated' || (sim.status as any) === 'suspended' ? 'مخصص' :
+                          sim.status === 'allocated' || sim.status === 'suspended' ? 'مخصص' :
                          'تالف'}
                       </span>
                     </td>

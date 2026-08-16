@@ -70,9 +70,9 @@ export default function AgentSellerTreeModal({ open, onClose }: { open: boolean;
     setLoading(true);
     setError(null);
     Promise.all([
-      api.getAgents().then((data: any) => { if (mounted) setAgents(Array.isArray(data) ? data : []); }),
-      api.getSellers().then((data: any) => { if (mounted) setSellers(Array.isArray(data) ? data : []); }),
-      api.getInventories().then((data: any) => { if (mounted) setInventories(Array.isArray(data) ? data : []); }).catch(() => { if (mounted) setInventories([]); }),
+      api.getAgents().then((data) => { if (mounted) setAgents(Array.isArray(data) ? (data as unknown as AgentRow[]) : []); }),
+      api.getSellers().then((data) => { if (mounted) setSellers(Array.isArray(data) ? (data as unknown as SellerRow[]) : []); }),
+      api.getInventories().then((data) => { if (mounted) setInventories(Array.isArray(data) ? (data as unknown as InvRow[]) : []); }).catch(() => { if (mounted) setInventories([]); }),
     ])
       .then(() => { if (mounted) setLoading(false); })
       .catch((err: unknown) => {

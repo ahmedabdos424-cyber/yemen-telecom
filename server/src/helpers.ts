@@ -11,7 +11,7 @@ export function getPagination(req: Request) {
 export async function paginatedQuery<T>(
   baseQuery: string,
   countQuery: string,
-  params: any[],
+  params: unknown[],
   page: number,
   limit: number,
   offset: number

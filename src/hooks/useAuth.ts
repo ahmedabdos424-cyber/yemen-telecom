@@ -140,7 +140,7 @@ export function useAuth() {
   };
 
   const handleLogout = useCallback(() => {
-    api.logout().catch(() => {});
+    api.logout().catch((err) => console.warn('[auth] logout request failed (session cleared locally):', err));
     clearSession();
   }, [clearSession]);
 

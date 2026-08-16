@@ -109,8 +109,8 @@ router.post('/login', authRateLimiter, validate(loginSchema), async (req: Reques
       logger.error('[LOGIN ERROR]', {
         message: err instanceof Error ? err.message : String(err),
         stack: err instanceof Error ? err.stack : undefined,
-        code: err && typeof err === 'object' && 'code' in err ? (err as any).code : undefined,
-        detail: err && typeof err === 'object' && 'detail' in err ? (err as any).detail : undefined,
+        code: err && typeof err === 'object' && 'code' in err ? (err as unknown as { code?: unknown }).code : undefined,
+        detail: err && typeof err === 'object' && 'detail' in err ? (err as unknown as { detail?: unknown }).detail : undefined,
         name: err instanceof Error ? err.name : undefined,
       });
     }

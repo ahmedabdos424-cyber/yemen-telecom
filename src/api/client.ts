@@ -18,22 +18,26 @@ import type {
   SystemHealthResponse,
 } from './types';
 
-const REQUEST_TIMEOUT_MS = 30000;
+const REQUEST_TIMEOUT_MS = 15000;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function fetchWithTimeout(url: string, options: RequestInit = {}, retries = 2): Promise<Response> {
+  // إعادة المحاولة (Retry) تقتصر على طلبات القراءة (GET) عند أخطاء الشبكة فقط،
+  // لتجنّب عمليات POST/PUT/DELETE غير قابلة للتكرار (non-idempotent).
+  const method = (options.method || 'GET').toUpperCase();
+  const maxAttempts = method === 'GET' ? retries + 1 : 1;
   let lastErr: unknown;
-  for (let attempt = 0; attempt <= retries; attempt++) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
       return await fetch(url, { ...options, signal: controller.signal });
     } catch (err) {
       lastErr = err;
-      if (attempt < retries) {
+      if (attempt < maxAttempts - 1) {
         await delay(3000);
         continue;
       }
