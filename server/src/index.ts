@@ -10,6 +10,7 @@ import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
 import { query } from './db';
+import { getMaintenanceMode } from './maintenance';
 import { cacheGet, cacheSet, cacheStats } from './cache';
 import { authenticateToken, requireRole } from './middleware/auth';
 import { clearExpiredLoginLocks } from './middleware/rateLimiter';
@@ -322,8 +323,7 @@ app.use('/api', async (req: express.Request, res: express.Response, next: expres
   if (req.method === 'GET') return next();
   if (req.path.startsWith('/auth/')) return next();
   try {
-    const result = await query('SELECT maintenance_mode FROM system_settings WHERE id = 1');
-    if (result.rows.length > 0 && result.rows[0].maintenance_mode) {
+    if (await getMaintenanceMode()) {
       return res.status(503).json({ error: 'System is in maintenance mode. Please try again later.' });
     }
   } catch { }

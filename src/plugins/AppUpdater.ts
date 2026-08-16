@@ -1,4 +1,4 @@
-import { registerPlugin } from '@capacitor/core';
+import { registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 
 export interface AppUpdaterPlugin {
   downloadApk(options: { url: string; fileName?: string; sha256?: string; size?: number }): Promise<{
@@ -11,7 +11,7 @@ export interface AppUpdaterPlugin {
   deleteApk(options?: { path?: string }): Promise<{ deleted: boolean }>;
   canRequestPackageInstalls(): Promise<{ allowed: boolean }>;
   openInstallSettings(): Promise<{ launched: boolean }>;
-  addListener(eventName: 'progress', listenerFunc: (data: { progress: number; downloaded: number; total: number }) => void): Promise<any>;
+  addListener(eventName: 'progress', listenerFunc: (data: { progress: number; downloaded: number; total: number }) => void): Promise<PluginListenerHandle>;
   removeAllListeners(): Promise<void>;
 }
 

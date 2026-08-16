@@ -1,6 +1,6 @@
 import { Suspense, lazy, useState, useEffect, useRef } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { ViewType, Role } from './types';
+import { ViewType, Role, Sim } from './types';
 
 import SplashScreen from './components/SplashScreen';
 import LoginScreen from './components/LoginScreen';
@@ -278,7 +278,7 @@ function AuthenticatedApp() {
         </Routes>
       );
     } else if (role === 'seller') {
-      const sellerOnUpdateSims = (updated: any[]) => agt.handleUpdateSimsForSeller(updated as any);
+      const sellerOnUpdateSims = (updated: Sim[]) => agt.handleUpdateSimsForSeller(updated);
       return (
         <Routes>
           <Route path="/seller/home" element={<SellerDashboard sellerData={agt.selfSellerData} sims={(agt.sims ?? []).filter(s => s.status === 'available')} operations={(agt.operations ?? [])} activeTab={agt.activeTab} setActiveTab={agt.handleSetRoleTab} onLogout={handleLogout} onConfirmLogout={handleLogout} darkMode={darkMode} setDarkMode={setDarkMode} onUpdateSims={sellerOnUpdateSims} biometricAvailable={biometricAvailable} biometricEnabled={biometricEnabled} onEnableBiometric={() => enableBiometricLogin(username)} onDisableBiometric={disableBiometricLogin} />} />

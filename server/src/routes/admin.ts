@@ -2,6 +2,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { Router, Request, Response } from 'express';
 import { query, transaction } from '../db';
+import { invalidateMaintenanceMode } from '../maintenance';
 import { logger } from '../logger';
 import { cacheStats } from '../cache';
 import { realtimeStats } from '../services/realtime.service';
@@ -97,6 +98,7 @@ router.put('/settings', requireRole('manager'), validate(updateSettingsSchema), 
         settings.identityRemindersFrequency || 'weekly',
       ]
     );
+    invalidateMaintenanceMode();
     res.json(mapAdminSettingsToCamelCase(result.rows[0]));
   } catch (err) {
     logger.error('Error updating settings:', err);
@@ -708,6 +710,7 @@ router.post('/system/lockdown', requireRole('manager'), async (_req: Request, re
       [!isCurrentlyLocked ? 'suspended' : 'active']
     );
     const newStatus = !isCurrentlyLocked;
+    invalidateMaintenanceMode();
     res.json({
       success: true,
       locked: newStatus,

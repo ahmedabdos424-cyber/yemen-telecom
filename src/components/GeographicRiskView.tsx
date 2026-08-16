@@ -3,103 +3,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
-import type { AuditLogEntry, DuplicateIdentityRow } from '../api/types';
+import { Network, Shield, ShieldAlert } from 'lucide-react';
 import { api } from '../api/client';
+import type { AuditLogEntry, DuplicateIdentityRow } from '../api/types';
 import ConfirmModal from './shared/ConfirmModal';
-import { 
-  Network, 
-  ShieldAlert, 
-  MapPin, 
-  Activity, 
-  HelpCircle, 
-  User, 
-  CheckCircle, 
-  AlertTriangle, 
-  Download, 
-  RefreshCw, 
-  ZoomIn, 
-  ZoomOut, 
-  Maximize,
-  Shield,
-  FileText,
-  X
-} from 'lucide-react';
-import { useToast, ToastContainer } from '../hooks/useToast';
-
-interface OperationLogItem {
-  id: string;
-  action: string;
-  time: string;
-  status: 'success' | 'failed' | 'warning';
-  details: string;
-}
-
-interface GraphNode {
-  id: string;
-  label: string;
-  type: 'city' | 'checkpoint' | 'identity';
-  color: string;
-  size: number;
-  risk: string;
-  region?: string;
-  idNo?: string;
-  sims?: number;
-  flagged?: boolean;
-  blocked?: boolean;
-  reviewStatus?: string;
-  x?: number;
-  y?: number;
-  fx?: number | null;
-  fy?: number | null;
-}
-
-interface SimLink {
-  source: string | GraphNode;
-  target: string | GraphNode;
-  value: number;
-}
-
-declare global {
-  interface Window {
-    zoomInGraph?: () => void;
-    zoomOutGraph?: () => void;
-    zoomResetGraph?: () => void;
-    zoomRestartPhysics?: () => void;
-  }
-}
-
-function toOperationStatus(status: string): OperationLogItem['status'] {
-  if (status === 'verified' || status === 'normal') return 'success';
-  return 'warning';
-}
-
-function downloadCsv(content: string, filename: string) {
-  const blob = new Blob(['\uFEFF' + content], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function identityCsvRows(rows: DuplicateIdentityRow[]): string[] {
-  const header = ['رقم الهوية', 'الاسم', 'عدد الشرائح', 'عدد التكرارات', 'مستوى الخطورة', 'المنطقة', 'الحالة'];
-  const body = rows.map((r) => [
-    r.idNo, r.name, r.simsCount, r.duplicatesCount, r.risk, r.region,
-    r.blocked ? 'محظور' : r.flagged ? 'مشتبه بها' : 'قيد المراقبة',
-  ].join(','));
-  return [header.join(','), ...body];
-}
-
-function formatLastActivity(iso?: string | null): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return '—';
-  return d.toLocaleString('ar', { dateStyle: 'short', timeStyle: 'short' });
-}
+import { ToastContainer, useToast } from '../hooks/useToast';
+import AuditLogCard from './geo/AuditLogCard';
+import IdentitiesTable from './geo/IdentitiesTable';
+import NodeOperationsPanel from './geo/NodeOperationsPanel';
+import RiskIndicatorsGrid from './geo/RiskIndicatorsGrid';
+import RiskNetworkGraph from './geo/RiskNetworkGraph';
+import type { GraphNode, OperationLogItem, SimLink } from './geo/riskTypes';
+import { toOperationStatus } from './geo/riskTypes';
 
 export default function GeographicRiskView() {
   const [identities, setIdentities] = useState<DuplicateIdentityRow[]>([]);
@@ -112,7 +29,7 @@ export default function GeographicRiskView() {
   const [blockConfirm, setBlockConfirm] = useState<{idNo: string; name: string} | null>(null);
   const [actionLoading, setActionLoading] = useState<{ [key: string]: boolean }>({});
 
-  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
+  const { toasts, dismissToast, toastSuccess, toastError, toastWarning } = useToast();
 
   const svgRef = useRef<SVGSVGElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -172,12 +89,6 @@ export default function GeographicRiskView() {
     return { total, highRiskCount, mediumRiskCount, lowRiskCount, riskPct, underReview, underReviewPct, highBarPct, medBarPct, lowBarPct };
   }, [identities]);
 
-  const riskLevelText = summaryStats.riskPct >= 25 ? 'تحذير مرتفع' : summaryStats.highRiskCount > 0 ? 'تحذير' : 'مستقر';
-  const riskLevelClass = summaryStats.riskPct >= 25
-    ? 'bg-red-100 text-secondary border border-red-200'
-    : summaryStats.highRiskCount > 0
-      ? 'bg-orange-100 text-orange-700 border border-orange-200'
-      : 'bg-emerald-100 text-emerald-700 border border-emerald-200';
   const distinctRegionsCount = new Set(identities.map((i) => i.region).filter(Boolean)).size;
 
   // Real operations feed derived from the audit-log API (no hardcoded entries)
@@ -267,6 +178,24 @@ export default function GeographicRiskView() {
     (item) => (item.name ?? '').includes(searchWord) || (item.idNo ?? '').includes(searchWord) || (item.region ?? '').includes(searchWord)
   );
 
+  const handleInspect = (item: DuplicateIdentityRow) => {
+    setSelectedNode({
+      id: item.idNo,
+      label: item.name,
+      type: 'identity',
+      color: item.risk === 'مرتفع جداً' ? '#dc2626' : '#eab308',
+      size: 15,
+      region: item.region,
+      idNo: item.idNo,
+      sims: item.simsCount,
+      risk: item.risk,
+      flagged: item.flagged,
+      blocked: item.blocked,
+      reviewStatus: item.reviewStatus
+    });
+    document.getElementById('d3-section')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   // D3 Interactive Simulation Engine logic
   useEffect(() => {
     if (!svgRef.current) return;
@@ -311,7 +240,7 @@ export default function GeographicRiskView() {
     // 2. Build Links representation
     const graphLinks: SimLink[] = [
       ...baseNodes.filter(n => n.id !== 'telecom-backbone').map(n => ({ source: 'telecom-backbone', target: n.id, value: 2 })),
-      
+
       ...identities.map(m => ({
         source: m.idNo,
         target: regionsMap[m.region] || 'telecom-backbone',
@@ -518,215 +447,17 @@ export default function GeographicRiskView() {
   return (
     <div className="space-y-6">
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-      {/* Risk indicators grid panel */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* Level 0 indicator */}
-        <div className="md:col-span-2 card p-6 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full -mr-16 -mt-16"></div>
-          <div className="relative z-10">
-            <div className="flex justify-between items-start mb-3">
-              <span className="text-xs text-gray-500 font-bold">مستوى المخاطر التكرارية العالمي</span>
-              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${riskLevelClass}`}>{riskLevelText}</span>
-            </div>
-            <div className="flex items-end gap-3">
-              <h3 className="text-4xl font-bold text-gray-900 leading-none">{summaryStats.riskPct.toFixed(1)}%</h3>
-              <div className="flex items-center text-secondary text-xs font-bold pb-1 font-mono">
-                <span className="material-symbols-outlined text-sm">trending_up</span>
-                <span>{summaryStats.highRiskCount} حالة عالية</span>
-              </div>
-            </div>
-            <p className="text-[11px] text-gray-500 mt-3 leading-relaxed max-w-[90%]">
-              إجمالي الهويات المكررة المكتشفة {summaryStats.total} هوية موزعة على {distinctRegionsCount} منطقة، منها {summaryStats.highRiskCount} هوية بمستوى خطورة مرتفع جداً تخضع للمراجعة الفورية.
-            </p>
-            <div className="mt-5 h-2 bg-gray-100 rounded-full overflow-hidden flex">
-              <div className="bg-secondary h-full" style={{ width: `${summaryStats.highBarPct}%` }}></div>
-              <div className="bg-orange-500 h-full" style={{ width: `${summaryStats.medBarPct}%` }}></div>
-              <div className="bg-green-500 h-full" style={{ width: `${summaryStats.lowBarPct}%` }}></div>
-            </div>
-          </div>
-        </div>
+      <RiskIndicatorsGrid stats={summaryStats} distinctRegionsCount={distinctRegionsCount} />
 
-        {/* Counter cards */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200/85 p-5 flex flex-col justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-800">
-              <span className="material-symbols-outlined text-lg">filter_none</span>
-            </div>
-            <span className="text-xs text-gray-500 font-bold">إجمالي الهويات المكررة</span>
-          </div>
-          <div>
-            <h4 className="text-2xl font-bold text-gray-900 font-mono">{summaryStats.total.toLocaleString()}</h4>
-            <p className="text-[11px] text-gray-400 mt-1">حالة مكررة مشتبه بها نشطة</p>
-          </div>
-        </div>
-
-        <div className="card p-5 flex flex-col justify-between">
-           <div className="flex items-center gap-3">
-             <div className="w-9 h-9 rounded-lg bg-green-50 border border-green-100 flex items-center justify-center text-green-600">
-              <span className="material-symbols-outlined text-lg">rule</span>
-            </div>
-            <span className="text-xs text-gray-500 font-bold">الحالات الخاضعة للمراجعة</span>
-          </div>
-          <div>
-            <h4 className="text-2xl font-bold text-gray-900 font-mono">{summaryStats.underReview.toLocaleString()}</h4>
-            <p className="text-[11px] text-green-600 font-semibold mt-1">{summaryStats.underReviewPct.toFixed(0)}% من إجمالي التكرارات في العقد</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Table Data Filters */}
-      <div className="card overflow-hidden">
-         <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-4">
-           <div className="relative w-full sm:w-80">
-             <input
-               type="text"
-               value={searchWord}
-               onChange={(e) => setSearchWord(e.target.value)}
-               placeholder="البحث برقم الهوية، الاسم أو المنطقة..."
-               className="input-field bg-gray-50 pr-10 text-xs"
-             />
-            <span className="material-symbols-outlined absolute right-3 top-2 text-gray-450 text-sm">search</span>
-          </div>
-          <button 
-            onClick={() => {
-              if (filteredIdentities.length === 0) { toastInfo('لا توجد بيانات مطابقة للتصدير حالياً'); return; }
-              downloadCsv(identityCsvRows(filteredIdentities).join('\n'), `تقرير_المخاطر_${new Date().toISOString().slice(0, 10)}.csv`);
-              toastSuccess('تم تصدير تقرير تحليل الهويات كملف CSV لمراجعته مع الشؤون القانونية.');
-            }}
-             className="btn btn-sm w-full sm:w-auto flex items-center justify-center gap-2"
-          >
-            <Download size={14} />
-            تصدير تقرير المخاطر
-          </button>
-        </div>
-
-        <div className="table-wrap">
-          <table className="w-full text-right text-xs">
-            <thead>
-              <tr className="bg-gray-100 text-gray-700 border-b border-gray-200">
-                <th className="px-6 py-4 font-bold">رقم الهوية الوطنية</th>
-                <th className="px-6 py-4 font-bold">اسم العميل المسجّل</th>
-                <th className="px-6 py-4 font-bold">الشرائح النشطة معه</th>
-                <th className="px-6 py-4 font-bold">عدد عقود التكرار</th>
-                <th className="px-6 py-4 font-bold">الوكيل/البائع المسجّل</th>
-                <th className="px-6 py-4 font-bold">آخر نشاط</th>
-                <th className="px-6 py-4 font-bold">مستوى الخطورة الإحصائي</th>
-                <th className="px-6 py-4 font-bold">منطقة التوزيع</th>
-                <th className="px-6 py-4 font-bold text-left">الإجراءات والتحقيق</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-105">
-              {filteredIdentities.map((item) => (
-                <tr key={item.idNo} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 font-mono font-bold text-gray-900">{item.idNo}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-[11px] font-bold text-gray-700">
-                        {item.avatarInitials}
-                      </div>
-                      <span className="font-semibold text-gray-900">{item.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 font-mono text-gray-600">{item.simsCount} شرائح</td>
-                  <td className="px-6 py-4 font-mono font-bold text-secondary">{item.duplicatesCount} سجلات</td>
-                  <td className="px-6 py-4">
-                    {(item.agentNames && item.agentNames.length > 0)
-                      ? item.agentNames.join('، ')
-                      : <span className="text-gray-400">غير مسجّل</span>}
-                  </td>
-                  <td className="px-6 py-4 text-[11px] text-gray-600">{formatLastActivity(item.lastActivity)}</td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                      item.risk === 'مرتفع جداً'
-                        ? 'bg-red-50 text-secondary border border-red-150'
-                        : 'bg-orange-100 text-orange-700 border border-orange-200'
-                    }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${item.risk === 'مرتفع جداً' ? 'bg-secondary' : 'bg-orange-500'}`}></span>
-                      {item.risk}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">{item.region}</td>
-                   <td className="px-6 py-4">
-                    <div className="flex items-center justify-end gap-2">
-                      <button 
-                        onClick={() => {
-                          setSelectedNode({
-                            id: item.idNo,
-                            label: item.name,
-                            type: 'identity',
-                            color: item.risk === 'مرتفع جداً' ? '#dc2626' : '#eab308',
-                            size: 15,
-                            region: item.region,
-                            idNo: item.idNo,
-                            sims: item.simsCount,
-                            risk: item.risk,
-                            flagged: item.flagged,
-                            blocked: item.blocked,
-                            reviewStatus: item.reviewStatus
-                          });
-                          document.getElementById('d3-section')?.scrollIntoView({ behavior: 'smooth' });
-                        }}
-                        className="btn-icon bg-sky-50 text-sky-700 hover:bg-sky-100 border-sky-100" 
-                         title="تحليل الترابط والعمليات جغرافياً"
-                       >
-                         <span className="material-symbols-outlined text-lg">account_tree</span>
-                       </button>
-                       <button 
-                          onClick={() => {
-                            setSelectedNode({
-                              id: item.idNo,
-                              label: item.name,
-                              type: 'identity',
-                              color: item.risk === 'مرتفع جداً' ? '#dc2626' : '#eab308',
-                              size: 15,
-                              region: item.region,
-                              idNo: item.idNo,
-                              sims: item.simsCount,
-                              risk: item.risk,
-                              flagged: item.flagged,
-                              blocked: item.blocked,
-                              reviewStatus: item.reviewStatus
-                            });
-                            document.getElementById('d3-section')?.scrollIntoView({ behavior: 'smooth' });
-                          }}
-                         className="btn-icon hover:bg-gray-100 text-gray-500 hover:text-gray-900 border-gray-100" 
-                         title="تفاصيل الهوية ومستنداتها"
-                       >
-                         <span className="material-symbols-outlined text-lg">visibility</span>
-                       </button>
-                       {item.blocked ? (
-                         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold bg-red-100 text-secondary border border-red-200">
-                           <span className="material-symbols-outlined text-sm">lock</span>
-                           محظور
-                         </span>
-                       ) : (
-                         <>
-                           <button 
-                             disabled={actionLoading[`flag-${item.idNo}`]}
-                             onClick={() => handleFlagRow(item.idNo, item.name)}
-                             className="btn-icon hover:bg-red-50 text-secondary border-red-50 disabled:opacity-50" 
-                             title="وضع علامة اشتباه أمني"
-                           >
-                             <span className="material-symbols-outlined text-lg">flag</span>
-                           </button>
-                           <button 
-                             disabled={actionLoading[`block-${item.idNo}`]}
-                             onClick={() => handleBlockRow(item.idNo, item.name)}
-                             className="btn-icon hover:bg-red-900/10 text-secondary border-red-100 font-bold disabled:opacity-50" 
-                             title="حظر الهوية فوراً"
-                           >
-                             <span className="material-symbols-outlined text-lg text-[#e02928]">block</span>
-                           </button>
-                         </>
-                       )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <IdentitiesTable
+        identities={filteredIdentities}
+        searchWord={searchWord}
+        onSearchChange={setSearchWord}
+        actionLoading={actionLoading}
+        onFlag={handleFlagRow}
+        onBlock={handleBlockRow}
+        onInspect={handleInspect}
+      />
 
       {/* D3 Graphical Interactive Network Graph Section */}
       <div id="d3-section" className="space-y-4 pt-4 border-t border-gray-200">
@@ -742,290 +473,21 @@ export default function GeographicRiskView() {
 
         {/* Master Container Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* D3 Canvas container */}
-          <div className="lg:col-span-2 card bg-[#0b0f19] border-slate-900 p-5 flex flex-col justify-between relative text-slate-100 overflow-hidden">
-            
-            {/* Legend controls */}
-            <div className="flex flex-wrap justify-between items-center gap-4 border-b border-slate-800/80 pb-3 mb-4 z-10 relative">
-              <div className="flex flex-wrap gap-4 text-xs">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded-full bg-red-600 border border-red-500"></span>
-                  <span className="text-slate-300">محافظة/مدينة</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded-full bg-red-500"></span>
-                  <span className="text-slate-300">هوية مشتبه بها جداً</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded-full bg-amber-500"></span>
-                  <span className="text-slate-300">هوية متوسطة المخاطر</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded-full bg-slate-500"></span>
-                  <span className="text-slate-300">منفذ التحقق المركزي</span>
-                </div>
-              </div>
+          <RiskNetworkGraph svgRef={svgRef} containerRef={containerRef} dimensions={dimensions} />
 
-              {/* View Status */}
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
-                <span className="text-[11px] text-slate-400 font-bold">بيانات حية من قاعدة البيانات</span>
-              </div>
-            </div>
-
-            {/* D3 Canvas wrapper with resizing elements */}
-            <div 
-              ref={containerRef}
-              className="relative w-full rounded-xl overflow-hidden bg-slate-950/80 border border-slate-900 flex items-center justify-center min-h-[360px] cursor-grab"
-            >
-              <svg 
-                ref={svgRef}
-                width={dimensions.width}
-                height={dimensions.height}
-                className="w-full block"
-              />
-
-              {/* Float overlays: Navigation zoom controls */}
-              <div className="absolute left-3 bottom-3 flex flex-col gap-1.5 z-20">
-                <button
-                  type="button"
-                  onClick={() => window.zoomInGraph?.()}
-                  className="btn-icon rounded-lg bg-slate-900/90 hover:bg-slate-850 border-slate-800 text-white hover:scale-105"
-                  title="تكبير"
-                >
-                  <ZoomIn size={18} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => window.zoomOutGraph?.()}
-                  className="btn-icon rounded-lg bg-slate-900/90 hover:bg-slate-850 border-slate-800 text-white hover:scale-105"
-                  title="تصغير"
-                >
-                  <ZoomOut size={18} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => window.zoomResetGraph?.()}
-                  className="btn-icon rounded-lg bg-slate-900/90 hover:bg-slate-850 border-slate-800 text-white hover:scale-105"
-                  title="إعادة التمركز"
-                >
-                  <Maximize size={18} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => window.zoomRestartPhysics?.()}
-                  className="btn-icon rounded-lg bg-slate-900/90 hover:bg-slate-850 border-slate-800 text-white hover:scale-105"
-                  title="تنشيط الجاذبية"
-                >
-                  <RefreshCw size={18} />
-                </button>
-              </div>
-
-              {/* Interactive Help Hint overlay label */}
-              <div className="absolute right-3 top-3 px-2.5 py-1 rounded bg-slate-900/80 border border-slate-800 flex items-center gap-1.5 text-[11px] text-slate-400 font-mono select-none">
-                <HelpCircle size={10} className="text-secondary" />
-                <span>جرّب سحب العقد وتحريكها بيدك بالماوس</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Connected Operations Detail logs timeline Column */}
-           <div className="card p-5 flex flex-col justify-between min-h-[460px]">
-            {selectedNode ? (
-              <div className="flex flex-col h-full justify-between">
-                <div>
-                  {/* Active target descriptor Card */}
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center text-secondary">
-                        {selectedNode.type === 'city' ? (
-                          <MapPin size={18} />
-                        ) : selectedNode.type === 'checkpoint' ? (
-                          <Shield size={18} />
-                        ) : (
-                          <User size={18} />
-                        )}
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-bold text-gray-950">{selectedNode.label}</h4>
-                        <p className="text-[11px] text-text-muted mt-0.5">
-                          {selectedNode.type === 'city' ? 'عقدة تجميع البيانات الإقليمية' : selectedNode.type === 'checkpoint' ? 'معبر الحماية' : `هوية كود: ${selectedNode.idNo}`}
-                        </p>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => setSelectedNode(null)}
-                      className="p-2.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-700 transition min-w-[44px] min-h-[44px] flex items-center justify-center"
-                      title="إغلاق التفتيش"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-
-                  {/* Quick stats for active node card */}
-                  <div className="p-3 bg-gray-50 rounded-xl border border-gray-150/80 mb-4 flex justify-between text-xs text-right">
-                    <div>
-                      <p className="text-[11px] text-gray-500">درجة خطورتها</p>
-                      <span className={`font-bold inline-flex items-center gap-1 mt-0.5 ${selectedNode.risk === 'مرتفع جداً' ? 'text-secondary' : 'text-amber-600'}`}>
-                        {selectedNode.risk || 'عادي'}
-                      </span>
-                    </div>
-
-                    {selectedNode.type === 'identity' && (
-                      <div className="border-r border-gray-200 pr-3">
-                        <p className="text-[11px] text-gray-500">الشرائح المسجلة</p>
-                        <span className="font-bold text-gray-950 mt-0.5 block">{selectedNode.sims} شريحة</span>
-                      </div>
-                    )}
-
-                    <div className="border-r border-gray-200 pr-3">
-                      <p className="text-[11px] text-gray-500">المنطقة الجغرافية</p>
-                      <span className="font-bold text-gray-950 mt-0.5 block">{selectedNode.region || 'المركز المركزي'}</span>
-                    </div>
-                  </div>
-
-                  {/* Header Title Operations Log */}
-                  <h5 className="font-bold text-gray-950 text-xs mb-3 flex items-center gap-1">
-                    <Activity size={12} className="text-secondary" />
-                    سجل العمليات والتحقق المباشر
-                  </h5>
-
-                  {/* Operations Log lists */}
-                  <div className="space-y-3.5 max-h-64 overflow-y-auto pr-1">
-                    {activeLogs.length > 0 ? (
-                      activeLogs.map((item: OperationLogItem) => (
-                        <div key={item.id} className="p-2.5 bg-gray-50 rounded-xl border border-gray-150 flex flex-col gap-1 text-right">
-                          <div className="flex justify-between items-center">
-                            <span className="text-[11px] text-gray-450 font-sans">{item.time}</span>
-                            <span className={`px-1.5 py-0.25 text-[10px] font-bold rounded-full border ${
-                              item.status === 'success' ? 'bg-green-50 text-green-700 border-green-200' :
-                              item.status === 'failed' ? 'bg-red-50 text-red-700 border-red-200' :
-                              'bg-amber-50 text-amber-700 border-amber-200'
-                            }`}>
-                              {item.status === 'success' ? 'عملية ناجحة' : item.status === 'failed' ? 'عملية مرفوضة' : 'إنذار اشتباه'}
-                            </span>
-                          </div>
-                          <p className="text-[11px] font-bold text-gray-900">{item.action}</p>
-                          <p className="text-[11px] text-gray-500 leading-normal">{item.details}</p>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-6 text-xs text-gray-400 font-medium">
-                        لا تتوفر سجلات عمليات إضافية لهذه العقدة بالنظام.
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                 {/* Target node actions */}
-                <div className="pt-4 border-t border-gray-100 flex flex-col gap-2 mt-4 text-xs font-bold">
-                  {selectedNode.type === 'identity' ? (
-                    selectedNode.blocked ? (
-                      <div className="w-full py-2.5 bg-red-100 text-secondary border border-red-200 rounded-lg flex items-center justify-center gap-1.5">
-                        <span className="material-symbols-outlined text-sm">lock</span>
-                        هذه الهوية محظورة حالياً
-                      </div>
-                    ) : (
-                      <>
-                        <button
-                          disabled={actionLoading[`flag-${selectedNode.idNo}`]}
-                          onClick={() => handleFlagRow(selectedNode.idNo ?? '', selectedNode.label)}
-                          className="w-full py-2.5 bg-red-100/50 hover:bg-red-100 text-secondary border border-red-200 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-                        >
-                          <ShieldAlert size={14} />
-                          وضع علامة اشتباه أمني فوراً
-                        </button>
-                        <button
-                          disabled={actionLoading[`block-${selectedNode.idNo}`]}
-                          onClick={() => handleBlockRow(selectedNode.idNo ?? '', selectedNode.label)}
-                          className="w-full py-2.5 bg-[#e02928] text-white rounded-lg flex items-center justify-center gap-1.5 hover:bg-red-700 shadow-sm transition-all cursor-pointer disabled:opacity-50"
-                        >
-                          <AlertTriangle size={14} />
-                          تجميد وحظر الهوية فورا
-                        </button>
-                      </>
-                    )
-                  ) : (
-                    <button
-                      onClick={() => {
-                        const regionRows = identities.filter(
-                          (i) => (selectedNode.region && i.region === selectedNode.region) || i.region === selectedNode.label || i.idNo === selectedNode.label || i.name === selectedNode.label
-                        );
-                        if (regionRows.length === 0) { toastInfo('لا توجد هويات مسجلة لهذه العقدة للتصدير حالياً'); return; }
-                        downloadCsv(identityCsvRows(regionRows).join('\n'), `تقرير_منطقة_${selectedNode.label}_${new Date().toISOString().slice(0, 10)}.csv`);
-                        toastSuccess(`تم تصدير سجل تكرار الهويات لمنطقة: ${selectedNode.label}`);
-                      }}
-                      className="w-full py-2.5 bg-primary text-white rounded-lg flex items-center justify-center gap-1.5 hover:opacity-90 shadow-sm transition-all cursor-pointer"
-                    >
-                      <FileText size={14} />
-                      تصدير تقرير المنطقة الجغرافي
-                    </button>
-                  )}
-                </div>
-              </div>
-            ) : (
-              /* Inside Column empty instruction status panel */
-              <div className="flex flex-col items-center justify-center h-full text-center py-10 px-4">
-                <div className="w-14 h-14 bg-red-50 text-secondary rounded-full flex items-center justify-center mb-4 border border-red-100 shadow-sm animate-bounce">
-                  <Network size={24} />
-                </div>
-                <h4 className="text-sm font-bold text-gray-900">تشريح الهويات وتقاطع المناطق</h4>
-                <p className="text-xs text-text-muted leading-relaxed max-w-[240px] mt-2">
-                  يرجى النقر على أي عُقدة تفاعلية في خريطة التوصيل الجانبية (D3) لاستخلاص وتحليل سجل تلاعب الهويات عبر شبكة توزيع الشرائح تلقائياً.
-                </p>
-                <div className="mt-6 flex flex-col gap-2 w-full text-xs font-medium text-gray-600">
-                  <div className="flex items-center gap-2 p-2.5 bg-gray-50 rounded-xl border border-gray-150 text-right">
-                    <CheckCircle className="text-green-500 shrink-0" size={14} />
-                    <span>تحليل التقاطعات وتحديد الهويات المستعارة</span>
-                  </div>
-                  <div className="flex items-center gap-2 p-2.5 bg-gray-50 rounded-xl border border-gray-150 text-right">
-                    <CheckCircle className="text-green-500 shrink-0" size={14} />
-                    <span>استعراض وتحليل الهويات المكررة عبر الشبكة لحظياً</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          <NodeOperationsPanel
+            selectedNode={selectedNode}
+            activeLogs={activeLogs}
+            identities={identities}
+            actionLoading={actionLoading}
+            onClose={() => setSelectedNode(null)}
+            onFlag={handleFlagRow}
+            onBlock={handleBlockRow}
+          />
         </div>
       </div>
 
-      {/* Live Audit dynamic logging timeline */}
-      <div className="card p-5 flex flex-col justify-between">
-         <h5 className="font-bold text-gray-900 text-sm mb-4">سجل إجراءات التحقيق والمراقبة الأخيرة</h5>
-        <div className="space-y-4 flex-1 max-h-64 overflow-y-auto">
-          {logs.map((log) => (
-            <div key={log.id} className="flex gap-3 relative">
-              <div className="w-5 h-5 rounded-full bg-gray-50 border border-gray-150 shrink-0 flex items-center justify-center text-gray-500 z-10 text-[11px]">
-                {log.status === 'blocked' ? (
-                  <span className="material-symbols-outlined text-xs text-secondary font-bold">priority_high</span>
-                ) : log.status === 'verified' ? (
-                  <span className="material-symbols-outlined text-xs text-green-600 font-bold">check</span>
-                ) : (
-                  <span className="material-symbols-outlined text-xs text-blue-600 animate-spin font-bold">refresh</span>
-                )}
-              </div>
-              <div>
-                <p className="text-xs font-bold text-gray-900">{log.title}</p>
-                <p className="text-[11px] text-gray-500 mt-0.5">بواسطة: {log.user} • {log.time}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-        <button 
-          onClick={() => {
-            if (logs.length === 0) { toastInfo('لا توجد سجلات تدقيق للتصدير حالياً'); return; }
-            const header = ['النوع', 'العنوان', 'المستخدم', 'الوقت', 'الحالة'];
-            const body = logs.map((log) => [log.type, log.title, log.user, log.time, log.status].join(','));
-            downloadCsv([header.join(','), ...body].join('\n'), `سجل_التدقيق_${new Date().toISOString().slice(0, 10)}.csv`);
-            toastSuccess(`تم تصدير سجل التحقيق (${logs.length} سجلاً) كملف CSV.`);
-          }}
-          className="btn btn-ghost btn-sm w-full mt-4 text-xs"
-        >
-          تصدير سجل التحقيق الكامل (CSV)
-        </button>
-      </div>
+      <AuditLogCard logs={logs} />
 
       <ConfirmModal
         open={blockConfirm !== null}

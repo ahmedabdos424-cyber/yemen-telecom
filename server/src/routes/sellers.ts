@@ -11,7 +11,30 @@ import { notifyNewMember } from '../services/fcm.service';
 
 const router = Router();
 
-const mapSeller = (row: any) => ({
+interface SellerDbRow {
+  id: number | string;
+  seller_id?: string | null;
+  name: string;
+  store_name?: string | null;
+  id_number?: string | null;
+  phone: string;
+  region?: string | null;
+  region_code?: string | null;
+  status?: string | null;
+  total_sales?: number | null;
+  current_stock?: number | null;
+  efficiency?: number | null;
+  sims_count?: number | null;
+  sales_30_days?: number | null;
+  sales_growth?: number | null;
+  activity_rate?: number | null;
+  creation_date?: string | null;
+  last_login?: string | null;
+  avatar?: string | null;
+  agent_name?: string | null;
+}
+
+const mapSeller = (row: SellerDbRow) => ({
   id: String(row.id),
   sellerId: row.seller_id,
   name: row.name,
@@ -230,7 +253,7 @@ router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), 
       }
     });
   } catch (err: unknown) {
-    if (err && typeof err === 'object' && 'statusCode' in err && (err as any).statusCode === 409) {
+    if (err && typeof err === 'object' && 'statusCode' in err && (err as { statusCode?: number }).statusCode === 409) {
       return res.status(409).json({ error: err instanceof Error ? err.message : String(err) });
     }
     logger.error('Error creating seller:', err);

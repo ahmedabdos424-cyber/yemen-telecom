@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Seller, Sim, Operation, OperatorInventory, Operator } from '../types';
+import { Seller, Sim, Operation, OperatorInventory, Operator, SimStatus, simProvider } from '../types';
 import { api } from '../api/client';
+import type { CreateSellerResponse, SimRow } from '../api/types';
 import { captureError } from '../lib/monitor.ts';
 import { useMountedRef } from './useMountedRef';
 import {
@@ -34,6 +35,23 @@ function isNetworkError(err: unknown): boolean {
   return false;
 }
 
+function toLocalSim(r: SimRow): Sim {
+  return {
+    id: String(r.id),
+    iccid: r.iccid,
+    provider: simProvider(r.provider as Operator),
+    status: r.status as SimStatus,
+    dateAdded: r.date_added,
+    phone: r.phone,
+    owner: r.owner,
+    category: r.package_type,
+    contract_image: r.contract_image ?? undefined,
+    customer_name: r.customer_name ?? undefined,
+    customer_id: r.customer_id ?? undefined,
+    assigned_to: r.assigned_to,
+  };
+}
+
 interface QueuedActivation {
   fullName: string;
   idNumber: string;
@@ -58,7 +76,7 @@ async function syncActivationItem(item: OfflineQueueItem): Promise<void> {
   await api.createOperation({ type: 'activate', target: q.phoneNumber, operator: q.operator, status: 'success', customerName: q.fullName, customerId: q.idNumber, contractImage: contractImage || undefined, iccid: q.iccid });
   await api.createCustomer({ fullName: q.fullName, idNumber: q.idNumber, phone: q.phoneNumber }).catch(err => { captureError(err, 'createCustomerOnActivation'); });
   const allSims = (await api.getSims()) ?? [];
-  const target = allSims.find((s: any) => s.iccid === q.iccid);
+  const target = allSims.find(s => s.iccid === q.iccid);
   if (target) {
     await api.updateSim(target.id, { status: 'activated', customerName: q.fullName, customerId: q.idNumber, contractImage: contractImage || undefined });
   } else {
@@ -117,9 +135,9 @@ export function useAgentSellerState(role: string | null, username: string) {
     localStorage.setItem('tele_role_tab', tab);
   };
 
-  const handleAddSellerForAgent = async (data: any) => {
+  const handleAddSellerForAgent = async (data: CreateSellerResponse) => {
     try {
-      const created = data?.seller || data;
+      const created = data.seller as Seller;
       if (mountedRef.current) setSellers(prev => [created, ...prev]);
       if (data?.credentials) {
         if (mountedRef.current) setSellerCredentials({
@@ -214,7 +232,7 @@ export function useAgentSellerState(role: string | null, username: string) {
         phone: simData.phoneNumber,
       }).catch(err => { captureError(err, 'createCustomerOnActivation'); });
       const allSims = (await api.getSims()) ?? [];
-      const target = allSims.find((s: any) => s.iccid === simData.iccid);
+      const target = allSims.find(s => s.iccid === simData.iccid);
       if (target) {
         await api.updateSim(target.id, { status: 'activated', customerName: simData.fullName, customerId: simData.idNumber, contractImage: contractImage || undefined });
       } else {
@@ -262,8 +280,8 @@ export function useAgentSellerState(role: string | null, username: string) {
 
   const handleEditSellerForAgent = async (seller: Seller) => {
     try {
-      const updated = await api.updateSeller(Number(seller.id), { name: seller.name, phone: seller.phone, region: seller.region });
-      if (mountedRef.current) setSellers(prev => prev.map(s => s.id === seller.id ? { ...s, ...(updated as any) } : s));
+      const updated = (await api.updateSeller(Number(seller.id), { name: seller.name, phone: seller.phone, region: seller.region })) as Seller;
+      if (mountedRef.current) setSellers(prev => prev.map(s => s.id === seller.id ? { ...s, ...updated } : s));
     } catch (err) {
       captureError(err, 'handleEditSellerForAgent');
       throw err;
@@ -310,16 +328,14 @@ export function useAgentSellerState(role: string | null, username: string) {
       for (const sim of updated) {
         const before = prevById.get(sim.id);
         if (!before) {
-          await api.createSim(sim as any);
-        } else if (before.status !== sim.status || before.iccid !== sim.iccid || before.phone !== sim.phone || before.category !== sim.category || before.operator !== sim.operator || before.owner !== (sim as any).owner) {
+          await api.createSim(sim);
+        } else if (before.status !== sim.status || before.iccid !== sim.iccid || before.phone !== sim.phone || before.category !== sim.category || before.operator !== sim.operator || before.owner !== sim.owner) {
           await api.updateSim(Number(sim.id), {
             status: sim.status,
             iccid: sim.iccid,
             phone: sim.phone,
-            category: sim.category,
-            operator: sim.operator,
-            owner: (sim as any).owner,
-          } as any);
+            owner: sim.owner,
+          });
         }
       }
       for (const old of prev) {
@@ -346,10 +362,10 @@ export function useAgentSellerState(role: string | null, username: string) {
       api.getOperations(),
     ]);
     if (!mountedRef.current) return;
-    if (results[0].status === 'fulfilled') setSellers((results[0].value as any) ?? []);
-    if (results[1].status === 'fulfilled') setSims((results[1].value as any) ?? []);
-    if (results[2].status === 'fulfilled') setInventories((results[2].value as any) ?? []);
-    if (results[3].status === 'fulfilled') setOperations((results[3].value as any) ?? []);
+    if (results[0].status === 'fulfilled') setSellers((results[0].value ?? []) as Seller[]);
+    if (results[1].status === 'fulfilled') setSims((results[1].value ?? []).map(toLocalSim));
+    if (results[2].status === 'fulfilled') setInventories((results[2].value ?? []) as OperatorInventory[]);
+    if (results[3].status === 'fulfilled') setOperations((results[3].value ?? []) as Operation[]);
   }, [mountedRef]);
 
   // Self seller data for seller role — starts empty for new accounts

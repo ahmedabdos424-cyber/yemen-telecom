@@ -7,6 +7,24 @@ import { validate, createSimSchema, updateSimSchema, activateSimSchema, transfer
 import { createAlert } from '../services/alerts.service';
 import { broadcastEvent } from '../services/realtime.service';
 
+interface SimDbRow {
+  id: number;
+  phone?: string;
+  iccid: string;
+  provider?: string;
+  status?: string;
+  owner?: string;
+  date_added?: string;
+  package_type?: string;
+  assigned_to?: number | null;
+  contract_image?: string | null;
+  customer_name?: string | null;
+  customer_id?: string | null;
+  created_at?: string;
+  owner_role?: string;
+  assigned_to_agent?: number | null;
+}
+
 const router = Router();
 
 router.post('/activate', requireRole('manager', 'agent', 'seller'), validate(activateSimSchema), async (req: AuthRequest, res: Response) => {
@@ -194,7 +212,7 @@ router.get('/', requireRole('manager', 'agent'), async (req: Request, res: Respo
   try {
     const { page, limit, offset } = getPagination(req);
     if (req.query.page || req.query.limit) {
-      const result = await paginatedQuery<any>(
+      const result = await paginatedQuery<SimDbRow>(
         'SELECT * FROM sims ORDER BY id DESC',
         'SELECT COUNT(*) FROM sims',
         [], page, limit, offset
@@ -235,7 +253,7 @@ router.post('/', requireRole('manager'), validate(createSimSchema), async (req: 
     broadcastEvent({ type: 'sim.created', entity: 'sim', id: result.rows[0].id, iccid, status: result.rows[0].status });
     res.status(201).json(result.rows[0]);
   } catch (err: unknown) {
-    if (err && typeof err === 'object' && 'code' in err && (err as any).code === '23505') {
+    if (err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === '23505') {
       return res.status(409).json({ error: 'ICCID already exists' });
     }
     logger.error('Error creating sim:', err);

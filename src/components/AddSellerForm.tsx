@@ -5,6 +5,7 @@ import CameraCapture from './shared/CameraCapture';
 import { useOcr } from '../hooks/useOcr';
 import { useToast, ToastContainer } from '../hooks/useToast';
 import { api } from '../api/client';
+import type { CreateSellerResponse } from '../api/types';
 
 function dataUrlToFile(dataUrl: string, filename: string): File {
   const [meta, base64] = dataUrl.split(',');
@@ -16,7 +17,7 @@ function dataUrlToFile(dataUrl: string, filename: string): File {
 }
 
 interface AddSellerFormProps {
-  onSellerAdded: (result: any) => void;
+  onSellerAdded: (result: CreateSellerResponse) => void;
   agentName?: string;
 }
 

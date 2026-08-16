@@ -25,7 +25,7 @@ export function useAppUpdate() {
       } else if (manual) {
         setUpdateInfo(null);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Update check failed:', err);
       if (manual) setError('تعذر التحقق من التحديثات. حاول مرة أخرى لاحقاً.');
     } finally {
@@ -75,11 +75,11 @@ export function useAppUpdate() {
       // but it's good practice.
       listener.remove();
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Update failed:', err);
       listenerRef.current?.remove();
       listenerRef.current = null;
-      setError(err.message || 'فشل تنزيل أو تثبيت التحديث.');
+      setError(err instanceof Error ? err.message : 'فشل تنزيل أو تثبيت التحديث.');
     } finally {
       setDownloading(false);
     }
