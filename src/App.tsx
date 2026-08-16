@@ -150,7 +150,7 @@ function AuthenticatedApp() {
     return (
       <>
         <ErrorBoundary>
-          <LoginScreen onLogin={handleLogin} onBiometricLogin={auth.handleBiometricLogin} biometricAvailable={auth.biometricAvailable} biometricEnabled={auth.biometricEnabled} darkMode={darkMode} setDarkMode={setDarkMode} />
+          <LoginScreen onLogin={handleLogin} onBiometricLogin={auth.handleBiometricLogin} biometricEnabled={auth.biometricEnabled} darkMode={darkMode} setDarkMode={setDarkMode} />
         </ErrorBoundary>
         <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       </>
@@ -364,9 +364,9 @@ function AuthenticatedApp() {
                   <div className="w-16 h-16 rounded-2xl bg-red-500/15 border border-red-500/25 flex items-center justify-center mb-4">
                     <Fingerprint size={32} className="text-red-500" />
                   </div>
-                  <h3 className="text-base font-bold text-slate-100">تفعيل الدخول السريع بالبصمة؟</h3>
+                  <h3 className="text-base font-bold text-slate-100">تفعيل الدخول بالبصمة</h3>
                   <p className="text-xs text-slate-400 leading-relaxed mt-2 max-w-[280px]">
-                    وفّر وقتك في كل مرة تدخل فيها إلى التطبيق: افتح التطبيق واضغط على أيقونة البصمة لتسجيل الدخول دون إدخال اسم المستخدم وكلمة المرور.
+                    هل تريد تفعيل تسجيل الدخول السريع باستخدام البصمة للمرات القادمة؟
                   </p>
                 </div>
                 <div className="space-y-2.5">

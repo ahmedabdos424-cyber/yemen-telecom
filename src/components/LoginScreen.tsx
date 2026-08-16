@@ -8,7 +8,6 @@ import { FingerprintScannerIcon } from './shared/FingerprintScannerIcon';
 interface LoginScreenProps {
   onLogin: (role: Role, username: string, password: string) => Promise<{ role: Role; commit: () => void } | null>;
   onBiometricLogin?: () => Promise<{ role: Role; commit: () => void } | null>;
-  biometricAvailable?: boolean;
   biometricEnabled?: boolean;
   darkMode: boolean;
   setDarkMode: (dark: boolean) => void;
@@ -33,7 +32,7 @@ function removeUsername(u: string) {
   localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(list));
 }
 
-export default function LoginScreen({ onLogin, onBiometricLogin, biometricAvailable, biometricEnabled, darkMode, setDarkMode }: LoginScreenProps) {
+export default function LoginScreen({ onLogin, onBiometricLogin, biometricEnabled, darkMode, setDarkMode }: LoginScreenProps) {
   const { toasts, dismissToast, toastError, toastWarning, toastInfo } = useToast();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -118,11 +117,13 @@ export default function LoginScreen({ onLogin, onBiometricLogin, biometricAvaila
   };
 
   const [biometricLoading, setBiometricLoading] = useState(false);
+  const [biometricFailures, setBiometricFailures] = useState(0);
+  const MAX_BIOMETRIC_FAILURES = 3;
 
   const handleBiometric = async () => {
     if (biometricLoading || !onBiometricLogin) return;
     if (!biometricEnabled) {
-      toastInfo('لتفعيل الدخول بالبصمة، يرجى تسجيل الدخول باسم المستخدم وكلمة المرور للمرة الأولى، ثم تفعيل الخيار من إعدادات الحساب.');
+      toastInfo('يرجى تسجيل الدخول بكلمة المرور أولاً لتفعيل البصمة لهذه الجلسة');
       return;
     }
     setBiometricLoading(true);
@@ -134,17 +135,32 @@ export default function LoginScreen({ onLogin, onBiometricLogin, biometricAvaila
       if (result) {
         setSuccess(true);
         setBiometricLoading(false);
+        setBiometricFailures(0);
         setTimeout(() => {
           if (!abortRef.current) result.commit();
         }, 450);
       } else {
         setBiometricLoading(false);
-        toastWarning('تعذر التحقق البيومتري. تأكد من تسجيل بصمتك على الجهاز وأعد المحاولة، أو استخدم كلمة المرور');
+        const attempts = biometricFailures + 1;
+        if (attempts >= MAX_BIOMETRIC_FAILURES) {
+          setBiometricFailures(0);
+          toastWarning('تجاوزت الحد الأقصى لمحاولات البصمة. استخدم كلمة المرور لتسجيل الدخول');
+        } else {
+          setBiometricFailures(attempts);
+          toastWarning('تعذر التحقق البيومتري. تأكد من تسجيل بصمتك على الجهاز وأعد المحاولة، أو استخدم كلمة المرور');
+        }
       }
     } catch (err) {
       if (abortRef.current) return;
       setBiometricLoading(false);
-      toastError('تعذر التحقق البيومتري. حاول مجدداً أو استخدم كلمة المرور');
+      const attempts = biometricFailures + 1;
+      if (attempts >= MAX_BIOMETRIC_FAILURES) {
+        setBiometricFailures(0);
+        toastWarning('تجاوزت الحد الأقصى لمحاولات البصمة. استخدم كلمة المرور لتسجيل الدخول');
+      } else {
+        setBiometricFailures(attempts);
+        toastError('تعذر التحقق البيومتري. حاول مجدداً أو استخدم كلمة المرور');
+      }
     }
   };
 
@@ -412,7 +428,7 @@ export default function LoginScreen({ onLogin, onBiometricLogin, biometricAvaila
 
             {/* ===== SUBMIT + BIOMETRIC QUICK LOGIN ===== */}
             <div className="flex flex-row items-center gap-2 w-full" dir="rtl">
-              {onBiometricLogin && biometricAvailable && (
+              {onBiometricLogin && (
                 <motion.button
                   type="button"
                   onClick={handleBiometric}

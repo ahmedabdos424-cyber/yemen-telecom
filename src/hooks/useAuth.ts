@@ -46,8 +46,9 @@ export function useAuth() {
     localStorage.removeItem('tele_username');
     localStorage.removeItem('tele_role_tab');
     localStorage.removeItem('tele_manager_view');
-    clearBiometricCredential().catch(() => {});
-    setBiometricEnabled(false);
+    // The biometric credential is intentionally preserved here: an explicit
+    // logout or password change must NOT erase the securely stored credential
+    // unless the user explicitly unbinds the device (disableBiometricLogin).
     setRole(null);
     setUsername('');
     setTokenWrapper(null);
@@ -186,6 +187,12 @@ export function useAuth() {
       return null;
     }
     setTokenWrapper(newToken);
+    // Rotate the stored credential to the freshly issued refresh token so the
+    // secure keystore entry never goes stale while the account stays active.
+    const { refreshToken: rotated } = getLoadedTokens();
+    if (rotated && rotated !== credential.refreshToken) {
+      await saveBiometricCredential({ username: credential.username, refreshToken: rotated, savedAt: Date.now() }).catch(() => {});
+    }
     const user = await api.getMe().catch(() => null);
     if (!user) {
       clearSession();
