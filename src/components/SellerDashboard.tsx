@@ -7,6 +7,7 @@ import SellerHome from './SellerHome';
 import SellerAccount from './SellerAccount';
 import SimsListView from './sims/SimsListView';
 import SettingsPanel from './shared/SettingsPanel';
+import type { BiometricToggleResult } from '../services/biometricAuth';
 import {
   RefreshCw, Check, X
 } from 'lucide-react';
@@ -25,7 +26,7 @@ interface SellerDashboardProps {
   onUpdateSims?: (updated: Sim[]) => void;
   biometricAvailable?: boolean;
   biometricEnabled?: boolean;
-  onEnableBiometric?: () => Promise<boolean>;
+  onEnableBiometric?: () => Promise<BiometricToggleResult>;
   onDisableBiometric?: () => Promise<void>;
 }
 
@@ -85,9 +86,12 @@ export default function SellerDashboard({
     try {
       if (val) {
         if (!onEnableBiometric) return;
-        const ok = await onEnableBiometric();
-        if (!ok) {
-          toastWarning('لم يتم تأكيد بصمتك. أعد المحاولة أو سجّل الدخول بكلمة المرور');
+        const result = await onEnableBiometric();
+        if (!result.enabled) {
+          // إلغاء المستخدم من نافذة النظام ليس فشلا: لا تنبيه
+          if (!result.cancelled) {
+            toastWarning(result.message || 'تعذر تفعيل الدخول بالبصمة. أعد المحاولة أو سجّل الدخول بكلمة المرور');
+          }
           return;
         }
         toastSuccess('تم تفعيل الدخول السريع بالبصمة');
@@ -97,7 +101,7 @@ export default function SellerDashboard({
         toastSuccess('تم إيقاف الدخول السريع بالبصمة');
       }
     } catch (err) {
-      toastWarning(err instanceof Error && err.message ? err.message : 'لم يتم التفعيل. تحقق من توفر مستشعر بصمة أو أعد المحاولة');
+      toastWarning(err instanceof Error && err.message ? err.message : 'تعذر تفعيل الدخول بالبصمة. تحقق من توفر مستشعر بصمة أو أعد المحاولة');
     }
   };
   

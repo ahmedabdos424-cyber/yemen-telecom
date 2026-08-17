@@ -109,42 +109,56 @@ describe('biometricAuth', () => {
     const status = await getBiometricStatus();
     expect(status.isAvailable).toBe(false);
     expect(status.hardwarePresent).toBe(false);
+    expect(status.errorMessage).toContain('تطبيق الجوال');
   });
 
-  it('authenticateBiometric returns false when not native', async () => {
+  it('authenticateBiometric returns not verified when not native', async () => {
     setNative(false);
-    expect(await authenticateBiometric()).toBe(false);
+    const result = await authenticateBiometric();
+    expect(result.verified).toBe(false);
+    expect(result.cancelled).toBe(false);
     expect(mockAuthenticate).not.toHaveBeenCalled();
   });
 
-  it('authenticateBiometric returns true on success', async () => {
+  it('authenticateBiometric returns verified on success', async () => {
     setNative(true);
-    expect(await authenticateBiometric('reason')).toBe(true);
+    const result = await authenticateBiometric('reason');
+    expect(result.verified).toBe(true);
+    expect(result.cancelled).toBe(false);
     expect(mockAuthenticate).toHaveBeenCalledWith(expect.objectContaining({ reason: 'reason', allowDeviceCredential: true }));
   });
 
-  it('authenticateBiometric returns false when native result is not verified', async () => {
+  it('authenticateBiometric returns not verified when native result is not verified', async () => {
     setNative(true);
     mockAuthenticate.mockResolvedValue(undefined);
-    expect(await authenticateBiometric()).toBe(false);
+    const result = await authenticateBiometric();
+    expect(result.verified).toBe(false);
+    expect(result.cancelled).toBe(false);
   });
 
-  it('authenticateBiometric returns false on userCancel', async () => {
+  it('authenticateBiometric flags userCancel as cancelled', async () => {
     setNative(true);
     mockAuthenticate.mockRejectedValue({ code: 'userCancel' });
-    expect(await authenticateBiometric()).toBe(false);
+    const result = await authenticateBiometric();
+    expect(result.verified).toBe(false);
+    expect(result.cancelled).toBe(true);
+    expect(result.code).toBe('userCancel');
   });
 
-  it('authenticateBiometric returns false on systemCancel', async () => {
+  it('authenticateBiometric flags systemCancel as cancelled', async () => {
     setNative(true);
     mockAuthenticate.mockRejectedValue({ code: 'systemCancel' });
-    expect(await authenticateBiometric()).toBe(false);
+    const result = await authenticateBiometric();
+    expect(result.verified).toBe(false);
+    expect(result.cancelled).toBe(true);
   });
 
-  it('authenticateBiometric returns false on other errors', async () => {
+  it('authenticateBiometric returns not verified (not cancelled) on other errors', async () => {
     setNative(true);
     mockAuthenticate.mockRejectedValue(new Error('hardware error'));
-    expect(await authenticateBiometric()).toBe(false);
+    const result = await authenticateBiometric();
+    expect(result.verified).toBe(false);
+    expect(result.cancelled).toBe(false);
   });
 
   it('save/get credential roundtrip', async () => {

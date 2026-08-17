@@ -4,6 +4,7 @@ import { Role } from '../types';
 import { Shield, User, Lock, Eye, EyeOff, ChevronLeft, Smartphone, Check } from 'lucide-react';
 import { useToast, ToastContainer } from '../hooks/useToast';
 import { FingerprintScannerIcon } from './shared/FingerprintScannerIcon';
+import { BiometricAuthError, hasBiometricCredential } from '../services/biometricAuth';
 
 interface LoginScreenProps {
   onLogin: (role: Role, username: string, password: string) => Promise<{ role: Role; commit: () => void } | null>;
@@ -123,8 +124,12 @@ export default function LoginScreen({ onLogin, onBiometricLogin, biometricEnable
   const handleBiometric = async () => {
     if (biometricLoading || !onBiometricLogin) return;
     if (!biometricEnabled) {
-      toastInfo('يرجى تسجيل الدخول بكلمة المرور أولاً لتفعيل البصمة لهذه الجلسة');
-      return;
+      // قد تكون الاعتمادية محفوظة في التخزين الآمن لكن حالة التفعيل لم تُحمَّل بعد
+      const hasCredential = await hasBiometricCredential();
+      if (!hasCredential) {
+        toastInfo('يرجى تسجيل الدخول بكلمة المرور أولا لتفعيل البصمة لهذا الجهاز');
+        return;
+      }
     }
     setBiometricLoading(true);
     setErrorMsg('');
@@ -132,37 +137,43 @@ export default function LoginScreen({ onLogin, onBiometricLogin, biometricEnable
     try {
       const result = await onBiometricLogin();
       if (abortRef.current) return;
+      setBiometricLoading(false);
       if (result) {
         setSuccess(true);
-        setBiometricLoading(false);
         setBiometricFailures(0);
         setTimeout(() => {
           if (!abortRef.current) result.commit();
         }, 450);
       } else {
-        setBiometricLoading(false);
-        const attempts = biometricFailures + 1;
-        if (attempts >= MAX_BIOMETRIC_FAILURES) {
-          setBiometricFailures(0);
-          toastWarning('تجاوزت الحد الأقصى لمحاولات البصمة. استخدم كلمة المرور لتسجيل الدخول');
-        } else {
-          setBiometricFailures(attempts);
-          toastWarning('تعذر التحقق البيومتري. تأكد من تسجيل بصمتك على الجهاز وأعد المحاولة، أو استخدم كلمة المرور');
-        }
+        // لا توجد اعتمادية صالحة أو فشل تجديد الجلسة: ليست محاولة بصمة فاشلة
+        toastInfo('انتهت صلاحية جلسة الدخول بالبصمة. سجّل الدخول بكلمة المرور ثم فعّل البصمة مجددا');
       }
     } catch (err) {
       if (abortRef.current) return;
       setBiometricLoading(false);
+      // إلغاء المستخدم من نافذة النظام: لا تنبيه ولا احتساب محاولة
+      if (err instanceof BiometricAuthError && err.cancelled) return;
       const attempts = biometricFailures + 1;
       if (attempts >= MAX_BIOMETRIC_FAILURES) {
         setBiometricFailures(0);
         toastWarning('تجاوزت الحد الأقصى لمحاولات البصمة. استخدم كلمة المرور لتسجيل الدخول');
       } else {
         setBiometricFailures(attempts);
-        toastError('تعذر التحقق البيومتري. حاول مجدداً أو استخدم كلمة المرور');
+        const detail = err instanceof BiometricAuthError && err.message ? err.message : 'تعذر التحقق البيومتري. حاول مجددا أو استخدم كلمة المرور';
+        toastError(detail);
       }
     }
   };
+
+  // الدخول السريع: إن كانت البصمة مفعّلة مسبقاً تُفتح نافذة النظام مباشرة
+  // عند ظهور الشاشة دون انتظار إدخال كلمة المرور.
+  const autoBiometricRef = useRef(false);
+  useEffect(() => {
+    if (!biometricEnabled || !onBiometricLogin || autoBiometricRef.current) return;
+    autoBiometricRef.current = true;
+    const timer = setTimeout(() => { void handleBiometric(); }, 350);
+    return () => clearTimeout(timer);
+  }, [biometricEnabled, onBiometricLogin]);
 
   const removeRecent = (e: MouseEvent, u: string) => {
     e.stopPropagation();

@@ -10,6 +10,7 @@ import { captureError } from '../lib/monitor.ts';
 import { api } from '../api/client';
 import { Fingerprint, Trash2 } from 'lucide-react';
 import { useToast, ToastContainer } from '../hooks/useToast';
+import { isNativeBiometrics, type BiometricToggleResult } from '../services/biometricAuth';
 
 interface SettingsViewProps {
   settings: SystemSettings;
@@ -17,7 +18,7 @@ interface SettingsViewProps {
   biometricAvailable?: boolean;
   biometricEnrolled?: boolean;
   biometricEnabled?: boolean;
-  onEnableBiometric?: () => Promise<boolean>;
+  onEnableBiometric?: () => Promise<BiometricToggleResult>;
   onDisableBiometric?: () => Promise<void>;
 }
 
@@ -109,9 +110,12 @@ export default function SettingsView({
     try {
       if (val) {
         if (!onEnableBiometric) return;
-        const ok = await onEnableBiometric();
-        if (!ok) {
-          toastWarning('لم يتم تأكيد بصمتك. أعد المحاولة أو سجّل الدخول بكلمة المرور');
+        const result = await onEnableBiometric();
+        if (!result.enabled) {
+          // إلغاء المستخدم من نافذة النظام ليس فشلا: لا تنبيه
+          if (!result.cancelled) {
+            toastWarning(result.message || 'تعذر تفعيل الدخول بالبصمة. أعد المحاولة أو سجّل الدخول بكلمة المرور');
+          }
           return;
         }
         toastSuccess('تم تفعيل الدخول السريع بالبصمة');
@@ -121,7 +125,7 @@ export default function SettingsView({
         toastSuccess('تم إيقاف الدخول السريع بالبصمة');
       }
     } catch (err) {
-      toastWarning(err instanceof Error && err.message ? err.message : 'لم يتم التفعيل. تحقق من توفر مستشعر بصمة أو أعد المحاولة');
+      toastWarning(err instanceof Error && err.message ? err.message : 'تعذر تفعيل الدخول بالبصمة. تحقق من توفر مستشعر بصمة أو أعد المحاولة');
     } finally {
       setBiometricBusy(false);
     }
@@ -191,13 +195,15 @@ export default function SettingsView({
                     <span className="text-xs font-semibold text-gray-900 block">الدخول السريع بالبصمة</span>
                     <span className="text-[11px] text-gray-500">
                       {!biometricAvailable
-                        ? 'هذا الجهاز لا يدعم التحقق بالبصمة أو لا توجد بصمة مسجلة'
+                        ? isNativeBiometrics()
+                          ? 'هذا الجهاز لا يدعم التحقق بالبصمة أو لا توجد بصمة مسجلة'
+                          : 'الدخول السريع بالبصمة متاح في تطبيق الجوال فقط، وليس عبر متصفح الويب'
                         : biometricEnabled
-                          ? 'يتم تسجيل الدخول ببصمة الإصبع بدلاً من كلمة المرور'
-                          : 'تفعيل تسجيل الدخول ببصمة الإصبع بدلاً من كلمة المرور'}
+                          ? 'يتم تسجيل الدخول ببصمة الإصبع بدلا من كلمة المرور'
+                          : 'تفعيل تسجيل الدخول ببصمة الإصبع بدلا من كلمة المرور'}
                     </span>
                     {biometricAvailable && !biometricEnrolled && (
-                      <span className="text-[10px] text-amber-600 block mt-0.5">سجّل بصمتك من إعدادات جهازك أولاً لتتمكن من التفعيل</span>
+                      <span className="text-[10px] text-amber-600 block mt-0.5">سجّل بصمتك من إعدادات جهازك أولا لتتمكن من التفعيل</span>
                     )}
                   </div>
                 </div>

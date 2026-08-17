@@ -11,6 +11,36 @@ export interface BiometricCredential {
 
 export type { BiometryStatus };
 
+/** Outcome of a single biometric prompt so callers can tell a user cancel
+ *  apart from a genuine verification failure and react accordingly. */
+export interface BiometricAuthResult {
+  verified: boolean;
+  /** True when the user dismissed the system prompt (not a failure). */
+  cancelled: boolean;
+  code?: string;
+  message?: string;
+}
+
+/** Result of enabling quick-login from a settings toggle. */
+export interface BiometricToggleResult {
+  enabled: boolean;
+  cancelled: boolean;
+  message?: string;
+}
+
+/** Thrown by the login flow so the UI can separate a user cancel from a
+ *  real biometric failure and avoid scary/incorrect toasts. */
+export class BiometricAuthError extends Error {
+  cancelled: boolean;
+  code?: string;
+  constructor(message: string, cancelled: boolean, code?: string) {
+    super(message);
+    this.name = 'BiometricAuthError';
+    this.cancelled = cancelled;
+    this.code = code;
+  }
+}
+
 function detectCapacitor(): boolean {
   try {
     return !!(window as unknown as { Capacitor?: { isNative?: boolean } }).Capacitor?.isNative;
@@ -70,9 +100,14 @@ const UNAVAILABLE_STATUS: BiometryStatus = {
   hardwarePresent: false,
 };
 
+const WEB_UNAVAILABLE_STATUS: BiometryStatus = {
+  ...UNAVAILABLE_STATUS,
+  errorMessage: 'الدخول السريع بالبصمة متاح في تطبيق الجوال فقط، وليس عبر متصفح الويب',
+};
+
 /** Full device capability report from the native BiometricPrompt layer. */
 export async function getBiometricStatus(): Promise<BiometryStatus> {
-  if (!detectCapacitor()) return UNAVAILABLE_STATUS;
+  if (!detectCapacitor()) return WEB_UNAVAILABLE_STATUS;
   try {
     const result = await BiometricAuth.checkBiometry();
     return {
@@ -97,8 +132,10 @@ export async function isBiometricEnrolled(): Promise<boolean> {
   return status.isEnrolled;
 }
 
-export async function authenticateBiometric(reason?: string): Promise<boolean> {
-  if (!detectCapacitor()) return false;
+const CANCEL_CODES = new Set(['userCancel', 'systemCancel', 'appCancel', 'canceled']);
+
+export async function authenticateBiometric(reason?: string): Promise<BiometricAuthResult> {
+  if (!detectCapacitor()) return { verified: false, cancelled: false, code: 'web' };
   try {
     const result = await BiometricAuth.authenticate({
       reason: reason || 'التحقق من هويتك للدخول السريع',
@@ -107,14 +144,13 @@ export async function authenticateBiometric(reason?: string): Promise<boolean> {
       cancelTitle: 'إلغاء',
       allowDeviceCredential: true,
     });
-    return result?.verified === true;
+    return { verified: result?.verified === true, cancelled: false };
   } catch (err) {
     const code = (err as { code?: string })?.code;
-    if (code === 'userCancel' || code === 'systemCancel' || code === 'appCancel' || code === 'canceled') {
-      return false;
-    }
-    captureError(err, 'authenticateBiometric');
-    return false;
+    const message = err instanceof Error ? err.message : (err as { message?: string })?.message;
+    const cancelled = CANCEL_CODES.has(code ?? '');
+    if (!cancelled) captureError(err, 'authenticateBiometric');
+    return { verified: false, cancelled, code, message };
   }
 }
 

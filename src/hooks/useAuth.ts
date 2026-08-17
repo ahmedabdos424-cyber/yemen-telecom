@@ -5,7 +5,7 @@ import { setFrontendSentryUser } from '../lib/sentry';
 import {
   isNativeBiometrics, isBiometricAvailable, isBiometricEnrolled, authenticateBiometric, getBiometricStatus,
   getBiometricCredential, hasBiometricCredential, clearBiometricCredential,
-  saveBiometricCredential,
+  saveBiometricCredential, BiometricAuthError, type BiometricToggleResult,
 } from '../services/biometricAuth';
 
 export function useAuth() {
@@ -144,22 +144,28 @@ export function useAuth() {
     clearSession();
   }, [clearSession]);
 
-  const enableBiometricLogin = useCallback(async (usernameToSave: string): Promise<boolean> => {
-    if (!isNativeBiometrics()) return false;
+  const enableBiometricLogin = useCallback(async (usernameToSave: string): Promise<BiometricToggleResult> => {
+    if (!isNativeBiometrics()) {
+      return { enabled: false, cancelled: false, message: 'الدخول السريع بالبصمة متاح في تطبيق الجوال فقط، وليس عبر متصفح الويب' };
+    }
     const status = await getBiometricStatus();
     if (!status.isAvailable) {
-      throw new Error(status.errorMessage || 'التحقق بالبصمة غير متاح على هذا الجهاز');
+      return { enabled: false, cancelled: false, message: status.errorMessage || 'التحقق بالبصمة غير متاح على هذا الجهاز' };
     }
     if (!status.isEnrolled) {
-      throw new Error('لا توجد بصمة مسجلة على هذا الجهاز. سجّل بصمتك من إعدادات جهازك أولاً');
+      return { enabled: false, cancelled: false, message: 'لا توجد بصمة مسجلة على هذا الجهاز. سجّل بصمتك من إعدادات جهازك أولا' };
     }
-    const authed = await authenticateBiometric('تأكيد بصمتك لتفعيل الدخول السريع');
-    if (!authed) return false;
+    const auth = await authenticateBiometric('تأكيد بصمتك لتفعيل الدخول السريع');
+    if (!auth.verified) {
+      return { enabled: false, cancelled: auth.cancelled, message: auth.cancelled ? undefined : auth.message };
+    }
     const { refreshToken: rt } = getLoadedTokens();
-    if (!rt) return false;
+    if (!rt) {
+      return { enabled: false, cancelled: false, message: 'تعذر حفظ الجلسة. سجّل الدخول بكلمة المرور ثم أعد المحاولة' };
+    }
     await saveBiometricCredential({ username: usernameToSave, refreshToken: rt, savedAt: Date.now() });
     setBiometricEnabled(true);
-    return true;
+    return { enabled: true, cancelled: false };
   }, []);
 
   const disableBiometricLogin = useCallback(async (): Promise<void> => {
@@ -174,8 +180,14 @@ export function useAuth() {
 
   const handleBiometricLogin = useCallback(async (): Promise<{ role: Role; commit: () => void } | null> => {
     if (!isNativeBiometrics()) return null;
-    const authed = await authenticateBiometric('استخدم بصمتك للدخول السريع');
-    if (!authed) throw new Error('Biometric verification failed');
+    const auth = await authenticateBiometric('استخدم بصمتك للدخول السريع');
+    if (!auth.verified) {
+      throw new BiometricAuthError(
+        auth.message || 'تعذر التحقق البيومتري',
+        auth.cancelled,
+        auth.code,
+      );
+    }
     const credential = await getBiometricCredential();
     if (!credential) return null;
     // Rotate the stored refresh token into a fresh session.

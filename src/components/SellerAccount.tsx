@@ -5,6 +5,7 @@ import ProfileAvatar from './shared/ProfileAvatar';
 import { useToast, ToastContainer } from '../hooks/useToast';
 import { api } from '../api/client';
 import SettingsPanel from './shared/SettingsPanel';
+import type { BiometricToggleResult } from '../services/biometricAuth';
 import {
   User, MapPin, TrendingUp, Smartphone, Layers, Award, Activity, Lock,
   LogOut, ChevronLeft, X, Settings, Trash2
@@ -19,7 +20,7 @@ interface SellerAccountProps {
   onLogout: () => void;
   biometricAvailable?: boolean;
   biometricEnabled?: boolean;
-  onEnableBiometric?: () => Promise<boolean>;
+  onEnableBiometric?: () => Promise<BiometricToggleResult>;
   onDisableBiometric?: () => Promise<void>;
 }
 
@@ -71,9 +72,12 @@ export default function SellerAccount({
     try {
       if (val) {
         if (!onEnableBiometric) return;
-        const ok = await onEnableBiometric();
-        if (!ok) {
-          toastWarning('لم يتم تأكيد بصمتك. أعد المحاولة أو سجّل الدخول بكلمة المرور');
+        const result = await onEnableBiometric();
+        if (!result.enabled) {
+          // إلغاء المستخدم من نافذة النظام ليس فشلا: لا تنبيه
+          if (!result.cancelled) {
+            toastWarning(result.message || 'تعذر تفعيل الدخول بالبصمة. أعد المحاولة أو سجّل الدخول بكلمة المرور');
+          }
           return;
         }
         toastSuccess('تم تفعيل الدخول السريع بالبصمة');
@@ -83,7 +87,7 @@ export default function SellerAccount({
         toastSuccess('تم إيقاف الدخول السريع بالبصمة');
       }
     } catch (err) {
-      toastWarning(err instanceof Error && err.message ? err.message : 'لم يتم التفعيل. تحقق من توفر مستشعر بصمة أو أعد المحاولة');
+      toastWarning(err instanceof Error && err.message ? err.message : 'تعذر تفعيل الدخول بالبصمة. تحقق من توفر مستشعر بصمة أو أعد المحاولة');
     }
   };
 
