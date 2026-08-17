@@ -2,6 +2,7 @@
 import { ViewType } from '../types';
 import AdminMoreDrawer from './AdminMoreDrawer';
 import MobileBottomNav from './shared/MobileBottomNav';
+import { managerNavItems } from './nav/navItems';
 
 interface BottomNavProps {
   currentView: ViewType;
@@ -17,14 +18,7 @@ export default function BottomNav({ currentView, setView, unresolvedAlertsCount,
   const isMoreOpen = mobileMenuOpen ?? isMoreOpenInternal;
   const setIsMoreOpen = setMobileMenuOpen ?? setIsMoreOpenInternal;
 
-  const primaryNavItems = [
-    { id: 'dashboard', label: 'الرئيسية', icon: 'home' },
-    { id: 'agents', label: 'الوكلاء', icon: 'groups' },
-    { id: 'sims', label: 'شرائحي', icon: 'sim_card' },
-    { id: 'reports', label: 'التقارير', icon: 'analytics' },
-    { id: 'settings', label: 'الإعدادات', icon: 'settings' },
-    { id: 'more', label: 'المزيد', icon: 'apps' },
-  ];
+  const primaryNavItems = managerNavItems;
 
   const handleNavClick = (itemId: string) => {
     if (itemId === 'more') {

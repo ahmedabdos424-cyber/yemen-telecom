@@ -7,8 +7,9 @@ import { useState } from 'react';
 import { ViewType } from '../types';
 import ProfileAvatar from './shared/ProfileAvatar';
 import { LogOut } from 'lucide-react';
+import { viewTitles, DEFAULT_VIEW_TITLE } from './nav/navItems';
 
-interface Alert {
+export interface Alert {
   id: string;
   title: string;
   description?: string;
@@ -38,30 +39,7 @@ export default function TopBar({
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
-  const getTitle = () => {
-    switch (currentView) {
-      case 'dashboard':
-        return 'لوحة التحكم المركزية';
-      case 'sims':
-        return 'إدارة الشرائح والمخزون';
-      case 'agents':
-        return 'إدارة الوكلاء المعتمدين';
-      case 'sellers':
-        return 'إدارة ومتابعة البائعين';
-      case 'alerts':
-        return 'تنبيهات النظام والمراقبة الفورية';
-      case 'duplicate-identities':
-        return 'مراقبة الهويات المتكررة والمخاطر';
-      case 'reports':
-        return 'مركز التقارير المتقدمة';
-      case 'settings':
-        return 'إعدادات النظام والأمان';
-      case 'add-agent':
-        return 'إضافة وكيل نظام جديد';
-      default:
-        return 'نظام توزيع الشرائح';
-    }
-  };
+  const title = viewTitles[currentView] ?? DEFAULT_VIEW_TITLE;
 
   return (
     <header className="fixed top-0 safe-top left-0 right-0 z-40 bg-white border-b border-gray-200 flex justify-between items-center h-12 md:h-16 px-3 md:px-8">
@@ -71,7 +49,7 @@ export default function TopBar({
           admin_panel_settings
         </span>
         <h1 className="font-headline-md text-sm md:text-lg font-bold text-gray-900 truncate max-w-[140px] md:max-w-none">
-          {getTitle().length > 20 ? getTitle().slice(0, 18) + '...' : getTitle()}
+          {title.length > 20 ? title.slice(0, 18) + '...' : title}
           <span className="text-gray-400 text-[10px] md:text-xs font-normal hidden sm:inline-block"> | مدير النظام</span>
         </h1>
       </div>

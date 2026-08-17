@@ -8,7 +8,7 @@ import { useToast, ToastContainer } from '../hooks/useToast';
 import { Plus } from 'lucide-react';
 import type { Seller, Sim, OperatorInventory, Operator, Role, Operation } from '../types';
 import SellerListView from './agent/SellerListView';
-import SimManagementView from './agent/SimManagementView';
+import SimsListView from './sims/SimsListView';
 import QuickActionsSection from './agent/QuickActionsSection';
 import InventorySummaryCards from './agent/InventorySummaryCards';
 import RecentOperationsTable from './agent/RecentOperationsTable';
@@ -54,8 +54,7 @@ export default function AgentDashboard({
   onEditSeller,
   onDeleteSeller,
   onUpdateInventories,
-  operations = [],
-  onUpdateSims
+  operations = []
 }: AgentDashboardProps) {
   // Modals state
   const [transferModalOpen, setTransferModalOpen] = useState(false);
@@ -120,9 +119,9 @@ export default function AgentDashboard({
           onDeleteSeller={onDeleteSeller}
         />
       ) : activeTab === 'my_sims' ? (
-        <SimManagementView
+        <SimsListView
           sims={sims}
-          onUpdateSims={onUpdateSims}
+          mode="agent"
         />
       ) : (
         <>

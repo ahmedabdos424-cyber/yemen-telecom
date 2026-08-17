@@ -4,7 +4,6 @@ import { ViewType, Role, Sim } from './types';
 
 import SplashScreen from './components/SplashScreen';
 import LoginScreen from './components/LoginScreen';
-import TopBar from './components/TopBar';
 import NavBar from './components/NavBar';
 import LoadingScreen from './components/shared/LoadingScreen';
 import ErrorBoundary from './components/shared/ErrorBoundary';
@@ -35,7 +34,7 @@ import { CameraProvider } from './context/CameraContext';
 const AgentDashboard = lazy(() => import('./components/AgentDashboard'));
 const AgentProfileView = lazy(() => import('./components/agent/AgentProfileView'));
 const SellerDashboard = lazy(() => import('./components/SellerDashboard'));
-const BottomNav = lazy(() => import('./components/BottomNav'));
+const ManagerChrome = lazy(() => import('./components/nav/ManagerChrome'));
 
 import { AnimatePresence, motion } from 'motion/react';
 import { Check, Copy, Fingerprint, X } from 'lucide-react';
@@ -213,7 +212,6 @@ function AuthenticatedApp() {
     return (
       <div className="min-h-dvh bg-theme-background font-sans antialiased text-slate-100">
         <SharedOfflineBanner />
-        <TopBar currentView={mgr.currentView} setView={(v) => { mgr.setView(v); navigate(`/manager/${v}`); }} unresolvedAlertsCount={mgr.alerts.length} alerts={mgr.alerts} displayName={username} role={role} onLogout={handleLogout} />
         <div className="flex pt-[calc(4rem+env(safe-area-inset-top))] min-h-dvh overflow-y-auto pb-[calc(4rem+env(safe-area-inset-bottom))]">
           <main className="flex-1 px-3 sm:px-4 md:px-8 py-4 md:py-8 lg:pt-10">
             <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
@@ -242,7 +240,15 @@ function AuthenticatedApp() {
         </div>
         <ToastNotifications />
         <Suspense fallback={null}>
-          <BottomNav currentView={mgr.currentView} setView={(v) => { mgr.setView(v); navigate(`/manager/${v}`); }} unresolvedAlertsCount={(mgr.alerts ?? []).length} onLogout={handleLogout} />
+          <ManagerChrome
+            currentView={mgr.currentView}
+            setView={(v) => { mgr.setView(v); navigate(`/manager/${v}`); }}
+            unresolvedAlertsCount={(mgr.alerts ?? []).length}
+            alerts={mgr.alerts}
+            displayName={username}
+            role={role}
+            onLogout={handleLogout}
+          />
         </Suspense>
       </div>
     );

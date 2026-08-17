@@ -1,7 +1,8 @@
 import { Role } from '../types';
-import { Home, PlusCircle, UserPlus, Users, Cpu, UserCircle, LogOut } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import MobileBottomNav from './shared/MobileBottomNav';
 import ProfileAvatar from './shared/ProfileAvatar';
+import { agentNavItems, sellerNavItems } from './nav/navItems';
 
 interface NavBarProps {
   role: Role;
@@ -14,37 +15,9 @@ interface NavBarProps {
 export default function NavBar({ role, activeTab, setActiveTab, username, onLogout }: NavBarProps) {
   const isAgent = role === 'agent';
 
-  const menuItems = isAgent
-    ? [
-        { id: 'home', label: 'الرئيسية', icon: Home },
-        { id: 'activate', label: 'تفعيل شريحة', icon: PlusCircle },
-        { id: 'add_seller', label: 'إضافة بائع', icon: UserPlus },
-        { id: 'sellers', label: 'البائعين', icon: Users },
-        { id: 'my_sims', label: 'شرائحي', icon: Cpu },
-        { id: 'account', label: 'بيانات الحساب', icon: UserCircle },
-      ]
-    : [
-        { id: 'home', label: 'الرئيسية', icon: Home },
-        { id: 'activate', label: 'تفعيل شريحة', icon: PlusCircle },
-        { id: 'my_sims', label: 'شرائحي', icon: Cpu },
-        { id: 'account', label: 'بيانات الحساب', icon: UserCircle },
-      ];
-
-  const bottomNavItems = isAgent
-    ? [
-        { id: 'home', label: 'الرئيسية', icon: 'home' },
-        { id: 'activate', label: 'تفعيل شريحة', icon: 'add_circle' },
-        { id: 'add_seller', label: 'إضافة بائع', icon: 'person_add' },
-        { id: 'sellers', label: 'البائعين', icon: 'group' },
-        { id: 'my_sims', label: 'شرائحي', icon: 'sim_card' },
-        { id: 'account', label: 'بيانات الحساب', icon: 'account_circle' },
-      ]
-    : [
-        { id: 'home', label: 'الرئيسية', icon: 'home' },
-        { id: 'activate', label: 'تفعيل شريحة', icon: 'add_circle' },
-        { id: 'my_sims', label: 'شرائحي', icon: 'sim_card' },
-        { id: 'account', label: 'بيانات الحساب', icon: 'account_circle' },
-      ];
+  const items = isAgent ? agentNavItems : sellerNavItems;
+  const menuItems = items.map((it) => ({ id: it.id, label: it.label, icon: it.Icon }));
+  const bottomNavItems = items.map((it) => ({ id: it.id, label: it.label, icon: it.iconMat }));
 
   return (
     <>

@@ -5,7 +5,7 @@ import { api } from '../api/client';
 import { useToast, ToastContainer } from '../hooks/useToast';
 import SellerHome from './SellerHome';
 import SellerAccount from './SellerAccount';
-import SellerSimsView from './SellerSimsView';
+import SimsListView from './sims/SimsListView';
 import SettingsPanel from './shared/SettingsPanel';
 import {
   RefreshCw, Check, X
@@ -156,7 +156,7 @@ export default function SellerDashboard({
       )}
 
       {activeTab === 'my_sims' && (
-        <SellerSimsView sims={sims} onUpdateSims={onUpdateSims} />
+        <SimsListView sims={sims} onUpdateSims={onUpdateSims} mode="seller" />
       )}
 
       <SettingsPanel
