@@ -1,7 +1,7 @@
 {
   "name": "yemen-telecom",
   "private": true,
-  "version": "1.0.9",
+  "version": "1.0.17",
   "engines": {
     "node": ">=24.0.0",
     "npm": ">=11.0.0"

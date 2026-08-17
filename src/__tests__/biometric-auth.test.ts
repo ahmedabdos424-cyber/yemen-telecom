@@ -178,12 +178,20 @@ describe('biometricAuth', () => {
     expect(await getBiometricCredential()).toBeNull();
   });
 
-  it('credential stored in localStorage on web fallback', async () => {
+  it('web never persists the biometric credential (no plaintext refreshToken in localStorage)', async () => {
     vi.resetModules();
     const fresh = await import('../services/biometricAuth');
     setNative(false);
     await fresh.saveBiometricCredential({ username: 'seller1', refreshToken: 'rt-abc', savedAt: 123 });
-    expect(localStorage.getItem('tele_biometric_credential')).toContain('rt-abc');
+    expect(localStorage.getItem('tele_biometric_credential')).toBeNull();
+    expect(await fresh.getBiometricCredential()).toBeNull();
+  });
+
+  it('web clears any legacy stored credential on read', async () => {
+    setNative(false);
+    localStorage.setItem('tele_biometric_credential', '{"username":"x","refreshToken":"rt-leak","savedAt":1}');
+    expect(await getBiometricCredential()).toBeNull();
+    expect(localStorage.getItem('tele_biometric_credential')).toBeNull();
   });
 
   it('native save stores an encrypted envelope, not the raw token', async () => {

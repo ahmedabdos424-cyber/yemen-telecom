@@ -119,10 +119,14 @@ export async function authenticateBiometric(reason?: string): Promise<boolean> {
 }
 
 export async function saveBiometricCredential(credential: BiometricCredential): Promise<void> {
+  // Web (non-Capacitor) never persists credentials: localStorage is readable by
+  // any script (e.g. via XSS) and would leak the refresh token. Native Android
+  // stores it inside the Android Keystore (see plugins/BiometricAuth.encrypt).
+  if (!detectCapacitor()) return;
   try {
     const storage = await getStorage();
     const payload = JSON.stringify(credential);
-    const toStore = detectCapacitor() ? await encryptValue(payload) : payload;
+    const toStore = await encryptValue(payload);
     await storage.set(CREDENTIAL_KEY, toStore);
   } catch (err) {
     captureError(err, 'saveBiometricCredential');
@@ -155,20 +159,27 @@ async function decryptValue(raw: string): Promise<string | null> {
 }
 
 export async function getBiometricCredential(): Promise<BiometricCredential | null> {
+  // On web, biometry is unavailable and we must never resume a session from a
+  // locally stored refresh token. Wipe any legacy web-stored credential too so
+  // a previously persisted token can never be silently reused after an XSS.
+  if (!detectCapacitor()) {
+    try {
+      localStorage.removeItem(CREDENTIAL_KEY);
+    } catch {
+      /* noop */
+    }
+    return null;
+  }
   try {
     const storage = await getStorage();
     const raw = await storage.get(CREDENTIAL_KEY);
     if (!raw) return null;
-    let json = raw;
-    if (detectCapacitor()) {
-      const decrypted = await decryptValue(raw);
-      if (decrypted === null) {
-        await storage.remove(CREDENTIAL_KEY).catch(() => {});
-        return null;
-      }
-      json = decrypted;
+    const decrypted = await decryptValue(raw);
+    if (decrypted === null) {
+      await storage.remove(CREDENTIAL_KEY).catch(() => {});
+      return null;
     }
-    const parsed = JSON.parse(json) as BiometricCredential;
+    const parsed = JSON.parse(decrypted) as BiometricCredential;
     if (!parsed.username || !parsed.refreshToken) return null;
     return parsed;
   } catch {
