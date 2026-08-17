@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   User, CheckCircle, AlertTriangle, TrendingUp, Search, X, Edit,
-  Smartphone, Lock, MoreVertical, Check, Cpu, Trash2, UserX, Save, MapPin, Phone, User as UserIcon, Key
+  Smartphone, Lock, MoreVertical, Cpu, Trash2, UserX, Save, MapPin, Phone, User as UserIcon, Key
 } from 'lucide-react';
 import { Seller } from '../../types';
 import { useToast, ToastContainer } from '../../hooks/useToast';
@@ -19,6 +19,7 @@ interface SellerListViewProps {
   onEditSeller?: (seller: Seller) => void;
   onDeleteSeller?: (sellerId: string) => Promise<void>;
   onLockToggle?: (sellerId: string, locked: boolean) => void;
+  onAllocateSims?: (sellerId: string, sellerName: string) => void;
 }
 
 export default function SellerListView({
@@ -27,15 +28,12 @@ export default function SellerListView({
   onResetSellerPassword,
   onEditSeller,
   onDeleteSeller,
-  onLockToggle
+  onLockToggle,
+  onAllocateSims
 }: SellerListViewProps) {
   const [sellerSearchQuery, setSellerSearchQuery] = useState('');
   const [sellerStatusFilter, setSellerStatusFilter] = useState('all');
   const [sellerLockedState, setSellerLockedState] = useState<Record<string, boolean>>({});
-  const [allocModalSeller, setAllocModalSeller] = useState<Seller | null>(null);
-  const [allocFrom, setAllocFrom] = useState('');
-  const [allocTo, setAllocTo] = useState('');
-  const [allocOp, setAllocOp] = useState<'yemen_mobile' | 'sabafon' | 'you'>('yemen_mobile');
   const [menuSeller, setMenuSeller] = useState<Seller | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Seller | null>(null);
   const [confirmDisable, setConfirmDisable] = useState<Seller | null>(null);
@@ -46,7 +44,7 @@ export default function SellerListView({
   const [editSaving, setEditSaving] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const { toasts, dismissToast, toastSuccess, toastError, toastWarning, toastInfo } = useToast();
+  const { toasts, dismissToast, toastSuccess, toastError, toastInfo } = useToast();
 
   // Compute stats for sellers
   const totalCount = sellers.length;
@@ -237,7 +235,7 @@ export default function SellerListView({
 
                           <button
                             onClick={() => {
-                              setAllocModalSeller(seller);
+                              onAllocateSims?.(String(seller.id), seller.name);
                             }}
                             className="btn-sm btn-ghost text-red-400 hover:bg-red-950/20 hover:text-red-300"
                             title="تخصيص شرائح"
@@ -318,7 +316,7 @@ export default function SellerListView({
 
                     {/* Action buttons */}
                     <div className="flex gap-2 pt-2 border-t border-slate-800/50">
-                      <button onClick={() => { setAllocModalSeller(seller); }} className="flex-1 btn btn-sm btn-ghost text-red-400 hover:text-red-300 text-[10px] h-9 flex items-center justify-center gap-1">
+                      <button onClick={() => { onAllocateSims?.(String(seller.id), seller.name); }} className="flex-1 btn btn-sm btn-ghost text-red-400 hover:text-red-300 text-[10px] h-9 flex items-center justify-center gap-1">
                         <Cpu size={18} /> <span>تخصيص</span>
                       </button>
                       <button onClick={() => {
@@ -561,135 +559,6 @@ export default function SellerListView({
                 >
                   إلغاء
                 </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* SIM Allocation Popup */}
-      <AnimatePresence>
-        {allocModalSeller && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setAllocModalSeller(null)}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ scale: 0.95, y: 15 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 15 }}
-              className="relative w-full max-w-sm md:max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-right text-slate-200 max-h-[90vh] overflow-y-auto"
-             >
-               <div className="flex justify-between items-center pb-4 border-b border-slate-800 mb-4">
-                 <div>
-                   <h3 className="text-sm font-bold text-slate-100">تخصيص شرائح</h3>
-                  <p className="text-[10px] text-slate-400 mt-0.5">للبائع: {allocModalSeller.name}</p>
-                </div>
-                <button onClick={() => setAllocModalSeller(null)} className="p-2.5 text-slate-500 hover:text-slate-100 hover:bg-slate-800 rounded-full transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center">
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-slate-400">شركة الاتصالات</label>
-                  <select
-                    value={allocOp}
-                    onChange={(e) => setAllocOp(e.target.value as 'yemen_mobile' | 'sabafon' | 'you')}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs outline-none focus:border-red-600 transition-colors text-slate-200"
-                  >
-                    <option value="yemen_mobile">يمن موبايل</option>
-                    <option value="sabafon">سبأفون</option>
-                    <option value="you">YOU</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-slate-400">رقم الشريحة من</label>
-                  <input
-                    type="text"
-                    value={allocFrom}
-                    onChange={(e) => setAllocFrom(e.target.value.replace(/\D/g, ''))}
-                    placeholder="89967XXXXXXXXXXXX"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs outline-none focus:border-red-600 transition-colors text-slate-200 font-sans"
-                    dir="ltr"
-                    style={{ textAlign: 'center' }}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-slate-400">رقم الشريحة إلى</label>
-                  <input
-                    type="text"
-                    value={allocTo}
-                    onChange={(e) => setAllocTo(e.target.value.replace(/\D/g, ''))}
-                    placeholder="89967XXXXXXXXXXXX"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs outline-none focus:border-red-600 transition-colors text-slate-200 font-sans"
-                    dir="ltr"
-                    style={{ textAlign: 'center' }}
-                  />
-                </div>
-
-                {/* Auto-calculated count — read-only */}
-                <div className="bg-slate-950/40 border border-slate-800 rounded-xl p-4 text-right">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-slate-400">المستلم:</span>
-                    <span className="font-bold text-slate-100">{allocModalSeller.name}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs mt-2 pt-2 border-t border-slate-800/40">
-                    <span className="text-slate-400">العدد:</span>
-                    <span className="font-bold text-emerald-400 text-sm">
-                      {allocFrom && allocTo
-                        ? `${parseInt(allocTo) - parseInt(allocFrom) + 1} شريحة`
-                        : '0 شريحة'}
-                    </span>
-                  </div>
-                  {allocFrom && allocTo && (
-                    <div className="text-[9px] text-slate-500 mt-1 text-left font-mono" dir="ltr">
-                      {allocFrom} - {allocTo}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const from = parseInt(allocFrom);
-                      const to = parseInt(allocTo);
-                      if (!allocFrom || !allocTo || isNaN(from) || isNaN(to)) {
-                        toastWarning('الرجاء إدخال نطاق أرقام صحيح');
-                        return;
-                      }
-                      if (to < from) {
-                        toastWarning('رقم (إلى) يجب أن يكون أكبر من أو يساوي رقم (من)');
-                        return;
-                      }
-                      const count = to - from + 1;
-                      toastSuccess(`تم تخصيص ${count} شريحة من ${allocOp === 'yemen_mobile' ? 'يمن موبايل' : allocOp === 'sabafon' ? 'سبأفون' : 'YOU'} للبائع ${allocModalSeller.name}`);
-                      setAllocModalSeller(null);
-                      setAllocFrom('');
-                      setAllocTo('');
-                    }}
-                    className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer"
-                  >
-                    <span className="flex items-center justify-center gap-2">
-                      <Check size={14} />
-                      تأكيد التخصيص
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setAllocModalSeller(null); setAllocFrom(''); setAllocTo(''); }}
-                    className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition-all cursor-pointer"
-                  >
-                    إلغاء
-                  </button>
-                </div>
               </div>
             </motion.div>
           </div>

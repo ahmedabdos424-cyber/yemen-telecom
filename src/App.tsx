@@ -57,6 +57,13 @@ function AuthenticatedApp() {
   const agtRef = useRef(agt);
   useEffect(() => { agtRef.current = agt; });
 
+  // Notification preference flags (mirror the toggles in SettingsPanel).
+  // Both default to ON unless explicitly stored as 'false'.
+  const SIM_NOTIF_KEY = 'tele_sim_notifications';
+  const LOW_STOCK_NOTIF_KEY = 'tele_low_stock_notifications';
+  const notifEnabled = (key: string) => localStorage.getItem(key) !== 'false';
+  const lowStockRef = useRef<Set<string>>(new Set());
+
   // Register this device for FCM push notifications once a user is logged in.
   // Foreground messages are surfaced as in-app toasts; background messages are
   // handled by the OS/service worker.
@@ -66,7 +73,10 @@ function AuthenticatedApp() {
     initPushNotifications((payload) => {
       if (cancelled) return;
       if (payload.title || payload.body) {
-        toastInfo(payload.title || 'إشعار جديد', payload.body);
+        // Respect the "توزيع الشرائح" notification preference.
+        if (notifEnabled(SIM_NOTIF_KEY)) {
+          toastInfo(payload.title || 'إشعار جديد', payload.body);
+        }
       }
     }).then((ok) => {
       if (ok) toastInfo('الإشعارات مفعلة', 'ستصلك تنبيهات النظام المهمة فورياً');
@@ -102,7 +112,10 @@ function AuthenticatedApp() {
         }
       }
       if (isAlertCreated) {
-        toastInfo(String(event.title ?? 'تنبيه جديد'), String(event.description ?? ''));
+        // Respect the "توزيع الشرائح" notification preference for system alerts.
+        if (notifEnabled(SIM_NOTIF_KEY)) {
+          toastInfo(String(event.title ?? 'تنبيه جديد'), String(event.description ?? ''));
+        }
       }
     });
     return () => {
@@ -110,6 +123,28 @@ function AuthenticatedApp() {
       disconnectRealtime();
     };
   }, [role, toastInfo]);
+
+  // Low-stock (10%) alert: the server does not emit this event, so we derive
+  // it client-side from the inventory snapshot. Toast only when an operator
+  // newly crosses the threshold, and respect the low-stock notification toggle.
+  useEffect(() => {
+    if (!role || (role !== 'agent' && role !== 'seller')) return;
+    if (!notifEnabled(LOW_STOCK_NOTIF_KEY)) {
+      lowStockRef.current = new Set();
+      return;
+    }
+    const lowNow = new Set<string>();
+    for (const inv of agt.inventories || []) {
+      const capacity = (inv.remaining ?? 0) + (inv.available ?? 0);
+      if (capacity > 0 && inv.available / capacity < 0.1) lowNow.add(inv.operator);
+    }
+    for (const op of lowNow) {
+      if (!lowStockRef.current.has(op)) {
+        toastWarning('مخزون منخفض', `مخزون ${op} أقل من 10% — يُرجى طلب دفعة جديدة.`);
+      }
+    }
+    lowStockRef.current = lowNow;
+  }, [agt.inventories, role, toastWarning]);
 
   useEffect(() => {
     const onSessionExpired = () => {
@@ -379,10 +414,14 @@ function AuthenticatedApp() {
                   <button
                     onClick={async () => {
                       try {
-                        const ok = await enableBiometricLogin(username);
-                        if (ok) dismissBiometricPrompt();
+                        const result = await enableBiometricLogin(username);
+                        if (result.enabled) {
+                          dismissBiometricPrompt();
+                        } else if (!result.cancelled && result.message) {
+                          toastWarning(result.message);
+                        }
                       } catch (err) {
-                        toastWarning(err instanceof Error && err.message ? err.message : 'لم يتم التفعيل. تحقق من توفر مستشعر بصمة أو أعد المحاولة');
+                        toastWarning(err instanceof Error && err.message ? err.message : 'تعذر تفعيل الدخول بالبصمة. تحقق من توفر مستشعر بصمة أو أعد المحاولة');
                       }
                     }}
                     className="w-full py-3.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-sm transition-all active:scale-[0.98] cursor-pointer min-h-[48px] flex items-center justify-center gap-2"

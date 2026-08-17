@@ -269,6 +269,14 @@ export function useAgentSellerState(role: string | null, username: string) {
       if (match) return prev.map(s => s.iccid === simData.iccid ? { ...s, status: 'activated' as const } : s);
       return [{ id: `sim_act_${Date.now()}`, iccid: simData.iccid, provider: toProvider(simData.operator), category: 'Prepaid Mobile SIM', status: 'activated', dateAdded: new Date().toISOString().split('T')[0].replace(/-/g, '/') }, ...prev];
     });
+
+    // Re-sync inventories/operations so the per-operator summary cards
+    // (available decremented, sold incremented) refresh without a manual pull.
+    try {
+      await refreshRoleData();
+    } catch (re) {
+      captureError(re, 'refreshAfterActivation');
+    }
   };
 
   const handleUpdateSellerStatusForAgent = (sellerId: string, status: 'active' | 'inactive') => {

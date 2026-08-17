@@ -45,7 +45,7 @@ export default function SimsListView({ sims = [], onUpdateSims, mode = 'seller' 
     if (!acc[op]) acc[op] = { total: 0, available: 0, sold: 0 };
     acc[op].total += 1;
     if (sim.status === 'available') acc[op].available += 1;
-    else if (sim.status === 'sold') acc[op].sold += 1;
+    else if (sim.status === 'sold' || sim.status === 'activated') acc[op].sold += 1;
     return acc;
   }, {} as Record<string, OperatorStat>);
 
@@ -57,7 +57,7 @@ export default function SimsListView({ sims = [], onUpdateSims, mode = 'seller' 
       (sim.category && sim.category.toLowerCase().includes(query));
     let matchesStatus = true;
     if (simStatusFilter === 'available') matchesStatus = sim.status === 'available';
-    else if (simStatusFilter === 'sold') matchesStatus = sim.status === 'sold';
+    else if (simStatusFilter === 'sold') matchesStatus = sim.status === 'sold' || sim.status === 'activated';
     let matchesOperator = true;
     if (simOperatorFilter !== 'all') {
       matchesOperator = (sim.operator || '').toLowerCase() === simOperatorFilter.toLowerCase();

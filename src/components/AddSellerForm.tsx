@@ -259,10 +259,9 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
             type="text"
             id="id_number"
             value={idNumber}
-            onChange={(e) => setIdNumber(e.target.value.replace(/[^0-9]/g, '').slice(0, 10))}
-            placeholder="xxxxxxxxxx"
-            inputMode="numeric"
-            pattern="[0-9]{10}"
+            onChange={(e) => setIdNumber(e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 20))}
+            placeholder="رقم الهوية الوطنية أو الإقامة"
+            maxLength={20}
             required
             className="input-field bg-slate-950 border-slate-850 text-sm text-right placeholder:text-slate-700 font-sans"
             dir="ltr"

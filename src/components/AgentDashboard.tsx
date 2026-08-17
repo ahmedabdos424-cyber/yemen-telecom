@@ -117,6 +117,7 @@ export default function AgentDashboard({
           onResetSellerPassword={onResetSellerPassword}
           onEditSeller={onEditSeller}
           onDeleteSeller={onDeleteSeller}
+          onAllocateSims={(sellerId) => openTransferModal(sellers.find(s => String(s.id) === sellerId))}
         />
       ) : activeTab === 'my_sims' ? (
         <SimsListView
