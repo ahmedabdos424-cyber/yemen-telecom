@@ -1,4 +1,4 @@
-FROM node:24-alpine AS frontend-build
+FROM node:26-alpine AS frontend-build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci && npm cache clean --force
@@ -14,14 +14,14 @@ ARG VITE_SENTRY_RELEASE=$RENDER_GIT_COMMIT
 ENV VITE_SENTRY_RELEASE=$VITE_SENTRY_RELEASE
 RUN npm run build
 
-FROM node:24-alpine AS server-build
+FROM node:26-alpine AS server-build
 WORKDIR /app/server
 COPY server/package*.json ./
 RUN npm ci && npm cache clean --force
 COPY server/ .
 RUN npx tsc
 
-FROM node:24-alpine
+FROM node:26-alpine
 WORKDIR /app
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
