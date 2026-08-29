@@ -296,9 +296,10 @@ export function useManagerState(role: string | null) {
     }).catch((err) => captureError(err, 'handleUpdateAgent'));
   };
 
-  const handleUpdateSeller = (id: string, fields: Partial<Seller>) => {
+  const handleUpdateSeller = (id: string, fields: Partial<Seller>, onComplete?: () => void) => {
     api.updateSeller(Number(id), fields).then(() => {
       if (mountedRef.current) setSellers(prev => prev.map(s => s.id === id ? { ...s, ...fields } : s));
+      onComplete?.();
     }).catch((err) => captureError(err, 'handleUpdateSeller'));
   };
 

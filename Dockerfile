@@ -5,7 +5,8 @@ RUN npm ci && npm cache clean --force
 COPY . .
 ENV NODE_ENV=production
 # Build-time env for Vite (Sentry DSN is public, not a secret)
-ARG VITE_SENTRY_DSN=https://e26574aa3569ad8263215c8c58a3be4b@o4511821570310144.ingest.de.sentry.io/4511821594034256
+# Injected via Render build args or environment variables
+ARG VITE_SENTRY_DSN
 ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
 # Release = deployed commit SHA (Render injects RENDER_GIT_COMMIT as a build arg)
 ARG RENDER_GIT_COMMIT
@@ -24,9 +25,8 @@ FROM node:24-alpine
 WORKDIR /app
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-# Runtime Sentry DSN (public value; falls back to service env var at runtime)
-ARG SENTRY_DSN=https://e26574aa3569ad8263215c8c58a3be4b@o4511821570310144.ingest.de.sentry.io/4511821594034256
-ENV SENTRY_DSN=$SENTRY_DSN
+# Runtime Sentry DSN (public value; injected via Render environment variable)
+ENV SENTRY_DSN=${SENTRY_DSN}
 
 COPY --from=frontend-build /app/dist ./dist
 COPY --from=server-build /app/server/dist ./server/dist

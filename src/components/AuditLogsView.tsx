@@ -91,7 +91,10 @@ export default function AuditLogsView() {
       )}
 
       {!loading && !error && logs.length === 0 && (
-        <div className="text-center py-10 text-slate-500 text-xs">لا توجد سجلات تدقيق متاحة</div>
+        <div className="text-center py-10 text-slate-500 text-xs">
+          <span className="material-symbols-outlined text-lg">history_edu</span>
+          لا توجد سجلات تدقيق متاحة
+        </div>
       )}
 
       {!loading && !error && logs.length > 0 && (

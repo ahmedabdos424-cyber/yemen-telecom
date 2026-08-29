@@ -13,5 +13,19 @@
       "*": "ask"
     }
   },
-  "plugin": ["./.opencode/plugin/notify.ts"]
+  "plugin": ["./.opencode/plugin/notify.ts"],
+  "mcpServers": {
+    "memory": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"]
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
+    }
+  }
 }

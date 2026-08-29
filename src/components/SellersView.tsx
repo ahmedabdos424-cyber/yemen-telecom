@@ -13,7 +13,7 @@ import CameraCapture from './shared/CameraCapture';
 interface SellersViewProps {
   sellers: Seller[];
   sims: SIM[];
-  onUpdateSeller: (id: string, updated: Partial<Seller>) => void;
+  onUpdateSeller: (id: string, updated: Partial<Seller>, onComplete?: () => void) => void;
   onAddBalance: (sellerId: string, amount: number, invoiceImage?: string) => void;
   loading?: boolean;
   error?: string | null;
@@ -45,6 +45,7 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
   const [activeTab, setActiveTab] = useState<'inventory' | 'customers' | 'transactions'>('inventory');
   const [showAddBalanceModal, setShowAddBalanceModal] = useState(false);
   const [balanceAmount, setBalanceAmount] = useState<number>(5000);
+  const [toggleSellerBusy, setToggleSellerBusy] = useState(false);
 
   const [invoiceImageUrl, setInvoiceImageUrl] = useState<string | null>(null);
   const [uploadingInvoice, setUploadingInvoice] = useState(false);
@@ -75,7 +76,8 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
 
   const toggleSellerStatus = useCallback((id: string, currentStatus: 'active' | 'inactive' | 'suspended' | 'low_stock') => {
     const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
-    onUpdateSeller(id, { status: newStatus });
+    setToggleSellerBusy(true);
+    onUpdateSeller(id, { status: newStatus }, () => setToggleSellerBusy(false));
   }, [onUpdateSeller]);
 
   const submitAddBalance = useCallback((e: React.FormEvent) => {
@@ -113,7 +115,8 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
     return (
       <div className="flex flex-col items-center justify-center py-20 space-y-4">
         <span className="material-symbols-outlined text-4xl text-gray-300">group_off</span>
-        <p className="text-gray-500 font-bold text-sm">لا توجد بيانات</p>
+        <p className="text-gray-500 font-bold text-sm">لا توجد بائعين مسجلين</p>
+        <p className="text-gray-400 text-xs mt-1">يمكنك إضافة بائع جديد من لوحة التحكم.</p>
       </div>
     );
   }
@@ -172,9 +175,8 @@ function SellersView({ sellers = [], sims = [], onUpdateSeller, onAddBalance, lo
               selectedSeller.status === 'active'
                 ? 'border-red-200 text-secondary hover:bg-red-50'
                 : 'border-green-200 text-green-700 hover:bg-green-50'
-            }`}
-          >
-            {selectedSeller.status === 'active' ? 'تعليق البائع' : 'تفعيل الحساب'}
+            } ${toggleSellerBusy ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            {selectedSeller.status === 'active' ? toggleSellerBusy ? 'جاري التعليق...' : 'تعليق البائع' : toggleSellerBusy ? 'جاري التفعيل...' : 'تفعيل الحساب'}
           </button>
         </div>
       </section>

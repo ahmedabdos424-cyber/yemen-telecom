@@ -343,17 +343,25 @@ export default function SellerPosManagementView({ open, onClose }: SellerPosMana
                               <span className="material-symbols-outlined text-[13px]">edit</span>
                               تعديل
                             </button>
-                            <button onClick={() => toggleStatus(seller)} disabled={actionBusy}
+                            <button onClick={() => {
+                              if (seller.status === 'active') {
+                                if (window.confirm('هل أنت متأكد من تعطيل هذا البائع؟ هذا الإجراء سيمنع الحساب من تسجيل الدخول وتنفيذOperations البيع.')) {
+                                  toggleStatus(seller);
+                                }
+                              } else {
+                                toggleStatus(seller);
+                              }
+                            }} disabled={actionBusy}
                               className={`flex-1 flex items-center justify-center gap-1 text-[10px] font-bold py-2 rounded-lg transition-colors cursor-pointer disabled:opacity-50 ${seller.status === 'active'
                                 ? 'bg-amber-500/15 text-amber-400 hover:bg-amber-500/25'
                                 : 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'}`}>
                               <span className="material-symbols-outlined text-[13px]">{seller.status === 'active' ? 'block' : 'play_arrow'}</span>
-                              {seller.status === 'active' ? 'تعطيل' : 'تفعيل'}
+                              {seller.status === 'active' ? actionBusy ? 'جاري التعطيل...' : 'تعطيل' : actionBusy ? 'جاري التفعيل...' : 'تفعيل'}
                             </button>
                             <button onClick={() => setDeleteFor(seller)} disabled={actionBusy}
                               className="flex-1 flex items-center justify-center gap-1 text-[10px] font-bold text-red-400 bg-red-500/10 hover:bg-red-500/20 py-2 rounded-lg transition-colors cursor-pointer disabled:opacity-50">
-                              <span className="material-symbols-outlined text-[13px]">delete</span>
-                              حذف
+                              <span className="material-symbols-outlined text-[13px]">{actionBusy ? 'sync' : 'delete'}</span>
+                              {actionBusy ? 'جاري الحذف...' : 'حذف'}
                             </button>
                           </div>
                         </div>

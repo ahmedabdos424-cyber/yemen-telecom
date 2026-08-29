@@ -1,11 +1,13 @@
 import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
+import crypto from 'crypto';
 import { logger } from '../logger';
 import { resolveTokenUser, ResolvedUser } from '../middleware/auth';
 
 export interface RealtimeEvent {
   type: string;
   at?: string;
+  correlationId?: string;
   [key: string]: unknown;
 }
 
@@ -13,6 +15,7 @@ interface RealtimeClient {
   ws: WebSocket;
   user: ResolvedUser | null;
   isAlive: boolean;
+  correlationId: string;
 }
 
 export interface RealtimeDeps {
@@ -31,7 +34,7 @@ export interface RealtimeGateway {
 // (JWT + blacklist + active session checks). Tests can inject a stub.
 const defaultDeps: RealtimeDeps = {
   resolveUser: resolveTokenUser,
-};
+}
 
 const WS_PATH = '/ws';
 const AUTH_TIMEOUT_MS = 10_000;
@@ -56,7 +59,8 @@ export function createRealtimeGateway(server: http.Server, deps: RealtimeDeps = 
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_PAYLOAD_BYTES });
 
   function attachHandlers(ws: WebSocket): void {
-    const client: RealtimeClient = { ws, user: null, isAlive: true };
+    const correlationId = crypto.randomUUID();
+    const client: RealtimeClient = { ws, user: null, isAlive: true, correlationId };
     clients.add(client);
 
     ws.on('pong', () => {
@@ -66,23 +70,25 @@ export function createRealtimeGateway(server: http.Server, deps: RealtimeDeps = 
     // First message must be { type: 'auth', token }. Anything else is ignored.
     const authTimer = setTimeout(() => {
       if (!client.user) {
-        sendJson(ws, { type: 'auth_error', reason: 'auth_timeout' });
+        sendJson(ws, { type: 'auth_error', reason: 'auth_timeout', correlationId });
         ws.close(4002, 'Authentication timeout');
       }
     }, AUTH_TIMEOUT_MS);
 
     ws.on('message', (raw: Buffer) => {
       if (client.user) return;
-      let msg: { type?: string; token?: string };
+      let msg: { type?: string; token?: string; correlationId?: string };
       try {
         msg = JSON.parse(raw.toString());
       } catch {
-        sendJson(ws, { type: 'auth_error', reason: 'invalid_json' });
+        sendJson(ws, { type: 'auth_error', reason: 'invalid_json', correlationId });
         ws.close(4001, 'Invalid message');
         return;
       }
+      // Use client-provided correlationId if present, otherwise use server-generated
+      const requestCorrelationId = msg.correlationId || correlationId;
       if (msg.type !== 'auth' || typeof msg.token !== 'string' || msg.token.length === 0) {
-        sendJson(ws, { type: 'auth_error', reason: 'auth_required' });
+        sendJson(ws, { type: 'auth_error', reason: 'auth_required', correlationId: requestCorrelationId });
         ws.close(4001, 'Authentication required');
         return;
       }
@@ -90,18 +96,19 @@ export function createRealtimeGateway(server: http.Server, deps: RealtimeDeps = 
         .then((user) => {
           if (ws.readyState !== WebSocket.OPEN) return;
           if (!user) {
-            sendJson(ws, { type: 'auth_error', reason: 'invalid_token' });
+            sendJson(ws, { type: 'auth_error', reason: 'invalid_token', correlationId: requestCorrelationId });
             ws.close(4001, 'Unauthorized');
             return;
           }
           clearTimeout(authTimer);
           client.user = user;
-          logger.info(`[REALTIME] client authenticated: ${user.username} (${user.role})`);
-          sendJson(ws, { type: 'auth_ok' });
+          client.correlationId = requestCorrelationId;
+          logger.info(`[REALTIME] client authenticated: ${user.username} (${user.role}) [correlationId: ${requestCorrelationId}]`);
+          sendJson(ws, { type: 'auth_ok', correlationId: requestCorrelationId });
         })
         .catch((err) => {
           logger.error('[REALTIME] auth resolution failed:', err);
-          sendJson(ws, { type: 'auth_error', reason: 'auth_failed' });
+          sendJson(ws, { type: 'auth_error', reason: 'auth_failed', correlationId: requestCorrelationId });
           ws.close(4001, 'Authentication failed');
         });
     });

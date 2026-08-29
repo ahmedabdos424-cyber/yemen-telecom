@@ -197,6 +197,9 @@ const OPERATOR_MAP: Record<string, string> = {
 };
 const VALID_OPERATORS = ['yemen_mobile', 'sabafon', 'you'] as const;
 
+// Provider ID validation (for new provider_id FK usage)
+const VALID_PROVIDER_IDS = [1, 2, 3] as const; // yemen_mobile=1, sabafon=2, you=3
+
 export function normalizeOperator(v: string): string {
   return OPERATOR_MAP[v] || v;
 }
@@ -205,22 +208,62 @@ function isValidOperator(v: string): boolean {
   return (VALID_OPERATORS as readonly string[]).includes(v);
 }
 
-// Required operator field (distributions, inventories)
+// Required operator field (distributions, inventories) — accepts slug or provider_id
 function requiredOperator() {
-  return z.string().min(1).max(50)
-    .transform(v => normalizeOperator(v))
-    .refine(v => isValidOperator(v), {
-      message: 'Invalid operator. Expected one of: yemen_mobile, sabafon, you',
-    });
+  return z.union([
+    z.string().min(1).max(50)
+      .transform(v => normalizeOperator(v))
+      .refine(v => isValidOperator(v), {
+        message: 'Invalid operator. Expected one of: yemen_mobile, sabafon, you',
+      }),
+    z.number().int().positive().refine(v => VALID_PROVIDER_IDS.includes(v as typeof VALID_PROVIDER_IDS[number]), {
+      message: 'Invalid provider_id. Must be 1, 2, or 3',
+    }),
+  ]);
 }
 
 // Optional operator field (operations — empty string allowed)
 function optionalOperator() {
-  return z.string().max(50).optional().default('')
-    .transform(v => v ? normalizeOperator(v) : v)
-    .refine(v => v === '' || isValidOperator(v), {
-      message: 'Invalid operator. Expected one of: yemen_mobile, sabafon, you',
-    });
+  return z.union([
+    z.string().max(50).optional().default('')
+      .transform(v => v ? normalizeOperator(v) : v)
+      .refine(v => v === '' || isValidOperator(v), {
+        message: 'Invalid operator. Expected one of: yemen_mobile, sabafon, you',
+      }),
+    z.number().int().positive().optional(),
+  ]);
+}
+
+// Helper to resolve operator string to provider_id
+export function resolveProviderId(_db: any, operatorOrId: string | number): number {
+  if (typeof operatorOrId === 'number') return operatorOrId;
+  const normalized = normalizeOperator(operatorOrId);
+  const providers: Record<string, number> = {
+    'yemen_mobile': 1,
+    'sabafon': 2,
+    'you': 3,
+  };
+  return providers[normalized] || 1;
+}
+
+// Helper to resolve provider_id to display_name
+export function resolveProviderDisplayName(_db: any, providerId: number): string {
+  const names: Record<number, string> = {
+    1: 'Yemen Mobile',
+    2: 'Sabafon',
+    3: 'YOU',
+  };
+  return names[providerId] || 'Unknown';
+}
+
+// Helper to resolve provider_id to slug
+export function resolveProviderSlug(_db: any, providerId: number): string {
+  const slugs: Record<number, string> = {
+    1: 'yemen_mobile',
+    2: 'sabafon',
+    3: 'you',
+  };
+  return slugs[providerId] || 'unknown';
 }
 
 // Operations

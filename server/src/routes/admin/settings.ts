@@ -60,7 +60,7 @@ router.get('/settings', requireRole('manager'), async (_req: Request, res: Respo
     res.json(mapAdminSettingsToCamelCase(result.rows[0]));
   } catch (err) {
     logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
-    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
+    res.status(503).json({ error: 'خدمة الصيانة غير متاحة', message: 'تعذر الوصول لخدمة الصيانة — يرجى المحاولة لاحقاً' });
   }
 });
 

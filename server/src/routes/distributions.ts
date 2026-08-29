@@ -3,9 +3,10 @@ import { query, transaction } from '../db';
 import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination } from '../helpers';
-import { validate, createDistributionSchema, approveDistributionSchema } from '../validation';
+import { validate, createDistributionSchema, approveDistributionSchema, resolveProviderId } from '../validation';
 import { broadcastEvent, broadcastToRoles } from '../services/realtime.service';
 import { notifyDistributionApproved } from '../services/fcm.service';
+import crypto from 'crypto';
 
 const router = Router();
 
@@ -13,7 +14,7 @@ const router = Router();
 // Reads fresh from the DB to stay decoupled from the transaction scope.
 async function notifyRecipients(requestId: number | string): Promise<void> {
   const drResult = await query(
-    'SELECT seller_id, agent_id, operator FROM distribution_requests WHERE id = $1',
+    'SELECT seller_id, agent_id, operator, provider_id FROM distribution_requests WHERE id = $1',
     [requestId]
   );
   const dr = drResult.rows[0];
@@ -28,9 +29,10 @@ async function notifyRecipients(requestId: number | string): Promise<void> {
     if (u.rows[0]?.id) userIds.push(u.rows[0].id);
   }
   if (userIds.length === 0) return;
+  const providerId = dr.provider_id;
   await notifyDistributionApproved(userIds, {
     requestId: `DIST-${dr.seller_id ?? dr.agent_id ?? 'NA'}`,
-    operator: dr.operator,
+    operator: providerId || dr.operator,
     count: 0,
   });
 }
@@ -105,13 +107,14 @@ router.post('/', requireRole('agent'), validate(createDistributionSchema), async
       if (s.rows.length > 0) sellerId = s.rows[0].id;
     }
     const requestId = `DIST-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+    const providerId = await resolveProviderId(null, operator);
     const result = await query(
-      `INSERT INTO distribution_requests (request_id, agent_id, seller_id, operator, count, notes)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [requestId, agentId, sellerId, operator, count, notes || '']
+      `INSERT INTO distribution_requests (request_id, agent_id, seller_id, operator, provider_id, count, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [requestId, agentId, sellerId, operator, providerId, count, notes || '']
     );
     broadcastToRoles(
-      { type: 'distribution.created', entity: 'distribution', id: result.rows[0].id, request_id: requestId, agent_id: agentId, operator, count, status: 'pending' },
+      { type: 'distribution.created', entity: 'distribution', id: result.rows[0].id, request_id: requestId, agent_id: agentId, operator, provider_id: providerId, count, status: 'pending' },
       ['manager']
     );
     res.status(201).json(result.rows[0]);
@@ -138,9 +141,11 @@ router.put('/:id/approve', requireRole('manager'), validate(approveDistributionS
         [decision, req.user!.id, notes || null, req.params.id]
       );
       if (decision === 'approved') {
+        // Use provider_id if available, fallback to operator
+        const operatorOrProviderId = dr.provider_id || dr.operator;
         const invRes = await client.query(
-          'UPDATE inventories SET available = available - $1, remaining = remaining + $1 WHERE operator = $2 AND available >= $3 RETURNING id',
-          [dr.count, dr.operator, dr.count]
+          'UPDATE inventories SET available = available - $1, remaining = remaining + $1 WHERE (operator = $2 OR provider_id = $2) AND available >= $3 RETURNING id',
+          [dr.count, operatorOrProviderId, dr.count]
         );
         if (invRes.rowCount === 0) {
           throw new Error('INSUFFICIENT_INVENTORY');

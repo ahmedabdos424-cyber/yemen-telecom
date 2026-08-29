@@ -80,6 +80,7 @@ interface LoginLockState {
 export const MAX_FAILED_LOGINS = 5;
 const LOCK_DURATIONS_MS = [60_000, 120_000, 300_000, 900_000]; // 1m → 2m → 5m → 15m
 const LOGIN_LOCK_TTL_MS = 30 * 60 * 1000; // ننسى السجل بعد انتهاء القفل بـ 30 دقيقة خمول
+const MAX_LOGIN_LOCKS = 10_000; // Prevent memory exhaustion under attack
 const loginLocks = new Map<string, LoginLockState>();
 
 function loginLockKey(username: string, ip: string): string {
@@ -118,6 +119,29 @@ export function recordLoginFailure(username: string, ip: string): number {
     entry.lockLevel = Math.min(entry.lockLevel + 1, LOCK_DURATIONS_MS.length - 1);
     entry.lockedUntil = now + LOCK_DURATIONS_MS[level];
     entry.failures = 0;
+    // Enforce max entries limit to prevent memory exhaustion
+    if (loginLocks.size >= MAX_LOGIN_LOCKS) {
+      // Remove oldest expired entry, or if none, remove oldest entry
+      let oldestKey: string | null = null;
+      let oldestTime = Infinity;
+      for (const [k, v] of loginLocks.entries()) {
+        if (now > v.lockedUntil && v.lockedUntil < oldestTime) {
+          oldestTime = v.lockedUntil;
+          oldestKey = k;
+        }
+      }
+      if (oldestKey) {
+        loginLocks.delete(oldestKey);
+      } else {
+        // All entries are currently locked - remove the oldest by lockLevel
+        for (const [k, v] of loginLocks.entries()) {
+          if (v.lockLevel < entry.lockLevel || (v.lockLevel === entry.lockLevel && v.lockedUntil < entry.lockedUntil)) {
+            loginLocks.delete(k);
+            break;
+          }
+        }
+      }
+    }
     loginLocks.set(key, entry);
     return LOCK_DURATIONS_MS[level];
   }

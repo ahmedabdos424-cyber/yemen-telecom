@@ -179,12 +179,14 @@ router.post('/duplicate-identities/:idNo/unblock', requireRole('manager'), async
     const idNo = req.params.idNo;
     if (!idNo) return res.status(400).json({ error: 'idNo is required' });
     const name = (req.body && typeof req.body.name === 'string') ? req.body.name : '';
+    const reason = (req.body && typeof req.body.reason === 'string') ? req.body.reason : '';
+    if (!reason) return res.status(400).json({ error: 'سبب الحظر مطلوب', message: 'يجب توفير سبب عملية رفع الحظر لتوثيق السجل.' });
     const performedBy = req.user?.username || 'manager';
 
     await query(
-      `INSERT INTO identity_risk_actions (id_no, name, action, performed_by)
-       VALUES ($1, $2, 'unblock', $3)`,
-      [idNo, name, performedBy]
+      `INSERT INTO identity_risk_actions (id_no, name, action, reason, performed_by)
+       VALUES ($1, $2, 'unblock', $3, $4)`,
+      [idNo, name, reason, performedBy]
     );
     await query(
       `UPDATE sellers SET status = 'active' WHERE id_number = $1 AND status = 'suspended'`,

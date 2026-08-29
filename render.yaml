@@ -1,4 +1,11 @@
 services:
+  - type: keyvalue
+    name: yemen-telecom-kv
+    region: oregon
+    plan: starter
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
+
   - type: web
     name: yemen-telecom
     env: docker
@@ -9,6 +16,11 @@ services:
     healthCheckPath: /api/health
     dockerfilePath: ./Dockerfile
     envVars:
+      - key: REDIS_URL
+        fromService:
+          name: yemen-telecom-kv
+          type: keyvalue
+          property: connectionString
       - key: NODE_ENV
         value: production
       - key: PORT
@@ -31,6 +43,8 @@ services:
         sync: false
       - key: DB_MAX_CONNECTIONS
         value: "10"
+      - key: DB_MIN_CONNECTIONS
+        value: "3"
       - key: DB_SLOW_QUERY_MS
         value: "500"
       - key: DB_FAMILY
@@ -66,27 +80,27 @@ services:
         sync: false
       # Sentry error tracking (DSN is public — not a secret)
       - key: SENTRY_DSN
-        value: https://e26574aa3569ad8263215c8c58a3be4b@o4511821570310144.ingest.de.sentry.io/4511821594034256
+        sync: false
       - key: VITE_SENTRY_DSN
-        value: https://e26574aa3569ad8263215c8c58a3be4b@o4511821570310144.ingest.de.sentry.io/4511821594034256
+        sync: false
       # APK self-update metadata (consumed by GET /api/app-version).
       # These MUST stay in sync with android/app/build.gradle (versionName / versionCode)
       # and with server/.env.example. A mismatch silently breaks the updater (rule #2).
       - key: APP_VERSION
-        sync: false
+        value: "1.0.18"
       - key: APP_VERSION_CODE
-        sync: false
-      - key: APP_APK_URL
-        sync: false
-      - key: APP_APK_SHA256
-        sync: false
-      - key: APP_APK_SIZE
-        sync: false
-      - key: APP_UPDATE_NOTES
-        sync: false
-      - key: APP_UPDATE_REQUIRED
-        sync: false
+        value: "23"
       - key: APP_APK_BUCKET
-        sync: false
+        value: "uploads"
       - key: APP_APK_OBJECT
-        sync: false
+        value: "releases/app-1.0.18.apk"
+      - key: APP_APK_URL
+        value: ""
+      - key: APP_APK_SHA256
+        value: "60B61008D89AE51054860DCED608DBBF71F0488CEFFB6493FF1475AFE124D21F"
+      - key: APP_APK_SIZE
+        value: "30050485"
+      - key: APP_UPDATE_NOTES
+        value: "تحسينات دورة الشرائح والتخصيص|تفعيل مفاتيح الإشعارات|إصلاح المصادقة بالبصمة والأداء والأمان"
+      - key: APP_UPDATE_REQUIRED
+        value: "false"

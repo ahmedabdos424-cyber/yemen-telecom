@@ -90,6 +90,12 @@ app.use(helmet({
 }));
 
 // Nonce-based CSP middleware — per-request nonce replaces 'unsafe-inline'
+// CSP connect-src can be overridden via CSP_CONNECT_SRC env var (comma-separated)
+const cspConnectSrc = (process.env.CSP_CONNECT_SRC || `'self' wss://yemen-telecom.onrender.com`)
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean)
+  .join(' ');
 app.use((_req, res, next) => {
   const nonce = crypto.randomBytes(16).toString('base64');
   res.locals.cspNonce = nonce;
@@ -100,7 +106,7 @@ app.use((_req, res, next) => {
     `style-src 'self' 'nonce-${nonce}' https://fonts.googleapis.com`,
     `font-src 'self' https://fonts.gstatic.com`,
     `img-src 'self' data: blob:`,
-    `connect-src 'self' wss://yemen-telecom.onrender.com`,
+    `connect-src ${cspConnectSrc}`,
     `frame-src 'none'`,
     `object-src 'none'`,
     `form-action 'self'`,
@@ -247,7 +253,7 @@ app.use('/api', apiLimiter);
 
 // Health check endpoint (public — no auth required)
 // Always returns 200 so Render's deploy health check succeeds.
-// Reports "degraded" in JSON body when DB is unreachable.
+// Reports "degraded" in JSON body when DB is unreachable or realtime/supabase issues.
 app.get('/api/health', async (_req, res) => {
   let dbOk = true;
   let dbLatencyMs: number | null = null;
@@ -261,16 +267,49 @@ app.get('/api/health', async (_req, res) => {
   } catch {
     dbOk = false;
   }
+
+  // Check realtime WebSocket gateway
+  let realtimeOk = true;
+  try {
+    const stats = realtimeStats();
+    realtimeOk = stats.total >= 0; // gateway is attached if stats object exists
+  } catch {
+    realtimeOk = false;
+  }
+
+  // Check Supabase connectivity (if configured)
+  let supabaseOk = true;
+  let supabaseLatencyMs: number | null = null;
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
+    const supabaseStart = Date.now();
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      await Promise.race([
+        supabase.from('providers').select('id').limit(1),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('supabase-timeout')), 3000)),
+      ]);
+      supabaseLatencyMs = Date.now() - supabaseStart;
+    } catch {
+      supabaseOk = false;
+    }
+  }
+
   const mem = process.memoryUsage();
   const rssMB = Math.round(mem.rss / 1024 / 1024);
   const heapUsedMB = Math.round(mem.heapUsed / 1024 / 1024);
   const heapTotalMB = Math.round(mem.heapTotal / 1024 / 1024);
   const osTotalMB = Math.round(os.totalmem() / 1024 / 1024);
-  const status = dbOk ? 'ok' : 'degraded';
+  const status = dbOk && realtimeOk && supabaseOk ? 'ok' : 'degraded';
   res.status(200).json({
     status,
     db: dbOk ? 'connected' : 'disconnected',
     db_latency_ms: dbLatencyMs,
+    realtime: realtimeOk ? 'connected' : 'disconnected',
+    supabase: supabaseOk ? 'connected' : 'disconnected',
+    supabase_latency_ms: supabaseLatencyMs,
     uptime: Math.floor((Date.now() - START_TIME) / 1000),
     requests: requestCount,
     memory: {
@@ -529,10 +568,10 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 });
 
 // OCR asset check — warn if tesseract assets are missing
-const tesseractPath = path.resolve(__dirname, '../../dist/tesseract');
+const tesseractPath = path.resolve(__dirname, '../../public/tesseract');
 try {
-  if (!fs.existsSync(tesseractPath) || !fs.existsSync(path.join(tesseractPath, 'lang', 'ara.traineddata.gz'))) {
-    logger.warn('[WARN] OCR tesseract assets not found at dist/tesseract/ — client-side OCR will be unavailable');
+  if (!fs.existsSync(tesseractPath) || !fs.existsSync(path.join(tesseractPath, 'lang', 'ara.traineddata'))) {
+    logger.warn('[WARN] OCR tesseract assets not found at public/tesseract/ — client-side OCR will be unavailable');
   }
 } catch { }
 

@@ -188,7 +188,18 @@ export function useAuth() {
         auth.code,
       );
     }
-    const credential = await getBiometricCredential();
+    const { credential, error } = await getBiometricCredential();
+    if (error) {
+      // Biometric credential decryption failed (key changed, corrupted, etc.)
+      // Clear the invalid credential and prompt user to re-enable biometric
+      await clearBiometricCredential();
+      setBiometricEnabled(false);
+      throw new BiometricAuthError(
+        error.message || 'انتهت صلاحية جلسة البصمة، يرجى تسجيل الدخول بكلمة المرور ثم تفعيل البصمة مجدداً',
+        false,
+        error.code,
+      );
+    }
     if (!credential) return null;
     // Rotate the stored refresh token into a fresh session.
     setRefreshToken(credential.refreshToken);

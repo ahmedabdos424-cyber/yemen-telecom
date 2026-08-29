@@ -63,7 +63,7 @@ export default function IdentitiesTable({ identities, searchWord, onSearchChange
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-105">
-            {identities.map((item) => (
+            {identities.length > 0 && identities.map((item) => (
               <tr key={item.idNo} className="hover:bg-gray-50 transition-colors">
                 <td className="px-6 py-4 font-mono font-bold text-gray-900">{item.idNo}</td>
                 <td className="px-6 py-4">
@@ -138,6 +138,13 @@ export default function IdentitiesTable({ identities, searchWord, onSearchChange
                 </td>
               </tr>
             ))}
+            {identities.length === 0 && (
+              <tr>
+                <td colSpan={9} className="py-12 text-center text-gray-500 text-xs">
+                  لا توجد هويات مكررة حتى الآن — excellent!
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

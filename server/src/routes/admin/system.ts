@@ -34,7 +34,7 @@ router.post('/reset', requireRole('manager'), validate(resetDataSchema), async (
     res.json({ success: true, message: 'System data reset completed', deleted: summary.deleted });
   } catch (err) {
     logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
-    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
+    res.status(503).json({ error: 'خدمة الخارة غير متاحة', message: 'تعذر التواصل مع خدمة الخلفية — يرجى إعادة المحاولة لاحقاً' });
   }
 });
 
@@ -80,7 +80,7 @@ router.post('/system/backup', requireRole('manager'), async (_req: Request, res:
     });
   } catch (err) {
     logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
-    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
+    res.status(503).json({ error: 'خدمة الخارة غير متاحة', message: 'تعذر التواصل مع خدمة الخلفية — يرجى إعادة المحاولة لاحقاً' });
   }
 });
 
@@ -101,7 +101,7 @@ router.get('/system/backup/download/:filename', requireRole('manager'), async (r
     res.redirect(url);
   } catch (err) {
     logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
-    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
+    res.status(503).json({ error: 'خدمة الخارة غير متاحة', message: 'تعذر التواصل مع خدمة الخلفية — يرجى إعادة المحاولة لاحقاً' });
   }
 });
 
@@ -129,7 +129,7 @@ router.post('/system/lockdown', requireRole('manager'), async (_req: Request, re
     });
   } catch (err) {
     logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
-    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
+    res.status(503).json({ error: 'خدمة الخارة غير متاحة', message: 'تعذر التواصل مع خدمة الخلفية — يرجى إعادة المحاولة لاحقاً' });
   }
 });
 
@@ -139,7 +139,7 @@ router.get('/system/lockdown/status', requireRole('manager'), async (_req: Reque
     res.json({ locked: result.rows[0]?.maintenance_mode || false });
   } catch (err) {
     logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
-    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
+    res.status(503).json({ error: 'خدمة الخارة غير متاحة', message: 'تعذر التواصل مع خدمة الخلفية — يرجى إعادة المحاولة لاحقاً' });
   }
 });
 
@@ -165,7 +165,7 @@ router.get('/monitoring', requireRole('manager'), async (_req: Request, res: Res
     });
   } catch (err) {
     logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
-    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
+    res.status(503).json({ error: 'خدمة الخارة غير متاحة', message: 'تعذر التواصل مع خدمة الخلفية — يرجى إعادة المحاولة لاحقاً' });
   }
 });
 

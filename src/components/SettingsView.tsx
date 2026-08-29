@@ -51,7 +51,10 @@ export default function SettingsView({
       document.body.appendChild(downloadAnchor);
       downloadAnchor.click();
       downloadAnchor.remove();
-    } catch (error) {
+      toastSuccess('نجاح', 'تم تنزيل تقرير التدقيق الأمني بنجاح');
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || error.message || 'حدث خطأ غير متوقع';
+      toastError('فشل', `تعذر تنزيل التقرير: ${errorMessage}`);
       captureError(error, 'downloadAuditReport');
     }
   };
@@ -60,13 +63,16 @@ export default function SettingsView({
     setIsBackingUp(true);
     try {
       const result = await api.createBackup();
+      toastSuccess('نجاح', `تم إنشاء النسخة الاحتياطية بنجاح (${result.sizeFormatted})`);
       const link = document.createElement('a');
       link.href = api.downloadBackup(result.filename);
       link.download = result.filename;
       document.body.appendChild(link);
       link.click();
       link.remove();
-    } catch (error) {
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || error.message || 'تعذر التواصل مع الخدمة';
+      toastError('فشل', `تعذر إنشاء النسخة الاحتياطية: ${errorMessage}`);
       captureError(error, 'handleBackup');
     } finally {
       setIsBackingUp(false);
@@ -79,23 +85,27 @@ export default function SettingsView({
       setLockdownConfirm(false);
       try {
         await onUpdateSettings({ ...settings, maintenanceMode: result.locked });
+        toastSuccess('نجاح', result.locked ? 'تم تفعيل وضع الصيانة' : 'تم إلغاء وضع الصيانة');
       } catch {
         setLockdownConfirm(false);
       }
-    } catch (error) {
-      captureError(error, 'handleLockdown');
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || error.message || 'تعذر الوصول لخدمة الصيانة';
+      toastError('فشل', `تعذر تغيير حالة الصيانة: ${errorMessage}`);
       setLockdownConfirm(false);
+      captureError(error, 'handleLockdown');
     }
   };
 
-  const updateSetting = async (patch: Partial<SystemSettings>, silent = false) => {
+const updateSetting = async (patch: Partial<SystemSettings>, silent = false) => {
     const updated = { ...settings, ...patch };
     try {
       await onUpdateSettings(updated);
-      if (!silent) toastSuccess('تم حفظ الإعدادات بنجاح');
-    } catch (err) {
+      if (!silent) toastSuccess('نجاح', 'تم حفظ الإعدادات بنجاح');
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.error || err.message || 'تعذر حفظ الإعدادات';
+      toastError('فشل', `تعذر حفظ الإعدادات: ${errorMessage}`);
       captureError(err, 'updateSetting');
-      toastError('تعذر حفظ الإعدادات، يرجى المحاولة لاحقاً');
     }
   };
 

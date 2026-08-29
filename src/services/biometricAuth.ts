@@ -162,39 +162,45 @@ export async function saveBiometricCredential(credential: BiometricCredential): 
   try {
     const storage = await getStorage();
     const payload = JSON.stringify(credential);
-    const toStore = await encryptValue(payload);
-    await storage.set(CREDENTIAL_KEY, toStore);
+    const encrypted = await BiometricAuth.encrypt(payload);
+    await storage.set(CREDENTIAL_KEY, JSON.stringify(encrypted));
   } catch (err) {
     captureError(err, 'saveBiometricCredential');
   }
 }
 
-interface EncryptedEnvelope {
-  v: 1;
-  iv: string;
-  data: string;
+export type DecryptErrorCode = 'corrupted' | 'key_missing' | 'key_changed' | 'unknown';
+
+interface DecryptResult {
+  data: string | null;
+  errorCode?: DecryptErrorCode;
+  errorMessage?: string;
 }
 
-async function encryptValue(plaintext: string): Promise<string> {
-  const { iv, ciphertext } = await BiometricAuth.encrypt(plaintext);
-  const envelope: EncryptedEnvelope = { v: 1, iv, data: ciphertext };
-  return JSON.stringify(envelope);
-}
-
-async function decryptValue(raw: string): Promise<string | null> {
+async function decryptValue(raw: string): Promise<DecryptResult> {
   try {
-    const envelope = JSON.parse(raw) as Partial<EncryptedEnvelope>;
-    if (envelope?.v !== 1 || typeof envelope.iv !== 'string' || typeof envelope.data !== 'string') {
-      return null;
+    const encrypted = JSON.parse(raw) as { iv: string; ciphertext: string };
+    if (typeof encrypted.iv !== 'string' || typeof encrypted.ciphertext !== 'string') {
+      return { data: null, errorCode: 'corrupted', errorMessage: 'بيانات البصمة تالفة، يرجى إعادة تفعيل الدخول بالبصمة' };
     }
-    const result = await BiometricAuth.decrypt(envelope.iv, envelope.data);
-    return result?.data ?? null;
-  } catch {
-    return null;
+    const result = await BiometricAuth.decrypt(encrypted.iv, encrypted.ciphertext);
+    return { data: result?.data ?? null };
+  } catch (err) {
+    const code = (err as { code?: string })?.code;
+    if (code === 'decryptFailed' || code === 'key_changed' || code === 'key_missing') {
+      // Android Keystore key is gone or changed (factory reset, lock screen changed, etc.)
+      return { 
+        data: null, 
+        errorCode: 'key_changed', 
+        errorMessage: 'تعذر الوصول للمفاتيح الآمنة (تغيير قفل الجهاز أو فورمات). يرجى تسجيل الدخول بكلمة المرور ثم إعادة تفعيل البصمة' 
+      };
+    }
+    // Other errors (corrupted data, etc.)
+    return { data: null, errorCode: 'unknown', errorMessage: 'حدث خطأ في استرجاع بيانات البصمة، يرجى إعادة تفعيل الدخول بالبصمة' };
   }
 }
 
-export async function getBiometricCredential(): Promise<BiometricCredential | null> {
+export async function getBiometricCredential(): Promise<{ credential: BiometricCredential | null; error?: { code: DecryptErrorCode; message: string } }> {
   // On web, biometry is unavailable and we must never resume a session from a
   // locally stored refresh token. Wipe any legacy web-stored credential too so
   // a previously persisted token can never be silently reused after an XSS.
@@ -204,22 +210,22 @@ export async function getBiometricCredential(): Promise<BiometricCredential | nu
     } catch {
       /* noop */
     }
-    return null;
+    return { credential: null, error: { code: 'unknown', message: 'الدخول بالبصمة متاح في تطبيق الجوال فقط' } };
   }
   try {
     const storage = await getStorage();
     const raw = await storage.get(CREDENTIAL_KEY);
-    if (!raw) return null;
+    if (!raw) return { credential: null };
     const decrypted = await decryptValue(raw);
-    if (decrypted === null) {
+    if (!decrypted.data) {
       await storage.remove(CREDENTIAL_KEY).catch(() => {});
-      return null;
+      return { credential: null, error: { code: decrypted.errorCode || 'unknown', message: decrypted.errorMessage || 'فشل استرجاع بيانات البصمة' } };
     }
-    const parsed = JSON.parse(decrypted) as BiometricCredential;
-    if (!parsed.username || !parsed.refreshToken) return null;
-    return parsed;
+    const parsed = JSON.parse(decrypted.data) as BiometricCredential;
+    if (!parsed.username || !parsed.refreshToken) return { credential: null };
+    return { credential: parsed };
   } catch {
-    return null;
+    return { credential: null, error: { code: 'unknown', message: 'فشل استرجاع بيانات البصمة' } };
   }
 }
 
