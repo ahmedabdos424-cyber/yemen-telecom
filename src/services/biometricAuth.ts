@@ -239,5 +239,5 @@ export async function clearBiometricCredential(): Promise<void> {
 }
 
 export async function hasBiometricCredential(): Promise<boolean> {
-  return (await getBiometricCredential()) !== null;
+  return (await getBiometricCredential()).credential !== null;
 }

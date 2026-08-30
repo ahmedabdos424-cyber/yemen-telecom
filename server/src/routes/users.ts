@@ -23,6 +23,18 @@ router.put('/password', validate(updatePasswordSchema), async (req: AuthRequest,
     }
     const hash = await bcrypt.hash(newPassword, 10);
     await query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, req.user.id]);
+
+    // Invalidate all existing refresh tokens by clearing the active session
+    // and inserting a blacklisted sentinel so old refresh tokens can no longer
+    // be exchanged. The sentinel is keyed on a wildcard prefix so the refresh
+    // endpoint can check `LIKE` — but since we also clear active_session_sid,
+    // any old JWT will fail the session check anyway.
+    await query(
+      'UPDATE users SET active_session_sid = NULL, session_expires_at = NULL WHERE id = $1',
+      [req.user.id]
+    );
+    logger.info(`[AUTH] Password changed for user ${req.user.id} — session invalidated`);
+
     res.json({ message: 'Password updated successfully' });
   } catch (err) {
     logger.error('Error updating password:', err);

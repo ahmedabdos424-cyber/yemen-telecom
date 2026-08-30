@@ -207,14 +207,6 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-// Rate limiting on auth endpoint
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: { error: 'Too many login attempts, please try again later' },
-});
-app.use('/api/auth/login', authLimiter);
-
 // Rate limiting on token refresh endpoint
 const refreshLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -303,7 +295,7 @@ app.get('/api/health', async (_req, res) => {
   const heapTotalMB = Math.round(mem.heapTotal / 1024 / 1024);
   const osTotalMB = Math.round(os.totalmem() / 1024 / 1024);
   const status = dbOk && realtimeOk && supabaseOk ? 'ok' : 'degraded';
-  res.status(200).json({
+  const healthData: Record<string, unknown> = {
     status,
     db: dbOk ? 'connected' : 'disconnected',
     db_latency_ms: dbLatencyMs,
@@ -312,17 +304,21 @@ app.get('/api/health', async (_req, res) => {
     supabase_latency_ms: supabaseLatencyMs,
     uptime: Math.floor((Date.now() - START_TIME) / 1000),
     requests: requestCount,
-    memory: {
+  };
+  // Only expose detailed memory info in non-production
+  if (envMode !== 'production') {
+    healthData.memory = {
       rssMB,
       heapUsedMB,
       heapTotalMB,
       heapUsedPercent: heapTotalMB > 0 ? Math.min(100, Math.round((heapUsedMB / heapTotalMB) * 100)) : 0,
       osTotalMB,
-    },
-    node: process.version,
-    env: process.env.NODE_ENV || 'development',
-    timestamp: new Date().toISOString(),
-  });
+    };
+    healthData.node = process.version;
+    healthData.env = envMode;
+  }
+  healthData.timestamp = new Date().toISOString();
+  res.status(200).json(healthData);
 });
 
 // Apply write rate limiter to all POST/PUT/DELETE routes

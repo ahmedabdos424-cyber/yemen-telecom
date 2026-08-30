@@ -4,6 +4,7 @@ import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination } from '../helpers';
 import { validate, createOperationSchema } from '../validation';
+import { cacheInvalidate } from '../cache';
 
 const router = Router();
 
@@ -71,6 +72,8 @@ router.post('/', requireRole('manager', 'agent', 'seller'), validate(createOpera
       contract_image: result.rows[0].contract_image,
       iccid: result.rows[0].iccid,
     });
+    // Invalidate report cache so fresh data appears immediately
+    cacheInvalidate('report:');
   } catch (err) {
     logger.error('Error creating operation:', err);
     res.status(500).json({ error: 'Internal server error' });

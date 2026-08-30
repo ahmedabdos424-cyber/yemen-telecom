@@ -117,12 +117,14 @@ export function useManagerState(role: string | null) {
     };
   }, [mountedRef]);
 
-  // Persist
-  useEffect(() => { localStorage.setItem('admin_sims', JSON.stringify(sims)); }, [sims]);
-  useEffect(() => { localStorage.setItem('admin_agents', JSON.stringify(agents)); }, [agents]);
-  useEffect(() => { localStorage.setItem('admin_sellers', JSON.stringify(sellers)); }, [sellers]);
-  useEffect(() => { localStorage.setItem('admin_alerts', JSON.stringify(alerts)); }, [alerts]);
-  useEffect(() => { localStorage.setItem('admin_settings', JSON.stringify(settings)); }, [settings]);
+  // Persist all admin state to localStorage in a single effect
+  useEffect(() => {
+    localStorage.setItem('admin_sims', JSON.stringify(sims));
+    localStorage.setItem('admin_agents', JSON.stringify(agents));
+    localStorage.setItem('admin_sellers', JSON.stringify(sellers));
+    localStorage.setItem('admin_alerts', JSON.stringify(alerts));
+    localStorage.setItem('admin_settings', JSON.stringify(settings));
+  }, [sims, agents, sellers, alerts, settings]);
 
   const setView = (view: ViewType) => {
     setCurrentView(view);

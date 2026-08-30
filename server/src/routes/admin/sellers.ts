@@ -5,6 +5,7 @@ import { requireRole } from '../../middleware/auth';
 import { getPagination } from '../../helpers';
 import { broadcastEvent } from '../../services/realtime.service';
 import { mapAuditRow } from './shared';
+import { cacheInvalidate } from '../../cache';
 
 const router = Router();
 
@@ -13,10 +14,16 @@ const router = Router();
 // ========================
 const ADMIN_SELLERS_SELECT = `
   SELECT s.*, a.name AS agent_name, u.username AS user_username, u.status AS user_status, u.last_login AS user_last_login,
-    (SELECT COUNT(*) FROM operations o WHERE o.type = 'activate' AND o.created_by = u.id) AS activations_count
+    COALESCE(ac.activations_count, 0) AS activations_count
   FROM sellers s
   LEFT JOIN agents a ON s.agent_id = a.id
   LEFT JOIN users u ON u.id = s.user_id
+  LEFT JOIN (
+    SELECT created_by, COUNT(*) AS activations_count
+    FROM operations
+    WHERE type = 'activate'
+    GROUP BY created_by
+  ) ac ON ac.created_by = u.id
 `;
 
 interface DbAdminSellerRow {
@@ -111,6 +118,7 @@ router.put('/sellers/:id/status', requireRole('manager'), async (req: Request, r
       }
     });
     broadcastEvent({ type: 'seller.updated', entity: 'seller', id, status, action: 'status-toggle' });
+    cacheInvalidate('report:');
     const updated = await query(`${ADMIN_SELLERS_SELECT} WHERE s.id = $1`, [id]);
     res.json(updated.rows[0] ? mapAdminSeller(updated.rows[0]) : { id: String(id), status });
   } catch (err) {

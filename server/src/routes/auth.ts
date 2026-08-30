@@ -35,7 +35,7 @@ async function logFailedLogin(username: string, deviceName: string, ip: string, 
   try {
     await query(
       `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
-       VALUES ($1, 'login_failed', $2, $3, NOW()::text, 'failed', $4, $5, $6, NOW(), 'failed')`,
+       VALUES ($1, 'login_failed', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'failed', $4, $5, $6, NOW(), 'failed')`,
       [logId, `محاولة دخول فاشلة: ${username}`, username, deviceName, ip, deviceId]
     );
   } catch (err) {
@@ -84,7 +84,7 @@ router.post('/login', authRateLimiter, validate(loginSchema), async (req: Reques
     const loginLogId = `LOGIN-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
     await query(
       `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
-       VALUES ($1, 'login', $2, $3, NOW()::text, 'success', $4, $5, $6, NOW(), 'active')`,
+       VALUES ($1, 'login', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', $4, $5, $6, NOW(), 'active')`,
       [loginLogId, `تسجيل دخول ناجح: ${user.display_name || user.username}`, user.username, deviceName, ip, deviceId]
     );
     const payload = { id: user.id, username: user.username, role: user.role, sid };
@@ -218,7 +218,7 @@ router.post('/logout', async (req: Request, res: Response) => {
     const logoutLogId = `LOGOUT-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
     await query(
       `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, logout_at, session_status)
-       VALUES ($1, 'logout', $2, $3, NOW()::text, 'success', $4, $5, $6, NOW(), NOW(), 'closed')`,
+       VALUES ($1, 'logout', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', $4, $5, $6, NOW(), NOW(), 'closed')`,
       [logoutLogId, `تسجيل خروج: ${decoded.username}`, decoded.username, deviceName, ip, deviceId]
     );
     res.clearCookie('token', { path: '/', httpOnly: true, secure: true, sameSite: 'strict' });
@@ -251,11 +251,30 @@ router.get('/me', async (req: Request, res: Response) => {
     if (blacklisted) {
       return res.status(401).json({ error: 'Token has been revoked' });
     }
-    const result = await query('SELECT id, username, display_name, role, phone, region, last_login, status, created_at FROM users WHERE id = $1', [decoded.id]);
+    const result = await query(
+      'SELECT id, username, display_name, role, phone, region, last_login, status, created_at, active_session_sid, session_expires_at FROM users WHERE id = $1',
+      [decoded.id]
+    );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
     const u = result.rows[0];
+
+    // Check if account is disabled
+    if (u.status !== 'active') {
+      return res.status(403).json({ error: 'Account disabled', code: 'ACCOUNT_DISABLED' });
+    }
+
+    // Check session validity (same checks as /refresh)
+    if (!isSessionExempt(decoded.username)) {
+      if (u.active_session_sid && decoded.sid && u.active_session_sid !== decoded.sid) {
+        return res.status(401).json({ error: 'Session terminated by a new login from another device', code: 'SESSION_TERMINATED' });
+      }
+      if (u.session_expires_at && new Date(u.session_expires_at) < new Date()) {
+        return res.status(401).json({ error: 'Session has expired', code: 'SESSION_EXPIRED' });
+      }
+    }
+
     res.json({
       id: u.id,
       username: u.username,

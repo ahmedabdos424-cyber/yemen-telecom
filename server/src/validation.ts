@@ -15,7 +15,11 @@ export function validate(schema: z.ZodSchema, source: 'body' | 'query' | 'params
 
 // Helper to strip HTML/script tags from strings (XSS prevention)
 function stripHtml(v: string): string {
-  return v.replace(/<[^>]*>/g, '').replace(/[<>]/g, '');
+  return v
+    .replace(/<[^>]*>/g, '')     // Remove HTML tags
+    .replace(/[<>]/g, '')        // Remove remaining angle brackets
+    .replace(/javascript:/gi, '') // Remove javascript: URIs
+    .replace(/on\w+\s*=/gi, '');  // Remove event handlers (onclick=, onerror=, etc.)
 }
 
 function s(min = 1, max = 200) {
@@ -182,7 +186,7 @@ export const updateSellerSchema = z.object({
 });
 
 export const updateSellerBalanceSchema = z.object({
-  amount: z.number().refine(v => !isNaN(v), 'Numeric amount is required'),
+  amount: z.number().finite('Numeric amount is required'),
   invoiceImage: z.string().max(1000).optional(),
 });
 

@@ -138,7 +138,9 @@ router.delete('/:id', requireRole('manager'), async (req: Request, res: Response
           [agent.user_id]
         );
       }
-      await client.query('UPDATE agents SET status = $1 WHERE id = $2', ['deleted', agentId]);
+      // Unlink sellers from this agent (set agent_id to NULL)
+      await client.query('UPDATE sellers SET agent_id = NULL WHERE agent_id = $1', [agentId]);
+      await client.query('UPDATE agents SET status = $1, sellers_count = 0 WHERE id = $2', ['deleted', agentId]);
     });
     res.json({ message: 'Agent deleted successfully' });
   } catch (err) {

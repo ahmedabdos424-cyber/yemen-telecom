@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import crypto from 'crypto';
 import { query, transaction } from '../db';
 import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
@@ -6,6 +7,8 @@ import { getPagination, paginatedQuery } from '../helpers';
 import { validate, createSimSchema, updateSimSchema, activateSimSchema, transferSimsSchema } from '../validation';
 import { createAlert } from '../services/alerts.service';
 import { broadcastEvent } from '../services/realtime.service';
+import { strictRateLimiter } from '../middleware/rateLimiter';
+import { cacheInvalidate } from '../cache';
 
 interface SimDbRow {
   id: number;
@@ -85,6 +88,7 @@ router.post('/activate', requireRole('manager', 'agent', 'seller'), validate(act
       return res.status(409).json({ error: 'تعذر التفعيل: الشريحة تم تفعيلها مسبقاً أو لم تعد متاحة' });
     }
     broadcastEvent({ type: 'sim.updated', entity: 'sim', id: sim.id, iccid, status: 'activated', action: 'activate' });
+    cacheInvalidate('report:');
     res.json(updated.rows[0]);
   } catch (err) {
     logger.error('Error activating sim:', err);
@@ -95,7 +99,7 @@ router.post('/activate', requireRole('manager', 'agent', 'seller'), validate(act
 const MAX_TRANSFER_SIMS = 5000;
 
 // Agent → seller SIM range transfer with strict ownership + isolation checks.
-router.post('/transfer', requireRole('agent'), validate(transferSimsSchema), async (req: AuthRequest, res: Response) => {
+router.post('/transfer', requireRole('agent'), strictRateLimiter, validate(transferSimsSchema), async (req: AuthRequest, res: Response) => {
   try {
     const { seller_id, from_iccid, to_iccid } = req.body;
 
@@ -193,6 +197,7 @@ router.post('/transfer', requireRole('agent'), validate(transferSimsSchema), asy
       from_iccid,
       to_iccid,
     });
+    cacheInvalidate('report:');
 
     res.json({
       transferred: updated.rows.length,
@@ -251,6 +256,7 @@ router.post('/', requireRole('manager'), validate(createSimSchema), async (req: 
         new Date().toLocaleDateString('ar-YE'), package_type || 'باقة مزايا الشهرية']
     );
     broadcastEvent({ type: 'sim.created', entity: 'sim', id: result.rows[0].id, iccid, status: result.rows[0].status });
+    cacheInvalidate('report:');
     res.status(201).json(result.rows[0]);
   } catch (err: unknown) {
     if (err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === '23505') {
@@ -291,18 +297,33 @@ router.put('/:id', requireRole('manager', 'agent', 'seller'), validate(updateSim
     const phone = req.body.phone ?? cur.phone;
     const iccid = req.body.iccid ?? cur.iccid;
     const provider = req.body.provider ?? cur.provider;
-    const status = req.body.status ?? cur.status;
     const owner = req.body.owner ?? cur.owner;
     const package_type = req.body.package_type ?? cur.package_type;
     const customerName = req.body.customer_name ?? req.body.customerName ?? cur.customer_name;
     const customerId = req.body.customer_id ?? req.body.customerId ?? cur.customer_id;
     const contractImage = req.body.contract_image ?? req.body.contractImage ?? cur.contract_image;
+
+    // Sellers may only set status to 'available' or 'reserved'
+    let status = cur.status;
+    if (req.user?.role === 'manager' || req.user?.role === 'agent') {
+      status = req.body.status ?? cur.status;
+    } else if (req.user?.role === 'seller') {
+      const allowedStatuses = ['available', 'requested'];
+      const requestedStatus = req.body.status ?? cur.status;
+      if (allowedStatuses.includes(requestedStatus)) {
+        status = requestedStatus;
+      } else if (requestedStatus !== cur.status) {
+        return res.status(403).json({ error: 'Access denied: sellers can only set status to available or requested' });
+      }
+    }
+
     const result = await query(
       `UPDATE sims SET phone=$1, iccid=$2, provider=$3, status=$4, owner=$5, package_type=$6,
          customer_name=$7, customer_id=$8, contract_image=$9 WHERE id=$10 RETURNING *`,
       [phone, iccid, provider, status, owner, package_type, customerName, customerId, contractImage, id]
     );
     broadcastEvent({ type: 'sim.updated', entity: 'sim', id, iccid, status, action: 'update' });
+    cacheInvalidate('report:');
     res.json(result.rows[0]);
   } catch (err) {
     logger.error('Error updating sim:', err);
@@ -310,11 +331,21 @@ router.put('/:id', requireRole('manager', 'agent', 'seller'), validate(updateSim
   }
 });
 
-router.delete('/:id', requireRole('manager'), async (req: Request, res: Response) => {
+router.delete('/:id', requireRole('manager'), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
+    const existing = await query('SELECT iccid FROM sims WHERE id = $1', [id]);
+    const iccid = existing.rows[0]?.iccid || 'unknown';
     await query('DELETE FROM sims WHERE id = $1', [id]);
+    // Audit log for SIM deletion
+    const deleteLogId = `SIM-DELETE-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+    await query(
+      `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
+       VALUES ($1, 'sim_deleted', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', '', '', '', NOW(), 'closed')`,
+      [deleteLogId, `حذف شريحة: ${iccid}`, req.user?.username || 'unknown']
+    );
     broadcastEvent({ type: 'sim.deleted', entity: 'sim', id });
+    cacheInvalidate('report:');
     res.json({ success: true });
   } catch (err) {
     logger.error('Error deleting sim:', err);

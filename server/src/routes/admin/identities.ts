@@ -108,7 +108,7 @@ function logIdentityAction(idNo: string, _name: string, action: string, performe
   const status = action === 'flag' ? 'flagged' : action === 'block' ? 'blocked' : 'resolved';
   return query(
     `INSERT INTO audit_logs (log_id, type, title, username, time, status)
-     VALUES ($1, 'identity_risk', $2, $3, NOW()::text, $4)`,
+     VALUES ($1, 'identity_risk', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), $4)`,
     [logId, title, performedBy, status]
   );
 }

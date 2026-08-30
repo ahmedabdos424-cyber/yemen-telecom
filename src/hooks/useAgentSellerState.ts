@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Seller, Sim, Operation, OperatorInventory, Operator, SimStatus, simProvider } from '../types';
 import { api } from '../api/client';
 import type { CreateSellerResponse, SimRow } from '../api/types';
@@ -376,13 +376,13 @@ export function useAgentSellerState(role: string | null, username: string) {
     if (results[3].status === 'fulfilled') setOperations((results[3].value ?? []) as Operation[]);
   }, [mountedRef]);
 
-  // Self seller data for seller role — starts empty for new accounts
-  const selfSellerData: Seller = sellers.find(s => s.username === username || s.name === username) || {
+  // Self seller data for seller role — memoized to avoid re-creating every render
+  const selfSellerData: Seller = useMemo(() => sellers.find(s => s.username === username || s.name === username) || {
     id: '', name: username, storeName: '', idNumber: '',
     phone: '', region: '', regionCode: '', status: 'active',
     totalSales: 0, currentStock: 0, efficiency: 0, creationDate: '',
     lastLogin: '', simsCount: 0, sales30Days: 0, salesGrowth: 0, activityRate: 0
-  };
+  }, [sellers, username]);
 
   return {
     sellers, sims, operations, inventories, activeTab, sellerCredentials, selfSellerData,
