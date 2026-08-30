@@ -75,8 +75,14 @@ export function useAuth() {
           }
           setFrontendSentryUser({ id: user.id, username: user.username, role: user.role });
           fetchCsrfToken();
-        } catch {
+        } catch (err) {
           if (cancelled) return;
+          const msg = err instanceof Error ? err.message.toLowerCase() : '';
+          // Disabled/locked account: force-logout immediately (403 from server)
+          if (msg.includes('403') || msg.includes('forbidden') || msg.includes('disabled') || msg.includes(' deactivated')) {
+            clearSession();
+            return;
+          }
           const newToken = await api.refresh();
           if (newToken) {
             setTokenWrapper(newToken);
@@ -195,7 +201,7 @@ export function useAuth() {
       await clearBiometricCredential();
       setBiometricEnabled(false);
       throw new BiometricAuthError(
-        error.message || 'انتهت صلاحية جلسة البصمة، يرجى تسجيل الدخول بكلمة المرور ثم تفعيل البصمة مجدداً',
+        error.message || 'انتهت صلاحية جلسة البصمة. سجّل الدخول بكلمة المرور ثم أعد تفعيل البصمة من الإعدادات',
         false,
         error.code,
       );

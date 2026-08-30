@@ -5,7 +5,7 @@ import {
   User, MapPin,
   Users, Layers, Package, TrendingUp, Target,
   Lock, LogOut, X, ChevronLeft, Eye, EyeOff,
-  Settings, Trash2
+  Settings
 } from 'lucide-react';
 import AgentSettingsModal from './AgentSettingsModal';
 import ProfileAvatar from '../shared/ProfileAvatar';
@@ -49,28 +49,35 @@ export default function AgentProfileView({
   const [fontSize, setFontSizeState] = useState<'sm' | 'base' | 'lg'>(() => {
     return (localStorage.getItem('tele_font_size') as 'sm' | 'base' | 'lg') || 'base';
   });
-  const [simNotifications, setSimNotifications] = useState<boolean>(() => {
-    return localStorage.getItem('tele_sim_notifications') !== 'false';
-  });
-  const [lowStockNotifications, setLowStockNotifications] = useState<boolean>(() => {
-    return localStorage.getItem('tele_low_stock_notifications') !== 'false';
-  });
+  const [simNotifications, setSimNotifications] = useState<boolean>(true);
+  const [lowStockNotifications, setLowStockNotifications] = useState<boolean>(true);
+
+  useEffect(() => {
+    api.getUserPreferences().then((prefs) => {
+      setSimNotifications(prefs.simNotifications);
+      setLowStockNotifications(prefs.lowStockNotifications);
+      if (prefs.fontSize && ['sm', 'base', 'lg'].includes(prefs.fontSize)) {
+        setFontSizeState(prefs.fontSize as 'sm' | 'base' | 'lg');
+      }
+    }).catch(() => {});
+  }, []);
 
   const setFontSize = (size: 'sm' | 'base' | 'lg') => {
     setFontSizeState(size);
     localStorage.setItem('tele_font_size', size);
+    api.updateUserPreferences({ fontSize: size }).catch(() => {});
   };
 
   const handleToggleSimNotifications = () => {
     const val = !simNotifications;
     setSimNotifications(val);
-    localStorage.setItem('tele_sim_notifications', String(val));
+    api.updateUserPreferences({ simNotifications: val }).catch(() => {});
   };
 
   const handleToggleLowStockNotifications = () => {
     const val = !lowStockNotifications;
     setLowStockNotifications(val);
-    localStorage.setItem('tele_low_stock_notifications', String(val));
+    api.updateUserPreferences({ lowStockNotifications: val }).catch(() => {});
   };
 
   const handleToggleBiometric = async () => {
@@ -304,24 +311,6 @@ export default function AgentProfileView({
          </div>
           <ChevronLeft size={16} className="text-slate-500 group-hover:text-slate-100 transition-colors" />
          </button>
-
-       {/* Delete Account Button */}
-       <button
-         type="button"
-         onClick={() => toastWarning('حذف الحساب الذاتي معطّل لدواعٍ أمنية ومالية. يرجى التواصل مع إدارة النظام لتقديم طلب إغلاق الحساب وتصفية المستحقات.')}
-         className="card w-full flex items-center justify-between p-4 bg-red-950/10 border-red-900/20 hover:bg-red-950/30 transition-all group"
-       >
-         <div className="flex items-center gap-3">
-           <div className="btn-icon rounded-xl bg-red-600/10 border-red-500/20 flex items-center justify-center text-red-500 group-hover:scale-105 transition-transform">
-             <Trash2 size={18} />
-           </div>
-           <div className="text-right">
-             <p className="text-sm font-bold text-red-400">حذف الحساب</p>
-             <p className="text-[10px] text-slate-500 mt-0.5">حذف الحساب الذاتي معطّل لدواعٍ أمنية ومالية. يرجى التواصل مع إدارة النظام لتقديم طلب إغلاق الحساب وتصفية المستحقات.</p>
-           </div>
-         </div>
-         <ChevronLeft size={16} className="text-slate-500 group-hover:text-slate-100 transition-colors" />
-       </button>
 
       {/* Change Password Modal */}
       <AnimatePresence>

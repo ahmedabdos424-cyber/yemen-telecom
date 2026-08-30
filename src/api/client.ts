@@ -325,6 +325,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     if (res.status === 401 && !path.startsWith('/auth/')) {
       emitSessionExpired(err.error || '');
     }
+    // Disabled/locked account: emit session expired so the UI forces logout
+    if (res.status === 403 && !path.startsWith('/auth/') && !path.startsWith('/csrf-token')) {
+      const msg = (err.error || '').toLowerCase();
+      if (msg.includes('disabled') || msg.includes('deactivated') || msg.includes('inactive') || msg.includes('inactive account') || msg.includes('blocked')) {
+        emitSessionExpired(err.error || 'Account disabled');
+      }
+    }
     const dur = performance.now() - start;
     captureTiming(`${options.method || 'GET'} ${path}`, dur);
     throw new Error(err.error || `HTTP ${res.status}`);
@@ -526,4 +533,10 @@ export const api = {
 
   // Upload
   uploadFile,
+
+  // User Preferences
+  getUserPreferences: () =>
+    request<{ simNotifications: boolean; lowStockNotifications: boolean; fontSize: string; darkMode: boolean }>('/users/preferences'),
+  updateUserPreferences: (data: { simNotifications?: boolean; lowStockNotifications?: boolean; fontSize?: string; darkMode?: boolean }) =>
+    request<{ message: string }>('/users/preferences', { method: 'PUT', body: JSON.stringify(data) }),
 };

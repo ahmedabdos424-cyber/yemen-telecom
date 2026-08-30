@@ -147,9 +147,16 @@ function AuthenticatedApp() {
   }, [agt.inventories, role, toastWarning]);
 
   useEffect(() => {
-    const onSessionExpired = () => {
+    const onSessionExpired = (e?: Event) => {
       if (!roleRef.current) return;
-      toastWarning('انتهت الجلسة', 'تم تسجيل الخروج لانتهاء الجلسة أو دخول الحساب من جهاز آخر');
+      const reason = (e as CustomEvent<{ reason?: string }>)?.detail?.reason || '';
+      const isDisabled = reason.toLowerCase().includes('disabled') || reason.toLowerCase().includes('deactivated');
+      toastWarning(
+        isDisabled ? 'تم تعطيل الحساب' : 'انتهت الجلسة',
+        isDisabled
+          ? 'تم تعطيل حسابك من قبل المدير. يرجى التواصل مع إدارة النظام'
+          : 'تم تسجيل الخروج لانتهاء الجلسة أو دخول الحساب من جهاز آخر'
+      );
       clearSession();
     };
     window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);

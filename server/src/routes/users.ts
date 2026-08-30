@@ -60,4 +60,68 @@ router.put('/profile', validate(updateProfileSchema), async (req: AuthRequest, r
   }
 });
 
+// ── User Preferences (notification toggles, display settings) ──
+
+router.get('/preferences', async (req: AuthRequest, res: Response) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  try {
+    const result = await query(
+      `SELECT sim_notifications, low_stock_notifications, font_size, dark_mode
+       FROM user_preferences WHERE user_id = $1`,
+      [req.user.id]
+    );
+    if (result.rows.length === 0) {
+      // Return defaults if no row exists yet
+      return res.json({
+        simNotifications: true,
+        lowStockNotifications: true,
+        fontSize: 'base',
+        darkMode: false,
+      });
+    }
+    const row = result.rows[0];
+    res.json({
+      simNotifications: row.sim_notifications,
+      lowStockNotifications: row.low_stock_notifications,
+      fontSize: row.font_size,
+      darkMode: row.dark_mode,
+    });
+  } catch (err) {
+    logger.error('Error fetching user preferences:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.put('/preferences', async (req: AuthRequest, res: Response) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  const { simNotifications, lowStockNotifications, fontSize, darkMode } = req.body;
+  try {
+    await query(
+      `INSERT INTO user_preferences (user_id, sim_notifications, low_stock_notifications, font_size, dark_mode, updated_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())
+       ON CONFLICT (user_id) DO UPDATE SET
+         sim_notifications = COALESCE($2, user_preferences.sim_notifications),
+         low_stock_notifications = COALESCE($3, user_preferences.low_stock_notifications),
+         font_size = COALESCE($4, user_preferences.font_size),
+         dark_mode = COALESCE($5, user_preferences.dark_mode),
+         updated_at = NOW()`,
+      [
+        req.user.id,
+        simNotifications ?? true,
+        lowStockNotifications ?? true,
+        fontSize ?? 'base',
+        darkMode ?? false,
+      ]
+    );
+    res.json({ message: 'Preferences updated successfully' });
+  } catch (err) {
+    logger.error('Error updating user preferences:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;

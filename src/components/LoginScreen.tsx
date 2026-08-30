@@ -127,7 +127,7 @@ export default function LoginScreen({ onLogin, onBiometricLogin, biometricEnable
       // قد تكون الاعتمادية محفوظة في التخزين الآمن لكن حالة التفعيل لم تُحمَّل بعد
       const hasCredential = await hasBiometricCredential();
       if (!hasCredential) {
-        toastInfo('يرجى تسجيل الدخول بكلمة المرور أولا لتفعيل البصمة لهذا الجهاز');
+        toastInfo('البصمة غير مُفعّلة على هذا الجهاز. سجّل الدخول بكلمة المرور ثم فعّل البصمة من الإعدادات');
         return;
       }
     }
@@ -146,7 +146,7 @@ export default function LoginScreen({ onLogin, onBiometricLogin, biometricEnable
         }, 450);
       } else {
         // لا توجد اعتمادية صالحة أو فشل تجديد الجلسة: ليست محاولة بصمة فاشلة
-        toastInfo('انتهت صلاحية جلسة الدخول بالبصمة. سجّل الدخول بكلمة المرور ثم فعّل البصمة مجددا');
+        toastInfo('انتهت صلاحية جلسة البصمة. سجّل الدخول بكلمة المرور ثم أعد تفعيل البصمة من الإعدادات');
       }
     } catch (err) {
       if (abortRef.current) return;

@@ -8,7 +8,7 @@ import { SystemSettings } from '../types';
 import ConfirmModal from './shared/ConfirmModal';
 import { captureError } from '../lib/monitor.ts';
 import { api } from '../api/client';
-import { Fingerprint, Trash2 } from 'lucide-react';
+import { Fingerprint } from 'lucide-react';
 import { useToast, ToastContainer } from '../hooks/useToast';
 import { isNativeBiometrics, type BiometricToggleResult } from '../services/biometricAuth';
 
@@ -625,28 +625,6 @@ const updateSetting = async (patch: Partial<SystemSettings>, silent = false) => 
               </label>
             </div>
           </section>
-        </div>
-      </div>
-
-      {/* Delete Account Section */}
-      <div className="mt-8 pt-6 border-t border-slate-800/40">
-        <div className="w-full flex items-center justify-between gap-3 p-4 bg-red-950/10 border border-red-900/20 rounded-2xl">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-red-600/10 border border-red-500/20 flex items-center justify-center text-red-500">
-              <Trash2 size={18} />
-            </div>
-            <div className="text-right">
-              <p className="text-sm font-bold text-red-400">حذف الحساب</p>
-              <p className="text-[10px] text-slate-500 mt-0.5">حذف الحساب الذاتي معطّل لدواعٍ أمنية ومالية. يرجى التواصل مع إدارة النظام لتقديم طلب إغلاق الحساب وتصفية المستحقات.</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => toastWarning('حذف الحساب الذاتي معطّل لدواعٍ أمنية ومالية. يرجى التواصل مع إدارة النظام لتقديم طلب إغلاق الحساب وتصفية المستحقات.')}
-            className="shrink-0 px-4 py-2 text-xs font-bold text-red-400 border border-red-900/30 rounded-xl hover:bg-red-950/30 transition-all cursor-pointer"
-          >
-            تقديم طلب
-          </button>
         </div>
       </div>
 

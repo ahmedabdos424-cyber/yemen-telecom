@@ -162,10 +162,22 @@ router.put('/:id', requireRole('manager'), validate(updateAgentSchema), async (r
     const sellers_count = req.body.sellers_count ?? cur.sellers_count;
     const sims_count = req.body.sims_count ?? cur.sims_count;
     const status = req.body.status ?? cur.status;
+    const statusChanged = status !== cur.status;
     const result = await query(
       `UPDATE agents SET name=$1, region=$2, phone=$3, sellers_count=$4, sims_count=$5, status=$6 WHERE id=$7 RETURNING *`,
       [name, region, phone, sellers_count, sims_count, status, agentId]
     );
+    // Sync user status + force-logout active session when disabling
+    if (statusChanged && cur.user_id) {
+      if (status === 'inactive') {
+        await query(
+          `UPDATE users SET status = $1, active_session_sid = NULL, session_expires_at = NOW() WHERE id = $2`,
+          [status, cur.user_id]
+        );
+      } else {
+        await query('UPDATE users SET status = $1 WHERE id = $2', [status, cur.user_id]);
+      }
+    }
     res.json(result.rows[0]);
    } catch (err) {
     const kind = getUniqueViolationKind(err);

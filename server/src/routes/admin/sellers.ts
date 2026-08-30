@@ -99,7 +99,15 @@ router.put('/sellers/:id/status', requireRole('manager'), async (req: Request, r
     await transaction(async (client) => {
       await client.query('UPDATE sellers SET status = $1 WHERE id = $2', [status, id]);
       if (seller.user_id) {
-        await client.query('UPDATE users SET status = $1 WHERE id = $2', [status, seller.user_id]);
+        // Sync user status + force-logout active session when disabling
+        if (status === 'inactive') {
+          await client.query(
+            `UPDATE users SET status = $1, active_session_sid = NULL, session_expires_at = NOW() WHERE id = $2`,
+            [status, seller.user_id]
+          );
+        } else {
+          await client.query('UPDATE users SET status = $1 WHERE id = $2', [status, seller.user_id]);
+        }
       }
     });
     broadcastEvent({ type: 'seller.updated', entity: 'seller', id, status, action: 'status-toggle' });

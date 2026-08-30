@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Seller } from '../types';
 import ProfileAvatar from './shared/ProfileAvatar';
@@ -8,7 +8,7 @@ import SettingsPanel from './shared/SettingsPanel';
 import type { BiometricToggleResult } from '../services/biometricAuth';
 import {
   User, MapPin, TrendingUp, Smartphone, Layers, Award, Activity, Lock,
-  LogOut, ChevronLeft, X, Settings, Trash2
+  LogOut, ChevronLeft, X, Settings
 } from 'lucide-react';
 
 interface SellerAccountProps {
@@ -43,28 +43,35 @@ export default function SellerAccount({
   const [fontSize, setFontSizeState] = useState<'sm' | 'base' | 'lg'>(() => {
     return (localStorage.getItem('tele_font_size') as 'sm' | 'base' | 'lg') || 'base';
   });
-  const [simNotifications, setSimNotifications] = useState<boolean>(() => {
-    return localStorage.getItem('tele_sim_notifications') !== 'false';
-  });
-  const [lowStockNotifications, setLowStockNotifications] = useState<boolean>(() => {
-    return localStorage.getItem('tele_low_stock_notifications') !== 'false';
-  });
+  const [simNotifications, setSimNotifications] = useState<boolean>(true);
+  const [lowStockNotifications, setLowStockNotifications] = useState<boolean>(true);
+
+  useEffect(() => {
+    api.getUserPreferences().then((prefs) => {
+      setSimNotifications(prefs.simNotifications);
+      setLowStockNotifications(prefs.lowStockNotifications);
+      if (prefs.fontSize && ['sm', 'base', 'lg'].includes(prefs.fontSize)) {
+        setFontSizeState(prefs.fontSize as 'sm' | 'base' | 'lg');
+      }
+    }).catch(() => {});
+  }, []);
 
   const setFontSize = (size: 'sm' | 'base' | 'lg') => {
     setFontSizeState(size);
     localStorage.setItem('tele_font_size', size);
+    api.updateUserPreferences({ fontSize: size }).catch(() => {});
   };
 
   const handleToggleSimNotifications = () => {
     const val = !simNotifications;
     setSimNotifications(val);
-    localStorage.setItem('tele_sim_notifications', String(val));
+    api.updateUserPreferences({ simNotifications: val }).catch(() => {});
   };
 
   const handleToggleLowStockNotifications = () => {
     const val = !lowStockNotifications;
     setLowStockNotifications(val);
-    localStorage.setItem('tele_low_stock_notifications', String(val));
+    api.updateUserPreferences({ lowStockNotifications: val }).catch(() => {});
   };
 
   const handleToggleBiometric = async () => {
@@ -299,23 +306,6 @@ export default function SellerAccount({
         <ChevronLeft size={16} className="text-slate-500 group-hover:text-slate-100 transition-colors" />
       </button>
 
-       {/* Delete Account Button */}
-       <button
-         type="button"
-         onClick={() => toastWarning('حذف الحساب الذاتي معطّل لدواعٍ أمنية ومالية. يرجى التواصل مع إدارة النظام لتقديم طلب إغلاق الحساب وتصفية المستحقات.')}
-         className="w-full flex items-center justify-between p-4 bg-red-950/10 border border-red-900/20 rounded-2xl hover:bg-red-950/30 transition-all group"
-       >
-         <div className="flex items-center gap-3">
-           <div className="w-10 h-10 rounded-xl bg-red-600/10 border border-red-500/20 flex items-center justify-center text-red-500 group-hover:scale-105 transition-transform">
-             <Trash2 size={18} />
-           </div>
-           <div className="text-right">
-             <p className="text-sm font-bold text-red-400">حذف الحساب</p>
-             <p className="text-[10px] text-slate-500 mt-0.5">حذف الحساب الذاتي معطّل لدواعٍ أمنية ومالية. يرجى التواصل مع إدارة النظام لتقديم طلب إغلاق الحساب وتصفية المستحقات.</p>
-           </div>
-         </div>
-         <ChevronLeft size={16} className="text-slate-500 group-hover:text-slate-100 transition-colors" />
-       </button>
         </div>
       </div>
 
