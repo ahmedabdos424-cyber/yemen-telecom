@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { query } from '../db';
 import { logger } from '../logger';
 import { AuthRequest } from '../middleware/auth';
@@ -45,6 +46,17 @@ router.put('/password', validate(updatePasswordSchema), async (req: AuthRequest,
 router.delete('/account', async (req: AuthRequest, res: Response) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Not authenticated' });
+  }
+  // Log the attempt even though it's rejected
+  const logId = `SELF-DEL-ATTEMPT-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+  try {
+    await query(
+      `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
+       VALUES ($1, 'self_deletion_attempt', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'denied', '', '', '', NOW(), 'active')`,
+      [logId, `محاولة حذف حساب ذاتي: ${req.user.username}`, req.user.username]
+    );
+  } catch (err) {
+    logger.warn('[AUDIT] Failed to log self-deletion attempt:', err);
   }
   return res.status(409).json({ error: 'Self account deletion is disabled.' });
 });

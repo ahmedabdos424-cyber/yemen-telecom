@@ -258,6 +258,17 @@ router.post('/', requireRole('manager'), validate(createSimSchema), async (req: 
     );
     broadcastEvent({ type: 'sim.created', entity: 'sim', id: result.rows[0].id, iccid, status: result.rows[0].status });
     cacheInvalidate('report:');
+    // Audit log for single SIM creation
+    const logId = `SIM-CREATE-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+    try {
+      await query(
+        `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
+         VALUES ($1, 'sim_created', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', '', '', '', NOW(), 'active')`,
+        [logId, `إنشاء شريحة: ${iccid} (${provider || 'Yemen Mobile'})`, (req as AuthRequest).user?.username || 'unknown']
+      );
+    } catch (err) {
+      logger.warn('[AUDIT] Failed to log SIM creation:', err);
+    }
     res.status(201).json(result.rows[0]);
   } catch (err: unknown) {
     if (err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === '23505') {
@@ -325,6 +336,17 @@ router.put('/:id', requireRole('manager', 'agent', 'seller'), validate(updateSim
     );
     broadcastEvent({ type: 'sim.updated', entity: 'sim', id, iccid, status, action: 'update' });
     cacheInvalidate('report:');
+    // Audit log for SIM update
+    const logId = `SIM-UPDATE-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+    try {
+      await query(
+        `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
+         VALUES ($1, 'sim_updated', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', '', '', '', NOW(), 'active')`,
+        [logId, `تحديث شريحة: ${iccid}`, req.user?.username || 'unknown']
+      );
+    } catch (err) {
+      logger.warn('[AUDIT] Failed to log SIM update:', err);
+    }
     res.json(result.rows[0]);
   } catch (err) {
     logger.error('Error updating sim:', err);

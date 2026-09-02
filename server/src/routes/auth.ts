@@ -119,10 +119,6 @@ router.post('/login', authRateLimiter, validate(loginSchema), async (req: Reques
     if (process.env.NODE_ENV !== 'production') {
       logger.error('[LOGIN ERROR]', {
         message: err instanceof Error ? err.message : String(err),
-        stack: err instanceof Error ? err.stack : undefined,
-        code: err && typeof err === 'object' && 'code' in err ? (err as unknown as { code?: unknown }).code : undefined,
-        detail: err && typeof err === 'object' && 'detail' in err ? (err as unknown as { detail?: unknown }).detail : undefined,
-        name: err instanceof Error ? err.name : undefined,
       });
     }
     res.status(500).json({ error: 'Internal server error' });
@@ -210,15 +206,14 @@ router.post('/logout', async (req: Request, res: Response) => {
       );
     }
     const cookieRefreshToken = req.cookies?.refreshToken;
-    const refreshTokenHeader = cookieRefreshToken || (req.headers['x-refresh-token'] as string);
-    if (refreshTokenHeader) {
+    if (cookieRefreshToken) {
       try {
-        const rtDecoded = jwt.verify(refreshTokenHeader, REFRESH_SECRET, { algorithms: ['HS256'] }) as TokenPayload;
+        const rtDecoded = jwt.verify(cookieRefreshToken, REFRESH_SECRET, { algorithms: ['HS256'] }) as TokenPayload;
         if (rtDecoded.exp) {
           const rtExpiresAt = new Date(rtDecoded.exp * 1000).toISOString();
           await query(
             'INSERT INTO token_blacklist (token_hash, expires_at, user_id) VALUES ($1, $2, $3) ON CONFLICT (token_hash) DO NOTHING',
-            [hashToken(refreshTokenHeader), rtExpiresAt, decoded.id]
+            [hashToken(cookieRefreshToken), rtExpiresAt, decoded.id]
           );
         }
       } catch { /* refresh token already expired — ignore */ }

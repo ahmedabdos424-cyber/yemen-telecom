@@ -109,9 +109,16 @@ describe('P0-04 Self-Deletion Prevention Security Tests', () => {
       expect(blacklistCalls.length).toBe(0);
     });
 
-    it('query() is never called for any authenticated request', async () => {
+    it('Only audit log INSERT executed (no destructive queries)', async () => {
       await del('/api/users/account', 'manager');
-      expect(query).not.toHaveBeenCalled();
+      const calls = (query as any).mock.calls;
+      // Only allowed call is the audit log INSERT
+      calls.forEach((c: any[]) => {
+        const sql = c[0]?.toLowerCase() || '';
+        if (sql.includes('insert')) {
+          expect(sql).toContain('audit_logs');
+        }
+      });
     });
   });
 
@@ -125,7 +132,13 @@ describe('P0-04 Self-Deletion Prevention Security Tests', () => {
 
     it('Other user routes still work (GET not affected)', async () => {
       await del('/api/users/account', 'manager');
-      expect(query).not.toHaveBeenCalled();
+      const calls = (query as any).mock.calls;
+      // Only the audit log INSERT should be called, no user modification
+      const destructiveCalls = calls.filter((c: any[]) => {
+        const sql = c[0]?.toLowerCase() || '';
+        return sql.startsWith('delete') || sql.startsWith('update') || sql.startsWith('select');
+      });
+      expect(destructiveCalls.length).toBe(0);
     });
   });
 
@@ -135,10 +148,11 @@ describe('P0-04 Self-Deletion Prevention Security Tests', () => {
     it('Token is not blacklisted when deletion is rejected', async () => {
       await del('/api/users/account', 'manager');
       const calls = (query as any).mock.calls;
-      const insertCalls = calls.filter((c: any[]) =>
-        c[0]?.toLowerCase().includes('insert')
+      // Audit log INSERT is expected; blacklist INSERT should NOT happen
+      const blacklistCalls = calls.filter((c: any[]) =>
+        c[0]?.toLowerCase().includes('insert') && c[0]?.toLowerCase().includes('token_blacklist')
       );
-      expect(insertCalls.length).toBe(0);
+      expect(blacklistCalls.length).toBe(0);
     });
 
     it('User status remains unchanged after rejection', async () => {

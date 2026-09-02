@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import crypto from 'crypto';
 import { query } from '../db';
 import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
@@ -99,6 +100,17 @@ router.post('/', requireRole('manager', 'agent', 'seller'), validate(createCusto
        RETURNING *`,
       [full_name, id_number, id_type, id_issue_date, phone || '', region || '', activated_by || null, req.user?.id]
     );
+    // Audit log for customer creation
+    const logId = `CUSTOMER-CREATE-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+    try {
+      await query(
+        `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
+         VALUES ($1, 'customer_created', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', '', '', '', NOW(), 'active')`,
+        [logId, `إنشاء عميل: ${full_name}`, req.user?.username || 'unknown']
+      );
+    } catch (err) {
+      logger.warn('[AUDIT] Failed to log customer creation:', err);
+    }
     res.status(201).json(result.rows[0]);
   } catch (err) {
     logger.error('Error creating customer:', err);

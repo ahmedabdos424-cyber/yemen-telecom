@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import crypto from 'crypto';
 import { query, transaction } from '../../db';
 import { logger } from '../../logger';
 import { requireRole, AuthRequest } from '../../middleware/auth';
@@ -125,6 +126,13 @@ router.post('/sims/batch', requireRole('manager'), validate(createSimBatchSchema
             userId: req.user?.id ?? null,
           },
           client
+        );
+        // Audit log for batch SIM insert
+        const logId = `BATCH-SIM-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+        await client.query(
+          `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
+           VALUES ($1, 'batch_sim_insert', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', '', '', '', NOW(), 'active')`,
+          [logId, `إدخال دفعة شرائح: ${inserted} شريحة (${from_iccid} → ${to_iccid})`, req.user?.username || 'unknown']
         );
       }
       return inserted;

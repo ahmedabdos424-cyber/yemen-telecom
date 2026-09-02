@@ -8,6 +8,7 @@ vi.hoisted(() => {
   process.env.JWT_SECRET = 'p0-02-test-jwt-secret';
   process.env.REFRESH_SECRET = 'p0-02-test-refresh-secret';
   process.env.BLACKLIST_HMAC_SECRET = 'test-blacklist-hmac-secret';
+  process.env.RATE_LIMIT_DISABLED = 'true';
 });
 
 vi.mock('../db', () => ({

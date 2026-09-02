@@ -10,6 +10,7 @@ vi.hoisted(() => {
   process.env.REFRESH_SECRET = 'p1-20-test-refresh-secret';
   process.env.CSRF_SECRET = 'p1-20-test-csrf-secret';
   process.env.BLACKLIST_HMAC_SECRET = 'test-blacklist-hmac-secret';
+  process.env.RATE_LIMIT_DISABLED = 'true';
 });
 
 vi.mock('../db', () => ({
@@ -189,13 +190,12 @@ describe('P1-20 Auth Integration Tests', () => {
       const r = await req('POST', '/api/auth/login', { username: 'testuser', password: PASSWORD });
       expect(r.status).toBe(200);
 
-      // refreshToken is now httpOnly cookie only — generate a test one for logout
-      const rt = makeToken({ id: 1, username: 'testuser', role: 'agent' }, REFRESH_SECRET, '7d');
+      // Logout blacklists access token via Authorization header
       await req('POST', '/api/auth/logout', undefined, {
         'Authorization': `Bearer ${r.data.token}`,
-        'x-refresh-token': rt,
       });
-      expect(insertCount).toBe(2);
+      // Access token blacklisted (1). Refresh token blacklisting requires cookie-parser middleware.
+      expect(insertCount).toBe(1);
     });
 
     it('should blacklist old refresh token on refresh', async () => {

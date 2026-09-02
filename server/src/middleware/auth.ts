@@ -4,8 +4,9 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
+import nodeCrypto from 'crypto';
 import { query } from '../db';
+import { logger } from '../logger';
 import { setSentryUser } from '../sentry';
 
 if (!process.env.JWT_SECRET) {
@@ -43,7 +44,7 @@ export function isSessionExempt(username?: string): boolean {
 }
 
 export function hashToken(token: string): string {
-  return crypto.createHmac('sha256', BLACKLIST_HMAC_SECRET).update(token).digest('hex');
+  return nodeCrypto.createHmac('sha256', BLACKLIST_HMAC_SECRET).update(token).digest('hex');
 }
 
 export async function isTokenBlacklisted(token: string): Promise<boolean> {
@@ -92,7 +93,8 @@ export async function resolveTokenUser(token: string): Promise<ResolvedUser | nu
       }
     }
     return { id: decoded.id, username: decoded.username, role: decoded.role };
-  } catch {
+  } catch (err) {
+    logger.warn('[AUTH] Token resolution failed:', err instanceof Error ? err.message : err);
     return null;
   }
 }

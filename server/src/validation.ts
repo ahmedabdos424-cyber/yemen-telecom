@@ -185,6 +185,9 @@ export const updateSellerSchema = z.object({
   idDocument: z.string().max(500).optional(),
 });
 
+// Agent cannot change seller status — separate schema without status field
+export const updateSellerByAgentSchema = updateSellerSchema.omit({ status: true });
+
 export const updateSellerBalanceSchema = z.object({
   amount: z.number().finite('Numeric amount is required').min(-1000000, 'Amount cannot exceed -1,000,000').max(1000000, 'Amount cannot exceed 1,000,000'),
   invoiceImage: z.string().max(1000).optional(),

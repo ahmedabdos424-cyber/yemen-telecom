@@ -24,8 +24,8 @@ export const authRateLimiter = rateLimit({
     });
   },
   skip: (req: Request) => {
-    // تخطي Rate Limiting في بيئة الاختبار
-    if (process.env.NODE_ENV === 'test') return true;
+    // تخطي Rate Limiting عبر متغير بيئة مخصص (لا يُستخدم في الإنتاج)
+    if (process.env.RATE_LIMIT_DISABLED === 'true') return true;
     // السماح بمسارات-health check دون تحديد
     return req.path === '/health' || req.path === '/api/health';
   }
@@ -82,7 +82,7 @@ interface LoginLockState {
 export const MAX_FAILED_LOGINS = 5;
 const LOCK_DURATIONS_MS = [60_000, 120_000, 300_000, 900_000]; // 1m → 2m → 5m → 15m
 const LOGIN_LOCK_TTL_MS = 30 * 60 * 1000; // ننسى السجل بعد انتهاء القفل بـ 30 دقيقة خمول
-const MAX_LOGIN_LOCKS = 10_000; // Prevent memory exhaustion under attack
+const MAX_LOGIN_LOCKS = 5_000; // Prevent memory exhaustion under attack (DB handles persistence)
 const loginLocks = new Map<string, LoginLockState>();
 
 function loginLockKey(username: string, ip: string): string {
