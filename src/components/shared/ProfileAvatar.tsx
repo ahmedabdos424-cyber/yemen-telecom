@@ -1,7 +1,27 @@
-import { useState, useRef, type ChangeEvent } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Camera, X } from 'lucide-react';
+import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { Camera, X, RefreshCw } from 'lucide-react';
 import profileImage from '../../assets/profile.png';
+
+function isNative(): boolean {
+  try {
+    return !!(window as unknown as { Capacitor?: { isNative?: boolean } }).Capacitor?.isNative;
+  } catch {
+    return false;
+  }
+}
+
+async function captureWithCamera(): Promise<string> {
+  const photo = await CapacitorCamera.getPhoto({
+    quality: 90,
+    allowEditing: false,
+    resultType: CameraResultType.DataUrl,
+    source: CameraSource.Camera,
+  });
+  if (!photo.dataUrl) throw new Error('فشل التقاط الصورة');
+  return photo.dataUrl;
+}
 
 interface ProfileAvatarProps {
   photo: string;
@@ -20,19 +40,41 @@ export default function ProfileAvatar({
   editable = true
 }: ProfileAvatarProps) {
   const [modalOpen, setModalOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [capturing, setCapturing] = useState(false);
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      if (ev.target?.result) {
-        onPhotoChange(ev.target.result as string);
-        setModalOpen(false);
+  const handleCapture = async () => {
+    setCapturing(true);
+    try {
+      const dataUrl = await captureWithCamera();
+      onPhotoChange(dataUrl);
+      setModalOpen(false);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!msg.includes('cancelled') && !msg.includes('User cancelled')) {
+        console.error('Camera error:', msg);
       }
+    } finally {
+      setCapturing(false);
+    }
+  };
+
+  const handleFileFallback = async () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        if (ev.target?.result) {
+          onPhotoChange(ev.target.result as string);
+          setModalOpen(false);
+        }
+      };
+      reader.readAsDataURL(file);
     };
-    reader.readAsDataURL(file);
+    input.click();
   };
 
   return (
@@ -53,14 +95,6 @@ export default function ProfileAvatar({
             +
           </button>
         )}
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleFileChange}
-          className="hidden"
-        />
       </div>
 
       {editable && (
@@ -94,12 +128,32 @@ export default function ProfileAvatar({
               <div className="space-y-3">
                 <button
                   type="button"
-                  onClick={() => { fileInputRef.current?.click(); }}
-                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  onClick={handleCapture}
+                  disabled={capturing}
+                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
-                  <Camera size={14} />
-                  <span>تغيير الصورة</span>
+                  {capturing ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" />
+                      <span>جاري الالتقاط...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Camera size={14} />
+                      <span>{isNative() ? 'فتح الكاميرا' : 'التقاط صورة'}</span>
+                    </>
+                  )}
                 </button>
+                {!isNative() && (
+                  <button
+                    type="button"
+                    onClick={handleFileFallback}
+                    className="w-full py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Camera size={14} />
+                    <span>اختيار من الملفات</span>
+                  </button>
+                )}
                 {photo && (
                   <button
                     type="button"

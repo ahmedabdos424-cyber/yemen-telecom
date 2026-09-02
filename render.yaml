@@ -97,9 +97,9 @@ services:
       - key: APP_APK_URL
         value: ""
       - key: APP_APK_SHA256
-        value: "4BFAF60F27BA467C156F1ADA34CA9316B3B42040E7D6A1C7D5ADE76FBC468D4A"
+        value: "D5C8A8E3966CD3B8B8F1E20875DD1DE8B583C00C0533DB86E6F5147C7A3E5002"
       - key: APP_APK_SIZE
-        value: "30054105"
+        value: "30054537"
       - key: APP_UPDATE_NOTES
         value: "فحص أمني شامل — 22 إصلاح|تحسينات RBAC وصلاحيات الأدوار|إصلاحات أداء Race Conditions وTOCTOU|تحسينات Schema وتنقيح قاعدة البيانات"
       - key: APP_UPDATE_REQUIRED

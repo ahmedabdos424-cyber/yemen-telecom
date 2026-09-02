@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useState, useEffect } from 'react';
+import { useRef, useCallback, useState, useEffect } from 'react';
 import { Camera, RefreshCw, Settings } from 'lucide-react';
 import CameraPreviewModal from './CameraPreviewModal';
 import { useCamera } from '../../context/CameraContext';
@@ -182,7 +182,6 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
   const [captureLocked, setCaptureLocked] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const denialCountRef = useRef(0);
   const mountedRef = useRef(true);
@@ -305,7 +304,7 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
         } else {
           setShowViewfinder(false);
           setScanning(false);
-          fileInputRef.current?.click();
+          toastError('فشل التقاط الصورة', msg || 'حدث خطأ غير متوقع');
         }
       }
       return;
@@ -355,7 +354,7 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
         }
         toastError('تعذر الوصول إلى الكاميرا', 'يرجى السماح بالوصول إلى الكاميرا من إعدادات المتصفح');
       } else {
-        fileInputRef.current?.click();
+        toastError('فشل فتح الكاميرا', 'حدث خطأ غير متوقع');
       }
     }
   }, [handleCaptureResult, toastInfo, toastError]);
@@ -389,22 +388,8 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
     startCamera();
   }, [startCamera]);
 
-  const handleFileFallback = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) { setShowViewfinder(false); setScanning(false); return; }
-    let blob: Blob = file;
-    if (blob.size > COMPRESS_THRESHOLD) {
-      blob = await compressImage(blob, MAX_DIMENSION, JPEG_QUALITY);
-    }
-    const dataUrl = await blobToDataUrl(blob);
-    capturedDataRef.current = dataUrl;
-    setPreviewImage(dataUrl);
-    setScanning(false);
-  }, []);
-
   return (
     <>
-      <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileFallback} className="hidden" />
       <canvas ref={canvasRef} className="hidden" />
 
       <button
@@ -506,7 +491,6 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
   const [captureLocked, setCaptureLocked] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const denialCountRef = useRef(0);
   const mountedRef = useRef(true);
@@ -591,7 +575,7 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
         } else {
           setShowViewfinder(false);
           setScanning(false);
-          fileInputRef.current?.click();
+          toastError('فشل التقاط الصورة', msg || 'حدث خطأ غير متوقع');
         }
       }
       return;
@@ -627,7 +611,9 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
         if (denialCountRef.current >= 2) { setPermanentDenial(true); }
         else { setPermissionDenied(true); }
         toastError('تعذر الوصول إلى الكاميرا', 'يرجى السماح بالوصول إلى الكاميرا من إعدادات المتصفح');
-      } else { fileInputRef.current?.click(); }
+      } else {
+        toastError('فشل فتح الكاميرا', 'حدث خطأ غير متوقع');
+      }
     }
   }, [handleCaptureResult, toastInfo, toastError]);
 
@@ -687,22 +673,8 @@ export function DocumentCapture({ onCapture, capturedImage, onRemove }: {
     startCamera();
   }, [startCamera]);
 
-  const handleFileFallback = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) { setShowViewfinder(false); setScanning(false); return; }
-    let blob: Blob = file;
-    if (blob.size > COMPRESS_THRESHOLD) {
-      blob = await compressImage(blob, MAX_DIMENSION, JPEG_QUALITY);
-    }
-    const dataUrl = await blobToDataUrl(blob);
-    capturedDataRef.current = dataUrl;
-    setPreviewImage(dataUrl);
-    setScanning(false);
-  }, []);
-
   return (
     <>
-      <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileFallback} className="hidden" />
       <canvas ref={canvasRef} className="hidden" />
 
       {!capturedImage ? (
