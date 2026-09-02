@@ -73,7 +73,7 @@
     "vitest": "4.1.9"
   },
   "optionalDependencies": {
-    "@rollup/rollup-win32-x64-msvc": "^4.34.9"
+    "@rollup/rollup-win32-x64-msvc": "^4.63.1"
   },
   "allowScripts": {
     "esbuild@0.25.12": true,
