@@ -44,7 +44,7 @@ router.post('/', requireRole('manager'), validate(createAgentSchema), async (req
     }
 
     const agentPassword = password || crypto.randomBytes(16).toString('hex');
-    const passwordHash = await bcrypt.hash(agentPassword, 10);
+    const passwordHash = await bcrypt.hash(agentPassword, 12);
 
     const { agent } = await transaction(async (client) => {
       const userRes = await client.query(

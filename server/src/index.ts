@@ -81,7 +81,13 @@ app.use((req, res, next) => {
   next();
 });
 
-const CSRF_SECRET = process.env.CSRF_SECRET!;
+if (!process.env.CSRF_SECRET) {
+  throw new Error('CSRF_SECRET environment variable is required');
+}
+const CSRF_SECRET = process.env.CSRF_SECRET;
+if (process.env.NODE_ENV === 'production' && CSRF_SECRET.length < 32) {
+  throw new Error('CSRF_SECRET must be at least 32 characters long in production');
+}
 
 // Security middleware — CSP is set manually below for per-request nonce support
 app.use(helmet({

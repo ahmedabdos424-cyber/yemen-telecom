@@ -19,6 +19,14 @@ if (!process.env.JWT_SECRET || !process.env.REFRESH_SECRET) {
 }
 const JWT_SECRET: string = process.env.JWT_SECRET;
 const REFRESH_SECRET: string = process.env.REFRESH_SECRET;
+if (process.env.NODE_ENV === 'production') {
+  if (JWT_SECRET.length < 32) {
+    throw new Error('JWT_SECRET must be at least 32 characters long in production');
+  }
+  if (REFRESH_SECRET.length < 32) {
+    throw new Error('REFRESH_SECRET must be at least 32 characters long in production');
+  }
+}
 const SESSION_DURATION_MS = 2 * 60 * 60 * 1000;
 const MAX_SESSION_LIFETIME_MS = 24 * 60 * 60 * 1000; // 24 hours absolute cap
 

@@ -38,7 +38,7 @@ async function seed() {
     for (const username of seedUsers) {
       const userResult = await client.query('SELECT id FROM users WHERE username = $1', [username]);
       if (userResult.rows.length > 0) {
-        const hash = await bcrypt.hash(passwords[username], 10);
+        const hash = await bcrypt.hash(passwords[username], 12);
         await client.query('UPDATE users SET password_hash = $1 WHERE username = $2', [hash, username]);
       }
     }

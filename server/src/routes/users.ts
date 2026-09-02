@@ -22,7 +22,7 @@ router.put('/password', validate(updatePasswordSchema), async (req: AuthRequest,
     if (!valid) {
       return res.status(401).json({ error: 'Current password is incorrect' });
     }
-    const hash = await bcrypt.hash(newPassword, 10);
+    const hash = await bcrypt.hash(newPassword, 12);
     await query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, req.user.id]);
 
     // Invalidate all existing refresh tokens by clearing the active session
