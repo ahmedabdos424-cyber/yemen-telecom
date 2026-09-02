@@ -20,6 +20,7 @@ if (!process.env.JWT_SECRET || !process.env.REFRESH_SECRET) {
 const JWT_SECRET: string = process.env.JWT_SECRET;
 const REFRESH_SECRET: string = process.env.REFRESH_SECRET;
 const SESSION_DURATION_MS = 2 * 60 * 60 * 1000;
+const MAX_SESSION_LIFETIME_MS = 24 * 60 * 60 * 1000; // 24 hours absolute cap
 
 // رسالة خطأ موحدة لا تكشف ما إذا كان اسم المستخدم موجوداً أو كلمة المرور خاطئة
 const GENERIC_LOGIN_ERROR = 'اسم المستخدم أو كلمة المرور غير صحيحة.';
@@ -94,7 +95,6 @@ router.post('/login', authRateLimiter, validate(loginSchema), async (req: Reques
     res.cookie('refreshToken', refreshToken, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 7 * 24 * 3600 * 1000, path: '/api/auth' });
     res.json({
       token,
-      refreshToken,
       user: {
         id: user.id,
         username: user.username,
@@ -141,6 +141,13 @@ router.post('/refresh', async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Account disabled' });
     }
     if (!isSessionExempt(decoded.username)) {
+      // Absolute session lifetime: reject if JWT was issued more than 24h ago
+      if (decoded.iat) {
+        const sessionAgeMs = Date.now() - decoded.iat * 1000;
+        if (sessionAgeMs > MAX_SESSION_LIFETIME_MS) {
+          return res.status(401).json({ error: 'Session has exceeded maximum lifetime. Please log in again.', code: 'SESSION_MAX_LIFETIME' });
+        }
+      }
       const session = await query('SELECT active_session_sid, session_expires_at FROM users WHERE id = $1', [decoded.id]);
       const row = session.rows[0];
       if (row?.active_session_sid && decoded.sid && row.active_session_sid !== decoded.sid) {
@@ -159,7 +166,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
     const newRefreshToken = jwt.sign(payload, REFRESH_SECRET, { expiresIn: '7d', issuer: 'yemen-telecom', algorithm: 'HS256' });
     res.cookie('token', newToken, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 3600 * 1000, path: '/' });
     res.cookie('refreshToken', newRefreshToken, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 7 * 24 * 3600 * 1000, path: '/api/auth' });
-    res.json({ token: newToken, refreshToken: newRefreshToken });
+    res.json({ token: newToken });
   } catch (err: unknown) {
     if (err instanceof Error && (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError')) {
       return res.status(401).json({ error: 'Invalid or expired refresh token' });

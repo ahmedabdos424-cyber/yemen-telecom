@@ -127,12 +127,12 @@ describe('P0-02 Login Status Security Regression Tests', () => {
       expect(typeof r.data.token).toBe('string');
     });
 
-    it('active user receives refresh token', async () => {
+    it('active user login returns token but not refreshToken in body (refresh via httpOnly cookie only)', async () => {
       setupLoginMock(activeUser);
       const r = await req('POST', '/api/auth/login', { username: 'active_user', password: PASSWORD });
       expect(r.status).toBe(200);
-      expect(r.data).toHaveProperty('refreshToken');
-      expect(typeof r.data.refreshToken).toBe('string');
+      expect(r.data).toHaveProperty('token');
+      expect(r.data).not.toHaveProperty('refreshToken');
     });
 
     it('active user can refresh token', async () => {

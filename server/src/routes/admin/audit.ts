@@ -11,9 +11,10 @@ router.get('/audit-logs', requireRole('manager'), async (req: Request, res: Resp
   try {
     const { page, limit, offset } = getPagination(req);
     const paginate = req.query.page || req.query.limit;
+    const SAFE_LIMIT = 500;
     const queryText = paginate
       ? 'SELECT * FROM audit_logs ORDER BY id DESC LIMIT $1 OFFSET $2'
-      : 'SELECT * FROM audit_logs ORDER BY id DESC';
+      : `SELECT * FROM audit_logs ORDER BY id DESC LIMIT ${SAFE_LIMIT}`;
     const params = paginate ? [limit, offset] : [];
     const result = await query(queryText, params);
     const totalResult = paginate ? await query('SELECT COUNT(*) AS count FROM audit_logs') : null;

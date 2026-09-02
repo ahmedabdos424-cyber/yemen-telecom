@@ -249,10 +249,7 @@ router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), 
 
     res.status(201).json({
       seller: createdSeller,
-      credentials: {
-        username: sellerUsername,
-        password: sellerPassword
-      }
+      message: 'تم إنشاء البائع بنجاح. اسم المستخدم: ' + sellerUsername,
     });
   } catch (err: unknown) {
     if (err && typeof err === 'object' && 'statusCode' in err && (err as { statusCode?: number }).statusCode === 409) {
@@ -387,11 +384,7 @@ router.post('/:id/reset-password', requireRole('manager', 'agent'), async (req: 
     );
     const userRes = await query('SELECT username FROM users WHERE id = $1', [seller.user_id]);
     res.json({
-      message: `Password reset successfully for ${seller.name}`,
-      credentials: {
-        username: userRes.rows[0].username,
-        password: newPassword,
-      },
+      message: `تم إعادة تعيين كلمة المرور بنجاح لـ ${seller.name}. اسم المستخدم: ${userRes.rows[0].username}`,
     });
   } catch (err) {
     logger.error('Error resetting seller password:', err);

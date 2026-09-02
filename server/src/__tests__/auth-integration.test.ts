@@ -97,12 +97,11 @@ describe('P1-20 Auth Integration Tests', () => {
   }
 
   describe('Full login & token lifecycle', () => {
-    it('should login, return token and refreshToken', async () => {
+    it('should login, return token (refreshToken is httpOnly cookie only)', async () => {
       mockUser();
       const r = await req('POST', '/api/auth/login', { username: 'testuser', password: PASSWORD });
       expect(r.status).toBe(200);
       expect(r.data.token).toBeDefined();
-      expect(r.data.refreshToken).toBeDefined();
       expect(r.data.user.username).toBe('testuser');
     });
 
@@ -190,9 +189,11 @@ describe('P1-20 Auth Integration Tests', () => {
       const r = await req('POST', '/api/auth/login', { username: 'testuser', password: PASSWORD });
       expect(r.status).toBe(200);
 
+      // refreshToken is now httpOnly cookie only — generate a test one for logout
+      const rt = makeToken({ id: 1, username: 'testuser', role: 'agent' }, REFRESH_SECRET, '7d');
       await req('POST', '/api/auth/logout', undefined, {
         'Authorization': `Bearer ${r.data.token}`,
-        'x-refresh-token': r.data.refreshToken,
+        'x-refresh-token': rt,
       });
       expect(insertCount).toBe(2);
     });
