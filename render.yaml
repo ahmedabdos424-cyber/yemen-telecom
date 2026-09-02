@@ -42,7 +42,7 @@ services:
       - key: DB_SSL_CA_CERT
         sync: false
       - key: DB_MAX_CONNECTIONS
-        value: "10"
+        value: "20"
       - key: DB_MIN_CONNECTIONS
         value: "3"
       - key: DB_SLOW_QUERY_MS

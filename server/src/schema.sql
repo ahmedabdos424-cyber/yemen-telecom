@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS sims (
   owner_role VARCHAR(10) NOT NULL DEFAULT 'admin' CHECK (owner_role IN ('admin', 'agent', 'seller')),
   assigned_to_agent INTEGER REFERENCES agents(id) ON DELETE SET NULL
 );
+CREATE INDEX IF NOT EXISTS idx_sims_assigned_to_agent ON sims(assigned_to_agent);
 
 CREATE TABLE IF NOT EXISTS alerts (
   id SERIAL PRIMARY KEY,

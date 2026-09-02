@@ -38,7 +38,8 @@ router.post('/activate', requireRole('manager', 'agent', 'seller'), validate(act
     const contractImage = req.body.contract_image ?? req.body.contractImage ?? null;
     const requester = req.user;
 
-    const existing = await query('SELECT * FROM sims WHERE iccid = $1', [iccid]);
+    // Lock the SIM row to prevent concurrent activation (TOCTOU fix)
+    const existing = await query('SELECT * FROM sims WHERE iccid = $1 FOR UPDATE', [iccid]);
     const sim = existing.rows[0];
 
     // Serial validation: the SIM must exist in the requester's available stock.
@@ -253,7 +254,7 @@ router.post('/', requireRole('manager'), validate(createSimSchema), async (req: 
       `INSERT INTO sims (phone, iccid, provider, status, owner, date_added, package_type)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
        [phone || '', iccid, provider || 'Yemen Mobile', status || 'available', owner || 'المركز الرئيسي',
-        new Date().toLocaleDateString('ar-YE'), package_type || 'باقة مزايا الشهرية']
+        new Date().toISOString().split('T')[0].replace(/-/g, '/'), package_type || 'باقة مزايا الشهرية']
     );
     broadcastEvent({ type: 'sim.created', entity: 'sim', id: result.rows[0].id, iccid, status: result.rows[0].status });
     cacheInvalidate('report:');

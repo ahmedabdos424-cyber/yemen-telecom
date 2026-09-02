@@ -75,7 +75,7 @@ router.post('/sims/batch', requireRole('manager'), validate(createSimBatchSchema
       iccids.push(value.toString().padStart(width, '0'));
     }
 
-    const dateAdded = new Date().toLocaleDateString('ar-YE');
+    const dateAdded = new Date().toISOString().split('T')[0].replace(/-/g, '/');
     const cols = 10;
     const placeholders = iccids
       .map((_, i) => `($${i * cols + 1}, $${i * cols + 2}, $${i * cols + 3}, $${i * cols + 4}, $${i * cols + 5}, $${i * cols + 6}, $${i * cols + 7}, $${i * cols + 8}, $${i * cols + 9}, $${i * cols + 10})`)
