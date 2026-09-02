@@ -524,10 +524,10 @@ app.get('/api/stats', requireRole('manager'), async (_req, res) => {
 
 // Debug route listing and cache stats endpoints (disabled in production)
 if (process.env.NODE_ENV !== 'production') {
-  app.get('/api/routes', (_req, res) => {
+  app.get('/api/routes', requireRole('manager'), (_req, res) => {
     res.json({ routes: listRoutes() });
   });
-  app.get('/api/cache-stats', (_req, res) => {
+  app.get('/api/cache-stats', requireRole('manager'), (_req, res) => {
     res.json({ ...cacheStats(), realtime: realtimeStats() });
   });
 }

@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { query } from '../db';
 import { logger } from '../logger';
 import { AuthRequest } from '../middleware/auth';
-import { validate, updatePasswordSchema, updateProfileSchema } from '../validation';
+import { validate, updatePasswordSchema, updateProfileSchema, updateUserPreferencesSchema } from '../validation';
 
 const router = Router();
 
@@ -106,7 +106,7 @@ router.get('/preferences', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.put('/preferences', async (req: AuthRequest, res: Response) => {
+router.put('/preferences', validate(updateUserPreferencesSchema), async (req: AuthRequest, res: Response) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Not authenticated' });
   }

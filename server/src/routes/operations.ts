@@ -49,6 +49,12 @@ router.post('/', requireRole('manager', 'agent', 'seller'), validate(createOpera
   const customerId = req.body.customer_id ?? req.body.customerId ?? null;
   const contractImage = req.body.contract_image ?? req.body.contractImage ?? null;
   const iccid = req.body.iccid ?? null;
+
+  // Sellers can only create recharge operations (not activate)
+  if (req.user?.role === 'seller' && type === 'activate') {
+    return res.status(403).json({ error: 'Sellers cannot create activation operations' });
+  }
+
   try {
     const opId = `op_${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
     const now = new Date();

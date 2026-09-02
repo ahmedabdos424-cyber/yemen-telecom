@@ -345,3 +345,16 @@ export const approveDistributionSchema = z.object({
   status: z.enum(['approved', 'rejected']),
   notes: so(200),
 });
+
+// User preferences
+export const updateUserPreferencesSchema = z.object({
+  simNotifications: z.boolean().optional(),
+  lowStockNotifications: z.boolean().optional(),
+  fontSize: z.enum(['small', 'base', 'large']).optional(),
+  darkMode: z.boolean().optional(),
+});
+
+// Customer search
+export const customerSearchSchema = z.object({
+  q: z.string().min(2, 'Search query must be at least 2 characters').max(100),
+});

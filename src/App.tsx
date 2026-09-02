@@ -39,6 +39,61 @@ const ManagerChrome = lazy(() => import('./components/nav/ManagerChrome'));
 import { AnimatePresence, motion } from 'motion/react';
 import { Check, Copy, Fingerprint, X } from 'lucide-react';
 
+// Moved outside AuthenticatedApp to prevent remounting on every render.
+// These components read from refs so they don't cause re-renders themselves.
+function SharedOfflineBanner({ isOnline, pendingTotal }: { isOnline: boolean; pendingTotal: number }) {
+  return !isOnline ? (
+    <div className="fixed top-0 left-0 right-0 z-[60] bg-red-600 text-white text-center py-1.5 text-[11px] font-bold shadow-lg flex items-center justify-center gap-2" role="alert" aria-live="assertive">
+      <span className="material-symbols-outlined text-xs">wifi_off</span>
+      لا يوجد اتصال بالإنترنت
+      {pendingTotal > 0 ? (
+        <span className="bg-white/20 rounded-full px-2 py-0.5">
+          {pendingTotal} عملية بانتظار المزامنة
+        </span>
+      ) : null}
+    </div>
+  ) : (
+    pendingTotal > 0 ? (
+      <div className="fixed top-0 left-0 right-0 z-[60] bg-amber-500 text-white text-center py-1.5 text-[11px] font-bold shadow-lg flex items-center justify-center gap-2" role="status" aria-live="polite">
+        <span className="material-symbols-outlined text-xs">sync</span>
+        {pendingTotal} عملية تنتظر المزامنة عند عودة الاتصال
+      </div>
+    ) : null
+  );
+}
+
+function ToastNotifications({ toasts, onDismiss, onNavigate }: { toasts: Array<{ id: string; title: string; message: string }>; onDismiss: (id: string) => void; onNavigate: (path: string) => void }) {
+  return (
+    <div className="fixed top-20 left-4 z-40 w-full max-w-sm flex flex-col gap-3 pointer-events-none">
+      <AnimatePresence>
+        {toasts.map((toast) => (
+          <motion.div key={toast.id} initial={{ opacity: 0, x: -100, scale: 0.95 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -100, scale: 0.95 }} transition={{ duration: 0.3 }}
+            className="bg-slate-900/95 backdrop-blur border border-red-500/30 text-slate-100 rounded-xl p-4 shadow-xl pointer-events-auto flex flex-col gap-2 text-right">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-1.5">
+              <div className="flex items-center gap-1.5 text-red-400 font-bold text-xs">
+                <span className="material-symbols-outlined text-sm">error</span>
+                <span>{toast.title}</span>
+              </div>
+              <button onClick={() => onDismiss(toast.id)} className="text-slate-500 hover:text-slate-100 transition-colors cursor-pointer p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center">
+                <span className="material-symbols-outlined text-xs">close</span>
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-300 leading-relaxed font-sans">{toast.message}</p>
+            <div className="flex justify-end gap-2 mt-1">
+              <button onClick={() => { onNavigate('/manager/duplicate-identities'); }} className="py-1 px-3 bg-secondary hover:bg-red-700 text-white font-bold text-[10px] rounded-lg transition-colors cursor-pointer">
+                شاشة مراقبة الهويات للتحقيق
+              </button>
+              <button onClick={() => onDismiss(toast.id)} className="py-1 px-2.5 bg-slate-800 hover:bg-slate-750 text-slate-300 font-medium text-[10px] rounded-lg transition-colors cursor-pointer">
+                تجاهل
+              </button>
+            </div>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function AuthenticatedApp() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -198,62 +253,12 @@ function AuthenticatedApp() {
     );
   }
 
-  const SharedOfflineBanner = () => {
-    const pendingTotal = (agt.offlinePending ?? 0) + (mgr.offlinePending ?? 0);
-    return !isOnline ? (
-      <div className="fixed top-0 left-0 right-0 z-[60] bg-red-600 text-white text-center py-1.5 text-[11px] font-bold shadow-lg flex items-center justify-center gap-2" role="alert" aria-live="assertive">
-        <span className="material-symbols-outlined text-xs">wifi_off</span>
-        لا يوجد اتصال بالإنترنت
-        {pendingTotal > 0 ? (
-          <span className="bg-white/20 rounded-full px-2 py-0.5">
-            {pendingTotal} عملية بانتظار المزامنة
-          </span>
-        ) : null}
-      </div>
-    ) : (
-      pendingTotal > 0 ? (
-        <div className="fixed top-0 left-0 right-0 z-[60] bg-amber-500 text-white text-center py-1.5 text-[11px] font-bold shadow-lg flex items-center justify-center gap-2" role="status" aria-live="polite">
-          <span className="material-symbols-outlined text-xs">sync</span>
-          {pendingTotal} عملية تنتظر المزامنة عند عودة الاتصال
-        </div>
-      ) : null
-    );
-  };
-
-  const ToastNotifications = () => (
-    <div className="fixed top-20 left-4 z-40 w-full max-w-sm flex flex-col gap-3 pointer-events-none">
-      <AnimatePresence>
-        {(mgr.toasts ?? []).map((toast) => (
-          <motion.div key={toast.id} initial={{ opacity: 0, x: -100, scale: 0.95 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -100, scale: 0.95 }} transition={{ duration: 0.3 }}
-            className="bg-slate-900/95 backdrop-blur border border-red-500/30 text-slate-100 rounded-xl p-4 shadow-xl pointer-events-auto flex flex-col gap-2 text-right">
-            <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-1.5">
-              <div className="flex items-center gap-1.5 text-red-400 font-bold text-xs">
-                <span className="material-symbols-outlined text-sm">error</span>
-                <span>{toast.title}</span>
-              </div>
-              <button onClick={() => mgr.dismissToast(toast.id)} className="text-slate-500 hover:text-slate-100 transition-colors cursor-pointer p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center">
-                <span className="material-symbols-outlined text-xs">close</span>
-              </button>
-            </div>
-            <p className="text-[11px] text-slate-300 leading-relaxed font-sans">{toast.message}</p>
-            <div className="flex justify-end gap-2 mt-1">
-              <button onClick={() => { navigate('/manager/duplicate-identities'); }} className="py-1 px-3 bg-secondary hover:bg-red-700 text-white font-bold text-[10px] rounded-lg transition-colors cursor-pointer">
-                شاشة مراقبة الهويات للتحقيق
-              </button>
-              <button onClick={() => mgr.dismissToast(toast.id)} className="py-1 px-2.5 bg-slate-800 hover:bg-slate-750 text-slate-300 font-medium text-[10px] rounded-lg transition-colors cursor-pointer">
-                تجاهل
-              </button>
-            </div>
-          </motion.div>
-        ))}
-      </AnimatePresence>
-    </div>
-  );
+  const pendingTotal = (agt.offlinePending ?? 0) + (mgr.offlinePending ?? 0);
 
   if (role === 'manager') {
     return (
       <div className="min-h-dvh bg-theme-background font-sans antialiased text-slate-100">
-        <SharedOfflineBanner />
+        <SharedOfflineBanner isOnline={isOnline} pendingTotal={pendingTotal} />
         <div className="flex pt-[calc(4rem+env(safe-area-inset-top))] min-h-dvh overflow-y-auto pb-[calc(4rem+env(safe-area-inset-bottom))]">
           <main className="flex-1 px-3 sm:px-4 md:px-8 py-4 md:py-8 lg:pt-10">
             <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
@@ -280,7 +285,7 @@ function AuthenticatedApp() {
             </div>
           </main>
         </div>
-        <ToastNotifications />
+        <ToastNotifications toasts={mgr.toasts ?? []} onDismiss={mgr.dismissToast} onNavigate={(path) => navigate(path)} />
         <Suspense fallback={null}>
           <ManagerChrome
             currentView={mgr.currentView}
@@ -342,7 +347,7 @@ function AuthenticatedApp() {
 
   return (
     <div className="min-h-dvh transition-colors duration-300 font-sans bg-slate-950 text-slate-100">
-      <SharedOfflineBanner />
+      <SharedOfflineBanner isOnline={isOnline} pendingTotal={pendingTotal} />
       {isLoading && !role ? <LoadingScreen /> : (
       <>
         <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:32px_32px] opacity-15 pointer-events-none" />

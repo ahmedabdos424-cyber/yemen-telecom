@@ -1,4 +1,4 @@
--- Migration 035: Add missing performance indexes for queries
+-- Migration 036: Add missing performance indexes for queries
 -- Created: 2026-08-09
 -- Purpose: Improve query performance for common lookup operations
 

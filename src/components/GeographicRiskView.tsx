@@ -34,6 +34,7 @@ export default function GeographicRiskView() {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const highRiskNotifiedRef = useRef(false);
+  const zoomFnsRef = useRef<{ zoomIn: () => void; zoomOut: () => void; reset: () => void; restart: () => void } | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -89,7 +90,7 @@ export default function GeographicRiskView() {
     return { total, highRiskCount, mediumRiskCount, lowRiskCount, riskPct, underReview, underReviewPct, highBarPct, medBarPct, lowBarPct };
   }, [identities]);
 
-  const distinctRegionsCount = new Set(identities.map((i) => i.region).filter(Boolean)).size;
+  const distinctRegionsCount = useMemo(() => new Set(identities.map((i) => i.region).filter(Boolean)).size, [identities]);
 
   // Real operations feed derived from the audit-log API (no hardcoded entries)
   const activeLogs: OperationLogItem[] = useMemo(() => {
@@ -396,22 +397,17 @@ export default function GeographicRiskView() {
 
     svg.call(d3Zoom);
 
-    // Expose control API methods to windows context
-    window.zoomInGraph = () => {
-      svg.transition().duration(250).call((sel) => d3Zoom.scaleBy(sel, 1.35));
-    };
-    window.zoomOutGraph = () => {
-      svg.transition().duration(250).call((sel) => d3Zoom.scaleBy(sel, 0.75));
-    };
-    window.zoomResetGraph = () => {
-      svg.transition().duration(250).call((sel) => d3Zoom.transform(sel, d3.zoomIdentity));
-    };
-    window.zoomRestartPhysics = () => {
-      simulation.alpha(1).restart();
+    // Expose zoom control functions via ref instead of polluting window.
+    zoomFnsRef.current = {
+      zoomIn: () => { svg.transition().duration(250).call((sel) => d3Zoom.scaleBy(sel, 1.35)); },
+      zoomOut: () => { svg.transition().duration(250).call((sel) => d3Zoom.scaleBy(sel, 0.75)); },
+      reset: () => { svg.transition().duration(250).call((sel) => d3Zoom.transform(sel, d3.zoomIdentity)); },
+      restart: () => { simulation.alpha(1).restart(); },
     };
 
     return () => {
       simulation.stop();
+      zoomFnsRef.current = null;
     };
   }, [dimensions, identities]);
 
@@ -473,7 +469,7 @@ export default function GeographicRiskView() {
 
         {/* Master Container Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <RiskNetworkGraph svgRef={svgRef} containerRef={containerRef} dimensions={dimensions} />
+          <RiskNetworkGraph svgRef={svgRef} containerRef={containerRef} dimensions={dimensions} zoomFns={zoomFnsRef.current} />
 
           <NodeOperationsPanel
             selectedNode={selectedNode}

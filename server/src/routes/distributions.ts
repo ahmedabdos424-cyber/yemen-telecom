@@ -103,8 +103,15 @@ router.post('/', requireRole('agent'), validate(createDistributionSchema), async
     const agentId = agentRes.rows[0].id;
     let sellerId = seller_id || null;
     if (seller_name && !sellerId) {
-      const s = await query('SELECT id FROM sellers WHERE name = $1', [seller_name]);
+      const s = await query('SELECT id FROM sellers WHERE name = $1 AND agent_id = $2', [seller_name, agentId]);
       if (s.rows.length > 0) sellerId = s.rows[0].id;
+    }
+    // Verify seller belongs to this agent if seller_id was provided directly
+    if (sellerId) {
+      const ownershipCheck = await query('SELECT id FROM sellers WHERE id = $1 AND agent_id = $2', [sellerId, agentId]);
+      if (ownershipCheck.rows.length === 0) {
+        return res.status(403).json({ error: 'Seller does not belong to this agent' });
+      }
     }
     const requestId = `DIST-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
     const providerId = await resolveProviderId(null, operator);

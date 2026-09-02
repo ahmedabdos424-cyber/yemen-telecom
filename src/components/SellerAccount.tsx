@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Seller } from '../types';
 import ProfileAvatar from './shared/ProfileAvatar';
@@ -45,15 +45,19 @@ export default function SellerAccount({
   });
   const [simNotifications, setSimNotifications] = useState<boolean>(true);
   const [lowStockNotifications, setLowStockNotifications] = useState<boolean>(true);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
     api.getUserPreferences().then((prefs) => {
+      if (!mountedRef.current) return;
       setSimNotifications(prefs.simNotifications);
       setLowStockNotifications(prefs.lowStockNotifications);
       if (prefs.fontSize && ['sm', 'base', 'lg'].includes(prefs.fontSize)) {
         setFontSizeState(prefs.fontSize as 'sm' | 'base' | 'lg');
       }
     }).catch(() => {});
+    return () => { mountedRef.current = false; };
   }, []);
 
   const setFontSize = (size: 'sm' | 'base' | 'lg') => {

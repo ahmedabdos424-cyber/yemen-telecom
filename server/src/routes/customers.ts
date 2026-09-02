@@ -3,7 +3,7 @@ import { query } from '../db';
 import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination } from '../helpers';
-import { validate, createCustomerSchema } from '../validation';
+import { validate, createCustomerSchema, customerSearchSchema } from '../validation';
 
 const router = Router();
 
@@ -34,11 +34,8 @@ router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: R
   }
 });
 
-router.get('/search', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
+router.get('/search', requireRole('manager', 'agent'), validate(customerSearchSchema, 'query'), async (req: AuthRequest, res: Response) => {
   const q = req.query.q as string;
-  if (!q || q.length < 2) {
-    return res.status(400).json({ error: 'Search query must be at least 2 characters' });
-  }
   try {
     let sql = 'SELECT * FROM customers WHERE (full_name ILIKE $1 OR id_number ILIKE $1 OR phone ILIKE $1)';
     const params: unknown[] = [`%${q}%`];

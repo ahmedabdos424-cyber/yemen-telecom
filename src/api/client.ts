@@ -144,12 +144,19 @@ export async function getSystemHealth(): Promise<SystemHealthResponse> {
   }
 }
 
-let authToken: string | null = null;
-let refreshToken: string | null = null;
-let csrfToken: string | null = null;
-let csrfHash: string | null = null;
-let tokensLoaded = false;
-let tokensLoadPromise: Promise<void> | null = null;
+// All mutable token state is encapsulated in a single object to avoid
+// scattered module-level variables and make reasoning about state easier.
+const tokens = {
+  auth: null as string | null,
+  refresh: null as string | null,
+  csrf: null as string | null,
+  csrfHash: null as string | null,
+  loaded: false,
+  loadPromise: null as Promise<void> | null,
+  // Mutex for refreshAccessToken — prevents concurrent refreshes that would
+  // overwrite each other's new token and lose the session.
+  refreshPromise: null as Promise<string | null> | null,
+};
 
 export const SESSION_EXPIRED_EVENT = 'tele:session-expired';
 
@@ -165,7 +172,9 @@ function getDeviceId(): string {
   try {
     let id = localStorage.getItem('tele_device_id');
     if (!id) {
-      id = (crypto as Crypto).randomUUID?.() || `dev-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+      const arr = new Uint8Array(16);
+      crypto.getRandomValues(arr);
+      id = Array.from(arr, (b) => b.toString(16).padStart(2, '0')).join('');
       localStorage.setItem('tele_device_id', id);
     }
     return id;
@@ -183,7 +192,7 @@ function getDeviceName(): string {
 }
 
 export function setToken(token: string | null) {
-  authToken = token;
+  tokens.auth = token;
   if (token) {
     tokenStorage.setAuthToken(token);
   } else {
@@ -192,7 +201,7 @@ export function setToken(token: string | null) {
 }
 
 export function setRefreshToken(token: string | null) {
-  refreshToken = token;
+  tokens.refresh = token;
   if (token) {
     tokenStorage.setRefreshToken(token);
   } else {
@@ -206,21 +215,21 @@ export function clearTokens() {
 }
 
 export async function loadTokens(): Promise<{ authToken: string | null; refreshToken: string | null }> {
-  if (!tokensLoaded) {
-    if (!tokensLoadPromise) {
-      tokensLoadPromise = (async () => {
-        authToken = await tokenStorage.getAuthToken();
-        refreshToken = await tokenStorage.getRefreshToken();
-        tokensLoaded = true;
+  if (!tokens.loaded) {
+    if (!tokens.loadPromise) {
+      tokens.loadPromise = (async () => {
+        tokens.auth = await tokenStorage.getAuthToken();
+        tokens.refresh = await tokenStorage.getRefreshToken();
+        tokens.loaded = true;
       })();
     }
-    await tokensLoadPromise;
+    await tokens.loadPromise;
   }
-  return { authToken, refreshToken };
+  return { authToken: tokens.auth, refreshToken: tokens.refresh };
 }
 
 export function getLoadedTokens(): { authToken: string | null; refreshToken: string | null } {
-  return { authToken, refreshToken };
+  return { authToken: tokens.auth, refreshToken: tokens.refresh };
 }
 
 export async function fetchCsrfToken(): Promise<void> {
@@ -228,36 +237,47 @@ export async function fetchCsrfToken(): Promise<void> {
     const res = await fetchWithTimeout(`${API_BASE}/csrf-token`, { credentials: CREDENTIALS_MODE });
     if (res.ok) {
       const data = await res.json();
-      csrfToken = data.token;
-      csrfHash = data.hash;
+      tokens.csrf = data.token;
+      tokens.csrfHash = data.hash;
     }
   } catch {
-    csrfToken = null;
-    csrfHash = null;
+    tokens.csrf = null;
+    tokens.csrfHash = null;
   }
 }
 
+// Token refresh with mutex: if multiple callers hit 401 concurrently, only one
+// refresh request is made and all callers share the same result promise.
 async function refreshAccessToken(): Promise<string | null> {
-  await loadTokens();
-  if (!refreshToken) return null;
-  try {
-    const res = await fetchWithTimeout(`${API_BASE}/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
-    });
-    if (!res.ok) {
+  // If a refresh is already in-flight, piggyback on it.
+  if (tokens.refreshPromise) return tokens.refreshPromise;
+
+  tokens.refreshPromise = (async () => {
+    try {
+      await loadTokens();
+      if (!tokens.refresh) return null;
+      const res = await fetchWithTimeout(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: tokens.refresh }),
+      });
+      if (!res.ok) {
+        clearTokens();
+        return null;
+      }
+      const data = await res.json();
+      setToken(data.token);
+      setRefreshToken(data.refreshToken);
+      return data.token;
+    } catch {
       clearTokens();
       return null;
     }
-    const data = await res.json();
-    setToken(data.token);
-    setRefreshToken(data.refreshToken);
-    return data.token;
-  } catch {
-    clearTokens();
-    return null;
-  }
+  })();
+
+  const result = await tokens.refreshPromise;
+  tokens.refreshPromise = null;
+  return result;
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -269,26 +289,27 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     'X-Device-Name': getDeviceName(),
     ...(options.headers as Record<string, string> || {}),
   };
-  if (authToken) {
-    headers['Authorization'] = `Bearer ${authToken}`;
+  if (tokens.auth) {
+    headers['Authorization'] = `Bearer ${tokens.auth}`;
   }
   const isLogout = path === '/auth/logout';
-  if (csrfToken && csrfHash && ((!path.startsWith('/auth/') && path !== '/csrf-token') || isLogout)) {
-    headers['X-CSRF-Token'] = csrfToken;
-    headers['X-CSRF-Hash'] = csrfHash;
+  if (tokens.csrf && tokens.csrfHash && ((!path.startsWith('/auth/') && path !== '/csrf-token') || isLogout)) {
+    headers['X-CSRF-Token'] = tokens.csrf;
+    headers['X-CSRF-Hash'] = tokens.csrfHash;
   }
-  if (refreshToken && isCapacitor && isLogout) {
-    headers['X-Refresh-Token'] = refreshToken;
+  if (tokens.refresh && isCapacitor && isLogout) {
+    headers['X-Refresh-Token'] = tokens.refresh;
   }
   const res = await fetchWithTimeout(`${API_BASE}${path}`, { ...options, headers, credentials: CREDENTIALS_MODE });
   if (res.status === 403 && !path.startsWith('/auth/') && path !== '/csrf-token') {
     const errBody = await res.json().catch(() => ({}));
     if (errBody.error && (errBody.error.includes('CSRF'))) {
       await fetchCsrfToken();
-      if (csrfToken && csrfHash) {
-        headers['X-CSRF-Token'] = csrfToken;
-        headers['X-CSRF-Hash'] = csrfHash;
-        const retryRes = await fetchWithTimeout(`${API_BASE}${path}`, { ...options, headers });
+      if (tokens.csrf && tokens.csrfHash) {
+        headers['X-CSRF-Token'] = tokens.csrf;
+        headers['X-CSRF-Hash'] = tokens.csrfHash;
+        // Preserve the original method and body so POST/PUT/DELETE retries work.
+        const retryRes = await fetchWithTimeout(`${API_BASE}${path}`, { ...options, headers, method: options.method || 'GET', body: options.body });
         if (!retryRes.ok) {
           const err2 = await retryRes.json().catch(() => ({ error: retryRes.statusText }));
           const dur = performance.now() - start;
@@ -304,7 +325,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       throw new Error(errBody.error || `HTTP ${res.status}`);
     }
   }
-  if (res.status === 401 && refreshToken && !path.startsWith('/auth/')) {
+  if (res.status === 401 && tokens.refresh && !path.startsWith('/auth/')) {
     const newToken = await refreshAccessToken();
     if (newToken) {
       headers['Authorization'] = `Bearer ${newToken}`;
@@ -346,12 +367,12 @@ async function uploadFile(file: File | Blob, fieldName = 'image'): Promise<{ url
   const form = new FormData();
   form.append(fieldName, file);
   const headers: Record<string, string> = {};
-  if (authToken) {
-    headers['Authorization'] = `Bearer ${authToken}`;
+  if (tokens.auth) {
+    headers['Authorization'] = `Bearer ${tokens.auth}`;
   }
-  if (csrfToken && csrfHash) {
-    headers['X-CSRF-Token'] = csrfToken;
-    headers['X-CSRF-Hash'] = csrfHash;
+  if (tokens.csrf && tokens.csrfHash) {
+    headers['X-CSRF-Token'] = tokens.csrf;
+    headers['X-CSRF-Hash'] = tokens.csrfHash;
   }
   const res = await fetchWithTimeout(`${API_BASE}/upload/image`, { method: 'POST', headers, body: form, credentials: CREDENTIALS_MODE });
   if (!res.ok) {

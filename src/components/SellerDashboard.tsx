@@ -112,6 +112,13 @@ export default function SellerDashboard({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isChangingPass, setIsChangingPass] = useState(false);
 
+  const resetPasswordFields = () => {
+    setIdNumberEntry('');
+    setCurrentPasswordEntry('');
+    setNewPassword('');
+    setConfirmPassword('');
+  };
+
   const handlePasswordChangeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentPasswordEntry) { toastWarning('الرجاء إدخال كلمة المرور الحالية للتحقق'); return; }
@@ -124,9 +131,7 @@ export default function SellerDashboard({
     try {
       await api.updatePassword(currentPasswordEntry, newPassword);
       if (onPasswordChanged) onPasswordChanged(newPassword);
-      setIdNumberEntry('');
-      setNewPassword('');
-      setConfirmPassword('');
+      resetPasswordFields();
       setPasswordOpen(false);
       toastSuccess('تم تحديث كلمة المرور الخاصة بك بنجاح!');
     } catch (err: unknown) {
@@ -173,7 +178,7 @@ export default function SellerDashboard({
         biometricEnabled={biometricEnabled}
         onToggleBiometric={handleToggleBiometric}
         biometricInAppearance={true}
-        onChangePassword={() => { setSettingsOpen(false); setPasswordOpen(true); }}
+        onChangePassword={() => { resetPasswordFields(); setSettingsOpen(false); setPasswordOpen(true); }}
         accountInfo={[
           { label: 'اسم المستخدم', value: sellerData.name },
           { label: 'رقم الحساب', value: sellerData.id },
@@ -211,7 +216,7 @@ export default function SellerDashboard({
               <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
                 <h3 className="text-sm font-bold text-slate-100">تغيير كلمة المرور</h3>
                 <button 
-                  onClick={() => setPasswordOpen(false)}
+                  onClick={() => { resetPasswordFields(); setPasswordOpen(false); }}
                   className="p-2.5 text-slate-500 hover:text-slate-100 rounded-full transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
                   <X size={16} />
@@ -295,7 +300,7 @@ export default function SellerDashboard({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPasswordOpen(false)}
+                    onClick={() => { resetPasswordFields(); setPasswordOpen(false); }}
                     className="w-full py-2.5 text-slate-400 hover:text-slate-300 text-xs hover:bg-slate-950 rounded-xl transition-colors cursor-pointer"
                   >
                     إلغاء

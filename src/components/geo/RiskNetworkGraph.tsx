@@ -10,9 +10,10 @@ interface RiskNetworkGraphProps {
   svgRef: RefObject<SVGSVGElement | null>;
   containerRef: RefObject<HTMLDivElement | null>;
   dimensions: { width: number; height: number };
+  zoomFns: { zoomIn: () => void; zoomOut: () => void; reset: () => void; restart: () => void } | null;
 }
 
-export default function RiskNetworkGraph({ svgRef, containerRef, dimensions }: RiskNetworkGraphProps) {
+export default function RiskNetworkGraph({ svgRef, containerRef, dimensions, zoomFns }: RiskNetworkGraphProps) {
   return (
     <div className="lg:col-span-2 card bg-[#0b0f19] border-slate-900 p-5 flex flex-col justify-between relative text-slate-100 overflow-hidden">
 
@@ -60,7 +61,7 @@ export default function RiskNetworkGraph({ svgRef, containerRef, dimensions }: R
         <div className="absolute left-3 bottom-3 flex flex-col gap-1.5 z-20">
           <button
             type="button"
-            onClick={() => window.zoomInGraph?.()}
+            onClick={() => zoomFns?.zoomIn()}
             className="btn-icon rounded-lg bg-slate-900/90 hover:bg-slate-850 border-slate-800 text-white hover:scale-105"
             title="تكبير"
           >
@@ -68,7 +69,7 @@ export default function RiskNetworkGraph({ svgRef, containerRef, dimensions }: R
           </button>
           <button
             type="button"
-            onClick={() => window.zoomOutGraph?.()}
+            onClick={() => zoomFns?.zoomOut()}
             className="btn-icon rounded-lg bg-slate-900/90 hover:bg-slate-850 border-slate-800 text-white hover:scale-105"
             title="تصغير"
           >
@@ -76,7 +77,7 @@ export default function RiskNetworkGraph({ svgRef, containerRef, dimensions }: R
           </button>
           <button
             type="button"
-            onClick={() => window.zoomResetGraph?.()}
+            onClick={() => zoomFns?.reset()}
             className="btn-icon rounded-lg bg-slate-900/90 hover:bg-slate-850 border-slate-800 text-white hover:scale-105"
             title="إعادة التمركز"
           >
@@ -84,7 +85,7 @@ export default function RiskNetworkGraph({ svgRef, containerRef, dimensions }: R
           </button>
           <button
             type="button"
-            onClick={() => window.zoomRestartPhysics?.()}
+            onClick={() => zoomFns?.restart()}
             className="btn-icon rounded-lg bg-slate-900/90 hover:bg-slate-850 border-slate-800 text-white hover:scale-105"
             title="تنشيط الجاذبية"
           >
