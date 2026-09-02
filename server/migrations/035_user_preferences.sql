@@ -8,5 +8,3 @@ CREATE TABLE IF NOT EXISTS user_preferences (
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
-
-CREATE INDEX IF NOT EXISTS idx_user_preferences_user_id ON user_preferences(user_id);

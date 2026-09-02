@@ -186,7 +186,7 @@ export const updateSellerSchema = z.object({
 });
 
 export const updateSellerBalanceSchema = z.object({
-  amount: z.number().finite('Numeric amount is required'),
+  amount: z.number().finite('Numeric amount is required').min(-1000000, 'Amount cannot exceed -1,000,000').max(1000000, 'Amount cannot exceed 1,000,000'),
   invoiceImage: z.string().max(1000).optional(),
 });
 

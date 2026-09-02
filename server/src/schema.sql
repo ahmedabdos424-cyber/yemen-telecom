@@ -465,28 +465,21 @@ $$ LANGUAGE plpgsql;
 -- Device token registry for push notifications
 CREATE TABLE IF NOT EXISTS device_tokens (
   id SERIAL PRIMARY KEY,
-  user_id INT REFERENCES users(id) ON DELETE CASCADE,
-  token TEXT NOT NULL UNIQUE,
-  platform VARCHAR(20) DEFAULT 'android',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- APK update install tracking
-CREATE TABLE IF NOT EXISTS app_update_installs (
-  id SERIAL PRIMARY KEY,
-  user_id INT REFERENCES users(id) ON DELETE SET NULL,
-  version_code INT NOT NULL,
-  installed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 034: FCM device token registry for push notifications
-  id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   token VARCHAR(512) NOT NULL UNIQUE,
   platform VARCHAR(20) NOT NULL DEFAULT 'android'
     CHECK (platform IN ('android', 'ios', 'web')),
   last_used_at TIMESTAMP DEFAULT NOW(),
   created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- APK update install tracking
+CREATE TABLE IF NOT EXISTS app_update_installs (
+  id SERIAL PRIMARY KEY,
+  device_id VARCHAR(128) NOT NULL,
+  version VARCHAR(32) NOT NULL,
+  version_code INTEGER NOT NULL,
+  installed_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_device_tokens_user_id ON device_tokens(user_id);

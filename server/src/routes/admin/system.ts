@@ -12,15 +12,21 @@ import { createAlert } from '../../services/alerts.service';
 
 const router = Router();
 
-const RESET_CONFIRM_TOKEN = process.env.RESET_CONFIRM_TOKEN || 'RESET_INVENTORY';
+const RESET_CONFIRM_TOKEN = process.env.RESET_CONFIRM_TOKEN;
+if (!RESET_CONFIRM_TOKEN && process.env.NODE_ENV === 'production') {
+  logger.warn('⚠️  RESET_CONFIRM_TOKEN env var not set — system reset endpoint will reject all requests');
+}
 
 // ========================
 // System: Data Reset (secure)
 // ========================
 router.post('/reset', requireRole('manager'), validate(resetDataSchema), async (req: AuthRequest, res: Response) => {
   try {
+    if (!RESET_CONFIRM_TOKEN) {
+      return res.status(503).json({ error: 'System reset is not configured. Set RESET_CONFIRM_TOKEN env var.' });
+    }
     if (req.body.confirm !== RESET_CONFIRM_TOKEN) {
-      return res.status(400).json({ error: 'Invalid confirmation token. Pass confirm="RESET_INVENTORY" to proceed.' });
+      return res.status(400).json({ error: 'Invalid confirmation token.' });
     }
     const summary = await resetSystemData();
     // Audit trail for the reset itself (recorded after the wipe).
