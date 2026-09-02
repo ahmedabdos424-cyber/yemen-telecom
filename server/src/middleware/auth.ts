@@ -27,6 +27,7 @@ export interface TokenPayload {
   username: string;
   role: string;
   sid?: string;
+  tv?: number;
   iat?: number;
   exp?: number;
   iss?: string;

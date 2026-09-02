@@ -9,7 +9,7 @@ import crypto from 'crypto';
 import { logger } from '../logger';
 import { query } from '../db';
 import { hashToken, isTokenBlacklisted, isSessionExempt, TokenPayload } from '../middleware/auth';
-import { authRateLimiter, isLoginLocked, getLoginLockRemaining, recordLoginFailure, recordLoginSuccess } from '../middleware/rateLimiter';
+import { authRateLimiter, isLoginLocked, getLoginLockRemaining, recordLoginFailure, recordLoginSuccess, isDbLocked, isGloballyLocked, recordDbFailure, clearDbLockout } from '../middleware/rateLimiter';
 import { getDeviceInfo } from '../helpers';
 import { validate, loginSchema } from '../validation';
 
@@ -48,9 +48,17 @@ router.post('/login', authRateLimiter, validate(loginSchema), async (req: Reques
   const { username, password } = req.body;
   try {
     const { deviceName, deviceId, ip } = getDeviceInfo(req);
-    // قفل تصاعدي في الذاكرة: (اسم المستخدم + عنوان IP)
+    // قفل تصاعدي: فحص الذاكرة أولاً ثم قاعدة البيانات (تحمل إعادة التشغيل)
     if (isLoginLocked(username, ip)) {
       return res.status(429).json({ error: lockoutMessage(getLoginLockRemaining(username, ip)) });
+    }
+    const dbLock = await isDbLocked(username, ip);
+    if (dbLock.locked) {
+      return res.status(429).json({ error: lockoutMessage(dbLock.remainingMs) });
+    }
+    const globalLock = await isGloballyLocked(username);
+    if (globalLock.locked) {
+      return res.status(429).json({ error: lockoutMessage(globalLock.remainingMs) });
     }
     const result = await query('SELECT * FROM users WHERE username = $1', [username]);
     if (result.rows.length === 0) {
@@ -66,13 +74,16 @@ router.post('/login', authRateLimiter, validate(loginSchema), async (req: Reques
     if (!valid) {
       await query('UPDATE users SET failed_attempts = COALESCE(failed_attempts, 0) + 1 WHERE id = $1', [user.id]);
       const lockedMs = recordLoginFailure(username, ip);
+      const dbLockedMs = await recordDbFailure(username, ip);
+      const effectiveLockMs = Math.max(lockedMs, dbLockedMs);
       await logFailedLogin(username, deviceName, ip, deviceId);
-      if (lockedMs > 0) {
-        return res.status(429).json({ error: lockoutMessage(lockedMs) });
+      if (effectiveLockMs > 0) {
+        return res.status(429).json({ error: lockoutMessage(effectiveLockMs) });
       }
       return res.status(401).json({ error: GENERIC_LOGIN_ERROR });
     }
     recordLoginSuccess(username, ip);
+    await clearDbLockout(username, ip);
     await query('UPDATE users SET last_login = NOW(), failed_attempts = 0, locked_until = NULL WHERE id = $1', [user.id]);
     const sid = crypto.randomUUID();
     if (!isSessionExempt(user.username)) {
@@ -88,7 +99,7 @@ router.post('/login', authRateLimiter, validate(loginSchema), async (req: Reques
        VALUES ($1, 'login', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', $4, $5, $6, NOW(), 'active')`,
       [loginLogId, `تسجيل دخول ناجح: ${user.display_name || user.username}`, user.username, deviceName, ip, deviceId]
     );
-    const payload = { id: user.id, username: user.username, role: user.role, sid };
+    const payload = { id: user.id, username: user.username, role: user.role, sid, tv: user.token_version || 1 };
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h', issuer: 'yemen-telecom', algorithm: 'HS256' });
     const refreshToken = jwt.sign(payload, REFRESH_SECRET, { expiresIn: '7d', issuer: 'yemen-telecom', algorithm: 'HS256' });
     res.cookie('token', token, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 3600 * 1000, path: '/' });
@@ -136,9 +147,14 @@ router.post('/refresh', async (req: Request, res: Response) => {
         [hashToken(refreshToken), new Date(rtExp * 1000).toISOString(), decoded.id]
       );
     }
-    const userRes = await query('SELECT status FROM users WHERE id = $1', [decoded.id]);
+    const userRes = await query('SELECT status, token_version FROM users WHERE id = $1', [decoded.id]);
     if (userRes.rows.length === 0 || userRes.rows[0].status !== 'active') {
       return res.status(403).json({ error: 'Account disabled' });
+    }
+    // Global token revocation: reject if token_version doesn't match
+    const currentTv = userRes.rows[0].token_version || 1;
+    if (decoded.tv && decoded.tv !== currentTv) {
+      return res.status(401).json({ error: 'Session revoked. Please log in again.', code: 'SESSION_REVOKED' });
     }
     if (!isSessionExempt(decoded.username)) {
       // Absolute session lifetime: reject if JWT was issued more than 24h ago
@@ -161,7 +177,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
         decoded.id,
       ]);
     }
-    const payload = { id: decoded.id, username: decoded.username, role: decoded.role, sid: decoded.sid };
+    const payload = { id: decoded.id, username: decoded.username, role: decoded.role, sid: decoded.sid, tv: decoded.tv };
     const newToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h', issuer: 'yemen-telecom', algorithm: 'HS256' });
     const newRefreshToken = jwt.sign(payload, REFRESH_SECRET, { expiresIn: '7d', issuer: 'yemen-telecom', algorithm: 'HS256' });
     res.cookie('token', newToken, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 3600 * 1000, path: '/' });

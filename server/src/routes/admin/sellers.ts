@@ -1,11 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { query, transaction } from '../../db';
 import { logger } from '../../logger';
-import { requireRole } from '../../middleware/auth';
+import { requireRole, AuthRequest } from '../../middleware/auth';
 import { getPagination } from '../../helpers';
 import { broadcastEvent } from '../../services/realtime.service';
 import { mapAuditRow } from './shared';
 import { cacheInvalidate } from '../../cache';
+import crypto from 'crypto';
 
 const router = Router();
 
@@ -91,7 +92,7 @@ router.get('/sellers', requireRole('manager'), async (_req: Request, res: Respon
 });
 
 // تفعيل/تعطيل بائع — يزامن حالة حساب المستخدم المرتبط به
-router.put('/sellers/:id/status', requireRole('manager'), async (req: Request, res: Response) => {
+router.put('/sellers/:id/status', requireRole('manager'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const status = req.body?.status;
@@ -103,6 +104,7 @@ router.put('/sellers/:id/status', requireRole('manager'), async (req: Request, r
       return res.status(404).json({ error: 'Seller not found' });
     }
     const seller = existing.rows[0];
+    const oldStatus = seller.status;
     await transaction(async (client) => {
       await client.query('UPDATE sellers SET status = $1 WHERE id = $2', [status, id]);
       if (seller.user_id) {
@@ -116,6 +118,13 @@ router.put('/sellers/:id/status', requireRole('manager'), async (req: Request, r
           await client.query('UPDATE users SET status = $1 WHERE id = $2', [status, seller.user_id]);
         }
       }
+      // Audit log for status toggle
+      const logId = `SELLER-STATUS-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+      await client.query(
+        `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
+         VALUES ($1, 'seller_status_toggle', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', '', '', '', NOW(), 'active')`,
+        [logId, `تغيير حالة البائع ${seller.name}: ${oldStatus} → ${status}`, req.user?.username || 'unknown']
+      );
     });
     broadcastEvent({ type: 'seller.updated', entity: 'seller', id, status, action: 'status-toggle' });
     cacheInvalidate('report:');
@@ -158,6 +167,33 @@ router.get('/sellers/:id/sessions', requireRole('manager'), async (req: Request,
     });
   } catch (err) {
     logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
+  }
+});
+
+// إلغاء جميع جلسات مستخدم معين (يرفع token_version)
+router.post('/users/:id/revoke-sessions', requireRole('manager'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userRes = await query('SELECT id, username, token_version FROM users WHERE id = $1', [id]);
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const user = userRes.rows[0];
+    await query(
+      `UPDATE users SET token_version = token_version + 1, active_session_sid = NULL, session_expires_at = NULL WHERE id = $1`,
+      [id]
+    );
+    // Audit log
+    const logId = `REVOKE-SESSIONS-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+    await query(
+      `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
+       VALUES ($1, 'sessions_revoked', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', '', '', '', NOW(), 'closed')`,
+      [logId, `إلغاء جميع جلسات المستخدم ${user.username}`, req.user?.username || 'unknown']
+    );
+    res.json({ message: `تم إلغاء جميع جلسات ${user.username} بنجاح`, previousVersion: user.token_version });
+  } catch (err) {
+    logger.error('Failed to revoke sessions:', { error: err, stack: (err as Error).stack });
     res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });
   }
 });

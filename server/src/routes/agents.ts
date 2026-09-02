@@ -122,7 +122,7 @@ router.get('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, res
   }
 });
 
-router.delete('/:id', requireRole('manager'), async (req: Request, res: Response) => {
+router.delete('/:id', requireRole('manager'), async (req: AuthRequest, res: Response) => {
   const agentId = parseId(req.params.id, res);
   if (agentId === null) return;
   try {
@@ -131,6 +131,10 @@ router.delete('/:id', requireRole('manager'), async (req: Request, res: Response
       return res.status(404).json({ error: 'Agent not found' });
     }
     const agent = existing.rows[0];
+    // Prevent manager from deleting their own agent profile
+    if (agent.user_id && req.user?.id === agent.user_id) {
+      return res.status(400).json({ error: 'لا يمكن حذف وكيلك الخاص' });
+    }
     await transaction(async (client) => {
       if (agent.user_id) {
         await client.query(

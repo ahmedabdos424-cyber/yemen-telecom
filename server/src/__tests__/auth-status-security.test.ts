@@ -100,10 +100,10 @@ describe('P0-02 Login Status Security Regression Tests', () => {
         }
         return Promise.resolve({ rows: [] });
       }
-      if (sql.includes('SELECT status FROM users WHERE id')) {
+      if (sql.includes('SELECT status, token_version FROM users WHERE id')) {
         const id = Number(params[0]);
-        if (id === 1) return Promise.resolve({ rows: [{ status: 'active' }] });
-        if (id === 2) return Promise.resolve({ rows: [{ status: 'inactive' }] });
+        if (id === 1) return Promise.resolve({ rows: [{ status: 'active', token_version: 1 }] });
+        if (id === 2) return Promise.resolve({ rows: [{ status: 'inactive', token_version: 1 }] });
         return Promise.resolve({ rows: [] });
       }
       return Promise.resolve({ rows: [] });

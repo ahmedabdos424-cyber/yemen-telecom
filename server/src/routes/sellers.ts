@@ -58,7 +58,7 @@ const mapSeller = (row: SellerDbRow) => ({
   agent_name: row.agent_name || ''
 });
 
-router.get('/', async (req: AuthRequest, res: Response) => {
+router.get('/', requireRole('manager', 'agent', 'seller'), async (req: AuthRequest, res: Response) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
@@ -294,6 +294,13 @@ router.put('/:id', requireRole('manager', 'agent'), validate(updateSellerSchema)
       `UPDATE sellers SET name=$1, store_name=$2, id_number=$3, phone=$4, region=$5, region_code=$6, status=$7, avatar=$8 WHERE id=$9 RETURNING *`,
       [name, store_name, id_number, phone, region, region_code, status, avatar, id]
     );
+    // Audit log for seller update
+    const updateLogId = `SELLER-UPDATE-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+    await query(
+      `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
+       VALUES ($1, 'seller_updated', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', '', '', '', NOW(), 'active')`,
+      [updateLogId, `تحديث بيانات البائع: ${name}`, req.user?.username || 'unknown']
+    );
     const updated = await query(
       `SELECT s.*, a.name as agent_name FROM sellers s LEFT JOIN agents a ON s.agent_id = a.id WHERE s.id = $1`,
       [id]
@@ -345,6 +352,13 @@ router.put('/:id/balance', requireRole('manager', 'agent'), validate(updateSelle
           [opId, `#BALANCE-${seller.seller_id}`, seller.name, invoiceImage, req.user?.id || null]
         );
       }
+      // Audit log for balance change (always, not just with invoice)
+      const balLogId = `BALANCE-CHANGE-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+      await client.query(
+        `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
+         VALUES ($1, 'balance_changed', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', '', '', '', NOW(), 'active')`,
+        [balLogId, `تغيير رصيد البائع ${updateResult.rows[0].name}: ${amount > 0 ? '+' : ''}${amount}`, req.user?.username || 'unknown']
+      );
       return finalResult.rows[0];
     });
     broadcastEvent({ type: 'seller.updated', entity: 'seller', id, action: 'balance', amount });
@@ -381,6 +395,13 @@ router.post('/:id/reset-password', requireRole('manager', 'agent'), async (req: 
     await query(
       'UPDATE users SET password_hash = $1, active_session_sid = NULL, session_expires_at = NULL WHERE id = $2',
       [passwordHash, seller.user_id]
+    );
+    // Audit log for password reset
+    const resetLogId = `PWD-RESET-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+    await query(
+      `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
+       VALUES ($1, 'seller_password_reset', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', '', '', '', NOW(), 'closed')`,
+      [resetLogId, `إعادة تعيين كلمة مرور البائع: ${seller.name}`, req.user?.username || 'unknown']
     );
     const userRes = await query('SELECT username FROM users WHERE id = $1', [seller.user_id]);
     res.json({

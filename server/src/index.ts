@@ -13,7 +13,7 @@ import { query } from './db';
 import { getMaintenanceMode } from './maintenance';
 import { cacheGet, cacheSet, cacheStats } from './cache';
 import { authenticateToken, requireRole } from './middleware/auth';
-import { clearExpiredLoginLocks } from './middleware/rateLimiter';
+import { clearExpiredLoginLocks, clearExpiredDbLockouts } from './middleware/rateLimiter';
 import { Sentry } from './sentry';
 import authRoutes from './routes/auth';
 import simsRoutes from './routes/sims';
@@ -604,6 +604,7 @@ setInterval(async () => {
     logger.error('[CLEANUP] Token cleanup failed:', err);
   }
   clearExpiredLoginLocks();
+  clearExpiredDbLockouts().catch((err) => logger.warn('[CLEANUP] DB lockout cleanup failed:', err));
 }, 60 * 60 * 1000);
 
 // Graceful shutdown

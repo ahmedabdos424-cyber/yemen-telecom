@@ -85,9 +85,9 @@ describe('P1-20 Auth Integration Tests', () => {
         if (username === user.username) return Promise.resolve({ rows: [user] });
         return Promise.resolve({ rows: [] });
       }
-      if (sql.includes('SELECT status FROM users WHERE id')) {
+      if (sql.includes('SELECT status, token_version FROM users WHERE id')) {
         const id = Number(params[0]);
-        if (id === user.id) return Promise.resolve({ rows: [{ status: user.status }] });
+        if (id === user.id) return Promise.resolve({ rows: [{ status: user.status, token_version: 1 }] });
         return Promise.resolve({ rows: [] });
       }
       if (sql.includes('INSERT INTO token_blacklist')) return Promise.resolve({ rows: [] });
@@ -210,8 +210,8 @@ describe('P1-20 Auth Integration Tests', () => {
         if (sql.includes('SELECT * FROM users WHERE username')) {
           return Promise.resolve({ rows: [testUser] });
         }
-        if (sql.includes('SELECT status FROM users WHERE id')) {
-          return Promise.resolve({ rows: [{ status: 'active' }] });
+        if (sql.includes('SELECT status, token_version FROM users WHERE id')) {
+          return Promise.resolve({ rows: [{ status: 'active', token_version: 1 }] });
         }
         if (sql.includes('INSERT INTO token_blacklist')) {
           blacklisted = true;
