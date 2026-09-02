@@ -87,20 +87,20 @@ services:
       # These MUST stay in sync with android/app/build.gradle (versionName / versionCode)
       # and with server/.env.example. A mismatch silently breaks the updater (rule #2).
       - key: APP_VERSION
-        value: "1.0.18"
+        value: "1.1.0"
       - key: APP_VERSION_CODE
-        value: "23"
+        value: "24"
       - key: APP_APK_BUCKET
         value: "uploads"
       - key: APP_APK_OBJECT
-        value: "releases/app-1.0.18.apk"
+        value: "releases/app-1.1.0.apk"
       - key: APP_APK_URL
         value: ""
       - key: APP_APK_SHA256
-        value: "60B61008D89AE51054860DCED608DBBF71F0488CEFFB6493FF1475AFE124D21F"
+        value: "4BFAF60F27BA467C156F1ADA34CA9316B3B42040E7D6A1C7D5ADE76FBC468D4A"
       - key: APP_APK_SIZE
-        value: "30050485"
+        value: "30054105"
       - key: APP_UPDATE_NOTES
-        value: "تحسينات دورة الشرائح والتخصيص|تفعيل مفاتيح الإشعارات|إصلاح المصادقة بالبصمة والأداء والأمان"
+        value: "فحص أمني شامل — 22 إصلاح|تحسينات RBAC وصلاحيات الأدوار|إصلاحات أداء Race Conditions وTOCTOU|تحسينات Schema وتنقيح قاعدة البيانات"
       - key: APP_UPDATE_REQUIRED
         value: "false"
