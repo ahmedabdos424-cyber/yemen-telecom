@@ -61,7 +61,9 @@ if (envMode === 'development') {
 logger.info(`[ENV] NODE_ENV=${envMode}`);
 
 const app = express();
-const PORT = parseInt(process.env.API_PORT || '4000');
+// Render injects PORT; API_PORT is this project's explicit override.
+// API_PORT wins when both are set (existing behavior preserved).
+const PORT = parseInt(process.env.API_PORT || process.env.PORT || '4000', 10);
 const START_TIME = Date.now();
 let requestCount = 0;
 

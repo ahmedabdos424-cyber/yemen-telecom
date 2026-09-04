@@ -118,10 +118,16 @@ jobs:
 
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/yemen_telecom_test
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: yemen_telecom_test
       NODE_ENV: test
       JWT_SECRET: test-jwt-secret-for-ci-at-least-32-chars-long
       REFRESH_SECRET: test-refresh-secret-for-ci-at-least-32-chars-long
       CSRF_SECRET: test-csrf-secret-for-ci-at-least-32-chars-long
+      BLACKLIST_HMAC_SECRET: test-blacklist-hmac-secret-for-ci-at-least-32-chars
 
     steps:
       - uses: actions/checkout@v4
@@ -278,11 +284,6 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
-      - name: Publish diagnostics to ntfy.sh
-        if: failure()
-        run: |
-          curl -s --max-time 15 -d "$(< /tmp/diag.txt)" "https://ntfy.sh/yt_telecom_ci_alerts" || true
-
       - name: Seed demo passwords
         run: npx tsx server/src/seed.ts
 
@@ -356,4 +357,7 @@ jobs:
 
       - name: Check for secrets in source
         run: |
-          ! grep -r -E '(-----BEGIN RSA PRIVATE KEY-----|-----BEGIN OPENSSH PRIVATE KEY-----)' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.json' . 2>/dev/null | grep -v node_modules | grep -v '.github/'
+          # Known key formats (vendored OCR assets + build output excluded — false positives)
+          ! grep -r -E '(-----BEGIN [A-Z ]*PRIVATE KEY-----|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}|ghp_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,}|xox[bap]-[A-Za-z0-9-]+)' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.json' . 2>/dev/null | grep -v node_modules | grep -v '.github/' | grep -v 'public/tesseract/' | grep -v '/dist/'
+          # Quoted secret assignments (tests excluded — they use placeholder values)
+          ! grep -r -E "(password|passwd|secret|api[_-]?key)[[:space:]]*[:=][[:space:]]*[\"'][^\"' ]{12,}[\"']" --include='*.ts' --include='*.tsx' --include='*.js' --include='*.json' . 2>/dev/null | grep -v node_modules | grep -v '.github/' | grep -v 'public/tesseract/' | grep -v '/dist/' | grep -v -E '\.test\.|__tests__'

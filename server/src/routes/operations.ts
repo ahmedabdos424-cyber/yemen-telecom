@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import { query } from '../db';
 import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
-import { getPagination } from '../helpers';
+import { getPagination, rejectIfUnpaginatedTooLarge } from '../helpers';
 import { validate, createOperationSchema } from '../validation';
 import { cacheInvalidate } from '../cache';
 
@@ -26,6 +26,10 @@ router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: R
     if (paginate) {
       sql += ' LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
       params.push(limit, offset);
+    } else {
+      const where = conditions.length ? ' WHERE ' + conditions.join(' AND ') : '';
+      // COUNT params exclude LIMIT/OFFSET (not yet pushed) — reuse filter params as-is.
+      if (await rejectIfUnpaginatedTooLarge(res, 'SELECT COUNT(*) FROM operations' + where, params, 'operations')) return;
     }
     const result = await query(sql, params);
     res.json(result.rows.map((r: { op_id: string; type: string; target: string; operator: string; date: string; time: string; status: string }) => ({

@@ -43,6 +43,12 @@ router.get('/app-version', async (_req, res: Response) => {
 
   let apkUrl = await resolveApkUrl();
 
+  // Visibility: an empty apkUrl silently breaks the self-updater on clients.
+  // Log loudly so a misconfigured APP_APK_OBJECT / APP_APK_URL shows in Render logs.
+  if (!apkUrl) {
+    logger.warn('[app-version] no APK available: set APP_APK_OBJECT (preferred) or a https APP_APK_URL — clients will receive an empty apkUrl');
+  }
+
   // Security: never serve a plaintext-http APK link.
   if (apkUrl && !isHttps(apkUrl)) {
     logger.warn('[app-version] refusing to serve non-https APK url');

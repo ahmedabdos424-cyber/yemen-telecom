@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import { query, transaction } from '../db';
 import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
-import { getPagination, paginatedQuery } from '../helpers';
+import { getPagination, paginatedQuery, rejectIfUnpaginatedTooLarge } from '../helpers';
 import { validate, createSimSchema, updateSimSchema, activateSimSchema, transferSimsSchema } from '../validation';
 import { createAlert } from '../services/alerts.service';
 import { broadcastEvent } from '../services/realtime.service';
@@ -38,35 +38,58 @@ router.post('/activate', requireRole('manager', 'agent', 'seller'), validate(act
     const contractImage = req.body.contract_image ?? req.body.contractImage ?? null;
     const requester = req.user;
 
-    // Lock the SIM row to prevent concurrent activation (TOCTOU fix)
-    const existing = await query('SELECT * FROM sims WHERE iccid = $1 FOR UPDATE', [iccid]);
-    const sim = existing.rows[0];
+    // Lock the SIM row inside a transaction so concurrent activations
+    // serialize on the row lock (FOR UPDATE is a no-op outside a transaction).
+    const result = await transaction(async (client) => {
+      const existing = await client.query('SELECT * FROM sims WHERE iccid = $1 FOR UPDATE', [iccid]);
+      const sim = existing.rows[0];
 
-    // Serial validation: the SIM must exist in the requester's available stock.
-    let inStock = false;
-    if (sim) {
-      if (requester?.role === 'agent') {
-        const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [requester.id]);
-        const agentId = agentRes.rows[0]?.id;
-        inStock =
-          sim.status === 'available' &&
-          sim.owner_role === 'agent' &&
-          agentId != null &&
-          Number(sim.assigned_to_agent) === Number(agentId);
-      } else if (requester?.role === 'seller') {
-        const sellerRes = await query('SELECT id FROM sellers WHERE user_id = $1', [requester.id]);
-        const sellerId = sellerRes.rows[0]?.id;
-        inStock =
-          sim.status === 'available' &&
-          sim.owner_role === 'seller' &&
-          sellerId != null &&
-          Number(sim.assigned_to) === Number(sellerId);
-      } else {
-        inStock = sim.status === 'available' && sim.owner_role === 'admin';
+      // Serial validation: the SIM must exist in the requester's available stock.
+      let inStock = false;
+      if (sim) {
+        if (requester?.role === 'agent') {
+          const agentRes = await client.query('SELECT id FROM agents WHERE user_id = $1', [requester.id]);
+          const agentId = agentRes.rows[0]?.id;
+          inStock =
+            sim.status === 'available' &&
+            sim.owner_role === 'agent' &&
+            agentId != null &&
+            Number(sim.assigned_to_agent) === Number(agentId);
+        } else if (requester?.role === 'seller') {
+          const sellerRes = await client.query('SELECT id FROM sellers WHERE user_id = $1', [requester.id]);
+          const sellerId = sellerRes.rows[0]?.id;
+          inStock =
+            sim.status === 'available' &&
+            sim.owner_role === 'seller' &&
+            sellerId != null &&
+            Number(sim.assigned_to) === Number(sellerId);
+        } else {
+          inStock = sim.status === 'available' && sim.owner_role === 'admin';
+        }
       }
-    }
 
-    if (!inStock) {
+      if (!inStock) {
+        return { ok: false as const, conflict: false as const };
+      }
+
+      const updated = await client.query(
+        `UPDATE sims SET status = 'activated', activated_by = $1,
+           customer_name = COALESCE($2, customer_name),
+           customer_id = COALESCE($3, customer_id),
+           contract_image = COALESCE($4, contract_image)
+         WHERE id = $5 AND status = 'available' RETURNING *`,
+        [requester?.id ?? null, customerName, customerId, contractImage, sim.id]
+      );
+      if (updated.rowCount === 0) {
+        return { ok: false as const, conflict: true as const };
+      }
+      return { ok: true as const, row: updated.rows[0], simId: sim.id };
+    });
+
+    if (!result.ok) {
+      if (result.conflict) {
+        return res.status(409).json({ error: 'تعذر التفعيل: الشريحة تم تفعيلها مسبقاً أو لم تعد متاحة' });
+      }
       await createAlert({
         title: 'محاولة تفعيل شريحة خارج المخزون المتاح',
         description: `فشلت محاولة تفعيل الشريحة ${iccid} لأنها غير موجودة في المخزون المتاح للوكيل.`,
@@ -76,21 +99,9 @@ router.post('/activate', requireRole('manager', 'agent', 'seller'), validate(act
       });
       return res.status(400).json({ error: 'الرقم التسلسلي غير متوفر في مخزونك' });
     }
-
-    const updated = await query(
-      `UPDATE sims SET status = 'activated', activated_by = $1,
-         customer_name = COALESCE($2, customer_name),
-         customer_id = COALESCE($3, customer_id),
-         contract_image = COALESCE($4, contract_image)
-       WHERE id = $5 AND status = 'available' RETURNING *`,
-      [requester?.id ?? null, customerName, customerId, contractImage, sim.id]
-    );
-    if (updated.rowCount === 0) {
-      return res.status(409).json({ error: 'تعذر التفعيل: الشريحة تم تفعيلها مسبقاً أو لم تعد متاحة' });
-    }
-    broadcastEvent({ type: 'sim.updated', entity: 'sim', id: sim.id, iccid, status: 'activated', action: 'activate' });
+    broadcastEvent({ type: 'sim.updated', entity: 'sim', id: result.simId, iccid, status: 'activated', action: 'activate' });
     cacheInvalidate('report:');
-    res.json(updated.rows[0]);
+    res.json(result.row);
   } catch (err) {
     logger.error('Error activating sim:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -225,6 +236,9 @@ router.get('/', requireRole('manager', 'agent'), async (req: Request, res: Respo
       );
       return res.json(result);
     }
+    // Legacy unpaginated shape (the SPA expects a plain array) — guarded by a
+    // shared row cap so a huge inventory can't OOM the response.
+    if (await rejectIfUnpaginatedTooLarge(res, 'SELECT COUNT(*) FROM sims', [], 'SIMs')) return;
     const result = await query('SELECT * FROM sims ORDER BY id DESC');
     res.json(result.rows);
   } catch (err) {

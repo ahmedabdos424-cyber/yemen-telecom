@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { query } from '../db';
 import { logger } from '../logger';
 import { requireRole } from '../middleware/auth';
-import { getPagination } from '../helpers';
+import { getPagination, rejectIfUnpaginatedTooLarge } from '../helpers';
 
 const router = Router();
 
@@ -15,6 +15,8 @@ router.get('/', requireRole('manager'), async (req: Request, res: Response) => {
     if (paginate) {
       sql += ' LIMIT $1 OFFSET $2';
       params.push(limit, offset);
+    } else {
+      if (await rejectIfUnpaginatedTooLarge(res, 'SELECT COUNT(*) FROM alerts', [], 'alerts')) return;
     }
     const result = await query(sql, params);
     res.json(result.rows);

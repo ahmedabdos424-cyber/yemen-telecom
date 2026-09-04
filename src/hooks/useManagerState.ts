@@ -6,6 +6,7 @@ import type {
   StatsResponse, SimRow, AgentRow, MappedSeller, AlertRow, MappedTransaction, DuplicateIdentityRow,
 } from '../api/types';
 import { captureError } from '../lib/monitor.ts';
+import { loadDataset, saveDataset } from '../lib/persist.ts';
 import { useMountedRef } from './useMountedRef';
 import { notifyInventoryUpdated } from '../services/realtime';
 import {
@@ -43,14 +44,6 @@ async function syncManagerSimItem(item: OfflineQueueItem): Promise<void> {
   }
 }
 
-function loadFromStorage<T>(key: string, fallback: T): T {
-  const saved = localStorage.getItem(key);
-  if (saved) {
-    try { return JSON.parse(saved); } catch { /* ignore */ }
-  }
-  return fallback;
-}
-
 const DEFAULT_SETTINGS: SystemSettings = {
   twoFAEnabled: true,
   email2FAEnabled: false,
@@ -74,13 +67,13 @@ const DEFAULT_SETTINGS: SystemSettings = {
 
 export function useManagerState(role: string | null) {
   const mountedRef = useMountedRef();
-  const [sims, setSims] = useState<SIM[]>(() => loadFromStorage('admin_sims', []));
-  const [agents, setAgents] = useState<Agent[]>(() => loadFromStorage('admin_agents', []));
-  const [sellers, setSellers] = useState<Seller[]>(() => loadFromStorage('admin_sellers', []));
-  const [alerts, setAlerts] = useState<SystemAlert[]>(() => loadFromStorage('admin_alerts', []));
+  const [sims, setSims] = useState<SIM[]>(() => loadDataset('admin_sims', []));
+  const [agents, setAgents] = useState<Agent[]>(() => loadDataset('admin_agents', []));
+  const [sellers, setSellers] = useState<Seller[]>(() => loadDataset('admin_sellers', []));
+  const [alerts, setAlerts] = useState<SystemAlert[]>(() => loadDataset('admin_alerts', []));
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [stats, setStats] = useState<StatsResponse>({} as StatsResponse);
-  const [settings, setSettings] = useState<SystemSettings>(() => loadFromStorage('admin_settings', DEFAULT_SETTINGS));
+  const [settings, setSettings] = useState<SystemSettings>(() => loadDataset('admin_settings', DEFAULT_SETTINGS));
   const [currentView, setCurrentView] = useState<ViewType>(() => {
     return (localStorage.getItem('tele_manager_view') as ViewType) || 'dashboard';
   });
@@ -118,12 +111,13 @@ export function useManagerState(role: string | null) {
   }, [mountedRef]);
 
   // Persist all admin state to localStorage in a single effect
+  // (PII-stripped, TTL-bound — see lib/persist.ts)
   useEffect(() => {
-    localStorage.setItem('admin_sims', JSON.stringify(sims));
-    localStorage.setItem('admin_agents', JSON.stringify(agents));
-    localStorage.setItem('admin_sellers', JSON.stringify(sellers));
-    localStorage.setItem('admin_alerts', JSON.stringify(alerts));
-    localStorage.setItem('admin_settings', JSON.stringify(settings));
+    saveDataset('admin_sims', sims);
+    saveDataset('admin_agents', agents);
+    saveDataset('admin_sellers', sellers);
+    saveDataset('admin_alerts', alerts);
+    saveDataset('admin_settings', settings);
   }, [sims, agents, sellers, alerts, settings]);
 
   const setView = (view: ViewType) => {

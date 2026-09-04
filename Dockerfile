@@ -28,6 +28,10 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 # Runtime Sentry DSN (public value; injected via Render environment variable)
 ENV SENTRY_DSN=${SENTRY_DSN}
 
+# Cap the V8 heap for small Render instances (free tier ~= 512 MB RAM).
+# This ENV exists only in the final image, so the build stages above are unaffected.
+ENV NODE_OPTIONS=--max-old-space-size=384
+
 COPY --from=frontend-build /app/dist ./dist
 COPY --from=server-build /app/server/dist ./server/dist
 COPY --from=server-build /app/server/node_modules ./server/node_modules
@@ -37,5 +41,5 @@ COPY --from=server-build /app/server/migrations ./server/migrations
 EXPOSE 4000
 USER appuser
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=15s \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:4000/api/health || exit 1
+  CMD sh -c "wget --no-verbose --tries=1 --spider http://localhost:${API_PORT:-${PORT:-4000}}/api/health || exit 1"
 CMD ["node", "-r", "./server/dist/sentry-preload.js", "server/dist/index.js"]

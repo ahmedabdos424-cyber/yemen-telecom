@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import { query, transaction } from '../db';
 import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
-import { getPagination, paginatedQuery } from '../helpers';
+import { getPagination, paginatedQuery, rejectIfUnpaginatedTooLarge } from '../helpers';
 import { validate, createAgentSchema, updateAgentSchema } from '../validation';
 import { notifyNewMember } from '../services/fcm.service';
 import { getUniqueViolationKind } from '../helpers/dbErrors';
@@ -25,6 +25,7 @@ router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: R
       );
       return res.json(result);
     }
+    if (await rejectIfUnpaginatedTooLarge(res, `SELECT COUNT(*) FROM agents ${whereClause}`, params, 'agents')) return;
     const result = await query(`SELECT * FROM agents ${whereClause} ORDER BY id`, params);
     res.json(result.rows);
   } catch (err) {

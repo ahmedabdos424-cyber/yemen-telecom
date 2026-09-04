@@ -41,7 +41,8 @@ const poolConfig: PoolConfig = {
         rejectUnauthorized,
         ...(process.env.DB_SSL_CA_CERT ? { ca: process.env.DB_SSL_CA_CERT.replace(/\\n/g, '\n') } : {}),
       },
-  max: parseInt(process.env.DB_MAX_CONNECTIONS || '30', 10),
+  // Default matches production (render.yaml: DB_MAX_CONNECTIONS=20, Supabase pooler).
+  max: parseInt(process.env.DB_MAX_CONNECTIONS || '20', 10),
   min: parseInt(process.env.DB_MIN_CONNECTIONS || '3', 10),
   connectionTimeoutMillis: 10000,
   idleTimeoutMillis: 30000,

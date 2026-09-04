@@ -164,8 +164,8 @@ describe('biometricAuth', () => {
   it('save/get credential roundtrip', async () => {
     setNative(true);
     await saveBiometricCredential({ username: 'seller1', refreshToken: 'rt-abc', savedAt: 123 });
-    const cred = await getBiometricCredential();
-    expect(cred).toEqual({ username: 'seller1', refreshToken: 'rt-abc', savedAt: 123 });
+    const { credential } = await getBiometricCredential();
+    expect(credential).toEqual({ username: 'seller1', refreshToken: 'rt-abc', savedAt: 123 });
   });
 
   it('hasBiometricCredential false when empty', async () => {
@@ -180,16 +180,18 @@ describe('biometricAuth', () => {
     expect(await hasBiometricCredential()).toBe(false);
   });
 
-  it('getBiometricCredential returns null for malformed data', async () => {
+  it('getBiometricCredential returns null credential for malformed data', async () => {
     setNative(true);
     localStorage.setItem('tele_biometric_credential', '{"username":"x"}');
-    expect(await getBiometricCredential()).toBeNull();
+    const { credential } = await getBiometricCredential();
+    expect(credential).toBeNull();
   });
 
-  it('getBiometricCredential returns null for invalid JSON', async () => {
+  it('getBiometricCredential returns null credential for invalid JSON', async () => {
     setNative(true);
     localStorage.setItem('tele_biometric_credential', 'not-json');
-    expect(await getBiometricCredential()).toBeNull();
+    const { credential } = await getBiometricCredential();
+    expect(credential).toBeNull();
   });
 
   it('web never persists the biometric credential (no plaintext refreshToken in localStorage)', async () => {
@@ -198,13 +200,15 @@ describe('biometricAuth', () => {
     setNative(false);
     await fresh.saveBiometricCredential({ username: 'seller1', refreshToken: 'rt-abc', savedAt: 123 });
     expect(localStorage.getItem('tele_biometric_credential')).toBeNull();
-    expect(await fresh.getBiometricCredential()).toBeNull();
+    const { credential } = await fresh.getBiometricCredential();
+    expect(credential).toBeNull();
   });
 
   it('web clears any legacy stored credential on read', async () => {
     setNative(false);
     localStorage.setItem('tele_biometric_credential', '{"username":"x","refreshToken":"rt-leak","savedAt":1}');
-    expect(await getBiometricCredential()).toBeNull();
+    const { credential } = await getBiometricCredential();
+    expect(credential).toBeNull();
     expect(localStorage.getItem('tele_biometric_credential')).toBeNull();
   });
 
@@ -212,32 +216,36 @@ describe('biometricAuth', () => {
     setNative(true);
     await saveBiometricCredential({ username: 'manager1', refreshToken: 'rt-secret-xyz', savedAt: 999 });
     const raw = localStorage.getItem('CapacitorStorage.tele_biometric_credential');
-    expect(raw).toContain('"v":1');
+    expect(raw).toContain('"iv"');
+    expect(raw).toContain('"ciphertext"');
     expect(raw).not.toContain('rt-secret-xyz');
-    expect(raw).toContain('"data"');
     expect(mockEncrypt).toHaveBeenCalledWith(expect.stringContaining('rt-secret-xyz'));
   });
 
   it('native get decrypts the envelope back to the credential', async () => {
     setNative(true);
     await saveBiometricCredential({ username: 'manager1', refreshToken: 'rt-secret-xyz', savedAt: 999 });
-    const cred = await getBiometricCredential();
-    expect(cred).toEqual({ username: 'manager1', refreshToken: 'rt-secret-xyz', savedAt: 999 });
+    const { credential } = await getBiometricCredential();
+    expect(credential).toEqual({ username: 'manager1', refreshToken: 'rt-secret-xyz', savedAt: 999 });
     expect(mockDecrypt).toHaveBeenCalledWith('aXZhbGlkLXZhbHVl', expect.any(String));
   });
 
-  it('native get clears the record and returns null when decrypt fails', async () => {
+  it('native get clears the record and returns null credential when decrypt fails', async () => {
     setNative(true);
     mockDecrypt.mockRejectedValue(new Error('decryptFailed'));
     await saveBiometricCredential({ username: 'manager1', refreshToken: 'rt-secret-xyz', savedAt: 999 });
-    expect(await getBiometricCredential()).toBeNull();
+    const { credential, error } = await getBiometricCredential();
+    expect(credential).toBeNull();
+    expect(error).toBeDefined();
     expect(localStorage.getItem('tele_biometric_credential')).toBeNull();
   });
 
   it('native get treats legacy plaintext envelope as invalid and clears it', async () => {
     setNative(true);
     localStorage.setItem('CapacitorStorage.tele_biometric_credential', '{"username":"x","refreshToken":"rt-old","savedAt":1}');
-    expect(await getBiometricCredential()).toBeNull();
+    const { credential, error } = await getBiometricCredential();
+    expect(credential).toBeNull();
+    expect(error?.code).toBe('corrupted');
     expect(localStorage.getItem('CapacitorStorage.tele_biometric_credential')).toBeNull();
   });
 
@@ -246,6 +254,7 @@ describe('biometricAuth', () => {
     mockEncrypt.mockRejectedValue(new Error('encryptFailed'));
     await saveBiometricCredential({ username: 'manager1', refreshToken: 'rt-secret-xyz', savedAt: 999 });
     expect(localStorage.getItem('tele_biometric_credential')).toBeNull();
-    expect(await getBiometricCredential()).toBeNull();
+    const { credential } = await getBiometricCredential();
+    expect(credential).toBeNull();
   });
 });

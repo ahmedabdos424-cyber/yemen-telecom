@@ -1,11 +1,35 @@
 import { query } from './db';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 
 export function getPagination(req: Request) {
   const page = Math.max(1, parseInt(req.query.page as string) || 1);
   const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
   const offset = (page - 1) * limit;
   return { page, limit, offset };
+}
+
+// Safety cap for legacy unpaginated list shapes (the SPA expects plain arrays).
+// Tables larger than this must be read via ?page&limit (max 200 per page).
+export const MAX_UNPAGINATED_ROWS = 5000;
+
+// Runs countQuery and, when the table exceeds the cap, responds 400 with a
+// pagination hint. Returns true when the response was already sent.
+export async function rejectIfUnpaginatedTooLarge(
+  res: Response,
+  countQuery: string,
+  params: unknown[],
+  entity: string
+): Promise<boolean> {
+  const countResult = await query(countQuery, params);
+  const total = parseInt(countResult.rows[0]?.count || '0', 10);
+  if (total > MAX_UNPAGINATED_ROWS) {
+    res.status(400).json({
+      error: `Too many ${entity} (${total}). Use pagination (?page&limit, max 200 per page).`,
+      total,
+    });
+    return true;
+  }
+  return false;
 }
 
 export async function paginatedQuery<T>(

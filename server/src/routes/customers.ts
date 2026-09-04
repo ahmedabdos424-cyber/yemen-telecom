@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import { query } from '../db';
 import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
-import { getPagination } from '../helpers';
+import { getPagination, rejectIfUnpaginatedTooLarge } from '../helpers';
 import { validate, createCustomerSchema, customerSearchSchema } from '../validation';
 
 const router = Router();
@@ -26,6 +26,9 @@ router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: R
     if (paginate) {
       queryText += ' LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
       params.push(limit, offset);
+    } else {
+      const where = conditions.length ? ' WHERE ' + conditions.join(' AND ') : '';
+      if (await rejectIfUnpaginatedTooLarge(res, 'SELECT COUNT(*) FROM customers' + where, params, 'customers')) return;
     }
     const result = await query(queryText, params);
     res.json(result.rows);

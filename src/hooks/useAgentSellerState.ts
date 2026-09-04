@@ -3,19 +3,12 @@ import { Seller, Sim, Operation, OperatorInventory, Operator, SimStatus, simProv
 import { api } from '../api/client';
 import type { CreateSellerResponse, SimRow } from '../api/types';
 import { captureError } from '../lib/monitor.ts';
+import { loadDataset, saveDataset } from '../lib/persist.ts';
 import { useMountedRef } from './useMountedRef';
 import {
   enqueueOffline, getNetworkStatus, getQueueStats, onNetworkChange, onQueueChanged,
   registerSyncHandlers, syncNow, OfflineQueueItem,
 } from '../services/offlineQueue';
-
-function loadFromStorage<T>(key: string, fallback: T): T {
-  const saved = localStorage.getItem(key);
-  if (saved) {
-    try { return JSON.parse(saved); } catch { /* ignore */ }
-  }
-  return fallback;
-}
 
 function dataUrlToFile(dataUrl: string, filename: string): File {
   const [meta, base64] = dataUrl.split(',');
@@ -88,10 +81,10 @@ async function syncActivationItem(item: OfflineQueueItem): Promise<void> {
 
 export function useAgentSellerState(role: string | null, username: string) {
   const mountedRef = useMountedRef();
-  const [sellers, setSellers] = useState<Seller[]>(() => loadFromStorage('tele_sellers', []));
-  const [sims, setSims] = useState<Sim[]>(() => loadFromStorage('tele_sims', []));
-  const [operations, setOperations] = useState<Operation[]>(() => loadFromStorage('tele_operations', []));
-  const [inventories, setInventories] = useState<OperatorInventory[]>(() => loadFromStorage('tele_inventories', []));
+  const [sellers, setSellers] = useState<Seller[]>(() => loadDataset('tele_sellers', []));
+  const [sims, setSims] = useState<Sim[]>(() => loadDataset('tele_sims', []));
+  const [operations, setOperations] = useState<Operation[]>(() => loadDataset('tele_operations', []));
+  const [inventories, setInventories] = useState<OperatorInventory[]>(() => loadDataset('tele_inventories', []));
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('tele_role_tab') || 'home');
   const [sellerCredentials, setSellerCredentials] = useState<{ username: string; password: string; sellerName: string; mode?: 'create' | 'reset' } | null>(null);
   const [offlinePending, setOfflinePending] = useState(0);
@@ -124,11 +117,11 @@ export function useAgentSellerState(role: string | null, username: string) {
     };
   }, [mountedRef]);
 
-  // Persist
-  useEffect(() => { localStorage.setItem('tele_sellers', JSON.stringify(sellers)); }, [sellers]);
-  useEffect(() => { localStorage.setItem('tele_sims', JSON.stringify(sims)); }, [sims]);
-  useEffect(() => { localStorage.setItem('tele_operations', JSON.stringify(operations)); }, [operations]);
-  useEffect(() => { localStorage.setItem('tele_inventories', JSON.stringify(inventories)); }, [inventories]);
+  // Persist (PII-stripped, TTL-bound — see lib/persist.ts)
+  useEffect(() => { saveDataset('tele_sellers', sellers); }, [sellers]);
+  useEffect(() => { saveDataset('tele_sims', sims); }, [sims]);
+  useEffect(() => { saveDataset('tele_operations', operations); }, [operations]);
+  useEffect(() => { saveDataset('tele_inventories', inventories); }, [inventories]);
 
   const handleSetRoleTab = (tab: string) => {
     setActiveTab(tab);
