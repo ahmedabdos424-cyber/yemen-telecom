@@ -90,10 +90,12 @@ services:
         value: "1.1.0"
       - key: APP_VERSION_CODE
         value: "24"
+      # Bucket/object must match production reality: private apk-releases bucket,
+      # flat versioned object names (verified live via signed-URL probe).
       - key: APP_APK_BUCKET
-        value: "uploads"
+        value: "apk-releases"
       - key: APP_APK_OBJECT
-        value: "releases/app-1.1.0.apk"
+        value: "yemen-telecom-v1.1.0.apk"
       - key: APP_APK_URL
         value: ""
       - key: APP_APK_SHA256
