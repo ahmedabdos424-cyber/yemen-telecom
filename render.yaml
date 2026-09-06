@@ -106,3 +106,10 @@ services:
         value: "فحص أمني شامل — 22 إصلاح|تحسينات RBAC وصلاحيات الأدوار|إصلاحات أداء Race Conditions وTOCTOU|تحسينات Schema وتنقيح قاعدة البيانات"
       - key: APP_UPDATE_REQUIRED
         value: "false"
+      # Firebase Admin SDK (push notifications)
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_STORAGE_BUCKET
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT_PATH
+        value: "./firebase-service-account.json"

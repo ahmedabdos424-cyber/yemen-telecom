@@ -29,10 +29,93 @@
       "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "."],
       "enabled": true
     },
+    "everything": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-everything"],
+      "enabled": true
+    },
     "postgres": {
       "type": "local",
-      "command": ["npx", "-y", "@modelcontextprotocol/server-postgres", "{env:POSTGRES_MCP_URL}"],
+      "command": ["npx", "-y", "@modelcontextprotocol/server-postgres", "postgresql://${env:DB_USER}:${env:DB_PASSWORD}@${env:DB_HOST}:${env:DB_PORT}/${env:DB_NAME}?sslmode=require"],
       "enabled": false
+    },
+    "github": {
+      "type": "local",
+      "command": ["npx", "-y", "@kalelaufa/github-mcp-server"],
+      "enabled": true,
+      "env": {
+        "GITHUB_TOKEN": "${env:GITHUB_TOKEN}"
+      }
+    },
+    "fetch": {
+      "type": "local",
+      "command": ["npx", "-y", "mcp-fetch"],
+      "enabled": true
+    },
+
+    "render": {
+      "type": "local",
+      "command": ["npx", "-y", "@niyogi/render-mcp", "start"],
+      "enabled": true,
+      "env": {
+        "RENDER_API_KEY": "${env:RENDER_API_KEY}"
+      }
+    },
+    "supabase": {
+      "type": "local",
+      "command": [
+        "npx", "-y", "@supabase/mcp-server-postgrest",
+        "--apiUrl", "https://qxroquilskugfemzmrzp.supabase.co/rest/v1",
+        "--apiKey", "${env:SUPABASE_ANON_KEY}",
+        "--schema", "public"
+      ],
+      "enabled": true
+    },
+    "sentry": {
+      "type": "local",
+      "command": ["npx", "-y", "@sentry/mcp-server", "--access-token", "${env:SENTRY_AUTH_TOKEN}"],
+      "enabled": true,
+      "env": {
+        "SENTRY_AUTH_TOKEN": "${env:SENTRY_AUTH_TOKEN}",
+        "SENTRY_ORG": "mliki-technique",
+        "SENTRY_PROJECT": "javascript-react"
+      }
+    },
+    "playwright": {
+      "type": "local",
+      "command": ["npx", "-y", "@executeautomation/playwright-mcp-server"],
+      "enabled": true
+    },
+    "puppeteer": {
+      "type": "local",
+      "command": ["npx", "-y", "@hisma/server-puppeteer"],
+      "enabled": true
+    },
+    "docker": {
+      "type": "local",
+      "command": ["npx", "-y", "docker-mcp-server"],
+      "enabled": false
+    },
+    "snyk": {
+      "type": "local",
+      "command": ["npx", "-y", "snyk", "mcp"],
+      "enabled": false,
+      "env": {
+        "SNYK_TOKEN": "${env:SNYK_TOKEN}"
+      }
+    },
+    "semgrep": {
+      "type": "local",
+      "command": ["npx", "-y", "@semgrep/mcp-server"],
+      "enabled": false
+    },
+    "postman": {
+      "type": "local",
+      "command": ["npx", "-y", "@postman/postman-mcp-server"],
+      "enabled": true,
+      "env": {
+        "POSTMAN_API_KEY": "${env:POSTMAN_API_KEY}"
+      }
     }
   }
 }

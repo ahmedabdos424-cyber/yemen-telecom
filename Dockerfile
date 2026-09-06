@@ -19,13 +19,14 @@ WORKDIR /app/server
 COPY server/package*.json ./
 RUN npm ci && npm cache clean --force
 COPY server/ .
-RUN npx tsc
+RUN npx tsc && npm prune --omit=dev
 
 FROM node:24-alpine
 WORKDIR /app
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 # Runtime Sentry DSN (public value; injected via Render environment variable)
+ARG SENTRY_DSN
 ENV SENTRY_DSN=${SENTRY_DSN}
 
 # Cap the V8 heap for small Render instances (free tier ~= 512 MB RAM).

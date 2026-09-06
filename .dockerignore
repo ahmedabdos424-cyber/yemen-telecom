@@ -1,75 +1,70 @@
-node_modules
-server/node_modules
+# Dependencies
+node_modules/
+server/node_modules/
 
-dist
-server/dist
+# Build outputs
+dist/
+server/dist/
 
-.git
-.github
+# Git
+.git/
+.gitignore/
 
-coverage
-
-android
-
-reports
-qa-reports
-
-backups
-
-*.log
-
+# Environment files (secrets)
 .env
 .env.*
+!.env.example
+server/.env
+server/.env.*
 
-*.bak
+# Android / iOS (not needed for Docker build)
+android/
+ios/
 
-.vscode
-
-.idea
-
-# Docker build artifacts
-Dockerfile
-.dockerignore
-render.yaml
-
-# OS artifacts
+# IDE / OS
+.vscode/
+.idea/
 .DS_Store
 Thumbs.db
 
-# Test artifacts
-testsprite_tests
-test-plans
-.vite
-.playwright-mcp
+# Test / QA
+__tests__/
+e2e/
+qa-tests/
+test-results/
+playwright-report/
+coverage/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
 
-# Android build artifacts
+# Documentation
+docs/
+release/
+*.md
+!README.md
+
+# Scripts (not needed in container)
+scripts/
+*.ps1
+*.sh
+
+# PWA / Tesseract WASM (regenerated)
+public/tesseract/
+
+# APK / Build artifacts
 *.apk
 *.aab
+*.zip
 
-# AI-generated audit artifacts
-AUDIT/
-SECRET_*
-*_AUDIT.md
-*_REPORT.md
-*_PLAN.md
-*_VERIFICATION.md
-*_ANALYSIS.md
-*_CHECKLIST.md
-*_DECISION.md
-*_FINDINGS.md
-*_ISSUES.md
+# AI / Tool configs
+.opencode/
+.claude/
+.agents/
+.codedev-mcp/
+testsprite_tests/
+testsprite-reports/
 
-RELEASE_PACKAGE/
-comprehensive-tests.mjs
-run-backend-tests.ps1
-backend-test-results.json
-*.lnk
-
-# Firebase cache
-.firebase/*.cache
-firebase-service-account.json
-
-# Server artifacts
-server/api_test_results.txt
-server/server.err
-server/backups/
+# Temporary worktrees
+.claude/worktrees/

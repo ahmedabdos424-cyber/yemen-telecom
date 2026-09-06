@@ -9,6 +9,12 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/__tests__/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}', 'server/src/**/*.test.{ts,tsx}'],
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/.claude/**',
+      '**/worktrees/**',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
@@ -18,7 +24,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, '.'),
+      '@': path.resolve(__dirname, './src'),
     },
   },
 });

@@ -50,7 +50,7 @@ router.post('/reset', requireRole('manager'), validate(resetDataSchema), async (
 router.post('/system/backup', requireRole('manager'), async (_req: Request, res: Response) => {
   try {
     const allowedTables: Record<string, string> = {
-      users: 'SELECT * FROM users ORDER BY id',
+      users: 'SELECT id, username, display_name, role, status, phone, email, region, created_at, last_login FROM users ORDER BY id',
       agents: 'SELECT * FROM agents ORDER BY id',
       sellers: 'SELECT * FROM sellers ORDER BY id',
       sims: 'SELECT * FROM sims ORDER BY id',
