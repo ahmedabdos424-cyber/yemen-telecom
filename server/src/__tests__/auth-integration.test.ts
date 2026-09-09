@@ -121,7 +121,7 @@ describe('P1-20 Auth Integration Tests', () => {
         { id: 1, username: 'testuser', role: 'agent', type: 'refresh' },
         REFRESH_SECRET, '7d'
       );
-      const r = await req('POST', '/api/auth/refresh', { refreshToken });
+      const r = await req('POST', '/api/auth/refresh', undefined, { 'X-Refresh-Token': refreshToken });
       expect(r.status).toBe(200);
       expect(r.data.token).toBeDefined();
       const decoded = jwt.verify(r.data.token, JWT_SECRET) as any;
@@ -154,19 +154,19 @@ describe('P1-20 Auth Integration Tests', () => {
       mockUser();
       const expired = makeToken({ id: 1, type: 'refresh' }, REFRESH_SECRET, '0s');
       await new Promise(r => setTimeout(r, 100));
-      const r = await req('POST', '/api/auth/refresh', { refreshToken: expired });
+      const r = await req('POST', '/api/auth/refresh', undefined, { 'X-Refresh-Token': expired });
       expect(r.status).toBe(401);
     });
 
     it('should reject refresh with malformed refresh token', async () => {
       mockUser();
-      const r = await req('POST', '/api/auth/refresh', { refreshToken: 'not-a-valid-jwt' });
+      const r = await req('POST', '/api/auth/refresh', undefined, { 'X-Refresh-Token': 'not-a-valid-jwt' });
       expect(r.status).toBe(401);
     });
 
     it('should reject refresh with empty refresh token', async () => {
       mockUser();
-      const r = await req('POST', '/api/auth/refresh', { refreshToken: '' });
+      const r = await req('POST', '/api/auth/refresh', undefined, { 'X-Refresh-Token': '' });
       expect(r.status).toBe(400);
     });
   });
@@ -225,7 +225,7 @@ describe('P1-20 Auth Integration Tests', () => {
         { id: 1, username: 'testuser', role: 'agent', type: 'refresh' },
         REFRESH_SECRET, '7d'
       );
-      const r = await req('POST', '/api/auth/refresh', { refreshToken });
+      const r = await req('POST', '/api/auth/refresh', undefined, { 'X-Refresh-Token': refreshToken });
       expect(r.status).toBe(200);
       expect(blacklisted).toBe(true);
     });
@@ -259,12 +259,12 @@ describe('P1-20 Auth Integration Tests', () => {
       expect(r.status).toBe(401);
     });
 
-    it('should reject login with disabled user', async () => {
+    it('should reject login with disabled user (generic 401, no enumeration)', async () => {
       const disabledUser = { ...testUser, status: 'inactive' };
       mockUser(disabledUser);
       const r = await req('POST', '/api/auth/login', { username: 'testuser', password: PASSWORD });
-      expect(r.status).toBe(403);
-      expect(r.data.error).toBe('Account disabled');
+      expect(r.status).toBe(401);
+      expect(r.data.error).not.toBe('Account disabled');
     });
   });
 

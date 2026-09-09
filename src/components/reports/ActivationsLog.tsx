@@ -3,7 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { useEffect, useState } from 'react';
 import type { ActivationReportRow } from '../../api/types';
+import { resolveSignedUploadUrl } from '../../lib/signedUploadUrl';
 import { ReportField } from './ReportField';
 
 interface ActivationsLogProps {
@@ -11,6 +13,47 @@ interface ActivationsLogProps {
   expandedAct: number | null;
   setExpandedAct: (i: number | null) => void;
   openLightbox: (img: string | null) => void;
+}
+
+/** Thumbnail that re-signs expired storage URLs (7-day signed links) in place. */
+function ContractImage({
+  src,
+  className,
+  title,
+  onOpen,
+}: {
+  src: string;
+  className: string;
+  title?: string;
+  onOpen: (src: string) => void;
+}) {
+  const [resolvedUrl, setResolvedUrl] = useState<string>(src);
+
+  useEffect(() => {
+    let live = true;
+    setResolvedUrl(src);
+    resolveSignedUploadUrl(src).then((fresh) => {
+      if (live && fresh !== src) setResolvedUrl(fresh);
+    });
+    return () => {
+      live = false;
+    };
+  }, [src]);
+
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label="عرض صورة العقد"
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpen(resolvedUrl);
+      }}
+      className={className}
+    >
+      <img src={resolvedUrl} alt="صورة العقد" className="w-full h-full object-cover" loading="lazy" />
+    </button>
+  );
 }
 
 export function ActivationsLog({ activations, expandedAct, setExpandedAct, openLightbox }: ActivationsLogProps) {
@@ -42,14 +85,12 @@ export function ActivationsLog({ activations, expandedAct, setExpandedAct, openL
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {a.contract_image ? (
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); openLightbox(a.contract_image); }}
-                            className="w-10 h-10 rounded-lg overflow-hidden border border-gray-200 shrink-0"
+                          <ContractImage
+                            src={a.contract_image}
                             title="عرض صورة العقد"
-                          >
-                            <img src={a.contract_image} alt="صورة العقد" className="w-full h-full object-cover" loading="lazy" />
-                          </button>
+                            className="w-10 h-10 rounded-lg overflow-hidden border border-gray-200 shrink-0"
+                            onOpen={(img) => openLightbox(img)}
+                          />
                         ) : (
                           <span className="material-symbols-outlined text-gray-300 text-lg">image_not_supported</span>
                         )}
@@ -70,13 +111,11 @@ export function ActivationsLog({ activations, expandedAct, setExpandedAct, openL
                         {a.contract_image ? (
                           <div className="mt-2.5">
                             <p className="text-[10px] font-bold text-gray-400 mb-1">صورة العقد</p>
-                            <button
-                              type="button"
-                              onClick={() => openLightbox(a.contract_image)}
+                            <ContractImage
+                              src={a.contract_image}
                               className="w-20 h-20 rounded-lg overflow-hidden border border-gray-200 hover:ring-2 hover:ring-blue-300 transition-shadow"
-                            >
-                              <img src={a.contract_image} alt="صورة العقد" className="w-full h-full object-cover" loading="lazy" />
-                            </button>
+                              onOpen={(img) => openLightbox(img)}
+                            />
                           </div>
                         ) : null}
                       </div>
@@ -111,14 +150,12 @@ export function ActivationsLog({ activations, expandedAct, setExpandedAct, openL
                       <td className="p-3 text-gray-600">{a.seller_name || a.actor_name || a.agent_name || '—'}</td>
                       <td className="p-3">
                         {a.contract_image ? (
-                          <button
-                            type="button"
-                            onClick={() => openLightbox(a.contract_image)}
-                            className="w-10 h-10 rounded-lg overflow-hidden border border-gray-200 hover:ring-2 hover:ring-blue-300 transition-shadow"
+                          <ContractImage
+                            src={a.contract_image}
                             title="عرض صورة العقد"
-                          >
-                            <img src={a.contract_image} alt="صورة العقد" className="w-full h-full object-cover" loading="lazy" />
-                          </button>
+                            className="w-10 h-10 rounded-lg overflow-hidden border border-gray-200 hover:ring-2 hover:ring-blue-300 transition-shadow"
+                            onOpen={(img) => openLightbox(img)}
+                          />
                         ) : (
                           <span className="text-gray-400 text-[11px]">بدون صورة</span>
                         )}

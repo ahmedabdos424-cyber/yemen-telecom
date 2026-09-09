@@ -79,8 +79,15 @@ export async function resolveTokenUser(token: string): Promise<ResolvedUser | nu
     if (blacklisted) {
       return null;
     }
-    const userCheck = await query('SELECT status FROM users WHERE id = $1', [decoded.id]);
+    const userCheck = await query('SELECT status, token_version FROM users WHERE id = $1', [decoded.id]);
     if (userCheck.rows.length === 0 || userCheck.rows[0].status !== 'active') {
+      return null;
+    }
+    // Global token revocation: reject when the token was issued under an old
+    // token_version (mirrors the /auth/refresh check). Tokens minted before
+    // the column existed carry no tv — only enforce when the claim is present.
+    const currentTv = userCheck.rows[0].token_version || 1;
+    if (decoded.tv && decoded.tv !== currentTv) {
       return null;
     }
     if (!isSessionExempt(decoded.username)) {

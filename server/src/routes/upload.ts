@@ -8,6 +8,9 @@ import { requireRole, AuthRequest } from '../middleware/auth';
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
 const UPLOAD_BUCKET = process.env.UPLOAD_BUCKET || 'uploads';
+// Signed URLs expire after 7 days (Supabase storage maximum). Shorter than the
+// max would break images viewed later; longer is not supported by the API.
+const SIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 let supabase: SupabaseClient | null = null;
 if (SUPABASE_URL && SUPABASE_ANON_KEY) {
@@ -66,8 +69,20 @@ async function uploadToSupabase(file: Express.Multer.File): Promise<{ url: strin
   if (error) {
     throw error;
   }
-  const { data } = supabase.storage.from(UPLOAD_BUCKET).getPublicUrl(filename);
-  return { url: data.publicUrl, filename };
+  // Never hand out permanent public URLs for contract / identity photos: the
+  // bucket may be public, which would leak PII (an ID photo is guessable from
+  // the URL if the bucket is listable). A 7-day signed URL limits exposure.
+  const { data } = await supabase.storage
+    .from(UPLOAD_BUCKET)
+    .createSignedUrl(filename, SIGNED_URL_TTL_SECONDS);
+  return { url: data?.signedUrl || '', filename };
+}
+
+function resolveSignedUploadUrl(filename: string): Promise<string | null> {
+  return supabase ? supabase.storage
+    .from(UPLOAD_BUCKET)
+    .createSignedUrl(filename, SIGNED_URL_TTL_SECONDS)
+    .then(({ data }) => data?.signedUrl || null) : Promise.resolve(null);
 }
 
 function validateFileMagic(file: Express.Multer.File): boolean {
@@ -106,6 +121,30 @@ router.post('/images', requireRole('manager', 'agent', 'seller'), upload.array('
   } catch (err) {
     logger.error('Error uploading to Supabase Storage:', err);
     res.status(500).json({ error: 'Failed to upload images' });
+  }
+});
+
+// GET /api/upload/signed/:filename — rehydrate a fresh signed URL for an
+// already-stored image (files live ~7 days per signed URL; this lets the app
+// recover a working link after expiry). Restrict to flat filenames only.
+router.get('/signed/:filename', requireRole('manager', 'agent', 'seller'), async (req: AuthRequest, res: Response) => {
+  const raw = req.params.filename || '';
+  const filename = raw.replace(/[^a-zA-Z0-9._-]/g, '');
+  if (!filename || filename !== raw) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
+  if (!supabase) {
+    return res.status(503).json({ error: 'Supabase storage is not configured' });
+  }
+  try {
+    const url = await resolveSignedUploadUrl(filename);
+    if (!url) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+    res.json({ url, filename });
+  } catch (err) {
+    logger.error('Error generating signed URL:', err);
+    res.status(500).json({ error: 'Failed to generate signed URL' });
   }
 });
 

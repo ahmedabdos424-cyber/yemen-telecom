@@ -143,7 +143,7 @@ describe('P0-02 Login Status Security Regression Tests', () => {
         'p0-02-test-refresh-secret',
         { expiresIn: '7d', issuer: 'yemen-telecom', algorithm: 'HS256' }
       );
-      const r = await req('POST', '/api/auth/refresh', { refreshToken });
+      const r = await req('POST', '/api/auth/refresh', undefined, { 'X-Refresh-Token': refreshToken });
       expect(r.status).toBe(200);
       expect(r.data).toHaveProperty('token');
     });
@@ -152,31 +152,31 @@ describe('P0-02 Login Status Security Regression Tests', () => {
   // ─── Disabled user ───
 
   describe('Disabled user login', () => {
-    it('disabled user cannot login (403)', async () => {
+    it('disabled user cannot login (generic 401, no account enumeration)', async () => {
       setupLoginMock(disabledUser);
       const r = await req('POST', '/api/auth/login', { username: 'disabled_user', password: PASSWORD });
-      expect(r.status).toBe(403);
+      expect(r.status).toBe(401);
     });
 
     it('disabled user receives no JWT', async () => {
       setupLoginMock(disabledUser);
       const r = await req('POST', '/api/auth/login', { username: 'disabled_user', password: PASSWORD });
-      expect(r.status).toBe(403);
+      expect(r.status).toBe(401);
       expect(r.data).not.toHaveProperty('token');
     });
 
     it('disabled user receives no refresh token', async () => {
       setupLoginMock(disabledUser);
       const r = await req('POST', '/api/auth/login', { username: 'disabled_user', password: PASSWORD });
-      expect(r.status).toBe(403);
+      expect(r.status).toBe(401);
       expect(r.data).not.toHaveProperty('refreshToken');
     });
 
-    it('error message is "Account disabled"', async () => {
+    it('error message does not reveal that the account exists (S5)', async () => {
       setupLoginMock(disabledUser);
       const r = await req('POST', '/api/auth/login', { username: 'disabled_user', password: PASSWORD });
-      expect(r.status).toBe(403);
-      expect(r.data.error).toBe('Account disabled');
+      expect(r.status).toBe(401);
+      expect(r.data.error).not.toBe('Account disabled');
     });
 
     it('disabled user cannot refresh token (403)', async () => {
@@ -186,7 +186,7 @@ describe('P0-02 Login Status Security Regression Tests', () => {
         'p0-02-test-refresh-secret',
         { expiresIn: '7d', issuer: 'yemen-telecom', algorithm: 'HS256' }
       );
-      const r = await req('POST', '/api/auth/refresh', { refreshToken });
+      const r = await req('POST', '/api/auth/refresh', undefined, { 'X-Refresh-Token': refreshToken });
       expect(r.status).toBe(403);
       expect(r.data.error).toBe('Account disabled');
     });

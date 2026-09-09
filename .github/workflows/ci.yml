@@ -194,8 +194,16 @@ jobs:
       CSRF_SECRET: test-csrf-secret-for-ci-at-least-32-chars-long
       BLACKLIST_HMAC_SECRET: test-blacklist-hmac-secret-for-ci
       SEED_PASSWORD_MANAGER: Password123
+      SEED_PASSWORD_AGENT: Password123
+      SEED_PASSWORD_SELLER: Password123
       E2E_USERNAME: manager
       E2E_PASSWORD: Password123
+      E2E_MANAGER_USER: manager
+      E2E_MANAGER_PASS: Password123
+      E2E_AGENT_USER: agent
+      E2E_AGENT_PASS: Password123
+      E2E_SELLER_USER: seller
+      E2E_SELLER_PASS: Password123
       E2E_BASE_URL: http://localhost:4173
 
     steps:

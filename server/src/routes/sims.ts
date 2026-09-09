@@ -30,6 +30,20 @@ interface SimDbRow {
 
 const router = Router();
 
+// Agency ownership scoping: an agent may only read SIMs that sit in their own
+// stock (mirrors the ownership check on PUT). Returns '' for managers and a
+// WHERE clause (with bound params) for agents. Rewrite the route arg as
+// AuthRequest so the role is available on both GET endpoints.
+async function agentOwnershipCondition(userId: number): Promise<{ clause: string; params: number[] }> {
+  const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [userId]);
+  const agentId = agentRes.rows[0]?.id;
+  if (agentId == null) {
+    // Agent role without an agent profile — there is no stock to read.
+    return { clause: ' WHERE 1 = 0', params: [] };
+  }
+  return { clause: " WHERE owner_role = 'agent' AND assigned_to_agent = $1", params: [Number(agentId)] };
+}
+
 router.post('/activate', requireRole('manager', 'agent', 'seller'), validate(activateSimSchema), async (req: AuthRequest, res: Response) => {
   try {
     const { iccid } = req.body;
@@ -225,21 +239,25 @@ router.post('/transfer', requireRole('agent'), strictRateLimiter, validate(trans
   }
 });
 
-router.get('/', requireRole('manager', 'agent'), async (req: Request, res: Response) => {
+router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
   try {
     const { page, limit, offset } = getPagination(req);
+    // Ownership isolation: agents may only read SIMs in their own stock.
+    const scope = req.user?.role === 'agent'
+      ? await agentOwnershipCondition(req.user.id)
+      : { clause: '', params: [] };
     if (req.query.page || req.query.limit) {
       const result = await paginatedQuery<SimDbRow>(
-        'SELECT * FROM sims ORDER BY id DESC',
-        'SELECT COUNT(*) FROM sims',
-        [], page, limit, offset
+        `SELECT * FROM sims${scope.clause} ORDER BY id DESC`,
+        `SELECT COUNT(*) FROM sims${scope.clause}`,
+        scope.params, page, limit, offset
       );
       return res.json(result);
     }
     // Legacy unpaginated shape (the SPA expects a plain array) — guarded by a
     // shared row cap so a huge inventory can't OOM the response.
-    if (await rejectIfUnpaginatedTooLarge(res, 'SELECT COUNT(*) FROM sims', [], 'SIMs')) return;
-    const result = await query('SELECT * FROM sims ORDER BY id DESC');
+    if (await rejectIfUnpaginatedTooLarge(res, `SELECT COUNT(*) FROM sims${scope.clause}`, scope.params, 'SIMs')) return;
+    const result = await query(`SELECT * FROM sims${scope.clause} ORDER BY id DESC`, scope.params);
     res.json(result.rows);
   } catch (err) {
     logger.error('Error fetching sims:', err);
@@ -247,10 +265,21 @@ router.get('/', requireRole('manager', 'agent'), async (req: Request, res: Respo
   }
 });
 
-router.get('/:id', requireRole('manager', 'agent'), async (req: Request, res: Response) => {
+router.get('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
-    const result = await query('SELECT * FROM sims WHERE id = $1', [id]);
+    let sql = 'SELECT * FROM sims WHERE id = $1';
+    const params: unknown[] = [id];
+    if (req.user?.role === 'agent') {
+      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
+      const agentId = agentRes.rows[0]?.id;
+      if (agentId == null) {
+        return res.status(404).json({ error: 'SIM not found' });
+      }
+      sql += " AND owner_role = 'agent' AND assigned_to_agent = $2";
+      params.push(Number(agentId));
+    }
+    const result = await query(sql, params);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'SIM not found' });
     }

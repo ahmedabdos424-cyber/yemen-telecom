@@ -199,7 +199,7 @@ app.get('/api/csrf-token', (_req, res) => {
 
 // CSRF validation middleware for state-changing requests
 app.use('/api', (req, res, next) => {
-  if (['POST', 'PUT', 'DELETE'].includes(req.method) && !req.path.startsWith('/auth/login') && !req.path.startsWith('/auth/refresh') && !req.path.startsWith('/csrf-token')) {
+  if (['POST', 'PUT', 'DELETE'].includes(req.method) && !req.path.startsWith('/auth/login') && !req.path.startsWith('/csrf-token')) {
     const csrfHeader = req.headers['x-csrf-token'] as string;
     const csrfHash = req.headers['x-csrf-hash'] as string;
     if (!csrfHeader || !csrfHash) {

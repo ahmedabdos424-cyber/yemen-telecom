@@ -76,7 +76,13 @@ router.post('/login', authRateLimiter, validate(loginSchema), async (req: Reques
     }
     const user = result.rows[0];
     if (user.status !== 'active') {
-      return res.status(403).json({ error: 'Account disabled' });
+      // S5: never reveal that the account exists but is disabled — a 403 +
+      // "Account disabled" leaks the account's existence to an attacker.
+      // Treat it exactly like a bad credential (uniform error + failure log).
+      await query('UPDATE users SET failed_attempts = COALESCE(failed_attempts, 0) + 1 WHERE id = $1', [user.id]);
+      recordLoginFailure(username, ip);
+      await logFailedLogin(username, deviceName, ip, deviceId);
+      return res.status(401).json({ error: GENERIC_LOGIN_ERROR });
     }
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
@@ -134,7 +140,14 @@ router.post('/login', authRateLimiter, validate(loginSchema), async (req: Reques
 });
 
 router.post('/refresh', async (req: Request, res: Response) => {
-  const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
+  // S4: never accept a refresh token from the JSON body. Browser sessions use
+  // the httpOnly cookie (CSRF-protected); the Capacitor WebView (no cookies)
+  // sends X-Refresh-Token, which cannot be attached cross-origin by an
+  // attacker without CORS preflight approval.
+  const cookieRefresh = req.cookies?.refreshToken as string | undefined;
+  const header = req.headers['x-refresh-token'];
+  const headerRefresh = typeof header === 'string' ? header : Array.isArray(header) ? header[0] : undefined;
+  const refreshToken = cookieRefresh || headerRefresh;
   if (!refreshToken) {
     return res.status(400).json({ error: 'Refresh token is required' });
   }

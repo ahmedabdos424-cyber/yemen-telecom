@@ -248,6 +248,8 @@ export async function fetchCsrfToken(): Promise<void> {
 
 // Token refresh with mutex: if multiple callers hit 401 concurrently, only one
 // refresh request is made and all callers share the same result promise.
+// The refresh token is sent as an X-Refresh-Token header (+ CSRF headers) —
+// never in the body — and the server requires CSRF on /auth/refresh (S4).
 async function refreshAccessToken(): Promise<string | null> {
   // If a refresh is already in-flight, piggyback on it.
   if (tokens.refreshPromise) return tokens.refreshPromise;
@@ -256,10 +258,20 @@ async function refreshAccessToken(): Promise<string | null> {
     try {
       await loadTokens();
       if (!tokens.refresh) return null;
+      if (!tokens.csrf || !tokens.csrfHash) {
+        await fetchCsrfToken();
+      }
+      if (!tokens.csrf || !tokens.csrfHash) return null;
       const res = await fetchWithTimeout(`${API_BASE}/auth/refresh`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: tokens.refresh }),
+        headers: {
+          'X-Refresh-Token': tokens.refresh,
+          'X-CSRF-Token': tokens.csrf,
+          'X-CSRF-Hash': tokens.csrfHash,
+          'X-Device-Id': getDeviceId(),
+          'X-Device-Name': getDeviceName(),
+        },
+        credentials: CREDENTIALS_MODE,
       });
       if (!res.ok) {
         clearTokens();
@@ -554,6 +566,8 @@ export const api = {
 
   // Upload
   uploadFile,
+  getSignedUploadUrl: (filename: string) =>
+    request<{ url: string; filename: string }>(`/upload/signed/${encodeURIComponent(filename)}`),
 
   // User Preferences
   getUserPreferences: () =>

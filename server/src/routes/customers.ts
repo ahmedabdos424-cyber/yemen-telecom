@@ -93,7 +93,7 @@ router.post('/', requireRole('manager', 'agent', 'seller'), validate(createCusto
     const result = await query(
       `INSERT INTO customers (full_name, id_number, id_type, id_issue_date, phone, region, first_activation, last_activation, activated_by, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW(), $7, $8)
-       ON CONFLICT (id_number) DO UPDATE SET
+       ON CONFLICT (id_number) WHERE id_number <> '' DO UPDATE SET
          sims_count = customers.sims_count + 1,
          last_activation = NOW(),
          phone = COALESCE(NULLIF(EXCLUDED.phone, ''), customers.phone),
