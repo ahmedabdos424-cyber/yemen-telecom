@@ -211,6 +211,16 @@ describe('Validation — Update SIM Schema', () => {
     const result = updateSimSchema.safeParse({ status: 'activated' });
     expect(result.success).toBe(true);
   });
+
+  it('F2 regression: should accept reserved status (seller flow)', () => {
+    const result = updateSimSchema.safeParse({ status: 'reserved' });
+    expect(result.success).toBe(true);
+  });
+
+  it('F2 regression: should reject the dead requested status', () => {
+    const result = updateSimSchema.safeParse({ status: 'requested' });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe('Validation — SIM Batch Schema (range-based ICCID)', () => {

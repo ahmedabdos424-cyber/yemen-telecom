@@ -332,18 +332,22 @@ router.put('/:id', requireRole('manager', 'agent', 'seller'), validate(updateSim
     const cur = existing.rows[0];
 
     // Ownership isolation: agents/sellers may only update SIMs in their own
-    // stock. Managers retain full access.
+    // stock. Managers retain full access. The ownership predicate is also
+    // re-asserted atomically inside the UPDATE below (F3) so a concurrent
+    // transfer cannot let a caller modify a SIM that left their stock mid-flight.
+    let agentId: number | null = null;
+    let sellerId: number | null = null;
     if (req.user?.role === 'agent') {
       const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      const agentId = agentRes.rows[0]?.id;
-      const owned = cur.owner_role === 'agent' && agentId != null && Number(cur.assigned_to_agent) === Number(agentId);
+      agentId = agentRes.rows[0]?.id != null ? Number(agentRes.rows[0].id) : null;
+      const owned = cur.owner_role === 'agent' && agentId != null && Number(cur.assigned_to_agent) === agentId;
       if (!owned) {
         return res.status(403).json({ error: 'Access denied: this SIM does not belong to your stock' });
       }
     } else if (req.user?.role === 'seller') {
       const sellerRes = await query('SELECT id FROM sellers WHERE user_id = $1', [req.user.id]);
-      const sellerId = sellerRes.rows[0]?.id;
-      const owned = cur.owner_role === 'seller' && sellerId != null && Number(cur.assigned_to) === Number(sellerId);
+      sellerId = sellerRes.rows[0]?.id != null ? Number(sellerRes.rows[0].id) : null;
+      const owned = cur.owner_role === 'seller' && sellerId != null && Number(cur.assigned_to) === sellerId;
       if (!owned) {
         return res.status(403).json({ error: 'Access denied: this SIM does not belong to your stock' });
       }
@@ -363,20 +367,41 @@ router.put('/:id', requireRole('manager', 'agent', 'seller'), validate(updateSim
     if (req.user?.role === 'manager' || req.user?.role === 'agent') {
       status = req.body.status ?? cur.status;
     } else if (req.user?.role === 'seller') {
-      const allowedStatuses = ['available', 'requested'];
+      const allowedStatuses = ['available', 'reserved'];
       const requestedStatus = req.body.status ?? cur.status;
       if (allowedStatuses.includes(requestedStatus)) {
         status = requestedStatus;
       } else if (requestedStatus !== cur.status) {
-        return res.status(403).json({ error: 'Access denied: sellers can only set status to available or requested' });
+        return res.status(403).json({ error: 'Access denied: sellers can only set status to available or reserved' });
       }
+    }
+
+    // F3 (TOCTOU): re-assert ownership atomically within the UPDATE so a row
+    // that left the caller's stock between the SELECT and the UPDATE is never
+    // modified. A 0-row update means the SIM vanished or is no longer owned.
+    let ownershipClause = '';
+    let ownershipParam: number | null = null;
+    if (req.user?.role === 'agent' && agentId != null) {
+      ownershipClause = " AND owner_role = 'agent' AND assigned_to_agent = $11";
+      ownershipParam = agentId;
+    } else if (req.user?.role === 'seller' && sellerId != null) {
+      ownershipClause = " AND owner_role = 'seller' AND assigned_to = $11";
+      ownershipParam = sellerId;
     }
 
     const result = await query(
       `UPDATE sims SET phone=$1, iccid=$2, provider=$3, status=$4, owner=$5, package_type=$6,
-         customer_name=$7, customer_id=$8, contract_image=$9 WHERE id=$10 RETURNING *`,
-      [phone, iccid, provider, status, owner, package_type, customerName, customerId, contractImage, id]
+         customer_name=$7, customer_id=$8, contract_image=$9 WHERE id=$10${ownershipClause} RETURNING *`,
+      ownershipParam == null
+        ? [phone, iccid, provider, status, owner, package_type, customerName, customerId, contractImage, id]
+        : [phone, iccid, provider, status, owner, package_type, customerName, customerId, contractImage, id, ownershipParam]
     );
+    if (result.rows.length === 0) {
+      const stillThere = await query('SELECT id FROM sims WHERE id = $1', [id]);
+      return res.status(stillThere.rows.length === 0 ? 404 : 403).json({
+        error: stillThere.rows.length === 0 ? 'SIM not found' : 'Access denied: this SIM does not belong to your stock',
+      });
+    }
     broadcastEvent({ type: 'sim.updated', entity: 'sim', id, iccid, status, action: 'update' });
     cacheInvalidate('report:');
     // Audit log for SIM update

@@ -213,9 +213,6 @@ CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(full_name);
 CREATE INDEX IF NOT EXISTS idx_distribution_status ON distribution_requests(status);
 CREATE INDEX IF NOT EXISTS idx_distribution_agent ON distribution_requests(agent_id);
 
--- Remove the static duplicate_identities seed data since we now query dynamically
-DELETE FROM duplicate_identities WHERE id > 0;
-
 -- Allow soft-delete status for sellers
 ALTER TABLE sellers DROP CONSTRAINT IF EXISTS sellers_status_check;
 ALTER TABLE sellers ADD CONSTRAINT sellers_status_check CHECK (status IN ('active', 'inactive', 'suspended', 'low_stock', 'deleted'));
@@ -258,7 +255,17 @@ ALTER TABLE operations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CUR
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE distribution_requests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
--- 009/037: provider_id FK (providers lookup table, see below)
+-- Providers lookup table (production: telecom operators).
+-- Created BEFORE the provider_id FK columns below: on a fresh database the
+-- REFERENCES providers(id) clauses fail if the table does not exist yet.
+CREATE TABLE IF NOT EXISTS providers (
+  id SERIAL PRIMARY KEY,
+  slug VARCHAR(50) UNIQUE NOT NULL,
+  display_name VARCHAR(100) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 009/037: provider_id FK
 ALTER TABLE sims ADD COLUMN IF NOT EXISTS provider_id INTEGER REFERENCES providers(id) ON DELETE SET NULL;
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS provider_id INTEGER REFERENCES providers(id) ON DELETE SET NULL;
 ALTER TABLE inventories ADD COLUMN IF NOT EXISTS provider_id INTEGER REFERENCES providers(id) ON DELETE SET NULL;
@@ -435,14 +442,6 @@ CREATE TABLE IF NOT EXISTS identity_risk_actions (
 
 CREATE INDEX IF NOT EXISTS idx_identity_risk_actions_id_no ON identity_risk_actions(id_no);
 CREATE INDEX IF NOT EXISTS idx_identity_risk_actions_created ON identity_risk_actions(created_at);
-
--- Providers (production: telecom operators)
-CREATE TABLE IF NOT EXISTS providers (
-  id SERIAL PRIMARY KEY,
-  slug VARCHAR(50) UNIQUE NOT NULL,
-  display_name VARCHAR(100) NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
 
 -- Schema migrations (production: applied migration filenames)
 CREATE TABLE IF NOT EXISTS schema_migrations (

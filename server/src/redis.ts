@@ -201,19 +201,21 @@ export async function clearExpiredLoginLocksRedis(): Promise<void> {
   if (!client) return;
 
   try {
-    // Scan for loginlock keys and clean expired ones
-    // Note: For production with many keys, use a scheduled job with SCAN
-    const keys = await client.keys('loginlock:*');
-    const now = Date.now();
+    // Use SCAN instead of KEYS to avoid blocking Redis on large datasets.
     const LOGIN_LOCK_TTL_MS = 30 * 60 * 1000;
-
-    for (const key of keys) {
-      const data = await client.hGetAll(key);
-      const lockedUntil = parseInt(data.lockedUntil || '0', 10);
-      if (now > lockedUntil + LOGIN_LOCK_TTL_MS) {
-        await client.del(key);
+    const now = Date.now();
+    let cursor = 0;
+    do {
+      const result = await client.scan(cursor, { MATCH: 'loginlock:*', COUNT: 100 });
+      cursor = result.cursor;
+      for (const key of result.keys) {
+        const data = await client.hGetAll(key);
+        const lockedUntil = parseInt(data.lockedUntil || '0', 10);
+        if (now > lockedUntil + LOGIN_LOCK_TTL_MS) {
+          await client.del(key);
+        }
       }
-    }
+    } while (cursor !== 0);
   } catch (err) {
     logger.error('[REDIS] Clear expired login locks failed:', err);
   }

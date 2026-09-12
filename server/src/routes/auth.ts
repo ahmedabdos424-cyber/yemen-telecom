@@ -227,14 +227,17 @@ router.post('/logout', async (req: Request, res: Response) => {
       );
     }
     const cookieRefreshToken = req.cookies?.refreshToken;
-    if (cookieRefreshToken) {
+    const refreshHeader = req.headers['x-refresh-token'];
+    const headerRefreshToken = typeof refreshHeader === 'string' ? refreshHeader : Array.isArray(refreshHeader) ? refreshHeader[0] : undefined;
+    const refreshTokenToRevoke = cookieRefreshToken || headerRefreshToken;
+    if (refreshTokenToRevoke) {
       try {
-        const rtDecoded = jwt.verify(cookieRefreshToken, REFRESH_SECRET, { algorithms: ['HS256'] }) as TokenPayload;
+        const rtDecoded = jwt.verify(refreshTokenToRevoke, REFRESH_SECRET, { algorithms: ['HS256'] }) as TokenPayload;
         if (rtDecoded.exp) {
           const rtExpiresAt = new Date(rtDecoded.exp * 1000).toISOString();
           await query(
             'INSERT INTO token_blacklist (token_hash, expires_at, user_id) VALUES ($1, $2, $3) ON CONFLICT (token_hash) DO NOTHING',
-            [hashToken(cookieRefreshToken), rtExpiresAt, decoded.id]
+            [hashToken(refreshTokenToRevoke), rtExpiresAt, decoded.id]
           );
         }
       } catch { /* refresh token already expired — ignore */ }
