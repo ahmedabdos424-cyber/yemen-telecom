@@ -113,7 +113,7 @@
     "postman": {
       "type": "local",
       "command": ["npx", "-y", "@postman/postman-mcp-server"],
-      "enabled": true,
+      "enabled": false,
       "env": {
         "POSTMAN_API_KEY": "${env:POSTMAN_API_KEY}"
       }

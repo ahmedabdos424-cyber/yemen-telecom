@@ -25,5 +25,5 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_username ON audit_logs(username);
 
 -- Record migration
 INSERT INTO schema_migrations (filename, applied_at)
-VALUES ('035_add_missing_performance_indexes.sql', NOW())
+VALUES ('036_add_missing_performance_indexes.sql', NOW())
 ON CONFLICT (filename) DO NOTHING;
