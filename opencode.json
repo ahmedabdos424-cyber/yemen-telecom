@@ -32,7 +32,7 @@
     "everything": {
       "type": "local",
       "command": ["npx", "-y", "@modelcontextprotocol/server-everything"],
-      "enabled": true
+      "enabled": false
     },
     "postgres": {
       "type": "local",
@@ -40,11 +40,12 @@
       "enabled": false
     },
     "github": {
-      "type": "local",
-      "command": ["npx", "-y", "@kalelaufa/github-mcp-server"],
+      "type": "remote",
+      "url": "https://api.githubcopilot.com/mcp/",
       "enabled": true,
-      "env": {
-        "GITHUB_TOKEN": "${env:GITHUB_TOKEN}"
+      "oauth": false,
+      "headers": {
+        "Authorization": "Bearer {env:GITHUB_PERSONAL_ACCESS_TOKEN}"
       }
     },
     "fetch": {

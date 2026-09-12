@@ -48,9 +48,6 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, retries 
   throw lastErr instanceof Error ? lastErr : new Error('Network request failed');
 }
 
-const hostname = window.location.hostname;
-const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('10.') || hostname.startsWith('192.168.');
-
 function detectCapacitor(): boolean {
   try {
     return !!(window as unknown as { Capacitor?: { isNative?: boolean } }).Capacitor?.isNative;
@@ -67,18 +64,17 @@ function detectCapacitor(): boolean {
 // keeps the relative '/api' path.
 const PROD_API = 'https://yemen-telecom.onrender.com/api';
 function resolveApiBase(): string {
+  // Vite dev server handles /api proxying via vite.config.ts → always relative.
   if (import.meta.env.DEV) return '/api';
-  // E2E/CI builds run `vite preview` against a local API; when the build was
-  // produced with VITE_PROXY_TARGET set (ci.yml e2e job) the relative path is
-  // safe because the preview proxy forwards /api to the local server. The APK
-  // and production builds never set this var, so they keep the absolute URL.
+  // E2E/CI builds run `vite preview` with VITE_PROXY_TARGET set; the preview
+  // proxy forwards /api to the local server, so relative path is safe.
   if (import.meta.env.VITE_PROXY_TARGET) return '/api';
+  // Native Capacitor app — always target the production API.
   if (detectCapacitor()) return PROD_API;
-  if (isLocal) {
-    // Inside the native WebView (androidScheme https) the origin is localhost but
-    // there is no local server, so always use the production API.
-    return PROD_API;
-  }
+  // Fallback: inside the native WebView, window.Capacitor may not yet be
+  // injected (timing), so any localhost origin must still target production.
+  // For normal browser access on localhost, prefer running `npm run dev`
+  // (Vite proxy) or set VITE_PROXY_TARGET for `npm run preview`.
   return PROD_API;
 }
 
