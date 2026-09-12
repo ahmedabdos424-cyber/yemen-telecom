@@ -128,6 +128,7 @@ jobs:
       REFRESH_SECRET: test-refresh-secret-for-ci-at-least-32-chars-long
       CSRF_SECRET: test-csrf-secret-for-ci-at-least-32-chars-long
       BLACKLIST_HMAC_SECRET: test-blacklist-hmac-secret-for-ci-at-least-32-chars
+      RESET_CONFIRM_TOKEN: RESET_INVENTORY
 
     steps:
       - uses: actions/checkout@v4
