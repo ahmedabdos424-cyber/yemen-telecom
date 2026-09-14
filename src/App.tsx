@@ -77,7 +77,7 @@ function SharedOfflineBanner({ isOnline, pendingTotal, onRetry }: { isOnline: bo
 
 function ToastNotifications({ toasts, onDismiss, onNavigate }: { toasts: Array<{ id: string; title: string; message: string }>; onDismiss: (id: string) => void; onNavigate: (path: string) => void }) {
   return (
-    <div className="fixed top-20 left-4 z-40 w-full max-w-sm flex flex-col gap-3 pointer-events-none">
+    <div className="fixed top-[calc(3.5rem+env(safe-area-inset-top))] inset-x-4 z-40 max-w-[calc(100vw-2rem)] flex flex-col gap-3 pointer-events-none">
       <AnimatePresence>
         {toasts.map((toast) => (
           <motion.div key={toast.id} initial={{ opacity: 0, x: -100, scale: 0.95 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -100, scale: 0.95 }} transition={{ duration: 0.3 }}

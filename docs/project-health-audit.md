@@ -215,10 +215,9 @@ if (Date.now() - entry.ts > entry.ttl) {
 
 ---
 
-### 14. [LOW] Toast Positioning on Mobile (Viewport Overflow)
-**File:** `src/App.tsx:109-137`  
-**Issue:** `ToastNotifications` fixed at `top-20 left-4` — may be cut off on small screens with safe area inset.  
-**Remediation:** Use `inset-x-4 top-[calc(4rem+env(safe-area-inset-top))] max-w-[calc(100vw-1rem)]`.
+### 14. [LOW] Toast Positioning on Mobile (Viewport Overflow) — Resolved
+**File:** `src/App.tsx` (ToastNotifications) + `src/hooks/useToast.tsx:29` (ToastContainer)  
+**Status:** Both containers now use `top-[calc(3.5rem+env(safe-area-inset-top))]` (or `bottom-[calc(5rem+env(safe-area-inset-bottom))]` for bottom position) with `inset-x-4 max-w-[calc(100vw-2rem)]` — no viewport overflow under notch/safe-area insets.
 
 ---
 
@@ -235,10 +234,10 @@ if (Date.now() - entry.ts > entry.ttl) {
 
 ---
 
-### 17. [LOW] Accessibility: Missing ARIA Labels on Icon-Only Buttons
+### 17. [LOW] Accessibility: Missing ARIA Labels on Icon-Only Buttons — Resolved
 **Files:** `src/components/AdminMoreDrawer.tsx:90-93, 204-207` — Close buttons have `aria-label` ✅  
-**Files:** `src/components/TopBar.tsx` — Notification bell, user menu need `aria-label`  
-**Remediation:** Add `aria-label="فتح الإشعارات"` etc.
+**Files:** `src/components/TopBar.tsx` — Notification bell + user menu now expose dynamic accessible names (`فتح/إغلاق الإشعارات (N تنبيه نشط)`, `قائمة المستخدم (…)`) with `aria-expanded` state.  
+**Coverage:** Pinned by `e2e/accessibility.spec.ts` (manager chrome, read-only).
 
 ---
 
@@ -293,13 +292,13 @@ if (Date.now() - entry.ts > entry.ttl) {
 ---
 
 ### 24. E2E Test Coverage Expansion
-**Current:** 6 TestSprite frontend tests + 4 backend tests + 296 unit/integration tests.  
-**Gaps:**  
-- Agent/seller login flows (session termination, concurrent device)  
+**Current:** 9 Playwright specs under `e2e/` (auth, accessibility, navigation, sellers, operations-flow, sim-inventory, dashboards, balance-inquiry, activation-flow) + 31 vitest files (450 passed). Agent/seller login flows (auth.spec.ts) and TopBar accessibility (accessibility.spec.ts) now covered.  
+**Remaining gaps:**  
 - SIM activation end-to-end (camera → OCR → submit)  
 - Distribution request lifecycle (create → approve → fulfill)  
 - Backup/restore flow  
-- Offline mode behavior
+- Offline mode behavior  
+- Session termination / concurrent device
 
 ---
 
