@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { query, transaction } from '../db';
 import { logger } from '../logger';
-import { requireRole, AuthRequest } from '../middleware/auth';
+import { requireRole, AuthRequest, resolveScopeAgentId } from '../middleware/auth';
 import { getPagination, paginatedQuery, rejectIfUnpaginatedTooLarge } from '../helpers';
 import { validate, createAgentSchema, updateAgentSchema } from '../validation';
 import { notifyNewMember } from '../services/fcm.service';
@@ -107,8 +107,8 @@ router.get('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, res
   if (agentId === null) return;
   try {
     if (req.user?.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      if (agentRes.rows.length === 0 || agentRes.rows[0].id !== agentId) {
+      const scopedAgentId = await resolveScopeAgentId(req);
+      if (scopedAgentId == null || Number(scopedAgentId) !== Number(agentId)) {
         return res.status(403).json({ error: 'Access denied: this agent does not belong to your account' });
       }
     }

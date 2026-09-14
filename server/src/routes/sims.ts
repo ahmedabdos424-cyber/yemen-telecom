@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { query, transaction } from '../db';
 import { logger } from '../logger';
-import { requireRole, AuthRequest } from '../middleware/auth';
+import { requireRole, AuthRequest, resolveScopeAgentId, resolveScopeSellerId } from '../middleware/auth';
 import { getPagination, paginatedQuery, rejectIfUnpaginatedTooLarge } from '../helpers';
 import { validate, createSimSchema, updateSimSchema, activateSimSchema, transferSimsSchema } from '../validation';
 import { createAlert } from '../services/alerts.service';
@@ -34,9 +34,7 @@ const router = Router();
 // stock (mirrors the ownership check on PUT). Returns '' for managers and a
 // WHERE clause (with bound params) for agents. Rewrite the route arg as
 // AuthRequest so the role is available on both GET endpoints.
-async function agentOwnershipCondition(userId: number): Promise<{ clause: string; params: number[] }> {
-  const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [userId]);
-  const agentId = agentRes.rows[0]?.id;
+async function agentOwnershipCondition(agentId: number | null): Promise<{ clause: string; params: number[] }> {
   if (agentId == null) {
     // Agent role without an agent profile — there is no stock to read.
     return { clause: ' WHERE 1 = 0', params: [] };
@@ -51,6 +49,12 @@ router.post('/activate', requireRole('manager', 'agent', 'seller'), validate(act
     const customerId = req.body.customer_id ?? req.body.customerId ?? null;
     const contractImage = req.body.contract_image ?? req.body.contractImage ?? null;
     const requester = req.user;
+
+    // Resolve the requester's role-scoped profile id once, before the
+    // transaction, so the ownership checks below reuse it instead of firing
+    // an extra agent/seller lookup per activation.
+    const scopeAgentId = requester?.role === 'agent' ? await resolveScopeAgentId(req) : null;
+    const scopeSellerId = requester?.role === 'seller' ? await resolveScopeSellerId(req) : null;
 
     // Lock the SIM row inside a transaction so concurrent activations
     // serialize on the row lock (FOR UPDATE is a no-op outside a transaction).
@@ -69,21 +73,17 @@ router.post('/activate', requireRole('manager', 'agent', 'seller'), validate(act
       let inStock = false;
       if (sim) {
         if (requester?.role === 'agent') {
-          const agentRes = await client.query('SELECT id FROM agents WHERE user_id = $1', [requester.id]);
-          const agentId = agentRes.rows[0]?.id;
           inStock =
             sim.status === 'available' &&
             sim.owner_role === 'agent' &&
-            agentId != null &&
-            Number(sim.assigned_to_agent) === Number(agentId);
+            scopeAgentId != null &&
+            Number(sim.assigned_to_agent) === Number(scopeAgentId);
         } else if (requester?.role === 'seller') {
-          const sellerRes = await client.query('SELECT id FROM sellers WHERE user_id = $1', [requester.id]);
-          const sellerId = sellerRes.rows[0]?.id;
           inStock =
             sim.status === 'available' &&
             sim.owner_role === 'seller' &&
-            sellerId != null &&
-            Number(sim.assigned_to) === Number(sellerId);
+            scopeSellerId != null &&
+            Number(sim.assigned_to) === Number(scopeSellerId);
         } else {
           inStock = sim.status === 'available' && sim.owner_role === 'admin';
         }
@@ -155,11 +155,10 @@ router.post('/transfer', requireRole('agent'), strictRateLimiter, validate(trans
       return res.status(400).json({ error: `Transfer limit is ${MAX_TRANSFER_SIMS} SIMs per request` });
     }
 
-    const agentRes = await query('SELECT id, name FROM agents WHERE user_id = $1', [req.user!.id]);
-    if (agentRes.rows.length === 0) {
+    const agentId = await resolveScopeAgentId(req);
+    if (agentId == null) {
       return res.status(400).json({ error: 'Agent profile not found' });
     }
-    const agentId = Number(agentRes.rows[0].id);
 
     // Isolation: the target seller must belong to the requesting agent.
     const sellerRes = await query('SELECT * FROM sellers WHERE id = $1', [seller_id]);
@@ -251,7 +250,7 @@ router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: R
     const { page, limit, offset } = getPagination(req);
     // Ownership isolation: agents may only read SIMs in their own stock.
     const scope = req.user?.role === 'agent'
-      ? await agentOwnershipCondition(req.user.id)
+      ? await agentOwnershipCondition(await resolveScopeAgentId(req))
       : { clause: '', params: [] };
     if (req.query.page || req.query.limit) {
       const result = await paginatedQuery<SimDbRow>(
@@ -278,8 +277,7 @@ router.get('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, res
     let sql = 'SELECT * FROM sims WHERE id = $1';
     const params: unknown[] = [id];
     if (req.user?.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      const agentId = agentRes.rows[0]?.id;
+      const agentId = await resolveScopeAgentId(req);
       if (agentId == null) {
         return res.status(404).json({ error: 'SIM not found' });
       }
@@ -345,15 +343,13 @@ router.put('/:id', requireRole('manager', 'agent', 'seller'), validate(updateSim
     let agentId: number | null = null;
     let sellerId: number | null = null;
     if (req.user?.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      agentId = agentRes.rows[0]?.id != null ? Number(agentRes.rows[0].id) : null;
+      agentId = await resolveScopeAgentId(req);
       const owned = cur.owner_role === 'agent' && agentId != null && Number(cur.assigned_to_agent) === agentId;
       if (!owned) {
         return res.status(403).json({ error: 'Access denied: this SIM does not belong to your stock' });
       }
     } else if (req.user?.role === 'seller') {
-      const sellerRes = await query('SELECT id FROM sellers WHERE user_id = $1', [req.user.id]);
-      sellerId = sellerRes.rows[0]?.id != null ? Number(sellerRes.rows[0].id) : null;
+      sellerId = await resolveScopeSellerId(req);
       const owned = cur.owner_role === 'seller' && sellerId != null && Number(cur.assigned_to) === sellerId;
       if (!owned) {
         return res.status(403).json({ error: 'Access denied: this SIM does not belong to your stock' });
