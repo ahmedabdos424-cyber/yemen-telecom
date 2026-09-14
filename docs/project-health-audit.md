@@ -244,11 +244,11 @@ if (Date.now() - entry.ts > entry.ttl) {
 
 ## 💡 Architectural & Feature Enhancements (Future Roadmap)
 
-### 18. Provider Migration (Text → FK) — Incomplete
-**File:** `server/src/schema.sql:280-283`  
-**Status:** Migration `009_normalize_providers.sql` created `providers` table and `provider_id` FKs, but application code still reads/writes legacy `provider` VARCHAR column.  
-**Impact:** Dual-write inconsistency risk; queries join on text instead of integer FK.  
-**Remediation:** Complete migration — update all routes (`sims.ts`, `operations.ts`, `inventories.ts`, `distributions.ts`, `reports.ts`) to use `provider_id`; drop legacy column after backfill.
+### 18. Provider Migration (Text → FK) — Dual-Write Locked (Monitored)
+**File:** `server/src/schema.sql` (provider_id FKs) + `server/migrations/037-039`  
+**Status:** DB layer complete — `037_provider_foreign_key` (FKs on 5 tables), `038_backfill_provider_id` (row-level backfill), `039_sync_provider_id_trigger` (BEFORE INSERT/UPDATE triggers keep `provider_id` in sync with the legacy text columns). Application code still reads/writes the legacy `provider`/`operator` text columns; the trigger maintains `provider_id` automatically.  
+**Guarantee:** Pinned by `server/src/__tests__/provider-sync-consistency.test.ts` — static checks that 039 covers exactly the five tables and both lookup branches, plus a live-Postgres consistency test (orphan + mismatch = 0) gated on `DB_*` presence.  
+**Deferred (does NOT change DB behavior):** updating all routes (`sims.ts`, `operations.ts`, `batch.ts`, `reports.ts`, `index.ts` stats) to read/write `provider_id` and then dropping the legacy columns — requires a coordinated app + production migration; revisit separately.
 
 ---
 
