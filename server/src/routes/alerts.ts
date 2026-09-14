@@ -1,8 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { query } from '../db';
 import { logger } from '../logger';
-import { requireRole } from '../middleware/auth';
+import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination, rejectIfUnpaginatedTooLarge } from '../helpers';
+import { logAudit } from '../audit-log';
 
 const router = Router();
 
@@ -26,11 +27,12 @@ router.get('/', requireRole('manager'), async (req: Request, res: Response) => {
   }
 });
 
-router.delete('/:id', requireRole('manager'), async (req: Request, res: Response) => {
+router.delete('/:id', requireRole('manager'), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
     await query('DELETE FROM alerts WHERE id = $1', [id]);
     res.json({ success: true });
+    void logAudit({ type: 'alert_deleted', title: `حذف التنبيه #${id}`, username: req.user?.username || 'unknown' });
   } catch (err) {
     logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
     res.status(500).json({ error: 'INTERNAL_ERROR', message: 'حدث خطأ داخلي في الخادم' });

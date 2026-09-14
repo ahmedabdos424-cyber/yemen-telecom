@@ -10,6 +10,7 @@ import type {
   MappedOperation, CreateOperationRequest,
   MappedInventory, UpdateInventoryItem,
   AlertRow,
+  CustomerRow, CustomerDetailRow,
   AdminSettingsResponse, UpdateSettingsRequest, MappedTransaction, DuplicateIdentityRow, AuditLogEntry, AuditLogPageResponse,
   UpdateProfileRequest,
   StatsResponse,
@@ -443,6 +444,8 @@ export const api = {
 
   // Sellers
   getSellers: () => request<MappedSeller[]>('/sellers'),
+  getSellersPaged: (page: number, limit = 20) =>
+    request<MappedSeller[]>(`/sellers?page=${page}&limit=${limit}`),
   createSeller: (data: CreateSellerRequest) =>
     request<CreateSellerResponse>('/sellers', { method: 'POST', body: JSON.stringify(data) }),
   updateSeller: (id: number, data: UpdateSellerRequest) =>
@@ -470,6 +473,12 @@ export const api = {
     request<MappedInventory[]>('/inventories', { method: 'PUT', body: JSON.stringify(data) }),
 
   // Customers
+  getCustomers: (page?: number, limit = 20) =>
+    request<CustomerRow[]>(page != null ? `/customers?page=${page}&limit=${limit}` : '/customers'),
+  searchCustomers: (q: string) =>
+    request<CustomerRow[]>(`/customers/search?q=${encodeURIComponent(q)}`),
+  getCustomer: (id: number | string) =>
+    request<CustomerDetailRow>(`/customers/${id}`),
   createCustomer: (data: { fullName: string; idNumber: string; idType?: string; idIssueDate?: string; phone?: string; region?: string }) =>
     request<Record<string, unknown>>('/customers', { method: 'POST', body: JSON.stringify(data) }),
 

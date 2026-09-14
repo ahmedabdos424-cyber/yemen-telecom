@@ -6,6 +6,7 @@ import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination, rejectIfUnpaginatedTooLarge } from '../helpers';
 import { validate, createOperationSchema } from '../validation';
 import { cacheInvalidate } from '../cache';
+import { logAudit } from '../audit-log';
 
 const router = Router();
 
@@ -88,6 +89,8 @@ router.post('/', requireRole('manager', 'agent', 'seller'), validate(createOpera
       [opId, type, target, operator || '', date, time, status || 'success', customerName, customerId, contractImage, iccid, req.user?.id]
     );
     res.status(201).json(toMappedOperation(result.rows[0]));
+    // Audit trail for sales operations (idempotent replays skip this)
+    void logAudit({ type: `operation_${type}`, title: `عملية ${type} على ${target || iccid || '—'}`, username: req.user?.username || 'unknown' });
     // Invalidate report cache so fresh data appears immediately
     cacheInvalidate('report:');
   } catch (err) {

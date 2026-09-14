@@ -1,9 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { query, transaction } from '../db';
 import { logger } from '../logger';
-import { requireRole } from '../middleware/auth';
+import { requireRole, AuthRequest } from '../middleware/auth';
 import { validate, updateInventoriesSchema, resolveProviderSlug } from '../validation';
 import { broadcastEvent } from '../services/realtime.service';
+import { logAudit } from '../audit-log';
 
 const router = Router();
 
@@ -32,7 +33,7 @@ router.get('/', requireRole('manager', 'agent'), async (_req: Request, res: Resp
   }
 });
 
-router.put('/', requireRole('manager'), validate(updateInventoriesSchema), async (req: Request, res: Response) => {
+router.put('/', requireRole('manager'), validate(updateInventoriesSchema), async (req: AuthRequest, res: Response) => {
   const updates: Array<{ operator: string | number; available: number; remaining: number }> = req.body;
   try {
     if (updates.length > 0) {
@@ -63,6 +64,7 @@ router.put('/', requireRole('manager'), validate(updateInventoriesSchema), async
     }));
     broadcastEvent({ type: 'inventory.updated', entity: 'inventory', action: 'update', operators });
     res.json(inventories);
+    void logAudit({ type: 'inventory_updated', title: `تحديث المخزون (${updates.length} مشغل)`, username: req.user?.username || 'unknown' });
   } catch (err) {
     logger.error('Error updating inventories:', err);
     res.status(500).json({ error: 'Internal server error' });

@@ -5,6 +5,7 @@ import { query } from '../db';
 import { logger } from '../logger';
 import { AuthRequest } from '../middleware/auth';
 import { validate, updatePasswordSchema, updateProfileSchema, updateUserPreferencesSchema } from '../validation';
+import { logAudit } from '../audit-log';
 
 const router = Router();
 
@@ -36,6 +37,7 @@ router.put('/password', validate(updatePasswordSchema), async (req: AuthRequest,
     logger.info(`[AUTH] Password changed for user ${req.user.id} — session invalidated`);
 
     res.json({ message: 'Password updated successfully' });
+    void logAudit({ type: 'password_changed', title: `تغيير كلمة المرور: ${req.user?.username || 'unknown'}`, username: req.user?.username || 'unknown' });
   } catch (err) {
     logger.error('Error updating password:', err);
     res.status(500).json({ error: 'Internal server error' });

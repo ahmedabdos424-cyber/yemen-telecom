@@ -498,6 +498,10 @@ export interface CustomerRow {
   created_by: number | null;
 }
 
+export interface CustomerDetailRow extends CustomerRow {
+  operations: MappedOperation[];
+}
+
 // ==================== Distributions ====================
 export interface DistributionRequestRow {
   id: number;

@@ -7,6 +7,7 @@ import { validate, createDistributionSchema, approveDistributionSchema, resolveP
 import { broadcastEvent, broadcastToRoles } from '../services/realtime.service';
 import { notifyDistributionApproved } from '../services/fcm.service';
 import crypto from 'crypto';
+import { logAudit } from '../audit-log';
 
 const router = Router();
 
@@ -163,6 +164,7 @@ router.put('/:id/approve', requireRole('manager'), validate(approveDistributionS
     // their distribution request was approved. Never blocks the HTTP response.
     notifyRecipients(req.params.id).catch((err) => logger.warn('[FCM] distribution approval notify failed:', err));
     res.json({ message: `Request ${decision} successfully` });
+    void logAudit({ type: `distribution_${decision}`, title: `${decision === 'approved' ? 'اعتماد' : 'رفض'} طلب توزيع ${req.params.id}`, username: req.user?.username || 'unknown' });
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
     if (errMsg === 'DISTRIBUTION_NOT_FOUND') {

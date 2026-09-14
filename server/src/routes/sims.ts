@@ -9,6 +9,7 @@ import { createAlert } from '../services/alerts.service';
 import { broadcastEvent } from '../services/realtime.service';
 import { strictRateLimiter } from '../middleware/rateLimiter';
 import { cacheInvalidate } from '../cache';
+import { logAudit } from '../audit-log';
 
 interface SimDbRow {
   id: number;
@@ -239,6 +240,7 @@ router.post('/transfer', requireRole('agent'), strictRateLimiter, validate(trans
       seller_id,
       status: 'available',
     });
+    void logAudit({ type: 'sims_transferred', title: `تحويل ${updated.rows.length} شريحة إلى البائع ${seller.name}`, username: req.user?.username || 'unknown' });
   } catch (err) {
     logger.error('Error transferring sims:', err);
     res.status(500).json({ error: 'Internal server error' });
