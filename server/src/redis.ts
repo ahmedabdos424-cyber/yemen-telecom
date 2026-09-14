@@ -1,4 +1,5 @@
 import { createClient, RedisClientType } from 'redis';
+import crypto from 'crypto';
 import { logger } from './logger';
 
 let redisClient: RedisClientType | null = null;
@@ -67,6 +68,11 @@ export async function checkRateLimit(
   const now = Date.now();
   const windowStart = now - windowMs;
   const redisKey = `ratelimit:${key}`;
+  // Stable member id reused for the add and (possible) remove below, so the
+  // over-limit cleanup actually deletes the entry just inserted (crypto-random,
+  // not Math.random, to stay collision-safe under high concurrency).
+  const memberId = crypto.randomBytes(16).toString('hex');
+  const member = `${now}:${memberId}`;
 
   try {
     const multi = client.multi();
@@ -75,7 +81,7 @@ export async function checkRateLimit(
     // Count current entries
     multi.zCard(redisKey);
     // Add current request
-    multi.zAdd(redisKey, { score: now, value: `${now}:${Math.random()}` });
+    multi.zAdd(redisKey, { score: now, value: member });
     // Set expiry on the key
     multi.expire(redisKey, Math.ceil(windowMs / 1000) + 1);
     const results = await multi.exec();
@@ -86,7 +92,7 @@ export async function checkRateLimit(
 
     if (!allowed) {
       // Remove the request we just added since it's over limit
-      await client.zRem(redisKey, `${now}:${Math.random()}`);
+      await client.zRem(redisKey, member);
     }
 
     return {

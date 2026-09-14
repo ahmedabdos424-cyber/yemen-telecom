@@ -1,4 +1,4 @@
-import { getLoadedTokens } from '../api/client';
+import { getLoadedTokens, SESSION_EXPIRED_EVENT } from '../api/client';
 
 export interface RealtimeEvent {
   type: string;
@@ -82,11 +82,18 @@ function handleMessage(raw: string): void {
     return;
   }
   if (msg.type === 'auth_error') {
-    // Token rejected (expired / revoked / session terminated). Close for good
-    // and let the session-expired flow take over.
+    // Token rejected (expired / revoked / session terminated). Close for good,
+    // then surface the session-expired flow (CL-5) so the app logs out instead
+    // of silently staying "logged in" with a dead realtime link.
     manualClose = true;
     socket?.close(4001, 'Unauthorized');
+    socket = null;
     emitStatus(false);
+    try {
+      window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT, { detail: { reason: 'invalid_token' } }));
+    } catch {
+      /* noop */
+    }
     return;
   }
   emitEvent(msg as unknown as RealtimeEvent);

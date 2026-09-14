@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Seller, Operation, Sim } from '../types';
 import { api } from '../api/client';
@@ -54,7 +54,8 @@ export default function SellerDashboard({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
 
-  // New settings preferences loaded from localStorage
+  // New settings preferences — the server's user_preferences table is the
+  // source of truth (CL-4); localStorage mirrors it for instant offline reads.
   const [fontSize, setFontSizeState] = useState<'sm' | 'base' | 'lg'>(() => {
     return (localStorage.getItem('tele_font_size') as 'sm' | 'base' | 'lg') || 'base';
   });
@@ -64,21 +65,37 @@ export default function SellerDashboard({
   const [lowStockNotifications, setLowStockNotifications] = useState<boolean>(() => {
     return localStorage.getItem('tele_low_stock_notifications') !== 'false';
   });
+
+  useEffect(() => {
+    api.getUserPreferences().then((prefs) => {
+      setSimNotifications(prefs.simNotifications);
+      setLowStockNotifications(prefs.lowStockNotifications);
+      if (prefs.fontSize && ['sm', 'base', 'lg'].includes(prefs.fontSize)) {
+        setFontSizeState(prefs.fontSize as 'sm' | 'base' | 'lg');
+      }
+      localStorage.setItem('tele_sim_notifications', String(prefs.simNotifications));
+      localStorage.setItem('tele_low_stock_notifications', String(prefs.lowStockNotifications));
+    }).catch(() => { /* offline — keep the localStorage cache */ });
+  }, []);
+
   const setFontSize = (size: 'sm' | 'base' | 'lg') => {
     setFontSizeState(size);
     localStorage.setItem('tele_font_size', size);
+    api.updateUserPreferences({ fontSize: size }).catch(() => {});
   };
 
   const handleToggleSimNotifications = () => {
     const val = !simNotifications;
     setSimNotifications(val);
     localStorage.setItem('tele_sim_notifications', String(val));
+    api.updateUserPreferences({ simNotifications: val }).catch(() => {});
   };
 
   const handleToggleLowStockNotifications = () => {
     const val = !lowStockNotifications;
     setLowStockNotifications(val);
     localStorage.setItem('tele_low_stock_notifications', String(val));
+    api.updateUserPreferences({ lowStockNotifications: val }).catch(() => {});
   };
 
   const handleToggleBiometric = async () => {

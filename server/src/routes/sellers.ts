@@ -5,6 +5,7 @@ import { query, transaction } from '../db';
 import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination } from '../helpers';
+import { getUniqueViolationKind } from '../helpers/dbErrors';
 import { validate, createSellerSchema, updateSellerSchema, updateSellerBalanceSchema } from '../validation';
 import { broadcastEvent } from '../services/realtime.service';
 import { notifyNewMember } from '../services/fcm.service';
@@ -250,10 +251,23 @@ router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), 
     res.status(201).json({
       seller: createdSeller,
       message: 'تم إنشاء البائع بنجاح. اسم المستخدم: ' + sellerUsername,
+      credentials: {
+        username: sellerUsername,
+        password: sellerPassword
+      }
     });
   } catch (err: unknown) {
     if (err && typeof err === 'object' && 'statusCode' in err && (err as { statusCode?: number }).statusCode === 409) {
       return res.status(409).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+    // The pre-check above guards the common case, but the unique index can still
+    // reject a concurrent duplicate (TOCTOU) — surface it as 409, never 500.
+    const kind = getUniqueViolationKind(err);
+    if (kind === 'username') {
+      return res.status(409).json({ error: 'اسم المستخدم غير متاح؛ يرجى إعادة المحاولة أو اختيار اسم مستخدم آخر' });
+    }
+    if (kind === 'phone') {
+      return res.status(409).json({ error: 'رقم الهاتف مستخدم بالفعل' });
     }
     logger.error('Error creating seller:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -406,6 +420,10 @@ router.post('/:id/reset-password', requireRole('manager', 'agent'), async (req: 
     const userRes = await query('SELECT username FROM users WHERE id = $1', [seller.user_id]);
     res.json({
       message: `تم إعادة تعيين كلمة المرور بنجاح لـ ${seller.name}. اسم المستخدم: ${userRes.rows[0].username}`,
+      credentials: {
+        username: userRes.rows[0].username,
+        password: newPassword
+      }
     });
   } catch (err) {
     logger.error('Error resetting seller password:', err);

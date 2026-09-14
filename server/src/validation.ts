@@ -287,6 +287,9 @@ export const createOperationSchema = z.object({
   contract_image: z.string().max(500).optional(),
   contractImage: z.string().max(500).optional(),
   iccid: z.string().max(30).optional(),
+  // Client-supplied idempotency key (op_id column is VARCHAR(100) UNIQUE).
+  op_id: z.string().max(100).optional(),
+  opId: z.string().max(100).optional(),
 });
 
 // Inventories

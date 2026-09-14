@@ -58,6 +58,13 @@ router.post('/activate', requireRole('manager', 'agent', 'seller'), validate(act
       const existing = await client.query('SELECT * FROM sims WHERE iccid = $1 FOR UPDATE', [iccid]);
       const sim = existing.rows[0];
 
+      // Idempotent replay: the SIM is already activated by the same requester
+      // (an offline-queue or network retry of a succeeded activation). Return
+      // the row untouched instead of a spurious 409 + high-priority alert.
+      if (sim && sim.status === 'activated' && requester?.id != null && Number(sim.activated_by) === Number(requester.id)) {
+        return { ok: true as const, row: sim, simId: sim.id, replay: true as const };
+      }
+
       // Serial validation: the SIM must exist in the requester's available stock.
       let inStock = false;
       if (sim) {

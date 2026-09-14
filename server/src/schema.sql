@@ -27,6 +27,11 @@ CREATE TABLE IF NOT EXISTS agents (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Keep schema.sql in sync with migration 004 — unique phone per agent
+-- (partial index allows multiple empty/blank phones).
+CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_phone_unique ON agents(phone)
+  WHERE phone != '' AND phone IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS sellers (
   id SERIAL PRIMARY KEY,
   seller_id VARCHAR(50) UNIQUE NOT NULL,
@@ -233,7 +238,7 @@ ALTER TABLE customers ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES use
 -- Schema additions from production migrations (drift sync)
 -- 006 (account lockout), 007 (updated_at), 009/037 (provider_id),
 -- 010 (timestamp companions), 026 (identity review), 028 (single-device
--- sessions + session audit), 029 (agent full_name)
+-- sessions + session audit), 029 (agent full_name), 044 (token_version)
 -- ============================================================
 
 -- 006: account lockout counters
@@ -243,6 +248,9 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP;
 -- 028: single-device session enforcement
 ALTER TABLE users ADD COLUMN IF NOT EXISTS active_session_sid VARCHAR(64);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS session_expires_at TIMESTAMP;
+
+-- 044: global session revocation (checked by authenticateToken and /auth/refresh)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INT NOT NULL DEFAULT 1;
 
 -- 007: updated_at on all mutable tables (auto-triggered below)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;

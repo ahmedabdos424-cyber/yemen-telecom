@@ -53,6 +53,10 @@ interface QueuedActivation {
   operator: Operator;
   contractImage?: string | null;
   role?: string | null;
+  // Stable idempotency key: generated once per activation and reused by the
+  // server (operations.op_id UNIQUE) so a sync replay never creates a
+  // duplicate operation row.
+  requestId: string;
 }
 
 async function syncActivationItem(item: OfflineQueueItem): Promise<void> {
@@ -66,7 +70,7 @@ async function syncActivationItem(item: OfflineQueueItem): Promise<void> {
   if (q.role === 'agent') {
     await api.activateSim({ iccid: q.iccid, customerName: q.fullName, customerId: q.idNumber, contractImage: contractImage || undefined });
   }
-  await api.createOperation({ type: 'activate', target: q.phoneNumber, operator: q.operator, status: 'success', customerName: q.fullName, customerId: q.idNumber, contractImage: contractImage || undefined, iccid: q.iccid });
+  await api.createOperation({ type: 'activate', target: q.phoneNumber, operator: q.operator, status: 'success', customerName: q.fullName, customerId: q.idNumber, contractImage: contractImage || undefined, iccid: q.iccid, opId: q.requestId });
   await api.createCustomer({ fullName: q.fullName, idNumber: q.idNumber, phone: q.phoneNumber }).catch(err => { captureError(err, 'createCustomerOnActivation'); });
   const allSims = (await api.getSims()) ?? [];
   const target = allSims.find(s => s.iccid === q.iccid);
@@ -168,6 +172,9 @@ export function useAgentSellerState(role: string | null, username: string) {
   };
 
   const handleSimActivationForSeller = async (simData: { fullName: string; idNumber: string; iccid: string; phoneNumber: string; operator: Operator; contractImage?: string | null }) => {
+    // Idempotency key for this logical activation: the online attempt and any
+    // offline-queue retry reuse it, so the server never double-records.
+    const requestId = crypto.randomUUID();
     // Activation lock: a seller with an empty stock cannot activate SIMs.
     if (role === 'seller' && (selfSellerData.currentStock ?? 0) <= 0) {
       throw new Error('لا يمكن تفعيل الشرائح: مخزونك الحالي فارغ. اطلب من الوكيل تحويل شرائح إليك أولاً.');
@@ -176,7 +183,7 @@ export function useAgentSellerState(role: string | null, username: string) {
     // immediately instead of letting the API client burn its retry budget.
     if (!(await getNetworkStatus())) {
       try {
-        await enqueueOffline('activate', { ...simData, role } satisfies QueuedActivation);
+        await enqueueOffline('activate', { ...simData, role, requestId } satisfies QueuedActivation);
       } catch (qe) {
         captureError(qe, 'enqueueActivationOffline');
       }
@@ -218,7 +225,7 @@ export function useAgentSellerState(role: string | null, username: string) {
         await api.activateSim({ iccid: simData.iccid, customerName: simData.fullName, customerId: simData.idNumber, contractImage: contractImage || undefined });
       }
 
-      await api.createOperation({ type: 'activate', target: simData.phoneNumber, operator: simData.operator, status: 'success', customerName: simData.fullName, customerId: simData.idNumber, contractImage: contractImage || undefined, iccid: simData.iccid });
+      await api.createOperation({ type: 'activate', target: simData.phoneNumber, operator: simData.operator, status: 'success', customerName: simData.fullName, customerId: simData.idNumber, contractImage: contractImage || undefined, iccid: simData.iccid, opId: requestId });
       await api.createCustomer({
         fullName: simData.fullName,
         idNumber: simData.idNumber,
@@ -239,7 +246,7 @@ export function useAgentSellerState(role: string | null, username: string) {
         // network returns. The optimistic local update below still runs, so
         // the seller sees the activation as done immediately.
         try {
-          await enqueueOffline('activate', { ...simData, role } satisfies QueuedActivation);
+          await enqueueOffline('activate', { ...simData, role, requestId } satisfies QueuedActivation);
         } catch (qe) {
           captureError(qe, 'enqueueActivationOffline');
         }

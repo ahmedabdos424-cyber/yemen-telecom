@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import crypto from 'crypto';
 import multer from 'multer';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { query } from '../db';
 import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
 
@@ -89,6 +90,29 @@ function validateFileMagic(file: Express.Multer.File): boolean {
   return hasValidMagicBytes(file.buffer, file.mimetype);
 }
 
+// Contract / identity documents are PII. Managers may rehydrate any signed
+// URL, but agents and sellers may only rehydrate documents linked to records
+// they own (their SIMs and their own operations). `strpos` is used instead of
+// LIKE so characters in the filename can never act as wildcards.
+async function canAccessDocument(user: { id: number; role: string }, filename: string): Promise<boolean> {
+  if (user.role === 'manager') return true;
+  const result = await query(
+    `SELECT 1 FROM sims s
+       WHERE strpos(s.contract_image, $1) > 0
+         AND (
+           s.assigned_to = (SELECT id FROM sellers WHERE user_id = $2)
+           OR s.assigned_to_agent = (SELECT id FROM agents WHERE user_id = $2)
+           OR s.assigned_to IN (SELECT id FROM sellers WHERE agent_id = (SELECT id FROM agents WHERE user_id = $2))
+         )
+     UNION
+     SELECT 1 FROM operations o
+       WHERE strpos(o.contract_image, $1) > 0 AND o.created_by = $2
+     LIMIT 1`,
+    [filename, user.id]
+  );
+  return result.rows.length > 0;
+}
+
 router.post('/image', requireRole('manager', 'agent', 'seller'), upload.single('image'), async (req: AuthRequest, res: Response) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No image file provided' });
@@ -137,6 +161,10 @@ router.get('/signed/:filename', requireRole('manager', 'agent', 'seller'), async
     return res.status(503).json({ error: 'Supabase storage is not configured' });
   }
   try {
+    const owned = await canAccessDocument(req.user!, filename);
+    if (!owned) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
     const url = await resolveSignedUploadUrl(filename);
     if (!url) {
       return res.status(404).json({ error: 'File not found' });

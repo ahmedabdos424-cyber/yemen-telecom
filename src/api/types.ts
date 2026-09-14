@@ -305,6 +305,7 @@ export interface CreateOperationRequest {
   contract_image?: string;
   contractImage?: string;
   iccid?: string;
+  opId?: string;
 }
 
 export interface QueryOperationsRequest {

@@ -126,6 +126,16 @@ router.post('/system/lockdown', requireRole('manager'), async (_req: Request, re
       `UPDATE sellers SET status = $1 WHERE status NOT IN ('deleted')`,
       [!isCurrentlyLocked ? 'suspended' : 'active']
     );
+    if (!isCurrentlyLocked) {
+      // Lockdown: force every non-manager session to re-authenticate. `sellers`
+      // status is a different table, so without this bump seller/agent JWTs
+      // would remain valid even while seller rows are suspended.
+      await query(
+        `UPDATE users SET token_version = token_version + 1,
+                active_session_sid = NULL, session_expires_at = NULL
+         WHERE role <> 'manager' AND status <> 'inactive'`
+      );
+    }
     const newStatus = !isCurrentlyLocked;
     invalidateMaintenanceMode();
     res.json({

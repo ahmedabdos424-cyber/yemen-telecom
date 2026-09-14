@@ -394,11 +394,17 @@ export type { ApiLoginResponse, ApiMeResponse, ApiBackupResponse, ApiLockdownRes
 
 export const api = {
   // Auth
-  login: (username: string, password: string) =>
-    request<ApiLoginResponse>('/auth/login', {
+  login: async (username: string, password: string) => {
+    const res = await request<ApiLoginResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
-    }),
+    });
+    // Rotate the CSRF token after a successful login so any token fetched
+    // before authentication (shared kiosk, stale session) is not reused for
+    // the new session (audit: CSRF token not rotated on login).
+    await fetchCsrfToken();
+    return res;
+  },
 
   getMe: () => request<ApiMeResponse>('/auth/me'),
   logout: () => request<Record<string, unknown>>('/auth/logout', { method: 'POST' }),
