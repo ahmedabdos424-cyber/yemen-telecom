@@ -11,7 +11,7 @@ async function toInventoryDto(r: { provider_id: number | null; operator: string;
   // Prefer provider_id, fallback to operator column for backward compatibility
   let operator = r.operator;
   if (r.provider_id) {
-    operator = await resolveProviderSlug(null, r.provider_id);
+    operator = resolveProviderSlug(r.provider_id);
   }
   return {
     operator,
@@ -58,7 +58,7 @@ router.put('/', requireRole('manager'), validate(updateInventoriesSchema), async
     const inventories = await Promise.all(result.rows.map(toInventoryDto));
     // Extract operators for broadcast (convert to slugs)
     const operators = await Promise.all(updates.map(async u => {
-      if (typeof u.operator === 'number') return resolveProviderSlug(null, u.operator);
+      if (typeof u.operator === 'number') return resolveProviderSlug(u.operator);
       return u.operator;
     }));
     broadcastEvent({ type: 'inventory.updated', entity: 'inventory', action: 'update', operators });

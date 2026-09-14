@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import crypto from 'crypto';
 import { query, transaction } from '../db';
 import { logger } from '../logger';
@@ -295,7 +295,7 @@ router.get('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, res
   }
 });
 
-router.post('/', requireRole('manager'), validate(createSimSchema), async (req: Request, res: Response) => {
+router.post('/', requireRole('manager'), validate(createSimSchema), async (req: AuthRequest, res: Response) => {
   const { phone, iccid, provider, status, owner, package_type } = req.body;
   try {
     const result = await query(
@@ -312,7 +312,7 @@ router.post('/', requireRole('manager'), validate(createSimSchema), async (req: 
       await query(
         `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
          VALUES ($1, 'sim_created', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', '', '', '', NOW(), 'active')`,
-        [logId, `إنشاء شريحة: ${iccid} (${provider || 'Yemen Mobile'})`, (req as AuthRequest).user?.username || 'unknown']
+        [logId, `إنشاء شريحة: ${iccid} (${provider || 'Yemen Mobile'})`, req.user?.username || 'unknown']
       );
     } catch (err) {
       logger.warn('[AUDIT] Failed to log SIM creation:', err);

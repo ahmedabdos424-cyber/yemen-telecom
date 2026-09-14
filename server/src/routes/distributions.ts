@@ -113,7 +113,7 @@ router.post('/', requireRole('agent'), validate(createDistributionSchema), async
       }
     }
     const requestId = `DIST-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
-    const providerId = await resolveProviderId(null, operator);
+    const providerId = resolveProviderId(operator);
     const result = await query(
       `INSERT INTO distribution_requests (request_id, agent_id, seller_id, operator, provider_id, count, notes)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
