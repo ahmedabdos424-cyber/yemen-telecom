@@ -83,7 +83,9 @@ router.post('/app-update-installed', async (req: Request, res: Response) => {
   try {
     await query(
       `INSERT INTO app_update_installs (device_id, version, version_code)
-       VALUES ($1, $2, $3)`,
+       VALUES ($1, $2, $3)
+       ON CONFLICT (device_id, version_code)
+       DO UPDATE SET installed_at = NOW()`,
       [deviceId, version, versionCode]
     );
     logger.info('[app-update] installed', { deviceId, version, versionCode });

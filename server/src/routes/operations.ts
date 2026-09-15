@@ -6,6 +6,7 @@ import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination, rejectIfUnpaginatedTooLarge } from '../helpers';
 import { validate, createOperationSchema } from '../validation';
 import { cacheInvalidate } from '../cache';
+import { logAudit } from '../audit-log';
 
 const router = Router();
 
@@ -54,6 +55,9 @@ router.post('/', requireRole('manager', 'agent', 'seller'), validate(createOpera
   const customerId = req.body.customer_id ?? req.body.customerId ?? null;
   const contractImage = req.body.contract_image ?? req.body.contractImage ?? null;
   const iccid = req.body.iccid ?? null;
+  // Client-supplied idempotency key: an offline-queue or network retry replays
+  // the exact same operation instead of inserting a duplicate row.
+  const clientOpId = req.body.op_id ?? req.body.opId ?? null;
 
   // Sellers can only create recharge operations (not activate)
   if (req.user?.role === 'seller' && type === 'activate') {
@@ -61,7 +65,21 @@ router.post('/', requireRole('manager', 'agent', 'seller'), validate(createOpera
   }
 
   try {
-    const opId = `op_${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+    // Idempotent replay: if an operation with this key already exists it is
+    // returned untouched. The key is bound to its original creator, so a
+    // replay can never hijack another user's operation id.
+    if (clientOpId) {
+      const existing = await query('SELECT * FROM operations WHERE op_id = $1', [clientOpId]);
+      if (existing.rows.length > 0) {
+        const row = existing.rows[0];
+        if (Number(row.created_by) !== Number(req.user?.id)) {
+          return res.status(409).json({ error: 'هوية العملية مستخدمة بالفعل' });
+        }
+        return res.json(toMappedOperation(row));
+      }
+    }
+
+    const opId = clientOpId ?? `op_${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
     const now = new Date();
     const date = now.toISOString().split('T')[0].replace(/-/g, '/');
     const time = 'الآن';
@@ -70,19 +88,9 @@ router.post('/', requireRole('manager', 'agent', 'seller'), validate(createOpera
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
       [opId, type, target, operator || '', date, time, status || 'success', customerName, customerId, contractImage, iccid, req.user?.id]
     );
-    res.status(201).json({
-      id: result.rows[0].op_id,
-      type: result.rows[0].type,
-      target: result.rows[0].target,
-      operator: result.rows[0].operator,
-      date: result.rows[0].date,
-      time: result.rows[0].time,
-      status: result.rows[0].status,
-      customer_name: result.rows[0].customer_name,
-      customer_id: result.rows[0].customer_id,
-      contract_image: result.rows[0].contract_image,
-      iccid: result.rows[0].iccid,
-    });
+    res.status(201).json(toMappedOperation(result.rows[0]));
+    // Audit trail for sales operations (idempotent replays skip this)
+    void logAudit({ type: `operation_${type}`, title: `عملية ${type} على ${target || iccid || '—'}`, username: req.user?.username || 'unknown' });
     // Invalidate report cache so fresh data appears immediately
     cacheInvalidate('report:');
   } catch (err) {
@@ -90,5 +98,25 @@ router.post('/', requireRole('manager', 'agent', 'seller'), validate(createOpera
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+function toMappedOperation(row: {
+  op_id: string; type: string; target: string; operator: string;
+  date: string; time: string; status: string;
+  customer_name?: string; customer_id?: string; contract_image?: string; iccid?: string;
+}): Record<string, unknown> {
+  return {
+    id: row.op_id,
+    type: row.type,
+    target: row.target,
+    operator: row.operator,
+    date: row.date,
+    time: row.time,
+    status: row.status,
+    customer_name: row.customer_name,
+    customer_id: row.customer_id,
+    contract_image: row.contract_image,
+    iccid: row.iccid,
+  };
+}
 
 export default router;

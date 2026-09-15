@@ -305,6 +305,7 @@ export interface CreateOperationRequest {
   contract_image?: string;
   contractImage?: string;
   iccid?: string;
+  opId?: string;
 }
 
 export interface QueryOperationsRequest {
@@ -495,6 +496,10 @@ export interface CustomerRow {
   created_at: string;
   activated_by: number | null;
   created_by: number | null;
+}
+
+export interface CustomerDetailRow extends CustomerRow {
+  operations: MappedOperation[];
 }
 
 // ==================== Distributions ====================

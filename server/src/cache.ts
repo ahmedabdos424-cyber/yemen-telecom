@@ -11,10 +11,25 @@ const keyOrder: string[] = [];
 let hits = 0;
 let misses = 0;
 
+// True LRU: the keyOrder tail is the most-recently-used end. When the cache is
+// at capacity a single insert must evict the oldest entry. The loop also guards
+// against any desync between store and keyOrder (e.g. a key that was deleted
+// but still lingers in keyOrder) so eviction keeps both structures in sync and
+// keyOrder can never grow without bound.
 function evictIfNeeded(): void {
-  if (store.size < MAX_CACHE_SIZE) return;
-  const oldest = keyOrder.shift();
-  if (oldest !== undefined) store.delete(oldest);
+  while (store.size >= MAX_CACHE_SIZE && keyOrder.length > 0) {
+    const oldest = keyOrder.shift();
+    if (oldest !== undefined && store.has(oldest)) {
+      store.delete(oldest);
+      break;
+    }
+  }
+}
+
+function touch(key: string): void {
+  const idx = keyOrder.indexOf(key);
+  if (idx !== -1) keyOrder.splice(idx, 1);
+  keyOrder.push(key);
 }
 
 export function cacheGet<T>(key: string): T | undefined {
@@ -30,15 +45,18 @@ export function cacheGet<T>(key: string): T | undefined {
     misses++;
     return undefined;
   }
+  touch(key);
   hits++;
   return entry.data as T;
 }
 
 export function cacheSet<T>(key: string, data: T, ttlMs: number): void {
   if (!store.has(key)) {
-    keyOrder.push(key);
+    touch(key);
+    evictIfNeeded();
+  } else {
+    touch(key);
   }
-  evictIfNeeded();
   store.set(key, { data, ts: Date.now(), ttl: ttlMs });
 }
 

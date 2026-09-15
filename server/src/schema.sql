@@ -27,6 +27,11 @@ CREATE TABLE IF NOT EXISTS agents (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Keep schema.sql in sync with migration 004 — unique phone per agent
+-- (partial index allows multiple empty/blank phones).
+CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_phone_unique ON agents(phone)
+  WHERE phone != '' AND phone IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS sellers (
   id SERIAL PRIMARY KEY,
   seller_id VARCHAR(50) UNIQUE NOT NULL,
@@ -213,9 +218,6 @@ CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(full_name);
 CREATE INDEX IF NOT EXISTS idx_distribution_status ON distribution_requests(status);
 CREATE INDEX IF NOT EXISTS idx_distribution_agent ON distribution_requests(agent_id);
 
--- Remove the static duplicate_identities seed data since we now query dynamically
-DELETE FROM duplicate_identities WHERE id > 0;
-
 -- Allow soft-delete status for sellers
 ALTER TABLE sellers DROP CONSTRAINT IF EXISTS sellers_status_check;
 ALTER TABLE sellers ADD CONSTRAINT sellers_status_check CHECK (status IN ('active', 'inactive', 'suspended', 'low_stock', 'deleted'));
@@ -236,7 +238,7 @@ ALTER TABLE customers ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES use
 -- Schema additions from production migrations (drift sync)
 -- 006 (account lockout), 007 (updated_at), 009/037 (provider_id),
 -- 010 (timestamp companions), 026 (identity review), 028 (single-device
--- sessions + session audit), 029 (agent full_name)
+-- sessions + session audit), 029 (agent full_name), 044 (token_version)
 -- ============================================================
 
 -- 006: account lockout counters
@@ -246,6 +248,9 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP;
 -- 028: single-device session enforcement
 ALTER TABLE users ADD COLUMN IF NOT EXISTS active_session_sid VARCHAR(64);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS session_expires_at TIMESTAMP;
+
+-- 044: global session revocation (checked by authenticateToken and /auth/refresh)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INT NOT NULL DEFAULT 1;
 
 -- 007: updated_at on all mutable tables (auto-triggered below)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
@@ -258,7 +263,17 @@ ALTER TABLE operations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CUR
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE distribution_requests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
--- 009/037: provider_id FK (providers lookup table, see below)
+-- Providers lookup table (production: telecom operators).
+-- Created BEFORE the provider_id FK columns below: on a fresh database the
+-- REFERENCES providers(id) clauses fail if the table does not exist yet.
+CREATE TABLE IF NOT EXISTS providers (
+  id SERIAL PRIMARY KEY,
+  slug VARCHAR(50) UNIQUE NOT NULL,
+  display_name VARCHAR(100) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 009/037: provider_id FK
 ALTER TABLE sims ADD COLUMN IF NOT EXISTS provider_id INTEGER REFERENCES providers(id) ON DELETE SET NULL;
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS provider_id INTEGER REFERENCES providers(id) ON DELETE SET NULL;
 ALTER TABLE inventories ADD COLUMN IF NOT EXISTS provider_id INTEGER REFERENCES providers(id) ON DELETE SET NULL;
@@ -435,14 +450,6 @@ CREATE TABLE IF NOT EXISTS identity_risk_actions (
 
 CREATE INDEX IF NOT EXISTS idx_identity_risk_actions_id_no ON identity_risk_actions(id_no);
 CREATE INDEX IF NOT EXISTS idx_identity_risk_actions_created ON identity_risk_actions(created_at);
-
--- Providers (production: telecom operators)
-CREATE TABLE IF NOT EXISTS providers (
-  id SERIAL PRIMARY KEY,
-  slug VARCHAR(50) UNIQUE NOT NULL,
-  display_name VARCHAR(100) NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
 
 -- Schema migrations (production: applied migration filenames)
 CREATE TABLE IF NOT EXISTS schema_migrations (

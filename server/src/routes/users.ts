@@ -5,6 +5,7 @@ import { query } from '../db';
 import { logger } from '../logger';
 import { AuthRequest } from '../middleware/auth';
 import { validate, updatePasswordSchema, updateProfileSchema, updateUserPreferencesSchema } from '../validation';
+import { logAudit } from '../audit-log';
 
 const router = Router();
 
@@ -23,20 +24,20 @@ router.put('/password', validate(updatePasswordSchema), async (req: AuthRequest,
       return res.status(401).json({ error: 'Current password is incorrect' });
     }
     const hash = await bcrypt.hash(newPassword, 12);
-    await query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, req.user.id]);
-
-    // Invalidate all existing refresh tokens by clearing the active session
-    // and inserting a blacklisted sentinel so old refresh tokens can no longer
-    // be exchanged. The sentinel is keyed on a wildcard prefix so the refresh
-    // endpoint can check `LIKE` — but since we also clear active_session_sid,
-    // any old JWT will fail the session check anyway.
+    // Invalidate all existing access AND refresh tokens by bumping the global
+    // token_version (checked by both authenticateToken and /auth/refresh), then
+    // clear the active session so any halfway-decoded JWT also fails the
+    // session check. Old tokens carry the previous tv and are rejected.
     await query(
-      'UPDATE users SET active_session_sid = NULL, session_expires_at = NULL WHERE id = $1',
-      [req.user.id]
+      `UPDATE users SET password_hash = $1, token_version = token_version + 1,
+              active_session_sid = NULL, session_expires_at = NULL
+       WHERE id = $2`,
+      [hash, req.user.id]
     );
     logger.info(`[AUTH] Password changed for user ${req.user.id} — session invalidated`);
 
     res.json({ message: 'Password updated successfully' });
+    void logAudit({ type: 'password_changed', title: `تغيير كلمة المرور: ${req.user?.username || 'unknown'}`, username: req.user?.username || 'unknown' });
   } catch (err) {
     logger.error('Error updating password:', err);
     res.status(500).json({ error: 'Internal server error' });

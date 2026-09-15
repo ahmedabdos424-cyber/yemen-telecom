@@ -40,7 +40,14 @@ export function captureError(error: unknown, context?: string) {
   } else {
     push('error', `${msg} ${safeMsg}`, { context });
   }
-  try { Sentry.captureException(error, { tags: { context: context || 'unknown' } }); } catch {}
+  try {
+    const safeError = new Error(safeMsg);
+    safeError.name = error instanceof Error ? error.name : 'Error';
+    if (error instanceof Error && error.stack) {
+      safeError.stack = redact(error.stack);
+    }
+    Sentry.captureException(safeError, { tags: { context: context || 'unknown', redacted: 'true' } });
+  } catch {}
 }
 
 export function captureEvent(name: string, data?: Record<string, unknown>) {

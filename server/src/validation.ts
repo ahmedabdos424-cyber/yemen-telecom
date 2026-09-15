@@ -242,7 +242,7 @@ function optionalOperator() {
 }
 
 // Helper to resolve operator string to provider_id
-export function resolveProviderId(_db: any, operatorOrId: string | number): number {
+export function resolveProviderId(operatorOrId: string | number): number {
   if (typeof operatorOrId === 'number') return operatorOrId;
   const normalized = normalizeOperator(operatorOrId);
   const providers: Record<string, number> = {
@@ -254,7 +254,7 @@ export function resolveProviderId(_db: any, operatorOrId: string | number): numb
 }
 
 // Helper to resolve provider_id to display_name
-export function resolveProviderDisplayName(_db: any, providerId: number): string {
+export function resolveProviderDisplayName(providerId: number): string {
   const names: Record<number, string> = {
     1: 'Yemen Mobile',
     2: 'Sabafon',
@@ -264,7 +264,7 @@ export function resolveProviderDisplayName(_db: any, providerId: number): string
 }
 
 // Helper to resolve provider_id to slug
-export function resolveProviderSlug(_db: any, providerId: number): string {
+export function resolveProviderSlug(providerId: number): string {
   const slugs: Record<number, string> = {
     1: 'yemen_mobile',
     2: 'sabafon',
@@ -287,6 +287,9 @@ export const createOperationSchema = z.object({
   contract_image: z.string().max(500).optional(),
   contractImage: z.string().max(500).optional(),
   iccid: z.string().max(30).optional(),
+  // Client-supplied idempotency key (op_id column is VARCHAR(100) UNIQUE).
+  op_id: z.string().max(100).optional(),
+  opId: z.string().max(100).optional(),
 });
 
 // Inventories

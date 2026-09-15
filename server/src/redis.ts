@@ -1,4 +1,5 @@
 import { createClient, RedisClientType } from 'redis';
+import crypto from 'crypto';
 import { logger } from './logger';
 
 let redisClient: RedisClientType | null = null;
@@ -67,6 +68,11 @@ export async function checkRateLimit(
   const now = Date.now();
   const windowStart = now - windowMs;
   const redisKey = `ratelimit:${key}`;
+  // Stable member id reused for the add and (possible) remove below, so the
+  // over-limit cleanup actually deletes the entry just inserted (crypto-random,
+  // not Math.random, to stay collision-safe under high concurrency).
+  const memberId = crypto.randomBytes(16).toString('hex');
+  const member = `${now}:${memberId}`;
 
   try {
     const multi = client.multi();
@@ -75,7 +81,7 @@ export async function checkRateLimit(
     // Count current entries
     multi.zCard(redisKey);
     // Add current request
-    multi.zAdd(redisKey, { score: now, value: `${now}:${Math.random()}` });
+    multi.zAdd(redisKey, { score: now, value: member });
     // Set expiry on the key
     multi.expire(redisKey, Math.ceil(windowMs / 1000) + 1);
     const results = await multi.exec();
@@ -86,7 +92,7 @@ export async function checkRateLimit(
 
     if (!allowed) {
       // Remove the request we just added since it's over limit
-      await client.zRem(redisKey, `${now}:${Math.random()}`);
+      await client.zRem(redisKey, member);
     }
 
     return {
@@ -201,19 +207,21 @@ export async function clearExpiredLoginLocksRedis(): Promise<void> {
   if (!client) return;
 
   try {
-    // Scan for loginlock keys and clean expired ones
-    // Note: For production with many keys, use a scheduled job with SCAN
-    const keys = await client.keys('loginlock:*');
-    const now = Date.now();
+    // Use SCAN instead of KEYS to avoid blocking Redis on large datasets.
     const LOGIN_LOCK_TTL_MS = 30 * 60 * 1000;
-
-    for (const key of keys) {
-      const data = await client.hGetAll(key);
-      const lockedUntil = parseInt(data.lockedUntil || '0', 10);
-      if (now > lockedUntil + LOGIN_LOCK_TTL_MS) {
-        await client.del(key);
+    const now = Date.now();
+    let cursor = 0;
+    do {
+      const result = await client.scan(cursor, { MATCH: 'loginlock:*', COUNT: 100 });
+      cursor = result.cursor;
+      for (const key of result.keys) {
+        const data = await client.hGetAll(key);
+        const lockedUntil = parseInt(data.lockedUntil || '0', 10);
+        if (now > lockedUntil + LOGIN_LOCK_TTL_MS) {
+          await client.del(key);
+        }
       }
-    }
+    } while (cursor !== 0);
   } catch (err) {
     logger.error('[REDIS] Clear expired login locks failed:', err);
   }

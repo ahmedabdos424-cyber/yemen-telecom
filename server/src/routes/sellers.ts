@@ -3,8 +3,9 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { query, transaction } from '../db';
 import { logger } from '../logger';
-import { requireRole, AuthRequest } from '../middleware/auth';
+import { requireRole, AuthRequest, resolveScopeAgentId } from '../middleware/auth';
 import { getPagination } from '../helpers';
+import { getUniqueViolationKind } from '../helpers/dbErrors';
 import { validate, createSellerSchema, updateSellerSchema, updateSellerBalanceSchema } from '../validation';
 import { broadcastEvent } from '../services/realtime.service';
 import { notifyNewMember } from '../services/fcm.service';
@@ -84,11 +85,10 @@ router.get('/', requireRole('manager', 'agent', 'seller'), async (req: AuthReque
         );
       }
     } else if (req.user.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      if (agentRes.rows.length === 0) {
+      const agentId = await resolveScopeAgentId(req);
+      if (agentId == null) {
         return res.json([]);
       }
-      const agentId = agentRes.rows[0].id;
       if (paginate) {
         result = await query(
           `SELECT s.*, a.name as agent_name 
@@ -150,8 +150,8 @@ router.get('/:id', requireRole('manager', 'agent', 'seller'), async (req: AuthRe
       return res.status(404).json({ error: 'Seller not found' });
     }
     if (req.user.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      if (agentRes.rows.length === 0 || agentRes.rows[0].id !== result.rows[0].agent_id) {
+      const agentId = await resolveScopeAgentId(req);
+      if (agentId == null || Number(agentId) !== Number(result.rows[0].agent_id)) {
         return res.status(403).json({ error: 'Access denied: this seller does not belong to your agency' });
       }
     } else if (req.user.role === 'seller') {
@@ -188,11 +188,10 @@ router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), 
     // prevent cross-tenant (IDOR) assignment of sellers to another agency.
     let agentId: number | null = null;
     if (req.user?.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      if (agentRes.rows.length === 0) {
+      agentId = await resolveScopeAgentId(req);
+      if (agentId == null) {
         return res.status(403).json({ error: 'Access denied: no agency is associated with your account' });
       }
-      agentId = agentRes.rows[0].id;
     } else if (agent_name) {
       const agentRes = await query('SELECT id FROM agents WHERE name = $1', [agent_name]);
       if (agentRes.rows.length > 0) {
@@ -250,10 +249,23 @@ router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), 
     res.status(201).json({
       seller: createdSeller,
       message: 'تم إنشاء البائع بنجاح. اسم المستخدم: ' + sellerUsername,
+      credentials: {
+        username: sellerUsername,
+        password: sellerPassword
+      }
     });
   } catch (err: unknown) {
     if (err && typeof err === 'object' && 'statusCode' in err && (err as { statusCode?: number }).statusCode === 409) {
       return res.status(409).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+    // The pre-check above guards the common case, but the unique index can still
+    // reject a concurrent duplicate (TOCTOU) — surface it as 409, never 500.
+    const kind = getUniqueViolationKind(err);
+    if (kind === 'username') {
+      return res.status(409).json({ error: 'اسم المستخدم غير متاح؛ يرجى إعادة المحاولة أو اختيار اسم مستخدم آخر' });
+    }
+    if (kind === 'phone') {
+      return res.status(409).json({ error: 'رقم الهاتف مستخدم بالفعل' });
     }
     logger.error('Error creating seller:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -268,8 +280,8 @@ router.put('/:id', requireRole('manager', 'agent'), validate(updateSellerSchema)
       return res.status(404).json({ error: 'Seller not found' });
     }
     if (req.user?.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      if (agentRes.rows.length === 0 || agentRes.rows[0].id !== existing.rows[0].agent_id) {
+      const agentId = await resolveScopeAgentId(req);
+      if (agentId == null || Number(agentId) !== Number(existing.rows[0].agent_id)) {
         return res.status(403).json({ error: 'Access denied: this seller does not belong to your agency' });
       }
     }
@@ -322,8 +334,8 @@ router.put('/:id/balance', requireRole('manager', 'agent'), validate(updateSelle
       return res.status(404).json({ error: 'Seller not found' });
     }
     if (req.user?.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      if (agentRes.rows.length === 0 || agentRes.rows[0].id !== existing.rows[0].agent_id) {
+      const agentId = await resolveScopeAgentId(req);
+      if (agentId == null || Number(agentId) !== Number(existing.rows[0].agent_id)) {
         return res.status(403).json({ error: 'Access denied: this seller does not belong to your agency' });
       }
     }
@@ -381,8 +393,8 @@ router.post('/:id/reset-password', requireRole('manager', 'agent'), async (req: 
       return res.status(404).json({ error: 'Seller not found' });
     }
     if (req.user?.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      if (agentRes.rows.length === 0 || agentRes.rows[0].id !== sellerRes.rows[0].agent_id) {
+      const agentId = await resolveScopeAgentId(req);
+      if (agentId == null || Number(agentId) !== Number(sellerRes.rows[0].agent_id)) {
         return res.status(403).json({ error: 'Access denied: this seller does not belong to your agency' });
       }
     }
@@ -406,6 +418,10 @@ router.post('/:id/reset-password', requireRole('manager', 'agent'), async (req: 
     const userRes = await query('SELECT username FROM users WHERE id = $1', [seller.user_id]);
     res.json({
       message: `تم إعادة تعيين كلمة المرور بنجاح لـ ${seller.name}. اسم المستخدم: ${userRes.rows[0].username}`,
+      credentials: {
+        username: userRes.rows[0].username,
+        password: newPassword
+      }
     });
   } catch (err) {
     logger.error('Error resetting seller password:', err);
@@ -421,8 +437,8 @@ router.delete('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, 
       return res.status(404).json({ error: 'Seller not found' });
     }
     if (req.user?.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      if (agentRes.rows.length === 0 || agentRes.rows[0].id !== existing.rows[0].agent_id) {
+      const agentId = await resolveScopeAgentId(req);
+      if (agentId == null || Number(agentId) !== Number(existing.rows[0].agent_id)) {
         return res.status(403).json({ error: 'Access denied: this seller does not belong to your agency' });
       }
     }

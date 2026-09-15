@@ -190,8 +190,14 @@ app.get('/', (_req, res) => {
 // Serve remaining static files (manifest, icons, etc.) — GET / is already handled above
 app.use(express.static('dist', { maxAge: '1y', immutable: true, etag: true }));
 
-// CSRF token generation endpoint (must be after CORS middleware)
-app.get('/api/csrf-token', (_req, res) => {
+// CSRF token generation endpoint (must be after CORS middleware). A light
+// per-IP limiter prevents abuse of this public, unauthenticated endpoint.
+const csrfLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: { error: 'Too many requests, please slow down' },
+});
+app.get('/api/csrf-token', csrfLimiter, (_req, res) => {
   const token = crypto.randomBytes(32).toString('hex');
   const hash = crypto.createHmac('sha256', CSRF_SECRET).update(token).digest('hex');
   res.json({ token, hash });

@@ -9,6 +9,7 @@ import { requireRole, AuthRequest } from '../../middleware/auth';
 import { validate, resetDataSchema } from '../../validation';
 import { resetSystemData } from '../../reset-data';
 import { createAlert } from '../../services/alerts.service';
+import { logAudit } from '../../audit-log';
 
 const router = Router();
 
@@ -38,6 +39,7 @@ router.post('/reset', requireRole('manager'), validate(resetDataSchema), async (
       userId: req.user?.id ?? null,
     });
     res.json({ success: true, message: 'System data reset completed', deleted: summary.deleted });
+    void logAudit({ type: 'system_reset', title: 'تصفير بيانات النظام', username: req.user?.username || 'unknown' });
   } catch (err) {
     logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
     res.status(503).json({ error: 'خدمة الخارة غير متاحة', message: 'تعذر التواصل مع خدمة الخلفية — يرجى إعادة المحاولة لاحقاً' });
@@ -47,7 +49,7 @@ router.post('/reset', requireRole('manager'), validate(resetDataSchema), async (
 // ========================
 // System: Backup
 // ========================
-router.post('/system/backup', requireRole('manager'), async (_req: Request, res: Response) => {
+router.post('/system/backup', requireRole('manager'), async (req: AuthRequest, res: Response) => {
   try {
     const allowedTables: Record<string, string> = {
       users: 'SELECT id, username, display_name, role, status, phone, email, region, created_at, last_login FROM users ORDER BY id',
@@ -84,6 +86,7 @@ router.post('/system/backup', requireRole('manager'), async (_req: Request, res:
       records: Object.values(backup).reduce((sum, arr) => sum + arr.length, 0),
       downloadUrl: result.url,
     });
+    void logAudit({ type: 'backup_created', title: `إنشاء نسخة احتياطية: ${result.filename}`, username: req.user?.username || 'unknown' });
   } catch (err) {
     logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
     res.status(503).json({ error: 'خدمة الخارة غير متاحة', message: 'تعذر التواصل مع خدمة الخلفية — يرجى إعادة المحاولة لاحقاً' });
@@ -114,7 +117,7 @@ router.get('/system/backup/download/:filename', requireRole('manager'), async (r
 // ========================
 // System: Emergency Lockdown
 // ========================
-router.post('/system/lockdown', requireRole('manager'), async (_req: Request, res: Response) => {
+router.post('/system/lockdown', requireRole('manager'), async (req: AuthRequest, res: Response) => {
   try {
     const current = await query('SELECT maintenance_mode FROM system_settings WHERE id = 1');
     const isCurrentlyLocked = current.rows[0]?.maintenance_mode || false;
@@ -126,6 +129,16 @@ router.post('/system/lockdown', requireRole('manager'), async (_req: Request, re
       `UPDATE sellers SET status = $1 WHERE status NOT IN ('deleted')`,
       [!isCurrentlyLocked ? 'suspended' : 'active']
     );
+    if (!isCurrentlyLocked) {
+      // Lockdown: force every non-manager session to re-authenticate. `sellers`
+      // status is a different table, so without this bump seller/agent JWTs
+      // would remain valid even while seller rows are suspended.
+      await query(
+        `UPDATE users SET token_version = token_version + 1,
+                active_session_sid = NULL, session_expires_at = NULL
+         WHERE role <> 'manager' AND status <> 'inactive'`
+      );
+    }
     const newStatus = !isCurrentlyLocked;
     invalidateMaintenanceMode();
     res.json({
@@ -133,6 +146,7 @@ router.post('/system/lockdown', requireRole('manager'), async (_req: Request, re
       locked: newStatus,
       message: newStatus ? 'Emergency lockdown activated. All seller accounts suspended.' : 'Lockdown deactivated. All seller accounts restored.',
     });
+    void logAudit({ type: newStatus ? 'lockdown_activated' : 'lockdown_deactivated', title: newStatus ? 'تفعيل الإغلاق الطارئ' : 'رفع الإغلاق الطارئ', username: req.user?.username || 'unknown' });
   } catch (err) {
     logger.error('Failed to process request:', { error: err, stack: (err as Error).stack });
     res.status(503).json({ error: 'خدمة الخارة غير متاحة', message: 'تعذر التواصل مع خدمة الخلفية — يرجى إعادة المحاولة لاحقاً' });

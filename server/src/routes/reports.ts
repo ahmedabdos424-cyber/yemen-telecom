@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { query } from '../db';
 import { logger } from '../logger';
 import { cacheGet, cacheSet } from '../cache';
-import { requireRole, AuthRequest } from '../middleware/auth';
+import { requireRole, AuthRequest, resolveScopeAgentId } from '../middleware/auth';
 import {
   DailySalesRow,
   AgentPerformanceRow,
@@ -10,7 +10,6 @@ import {
   SellerPerformanceRow,
   ActivationsReportRow,
   SellersRegistryRow,
-  AgentIdRow,
 } from '../types/reports';
 
 const router = Router();
@@ -91,12 +90,12 @@ router.get('/seller-performance', requireRole('manager', 'agent'), async (req: A
     let whereClause = '';
     let params: unknown[] | undefined;
     if (req.user?.role === 'agent') {
-      const agentRes = await query<AgentIdRow>('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      if (agentRes.rows.length === 0) {
+      const agentId = await resolveScopeAgentId(req);
+      if (agentId == null) {
         return res.json([]);
       }
       whereClause = ' WHERE s.agent_id = $1';
-      params = [agentRes.rows[0].id];
+      params = [agentId];
     }
     const result = await query<SellerPerformanceRow>(`
       SELECT
@@ -130,11 +129,10 @@ router.get('/activations', requireRole('manager', 'agent'), async (req: AuthRequ
     let whereClause = 'WHERE o.type = $1';
     let params: unknown[] = ['activate'];
     if (req.user?.role === 'agent') {
-      const agentRes = await query<AgentIdRow>('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      if (agentRes.rows.length === 0) {
+      const agentId = await resolveScopeAgentId(req);
+      if (agentId == null) {
         return res.json([]);
       }
-      const agentId = agentRes.rows[0].id;
       whereClause = `WHERE o.type = $1 AND (
         o.created_by = $2
         OR o.created_by IN (SELECT s.user_id FROM sellers s WHERE s.agent_id = $2)
@@ -171,12 +169,12 @@ router.get('/sellers', requireRole('manager', 'agent'), async (req: AuthRequest,
     let whereClause = '';
     let params: unknown[] | undefined;
     if (req.user?.role === 'agent') {
-      const agentRes = await query<AgentIdRow>('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      if (agentRes.rows.length === 0) {
+      const agentId = await resolveScopeAgentId(req);
+      if (agentId == null) {
         return res.json([]);
       }
       whereClause = ' WHERE s.agent_id = $1';
-      params = [agentRes.rows[0].id];
+      params = [agentId];
     }
     const result = await query<SellersRegistryRow>(`
       SELECT

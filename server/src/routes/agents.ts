@@ -1,13 +1,14 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { query, transaction } from '../db';
 import { logger } from '../logger';
-import { requireRole, AuthRequest } from '../middleware/auth';
+import { requireRole, AuthRequest, resolveScopeAgentId } from '../middleware/auth';
 import { getPagination, paginatedQuery, rejectIfUnpaginatedTooLarge } from '../helpers';
 import { validate, createAgentSchema, updateAgentSchema } from '../validation';
 import { notifyNewMember } from '../services/fcm.service';
 import { getUniqueViolationKind } from '../helpers/dbErrors';
+import { logAudit } from '../audit-log';
 
 const router = Router();
 
@@ -80,6 +81,7 @@ router.post('/', requireRole('manager'), validate(createAgentSchema), async (req
         password: agentPassword
       }
     });
+    void logAudit({ type: 'agent_created', title: `إنشاء وكيل: ${name}`, username: req.user?.username || 'unknown' });
    } catch (err) {
     const kind = getUniqueViolationKind(err);
     if (kind === 'phone') {
@@ -107,8 +109,8 @@ router.get('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, res
   if (agentId === null) return;
   try {
     if (req.user?.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      if (agentRes.rows.length === 0 || agentRes.rows[0].id !== agentId) {
+      const scopedAgentId = await resolveScopeAgentId(req);
+      if (scopedAgentId == null || Number(scopedAgentId) !== Number(agentId)) {
         return res.status(403).json({ error: 'Access denied: this agent does not belong to your account' });
       }
     }
@@ -148,13 +150,14 @@ router.delete('/:id', requireRole('manager'), async (req: AuthRequest, res: Resp
       await client.query('UPDATE agents SET status = $1, sellers_count = 0 WHERE id = $2', ['deleted', agentId]);
     });
     res.json({ message: 'Agent deleted successfully' });
+    void logAudit({ type: 'agent_deleted', title: `حذف وكيل: ${agent.name}`, username: req.user?.username || 'unknown' });
   } catch (err) {
     logger.error('Error deleting agent:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-router.put('/:id', requireRole('manager'), validate(updateAgentSchema), async (req: Request, res: Response) => {
+router.put('/:id', requireRole('manager'), validate(updateAgentSchema), async (req: AuthRequest, res: Response) => {
   const agentId = parseId(req.params.id, res);
   if (agentId === null) return;
   try {
@@ -186,6 +189,7 @@ router.put('/:id', requireRole('manager'), validate(updateAgentSchema), async (r
       }
     }
     res.json(result.rows[0]);
+    void logAudit({ type: 'agent_updated', title: `تحديث وكيل: ${name}`, username: req.user?.username || 'unknown' });
    } catch (err) {
     const kind = getUniqueViolationKind(err);
     if (kind === 'phone') {

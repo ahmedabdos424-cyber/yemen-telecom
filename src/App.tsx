@@ -9,9 +9,10 @@ import LoadingScreen from './components/shared/LoadingScreen';
 import ErrorBoundary from './components/shared/ErrorBoundary';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
 import { useToast, ToastContainer } from './hooks/useToast';
-import { SESSION_EXPIRED_EVENT, ensureServerIsAwake } from './api/client';
+import { api, SESSION_EXPIRED_EVENT, ensureServerIsAwake } from './api/client';
 import { initPushNotifications, removePushListeners } from './services/pushNotifications';
 import { connectRealtime, disconnectRealtime, onRealtimeEvent } from './services/realtime';
+import { retryFailed } from './services/offlineQueue';
 const DashboardView = lazy(() => import('./components/DashboardView'));
 const SIMsView = lazy(() => import('./components/SIMsView'));
 const AgentsView = lazy(() => import('./components/AgentsView'));
@@ -41,7 +42,17 @@ import { Check, Copy, Fingerprint, X } from 'lucide-react';
 
 // Moved outside AuthenticatedApp to prevent remounting on every render.
 // These components read from refs so they don't cause re-renders themselves.
-function SharedOfflineBanner({ isOnline, pendingTotal }: { isOnline: boolean; pendingTotal: number }) {
+function SharedOfflineBanner({ isOnline, pendingTotal, onRetry }: { isOnline: boolean; pendingTotal: number; onRetry: () => void }) {
+  const retryButton = pendingTotal > 0 ? (
+    <button
+      onClick={onRetry}
+      className="bg-white/25 hover:bg-white/35 active:bg-white/40 rounded-full px-2.5 py-0.5 min-h-[32px] flex items-center justify-center gap-1 transition-colors cursor-pointer"
+      aria-label="إعادة محاولة المزامنة"
+    >
+      <span className="material-symbols-outlined text-xs">refresh</span>
+      إعادة المحاولة
+    </button>
+  ) : null;
   return !isOnline ? (
     <div className="fixed top-0 left-0 right-0 z-[60] bg-red-600 text-white text-center py-1.5 text-[11px] font-bold shadow-lg flex items-center justify-center gap-2" role="alert" aria-live="assertive">
       <span className="material-symbols-outlined text-xs">wifi_off</span>
@@ -51,12 +62,14 @@ function SharedOfflineBanner({ isOnline, pendingTotal }: { isOnline: boolean; pe
           {pendingTotal} عملية بانتظار المزامنة
         </span>
       ) : null}
+      {retryButton}
     </div>
   ) : (
     pendingTotal > 0 ? (
       <div className="fixed top-0 left-0 right-0 z-[60] bg-amber-500 text-white text-center py-1.5 text-[11px] font-bold shadow-lg flex items-center justify-center gap-2" role="status" aria-live="polite">
         <span className="material-symbols-outlined text-xs">sync</span>
         {pendingTotal} عملية تنتظر المزامنة عند عودة الاتصال
+        {retryButton}
       </div>
     ) : null
   );
@@ -64,7 +77,7 @@ function SharedOfflineBanner({ isOnline, pendingTotal }: { isOnline: boolean; pe
 
 function ToastNotifications({ toasts, onDismiss, onNavigate }: { toasts: Array<{ id: string; title: string; message: string }>; onDismiss: (id: string) => void; onNavigate: (path: string) => void }) {
   return (
-    <div className="fixed top-20 left-4 z-40 w-full max-w-sm flex flex-col gap-3 pointer-events-none">
+    <div className="fixed top-[calc(3.5rem+env(safe-area-inset-top))] inset-x-4 z-40 max-w-[calc(100vw-2rem)] flex flex-col gap-3 pointer-events-none">
       <AnimatePresence>
         {toasts.map((toast) => (
           <motion.div key={toast.id} initial={{ opacity: 0, x: -100, scale: 0.95 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -100, scale: 0.95 }} transition={{ duration: 0.3 }}
@@ -113,10 +126,26 @@ function AuthenticatedApp() {
   useEffect(() => { agtRef.current = agt; });
 
   // Notification preference flags (mirror the toggles in SettingsPanel).
-  // Both default to ON unless explicitly stored as 'false'.
+  // Both default to ON unless explicitly stored as 'false'. The server's
+  // user_preferences table is the source of truth (CL-4); localStorage acts as
+  // an instant offline cache that is reconciled on each login/role change.
   const SIM_NOTIF_KEY = 'tele_sim_notifications';
   const LOW_STOCK_NOTIF_KEY = 'tele_low_stock_notifications';
-  const notifEnabled = (key: string) => localStorage.getItem(key) !== 'false';
+  const [simNotifEnabled, setSimNotifEnabled] = useState<boolean>(
+    () => localStorage.getItem(SIM_NOTIF_KEY) !== 'false'
+  );
+  const [lowStockNotifEnabled, setLowStockNotifEnabled] = useState<boolean>(
+    () => localStorage.getItem(LOW_STOCK_NOTIF_KEY) !== 'false'
+  );
+
+  useEffect(() => {
+    api.getUserPreferences().then((prefs) => {
+      setSimNotifEnabled(prefs.simNotifications);
+      setLowStockNotifEnabled(prefs.lowStockNotifications);
+      localStorage.setItem(SIM_NOTIF_KEY, String(prefs.simNotifications));
+      localStorage.setItem(LOW_STOCK_NOTIF_KEY, String(prefs.lowStockNotifications));
+    }).catch(() => { /* offline — keep the localStorage cache */ });
+  }, [role]);
   const lowStockRef = useRef<Set<string>>(new Set());
 
   // Register this device for FCM push notifications once a user is logged in.
@@ -128,8 +157,8 @@ function AuthenticatedApp() {
     initPushNotifications((payload) => {
       if (cancelled) return;
       if (payload.title || payload.body) {
-        // Respect the "توزيع الشرائح" notification preference.
-        if (notifEnabled(SIM_NOTIF_KEY)) {
+        // Respect the "توزيع الشرائح" notification preference (server-backed).
+        if (simNotifEnabled) {
           toastInfo(payload.title || 'إشعار جديد', payload.body);
         }
       }
@@ -168,7 +197,7 @@ function AuthenticatedApp() {
       }
       if (isAlertCreated) {
         // Respect the "توزيع الشرائح" notification preference for system alerts.
-        if (notifEnabled(SIM_NOTIF_KEY)) {
+        if (simNotifEnabled) {
           toastInfo(String(event.title ?? 'تنبيه جديد'), String(event.description ?? ''));
         }
       }
@@ -184,7 +213,7 @@ function AuthenticatedApp() {
   // newly crosses the threshold, and respect the low-stock notification toggle.
   useEffect(() => {
     if (!role || (role !== 'agent' && role !== 'seller')) return;
-    if (!notifEnabled(LOW_STOCK_NOTIF_KEY)) {
+    if (!lowStockNotifEnabled) {
       lowStockRef.current = new Set();
       return;
     }
@@ -258,7 +287,7 @@ function AuthenticatedApp() {
   if (role === 'manager') {
     return (
       <div className="min-h-dvh bg-theme-background font-sans antialiased text-slate-100">
-        <SharedOfflineBanner isOnline={isOnline} pendingTotal={pendingTotal} />
+        <SharedOfflineBanner isOnline={isOnline} pendingTotal={pendingTotal} onRetry={() => { retryFailed().catch(() => { /* handled by queue-changed refresh */ }); }} />
         <div className="flex pt-[calc(4rem+env(safe-area-inset-top))] min-h-dvh overflow-y-auto pb-[calc(4rem+env(safe-area-inset-bottom))]">
           <main className="flex-1 px-3 sm:px-4 md:px-8 py-4 md:py-8 lg:pt-10">
             <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
@@ -347,7 +376,7 @@ function AuthenticatedApp() {
 
   return (
     <div className="min-h-dvh transition-colors duration-300 font-sans bg-slate-950 text-slate-100">
-      <SharedOfflineBanner isOnline={isOnline} pendingTotal={pendingTotal} />
+      <SharedOfflineBanner isOnline={isOnline} pendingTotal={pendingTotal} onRetry={() => { retryFailed().catch(() => { /* handled by queue-changed refresh */ }); }} />
       {isLoading && !role ? <LoadingScreen /> : (
       <>
         <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:32px_32px] opacity-15 pointer-events-none" />

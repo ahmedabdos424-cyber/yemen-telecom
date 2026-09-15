@@ -10,6 +10,7 @@ import type {
   MappedOperation, CreateOperationRequest,
   MappedInventory, UpdateInventoryItem,
   AlertRow,
+  CustomerRow, CustomerDetailRow,
   AdminSettingsResponse, UpdateSettingsRequest, MappedTransaction, DuplicateIdentityRow, AuditLogEntry, AuditLogPageResponse,
   UpdateProfileRequest,
   StatsResponse,
@@ -48,9 +49,6 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, retries 
   throw lastErr instanceof Error ? lastErr : new Error('Network request failed');
 }
 
-const hostname = window.location.hostname;
-const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('10.') || hostname.startsWith('192.168.');
-
 function detectCapacitor(): boolean {
   try {
     return !!(window as unknown as { Capacitor?: { isNative?: boolean } }).Capacitor?.isNative;
@@ -67,18 +65,17 @@ function detectCapacitor(): boolean {
 // keeps the relative '/api' path.
 const PROD_API = 'https://yemen-telecom.onrender.com/api';
 function resolveApiBase(): string {
+  // Vite dev server handles /api proxying via vite.config.ts → always relative.
   if (import.meta.env.DEV) return '/api';
-  // E2E/CI builds run `vite preview` against a local API; when the build was
-  // produced with VITE_PROXY_TARGET set (ci.yml e2e job) the relative path is
-  // safe because the preview proxy forwards /api to the local server. The APK
-  // and production builds never set this var, so they keep the absolute URL.
+  // E2E/CI builds run `vite preview` with VITE_PROXY_TARGET set; the preview
+  // proxy forwards /api to the local server, so relative path is safe.
   if (import.meta.env.VITE_PROXY_TARGET) return '/api';
+  // Native Capacitor app — always target the production API.
   if (detectCapacitor()) return PROD_API;
-  if (isLocal) {
-    // Inside the native WebView (androidScheme https) the origin is localhost but
-    // there is no local server, so always use the production API.
-    return PROD_API;
-  }
+  // Fallback: inside the native WebView, window.Capacitor may not yet be
+  // injected (timing), so any localhost origin must still target production.
+  // For normal browser access on localhost, prefer running `npm run dev`
+  // (Vite proxy) or set VITE_PROXY_TARGET for `npm run preview`.
   return PROD_API;
 }
 
@@ -398,11 +395,17 @@ export type { ApiLoginResponse, ApiMeResponse, ApiBackupResponse, ApiLockdownRes
 
 export const api = {
   // Auth
-  login: (username: string, password: string) =>
-    request<ApiLoginResponse>('/auth/login', {
+  login: async (username: string, password: string) => {
+    const res = await request<ApiLoginResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
-    }),
+    });
+    // Rotate the CSRF token after a successful login so any token fetched
+    // before authentication (shared kiosk, stale session) is not reused for
+    // the new session (audit: CSRF token not rotated on login).
+    await fetchCsrfToken();
+    return res;
+  },
 
   getMe: () => request<ApiMeResponse>('/auth/me'),
   logout: () => request<Record<string, unknown>>('/auth/logout', { method: 'POST' }),
@@ -441,6 +444,8 @@ export const api = {
 
   // Sellers
   getSellers: () => request<MappedSeller[]>('/sellers'),
+  getSellersPaged: (page: number, limit = 20) =>
+    request<MappedSeller[]>(`/sellers?page=${page}&limit=${limit}`),
   createSeller: (data: CreateSellerRequest) =>
     request<CreateSellerResponse>('/sellers', { method: 'POST', body: JSON.stringify(data) }),
   updateSeller: (id: number, data: UpdateSellerRequest) =>
@@ -468,6 +473,12 @@ export const api = {
     request<MappedInventory[]>('/inventories', { method: 'PUT', body: JSON.stringify(data) }),
 
   // Customers
+  getCustomers: (page?: number, limit = 20) =>
+    request<CustomerRow[]>(page != null ? `/customers?page=${page}&limit=${limit}` : '/customers'),
+  searchCustomers: (q: string) =>
+    request<CustomerRow[]>(`/customers/search?q=${encodeURIComponent(q)}`),
+  getCustomer: (id: number | string) =>
+    request<CustomerDetailRow>(`/customers/${id}`),
   createCustomer: (data: { fullName: string; idNumber: string; idType?: string; idIssueDate?: string; phone?: string; region?: string }) =>
     request<Record<string, unknown>>('/customers', { method: 'POST', body: JSON.stringify(data) }),
 

@@ -1,30 +1,33 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { IDBPDatabase } from 'idb';
 
-const store = new Map<number, Record<string, unknown>>();
+const stores: Record<string, Map<number | string, Record<string, unknown>>> = {
+  queue: new Map(),
+  keys: new Map(),
+};
 let nextId = 1;
 
 const mockDb = {
   add: vi.fn(async (_storeName: string, value: Record<string, unknown>) => {
     const id = nextId++;
-    store.set(id, { ...value, id });
+    stores[_storeName]!.set(id, { ...value, id });
     return id;
   }),
-  get: vi.fn(async (_storeName: string, key: number) => store.get(key)),
-  getAll: vi.fn(async () => Array.from(store.values())),
+  get: vi.fn(async (_storeName: string, key: number | string) => stores[_storeName]?.get(key)),
+  getAll: vi.fn(async (_storeName: string) => Array.from(stores[_storeName]?.values() ?? [])),
   getAllFromIndex: vi.fn(async (_storeName: string, _index: string, key: string) =>
-    Array.from(store.values()).filter(v => v.status === key),
+    Array.from(stores[_storeName]?.values() ?? []).filter(v => v.status === key),
   ),
   put: vi.fn(async (_storeName: string, value: Record<string, unknown>) => {
-    const id = value.id as number;
-    store.set(id, value);
+    const id = value.id as number | string;
+    stores[_storeName]!.set(id, value);
     return id;
   }),
-  delete: vi.fn(async (_storeName: string, key: number) => {
-    store.delete(key);
+  delete: vi.fn(async (_storeName: string, key: number | string) => {
+    stores[_storeName]?.delete(key);
   }),
-  clear: vi.fn(async () => {
-    store.clear();
+  clear: vi.fn(async (_storeName: string) => {
+    stores[_storeName]?.clear();
   }),
 } as unknown as IDBPDatabase;
 
@@ -55,7 +58,8 @@ import {
 } from '../services/offlineQueue';
 
 beforeEach(() => {
-  store.clear();
+  stores.queue.clear();
+  stores.keys.clear();
   nextId = 1;
   networkListeners.length = 0;
   vi.clearAllMocks();
@@ -75,6 +79,16 @@ describe('offlineQueue', () => {
     expect(items[0].kind).toBe('activate');
     expect(items[1].kind).toBe('recharge');
     expect(items[0].status).toBe('pending');
+  });
+
+  it('stores queued payloads encrypted, never in plaintext', async () => {
+    await enqueueOffline('activate', { fullName: 'اسم العميل', idNumber: '1234567890' });
+    const stored = stores.queue.get(1);
+    expect(typeof stored?.payload).toBe('string');
+    expect(stored?.payload as string).toMatch(/^v1:/);
+    expect(stored?.payload as string).not.toContain('اسم العميل');
+    const items = await getQueue();
+    expect(items[0].payload).toEqual({ fullName: 'اسم العميل', idNumber: '1234567890' });
   });
 
   it('reports pending counts via getQueueStats', async () => {

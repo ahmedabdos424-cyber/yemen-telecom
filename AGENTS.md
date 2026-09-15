@@ -72,4 +72,4 @@ cd android && .\gradlew assembleRelease  # only when android/ changed (needs sig
 
 - No new dependencies unless strictly required; prefer existing utilities.
 - Tests: vitest `globals: true`, jsdom; frontend `src/**/*.test.{ts,tsx}`, backend `server/src/**/*.test.{ts,tsx}`; E2E Playwright config is `e2e/playwright.config.ts` (not the root one).
-- Skills: `.agents/skills/supabase/` (auto-loaded for Supabase work), `.claude/skills/testsprite-verify/` (run relevant TestSprite tests before reporting a fix done).
+- Skills: `.agents/skills/supabase/` (auto-loaded for Supabase work).

@@ -1,12 +1,13 @@
 import { Router, Response } from 'express';
 import { query, transaction } from '../db';
 import { logger } from '../logger';
-import { requireRole, AuthRequest } from '../middleware/auth';
+import { requireRole, AuthRequest, resolveScopeAgentId } from '../middleware/auth';
 import { getPagination } from '../helpers';
 import { validate, createDistributionSchema, approveDistributionSchema, resolveProviderId } from '../validation';
 import { broadcastEvent, broadcastToRoles } from '../services/realtime.service';
 import { notifyDistributionApproved } from '../services/fcm.service';
 import crypto from 'crypto';
+import { logAudit } from '../audit-log';
 
 const router = Router();
 
@@ -62,8 +63,8 @@ router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: R
         );
       }
     } else {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user!.id]);
-      if (agentRes.rows.length === 0) return res.json([]);
+      const agentId = await resolveScopeAgentId(req);
+      if (agentId == null) return res.json([]);
       if (paginate) {
         result = await query(
           `SELECT dr.*, a.name AS agent_name, s.name AS seller_name
@@ -72,7 +73,7 @@ router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: R
            LEFT JOIN sellers s ON dr.seller_id = s.id
            WHERE dr.agent_id = $1
            ORDER BY dr.id DESC LIMIT $2 OFFSET $3`,
-          [agentRes.rows[0].id, limit, offset]
+          [agentId, limit, offset]
         );
       } else {
         result = await query(
@@ -82,7 +83,7 @@ router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: R
            LEFT JOIN sellers s ON dr.seller_id = s.id
            WHERE dr.agent_id = $1
            ORDER BY dr.id DESC`,
-          [agentRes.rows[0].id]
+          [agentId]
         );
       }
     }
@@ -96,11 +97,10 @@ router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: R
 router.post('/', requireRole('agent'), validate(createDistributionSchema), async (req: AuthRequest, res: Response) => {
   const { seller_id, seller_name, operator, count, notes } = req.body;
   try {
-    const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user!.id]);
-    if (agentRes.rows.length === 0) {
+    const agentId = await resolveScopeAgentId(req);
+    if (agentId == null) {
       return res.status(400).json({ error: 'Agent profile not found' });
     }
-    const agentId = agentRes.rows[0].id;
     let sellerId = seller_id || null;
     if (seller_name && !sellerId) {
       const s = await query('SELECT id FROM sellers WHERE name = $1 AND agent_id = $2', [seller_name, agentId]);
@@ -114,7 +114,7 @@ router.post('/', requireRole('agent'), validate(createDistributionSchema), async
       }
     }
     const requestId = `DIST-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
-    const providerId = await resolveProviderId(null, operator);
+    const providerId = resolveProviderId(operator);
     const result = await query(
       `INSERT INTO distribution_requests (request_id, agent_id, seller_id, operator, provider_id, count, notes)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
@@ -164,6 +164,7 @@ router.put('/:id/approve', requireRole('manager'), validate(approveDistributionS
     // their distribution request was approved. Never blocks the HTTP response.
     notifyRecipients(req.params.id).catch((err) => logger.warn('[FCM] distribution approval notify failed:', err));
     res.json({ message: `Request ${decision} successfully` });
+    void logAudit({ type: `distribution_${decision}`, title: `${decision === 'approved' ? 'اعتماد' : 'رفض'} طلب توزيع ${req.params.id}`, username: req.user?.username || 'unknown' });
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
     if (errMsg === 'DISTRIBUTION_NOT_FOUND') {
