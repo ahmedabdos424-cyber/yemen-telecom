@@ -41,7 +41,7 @@ router.put('/', requireRole('manager'), validate(updateInventoriesSchema), async
   const updates: Array<{ operator: string | number; available: number; remaining: number }> = req.body;
   try {
     if (updates.length > 0) {
-      await transaction(async (client) => {
+      const touched = await transaction(async (client) => {
         const params: Array<string | number> = [];
         const rows: string[] = [];
         updates.forEach((inv, i) => {
@@ -50,14 +50,20 @@ router.put('/', requireRole('manager'), validate(updateInventoriesSchema), async
           params.push(inv.available, inv.remaining, inv.operator);
         });
         // Support both operator (slug) and provider_id in the update
-        await client.query(
+        const updated = await client.query(
           `UPDATE inventories i
            SET available = u.available, remaining = u.remaining
            FROM (VALUES ${rows.join(', ')}) AS u(available, remaining, operator_or_id)
            WHERE i.operator = u.operator_or_id OR i.provider_id = u.operator_or_id`,
           params
         );
+        return updated.rowCount ?? 0;
       });
+      // L-02: an unknown operator slug matches zero rows — fail loudly (400)
+      // instead of returning 200 with unchanged data.
+      if (touched === 0) {
+        return res.status(400).json({ error: 'No inventory rows matched the requested operator(s)' });
+      }
     }
     const result = await query('SELECT * FROM inventories ORDER BY id');
     const inventories = await Promise.all(result.rows.map(toInventoryDto));

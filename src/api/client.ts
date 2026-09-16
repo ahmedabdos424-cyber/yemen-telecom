@@ -380,15 +380,38 @@ async function uploadFile(file: File | Blob, fieldName = 'image'): Promise<{ url
   await loadTokens();
   const form = new FormData();
   form.append(fieldName, file);
-  const headers: Record<string, string> = {};
-  if (tokens.auth) {
-    headers['Authorization'] = `Bearer ${tokens.auth}`;
+  // M-05: mirror request()'s recovery — a 401 refreshes the access token and
+  // a 403-CSRF refetches the token pair, then the upload is retried once.
+  // (FormData bodies are reusable across retries.)
+  const buildHeaders = (): Record<string, string> => {
+    const headers: Record<string, string> = {};
+    if (tokens.auth) {
+      headers['Authorization'] = `Bearer ${tokens.auth}`;
+    }
+    if (tokens.csrf && tokens.csrfHash) {
+      headers['X-CSRF-Token'] = tokens.csrf;
+      headers['X-CSRF-Hash'] = tokens.csrfHash;
+    }
+    return headers;
+  };
+  const doUpload = () =>
+    fetchWithTimeout(`${API_BASE}/upload/image`, { method: 'POST', headers: buildHeaders(), body: form, credentials: CREDENTIALS_MODE });
+  let res = await doUpload();
+  if (res.status === 401 && tokens.refresh) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      res = await doUpload();
+    }
   }
-  if (tokens.csrf && tokens.csrfHash) {
-    headers['X-CSRF-Token'] = tokens.csrf;
-    headers['X-CSRF-Hash'] = tokens.csrfHash;
+  if (res.status === 403) {
+    const errBody = await res.clone().json().catch(() => ({} as Record<string, unknown>));
+    if (typeof errBody.error === 'string' && errBody.error.includes('CSRF')) {
+      await fetchCsrfToken();
+      if (tokens.csrf && tokens.csrfHash) {
+        res = await doUpload();
+      }
+    }
   }
-  const res = await fetchWithTimeout(`${API_BASE}/upload/image`, { method: 'POST', headers, body: form, credentials: CREDENTIALS_MODE });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || `HTTP ${res.status}`);
@@ -397,6 +420,28 @@ async function uploadFile(file: File | Blob, fieldName = 'image'): Promise<{ url
 }
 
 export type { ApiLoginResponse, ApiMeResponse, ApiBackupResponse, ApiLockdownResponse, ApiResetPasswordResponse, SystemHealthResponse } from './types';
+
+// M-04: preferences are fetched on every shell mount (App + 3 account
+// screens). Share in-flight requests and cache briefly instead of hitting
+// /users/preferences 4x per session start.
+type UserPrefs = { simNotifications: boolean; lowStockNotifications: boolean; fontSize: string; darkMode: boolean };
+const PREFS_TTL_MS = 60_000;
+let prefsCache: { data: UserPrefs; ts: number } | null = null;
+let prefsInflight: Promise<UserPrefs> | null = null;
+async function getCachedUserPreferences(): Promise<UserPrefs> {
+  if (prefsCache && Date.now() - prefsCache.ts < PREFS_TTL_MS) return prefsCache.data;
+  if (!prefsInflight) {
+    prefsInflight = request<UserPrefs>('/users/preferences')
+      .then((data) => {
+        prefsCache = { data, ts: Date.now() };
+        return data;
+      })
+      .finally(() => {
+        prefsInflight = null;
+      });
+  }
+  return prefsInflight;
+}
 
 export const api = {
   // Auth
@@ -589,8 +634,10 @@ export const api = {
     request<{ url: string; filename: string }>(`/upload/signed/${encodeURIComponent(filename)}`),
 
   // User Preferences
-  getUserPreferences: () =>
-    request<{ simNotifications: boolean; lowStockNotifications: boolean; fontSize: string; darkMode: boolean }>('/users/preferences'),
-  updateUserPreferences: (data: { simNotifications?: boolean; lowStockNotifications?: boolean; fontSize?: string; darkMode?: boolean }) =>
-    request<{ message: string }>('/users/preferences', { method: 'PUT', body: JSON.stringify(data) }),
+  getUserPreferences: () => getCachedUserPreferences(),
+  updateUserPreferences: (data: { simNotifications?: boolean; lowStockNotifications?: boolean; fontSize?: string; darkMode?: boolean }) => {
+    // Drop the read cache so the next fetch observes the write.
+    prefsCache = null;
+    return request<{ message: string }>('/users/preferences', { method: 'PUT', body: JSON.stringify(data) });
+  },
 };

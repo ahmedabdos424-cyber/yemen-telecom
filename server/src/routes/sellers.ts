@@ -6,7 +6,7 @@ import { logger } from '../logger';
 import { requireRole, AuthRequest, resolveScopeAgentId } from '../middleware/auth';
 import { getPagination } from '../helpers';
 import { getUniqueViolationKind, formatUniqueViolationMessage } from '../helpers/dbErrors';
-import { validate, idParamSchema, createSellerSchema, updateSellerSchema, updateSellerBalanceSchema } from '../validation';
+import { validate, idParamSchema, rejectEmptyBody, createSellerSchema, updateSellerSchema, updateSellerBalanceSchema } from '../validation';
 import { broadcastScopedEvent } from '../services/realtime.service';
 import { notifyNewMember } from '../services/fcm.service';
 import { cacheInvalidate } from '../cache';
@@ -277,7 +277,7 @@ router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), 
   }
 });
 
-router.put('/:id', requireRole('manager', 'agent'), validate(idParamSchema, 'params'), validate(updateSellerSchema), async (req: AuthRequest, res: Response) => {
+router.put('/:id', requireRole('manager', 'agent'), validate(idParamSchema, 'params'), rejectEmptyBody, validate(updateSellerSchema), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
     const existing = await query('SELECT * FROM sellers WHERE id = $1', [id]);
@@ -307,21 +307,25 @@ router.put('/:id', requireRole('manager', 'agent'), validate(idParamSchema, 'par
       return res.status(403).json({ error: 'Access denied: agents cannot change seller status' });
     }
 
-    await query(
-      `UPDATE sellers SET name=$1, store_name=$2, id_number=$3, phone=$4, region=$5, region_code=$6, status=$7, avatar=$8 WHERE id=$9 RETURNING *`,
-      [name, store_name, id_number, phone, region, region_code, status, avatar, id]
-    );
-    // Audit log for seller update
-    const updateLogId = `SELLER-UPDATE-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
-    await query(
-      `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
-       VALUES ($1, 'seller_updated', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', '', '', '', NOW(), 'active')`,
-      [updateLogId, `تحديث بيانات البائع: ${name}`, req.user?.username || 'unknown']
-    );
-    const updated = await query(
-      `SELECT s.*, a.name as agent_name FROM sellers s LEFT JOIN agents a ON s.agent_id = a.id WHERE s.id = $1`,
-      [id]
-    );
+    // M-02: UPDATE + audit + re-read run atomically — a failed audit must
+    // roll back the update instead of returning a false-failure 500.
+    const updated = await transaction(async (client) => {
+      await client.query(
+        `UPDATE sellers SET name=$1, store_name=$2, id_number=$3, phone=$4, region=$5, region_code=$6, status=$7, avatar=$8 WHERE id=$9 RETURNING *`,
+        [name, store_name, id_number, phone, region, region_code, status, avatar, id]
+      );
+      // Audit log for seller update
+      const updateLogId = `SELLER-UPDATE-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+      await client.query(
+        `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
+         VALUES ($1, 'seller_updated', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', '', '', '', NOW(), 'active')`,
+        [updateLogId, `تحديث بيانات البائع: ${name}`, req.user?.username || 'unknown']
+      );
+      return client.query(
+        `SELECT s.*, a.name as agent_name FROM sellers s LEFT JOIN agents a ON s.agent_id = a.id WHERE s.id = $1`,
+        [id]
+      );
+    });
     broadcastScopedEvent({ type: 'seller.updated', entity: 'seller', id, status, action: 'update', agent_id: existing.rows[0].agent_id, seller_id: id });
     res.json(mapSeller(updated.rows[0]));
   } catch (err) {
@@ -409,17 +413,21 @@ router.post('/:id/reset-password', requireRole('manager', 'agent'), validate(idP
     }
     const newPassword = crypto.randomBytes(16).toString('hex');
     const passwordHash = await bcrypt.hash(newPassword, 12);
-    await query(
-      'UPDATE users SET password_hash = $1, active_session_sid = NULL, session_expires_at = NULL WHERE id = $2',
-      [passwordHash, seller.user_id]
-    );
-    // Audit log for password reset
-    const resetLogId = `PWD-RESET-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
-    await query(
-      `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
-       VALUES ($1, 'seller_password_reset', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', '', '', '', NOW(), 'closed')`,
-      [resetLogId, `إعادة تعيين كلمة مرور البائع: ${seller.name}`, req.user?.username || 'unknown']
-    );
+    // M-02: password rotation + audit commit atomically — a failed audit
+    // must not leave the password changed with a 500 returned.
+    await transaction(async (client) => {
+      await client.query(
+        'UPDATE users SET password_hash = $1, active_session_sid = NULL, session_expires_at = NULL WHERE id = $2',
+        [passwordHash, seller.user_id]
+      );
+      // Audit log for password reset
+      const resetLogId = `PWD-RESET-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+      await client.query(
+        `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
+         VALUES ($1, 'seller_password_reset', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', '', '', '', NOW(), 'closed')`,
+        [resetLogId, `إعادة تعيين كلمة مرور البائع: ${seller.name}`, req.user?.username || 'unknown']
+      );
+    });
     const userRes = await query('SELECT username FROM users WHERE id = $1', [seller.user_id]);
     res.json({
       message: `تم إعادة تعيين كلمة المرور بنجاح لـ ${seller.name}. اسم المستخدم: ${userRes.rows[0].username}`,

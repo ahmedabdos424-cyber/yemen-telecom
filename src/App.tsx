@@ -171,6 +171,10 @@ function AuthenticatedApp() {
     };
   }, [role, toastInfo]);
 
+  // M-04: burst-coalescing for realtime refreshes — a burst of WS events
+  // (e.g. batch transfer emits several) triggers ONE refetch, not N full
+  // Promise.all refetches racing each other.
+  const refreshTimerRef = useRef<number | null>(null);
   // Realtime live updates: keep the WebSocket connected while logged in and
   // refresh role-scoped data whenever a remote change arrives (SIM activation
   // on another device, distribution approval, inventory edits…). New alerts
@@ -184,16 +188,19 @@ function AuthenticatedApp() {
       const isInventoryChange = event.type === 'inventory.updated';
       const isDistributionChange = event.type.startsWith('distribution.');
       const isAlertCreated = event.type === 'alert.created';
-      const mgrState = mgrRef.current;
-      const agtState = agtRef.current;
-      if (role === 'manager') {
-        if (isSimChange || isSellerChange || isInventoryChange || isDistributionChange || isAlertCreated) {
-          mgrState.refreshData().catch(() => {});
-        }
-      } else {
-        if (isSimChange || isSellerChange || isInventoryChange || isDistributionChange) {
-          agtState.refreshRoleData().catch(() => {});
-        }
+      const needsRefresh = role === 'manager'
+        ? (isSimChange || isSellerChange || isInventoryChange || isDistributionChange || isAlertCreated)
+        : (isSimChange || isSellerChange || isInventoryChange || isDistributionChange);
+      if (needsRefresh) {
+        if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = window.setTimeout(() => {
+          refreshTimerRef.current = null;
+          if (role === 'manager') {
+            mgrRef.current.refreshData().catch(() => {});
+          } else {
+            agtRef.current.refreshRoleData().catch(() => {});
+          }
+        }, 800);
       }
       if (isAlertCreated) {
         // Respect the "توزيع الشرائح" notification preference for system alerts.
@@ -205,6 +212,10 @@ function AuthenticatedApp() {
     return () => {
       unsub();
       disconnectRealtime();
+      if (refreshTimerRef.current) {
+        window.clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
     };
   }, [role, toastInfo]);
 

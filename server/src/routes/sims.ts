@@ -5,7 +5,7 @@ import { logger } from '../logger';
 import { requireRole, AuthRequest, resolveScopeAgentId, resolveScopeSellerId } from '../middleware/auth';
 import { getPagination, paginatedQuery, rejectIfUnpaginatedTooLarge } from '../helpers';
 import { getUniqueViolationKind, formatUniqueViolationMessage } from '../helpers/dbErrors';
-import { validate, idParamSchema, createSimSchema, updateSimSchema, activateSimSchema, transferSimsSchema } from '../validation';
+import { validate, idParamSchema, rejectEmptyBody, createSimSchema, updateSimSchema, activateSimSchema, transferSimsSchema } from '../validation';
 import { createAlert } from '../services/alerts.service';
 import { broadcastScopedEvent } from '../services/realtime.service';
 import { strictRateLimiter } from '../middleware/rateLimiter';
@@ -351,7 +351,7 @@ router.post('/', requireRole('manager'), validate(createSimSchema), async (req: 
   }
 });
 
-router.put('/:id', requireRole('manager', 'agent', 'seller'), validate(idParamSchema, 'params'), validate(updateSimSchema), async (req: AuthRequest, res: Response) => {
+router.put('/:id', requireRole('manager', 'agent', 'seller'), validate(idParamSchema, 'params'), rejectEmptyBody, validate(updateSimSchema), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
     const existing = await query('SELECT * FROM sims WHERE id = $1', [id]);
@@ -459,15 +459,22 @@ router.delete('/:id', requireRole('manager'), validate(idParamSchema, 'params'),
   const { id } = req.params;
   try {
     const existing = await query('SELECT iccid FROM sims WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'SIM not found' });
+    }
     const iccid = existing.rows[0]?.iccid || 'unknown';
-    await query('DELETE FROM sims WHERE id = $1', [id]);
-    // Audit log for SIM deletion
-    const deleteLogId = `SIM-DELETE-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
-    await query(
-      `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
-       VALUES ($1, 'sim_deleted', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', '', '', '', NOW(), 'closed')`,
-      [deleteLogId, `حذف شريحة: ${iccid}`, req.user?.username || 'unknown']
-    );
+    // M-02: DELETE + audit commit atomically — a failed audit must roll back
+    // the delete instead of returning a false-failure 500.
+    await transaction(async (client) => {
+      await client.query('DELETE FROM sims WHERE id = $1', [id]);
+      // Audit log for SIM deletion
+      const deleteLogId = `SIM-DELETE-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+      await client.query(
+        `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
+         VALUES ($1, 'sim_deleted', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', '', '', '', NOW(), 'closed')`,
+        [deleteLogId, `حذف شريحة: ${iccid}`, req.user?.username || 'unknown']
+      );
+    });
     broadcastScopedEvent({ type: 'sim.deleted', entity: 'sim', id });
     cacheInvalidate('report:');
     res.json({ success: true });

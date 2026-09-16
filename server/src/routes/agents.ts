@@ -5,7 +5,7 @@ import { query, transaction } from '../db';
 import { logger } from '../logger';
 import { requireRole, AuthRequest, resolveScopeAgentId } from '../middleware/auth';
 import { getPagination, paginatedQuery, rejectIfUnpaginatedTooLarge } from '../helpers';
-import { validate, createAgentSchema, updateAgentSchema } from '../validation';
+import { validate, rejectEmptyBody, createAgentSchema, updateAgentSchema } from '../validation';
 import { notifyNewMember } from '../services/fcm.service';
 import { getUniqueViolationKind } from '../helpers/dbErrors';
 import { logAudit } from '../audit-log';
@@ -165,7 +165,7 @@ router.delete('/:id', requireRole('manager'), async (req: AuthRequest, res: Resp
   }
 });
 
-router.put('/:id', requireRole('manager'), validate(updateAgentSchema), async (req: AuthRequest, res: Response) => {
+router.put('/:id', requireRole('manager'), rejectEmptyBody, validate(updateAgentSchema), async (req: AuthRequest, res: Response) => {
   const agentId = parseId(req.params.id, res);
   if (agentId === null) return;
   try {
@@ -181,21 +181,26 @@ router.put('/:id', requireRole('manager'), validate(updateAgentSchema), async (r
     const sims_count = req.body.sims_count ?? cur.sims_count;
     const status = req.body.status ?? cur.status;
     const statusChanged = status !== cur.status;
-    const result = await query(
-      `UPDATE agents SET name=$1, region=$2, phone=$3, sellers_count=$4, sims_count=$5, status=$6 WHERE id=$7 RETURNING *`,
-      [name, region, phone, sellers_count, sims_count, status, agentId]
-    );
-    // Sync user status + force-logout active session when disabling
-    if (statusChanged && cur.user_id) {
-      if (status === 'inactive') {
-        await query(
-          `UPDATE users SET status = $1, active_session_sid = NULL, session_expires_at = NOW() WHERE id = $2`,
-          [status, cur.user_id]
-        );
-      } else {
-        await query('UPDATE users SET status = $1 WHERE id = $2', [status, cur.user_id]);
+    // M-02: agent row + linked user row commit atomically so a failed user
+    // sync can never leave agents.status and users.status contradicting.
+    const result = await transaction(async (client) => {
+      const updated = await client.query(
+        `UPDATE agents SET name=$1, region=$2, phone=$3, sellers_count=$4, sims_count=$5, status=$6 WHERE id=$7 RETURNING *`,
+        [name, region, phone, sellers_count, sims_count, status, agentId]
+      );
+      // Sync user status + force-logout active session when disabling
+      if (statusChanged && cur.user_id) {
+        if (status === 'inactive') {
+          await client.query(
+            `UPDATE users SET status = $1, active_session_sid = NULL, session_expires_at = NOW() WHERE id = $2`,
+            [status, cur.user_id]
+          );
+        } else {
+          await client.query('UPDATE users SET status = $1 WHERE id = $2', [status, cur.user_id]);
+        }
       }
-    }
+      return updated;
+    });
     res.json(result.rows[0]);
     void logAudit({ type: 'agent_updated', title: `تحديث وكيل: ${name}`, username: req.user?.username || 'unknown' });
    } catch (err) {

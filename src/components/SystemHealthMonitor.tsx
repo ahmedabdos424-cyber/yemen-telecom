@@ -66,18 +66,34 @@ export default function SystemHealthMonitor({ role }: SystemHealthMonitorProps) 
     }
   }, [isAllowed]);
 
-  // Initial fetch + auto-polling every 15 seconds
+  // Initial fetch + auto-polling every 15 seconds. M-04: never poll while
+  // the tab is hidden or the device is offline — refetch on return instead.
   useEffect(() => {
     if (!isAllowed) return;
     fetchHealth();
-    const id = setInterval(fetchHealth, POLL_INTERVAL_MS);
-    return () => clearInterval(id);
+    const id = setInterval(() => {
+      if (document.hidden || !navigator.onLine) return;
+      fetchHealth();
+    }, POLL_INTERVAL_MS);
+    const onVisible = () => {
+      if (!document.hidden && navigator.onLine) fetchHealth();
+    };
+    const onOnline = () => fetchHealth();
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('online', onOnline);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('online', onOnline);
+    };
   }, [isAllowed, fetchHealth]);
 
   // 1-second tick so the uptime counter counts up live between polls
   useEffect(() => {
     if (!isAllowed) return;
-    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    const id = setInterval(() => {
+      if (!document.hidden) setTick((t) => t + 1);
+    }, 1000);
     return () => clearInterval(id);
   }, [isAllowed]);
 

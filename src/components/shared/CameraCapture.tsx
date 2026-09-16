@@ -398,6 +398,7 @@ export default function CameraCapture({ onCapture, iconSize = 16 }: CameraCaptur
         disabled={scanning}
         className="input-camera-btn text-slate-500 hover:text-slate-700 disabled:opacity-50"
         title="التقاط صورة"
+        aria-label="التقاط صورة"
       >
         {scanning ? <RefreshCw className="animate-spin" size={iconSize} /> : <Camera size={iconSize} />}
       </button>

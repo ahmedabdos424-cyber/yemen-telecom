@@ -163,10 +163,14 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
 
 
       {/* Operator Carrier Grid */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-3 w-full mb-8">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3 w-full mb-8" role="radiogroup" aria-label="اختيار المشغل">
         {/* Yemen Mobile */}
         <div 
           onClick={() => setOperator('yemen_mobile')}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOperator('yemen_mobile'); } }}
+          role="radio"
+          aria-checked={operator === 'yemen_mobile'}
+          tabIndex={0}
           className={`relative flex flex-col items-center gap-1.5 sm:gap-2 p-3 sm:p-4 border-2 rounded-2xl cursor-pointer transition-all duration-200 active:scale-[0.97] ${
             operator === 'yemen_mobile' 
               ? 'bg-op-ym border-op-ym shadow-lg scale-[1.02]' 
@@ -187,6 +191,10 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
         {/* Sabafon */}
         <div 
           onClick={() => setOperator('sabafon')}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOperator('sabafon'); } }}
+          role="radio"
+          aria-checked={operator === 'sabafon'}
+          tabIndex={0}
           className={`relative flex flex-col items-center gap-1.5 sm:gap-2 p-3 sm:p-4 border-2 rounded-2xl cursor-pointer transition-all duration-200 active:scale-[0.97] ${
             operator === 'sabafon' 
               ? 'bg-op-sf border-op-sf shadow-lg scale-[1.02]' 
@@ -207,6 +215,10 @@ export default function ActivateSimForm({ onSimActivated }: ActivateSimFormProps
         {/* YOU */}
         <div 
           onClick={() => setOperator('you')}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOperator('you'); } }}
+          role="radio"
+          aria-checked={operator === 'you'}
+          tabIndex={0}
           className={`relative flex flex-col items-center gap-1.5 sm:gap-2 p-3 sm:p-4 border-2 rounded-2xl cursor-pointer transition-all duration-200 active:scale-[0.97] ${
             operator === 'you' 
               ? 'bg-op-you border-op-you shadow-lg scale-[1.02]' 
