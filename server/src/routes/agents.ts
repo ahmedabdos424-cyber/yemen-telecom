@@ -147,7 +147,15 @@ router.delete('/:id', requireRole('manager'), async (req: AuthRequest, res: Resp
       }
       // Unlink sellers from this agent (set agent_id to NULL)
       await client.query('UPDATE sellers SET agent_id = NULL WHERE agent_id = $1', [agentId]);
-      await client.query('UPDATE agents SET status = $1, sellers_count = 0 WHERE id = $2', ['deleted', agentId]);
+      // H-02: return the agent's SIM stock to the admin pool instead of
+      // orphaning it. Activated SIMs keep their status/history — only the
+      // ownership moves back to the head office.
+      await client.query(
+        `UPDATE sims SET assigned_to_agent = NULL, owner_role = 'admin', owner = $1
+          WHERE assigned_to_agent = $2`,
+        ['المركز الرئيسي', agentId]
+      );
+      await client.query('UPDATE agents SET status = $1, sellers_count = 0, sims_count = 0 WHERE id = $2', ['deleted', agentId]);
     });
     res.json({ message: 'Agent deleted successfully' });
     void logAudit({ type: 'agent_deleted', title: `حذف وكيل: ${agent.name}`, username: req.user?.username || 'unknown' });

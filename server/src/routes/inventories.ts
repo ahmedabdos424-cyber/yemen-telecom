@@ -5,6 +5,7 @@ import { requireRole, AuthRequest } from '../middleware/auth';
 import { validate, updateInventoriesSchema, resolveProviderSlug } from '../validation';
 import { broadcastEvent } from '../services/realtime.service';
 import { logAudit } from '../audit-log';
+import { cacheInvalidate } from '../cache';
 
 const router = Router();
 
@@ -22,8 +23,11 @@ async function toInventoryDto(r: { provider_id: number | null; operator: string;
   };
 }
 
-router.get('/', requireRole('manager', 'agent'), async (_req: Request, res: Response) => {
+router.get('/', requireRole('manager', 'agent', 'seller'), async (_req: Request, res: Response) => {
   try {
+    // Read-only global stock overview for all roles (PUT stays manager-only).
+    // Sellers previously got 403 here while the app fetched it on every
+    // refresh (C-10); the data itself is aggregate availability, not PII.
     const result = await query('SELECT * FROM inventories ORDER BY id');
     const inventories = await Promise.all(result.rows.map(toInventoryDto));
     res.json(inventories);
@@ -63,6 +67,9 @@ router.put('/', requireRole('manager'), validate(updateInventoriesSchema), async
       return u.operator;
     }));
     broadcastEvent({ type: 'inventory.updated', entity: 'inventory', action: 'update', operators });
+    // H-03: inventory edits feed the daily-sales/operator reports (and the
+    // overview stats) — drop the cached reports so the next read is fresh.
+    cacheInvalidate('report:');
     res.json(inventories);
     void logAudit({ type: 'inventory_updated', title: `تحديث المخزون (${updates.length} مشغل)`, username: req.user?.username || 'unknown' });
   } catch (err) {

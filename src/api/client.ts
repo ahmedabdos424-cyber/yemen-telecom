@@ -267,6 +267,9 @@ async function refreshAccessToken(): Promise<string | null> {
           'X-CSRF-Hash': tokens.csrfHash,
           'X-Device-Id': getDeviceId(),
           'X-Device-Name': getDeviceName(),
+          // Native apps (no cookies) get the rotated refresh token in the
+          // JSON body for Keystore storage; web keeps the httpOnly cookie.
+          ...(isCapacitor ? { 'X-Native-App': '1' } : {}),
         },
         credentials: CREDENTIALS_MODE,
       });
@@ -276,7 +279,9 @@ async function refreshAccessToken(): Promise<string | null> {
       }
       const data = await res.json();
       setToken(data.token);
-      setRefreshToken(data.refreshToken);
+      // The server omits refreshToken for web sessions (httpOnly cookie only,
+      // S4) — never wipe the securely stored token on an absent field (C-01).
+      if (data.refreshToken) setRefreshToken(data.refreshToken);
       return data.token;
     } catch {
       clearTokens();
@@ -396,8 +401,11 @@ export type { ApiLoginResponse, ApiMeResponse, ApiBackupResponse, ApiLockdownRes
 export const api = {
   // Auth
   login: async (username: string, password: string) => {
+    // Native apps identify themselves so the server returns the refresh token
+    // in the body (Keystore-encrypted at rest); web uses the httpOnly cookie.
     const res = await request<ApiLoginResponse>('/auth/login', {
       method: 'POST',
+      headers: isCapacitor ? { 'X-Native-App': '1' } : {},
       body: JSON.stringify({ username, password }),
     });
     // Rotate the CSRF token after a successful login so any token fetched

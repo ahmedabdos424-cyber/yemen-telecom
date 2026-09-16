@@ -26,8 +26,18 @@ export interface RealtimeGateway {
   broadcastEvent(event: RealtimeEvent): void;
   broadcastToRoles(event: RealtimeEvent, roles: string[]): void;
   broadcastToUserIds(event: RealtimeEvent, userIds: number[]): void;
+  broadcastScoped(event: ScopedRealtimeEvent): void;
   stats(): { total: number; authenticated: number };
   close(): void;
+}
+
+// Scoped domain events carry the owning agency/seller so the gateway can
+// deliver them only to managers (who see everything) plus the owning
+// agent/seller. Events without scope (admin stock changes) reach managers
+// only — never leak cross-tenant operational data (H-05).
+export interface ScopedRealtimeEvent extends RealtimeEvent {
+  agent_id?: number | string | null;
+  seller_id?: number | string | null;
 }
 
 // Default dependency resolves users exactly like the Express auth middleware
@@ -183,6 +193,18 @@ export function createRealtimeGateway(server: http.Server, deps: RealtimeDeps = 
       const idSet = new Set(userIds);
       broadcast(event, (user) => idSet.has(user.id));
     },
+    broadcastScoped(event: ScopedRealtimeEvent): void {
+      broadcast(event, (user) => {
+        if (user.role === 'manager') return true;
+        if (user.role === 'agent') {
+          return event.agent_id != null && Number(user.agentId) === Number(event.agent_id);
+        }
+        if (user.role === 'seller') {
+          return event.seller_id != null && Number(user.sellerId) === Number(event.seller_id);
+        }
+        return false;
+      });
+    },
     stats(): { total: number; authenticated: number } {
       let authenticated = 0;
       for (const client of clients) {
@@ -226,6 +248,10 @@ export function broadcastToRoles(event: RealtimeEvent, roles: string[]): void {
 
 export function broadcastToUserIds(event: RealtimeEvent, userIds: number[]): void {
   activeGateway?.broadcastToUserIds(event, userIds);
+}
+
+export function broadcastScopedEvent(event: ScopedRealtimeEvent): void {
+  activeGateway?.broadcastScoped(event);
 }
 
 export function realtimeStats(): { total: number; authenticated: number } {

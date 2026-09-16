@@ -9,7 +9,8 @@ import crypto from 'crypto';
 import { logger } from '../logger';
 import { query } from '../db';
 import { hashToken, isTokenBlacklisted, isSessionExempt, TokenPayload } from '../middleware/auth';
-import { authRateLimiter, isLoginLocked, getLoginLockRemaining, recordLoginFailure, recordLoginSuccess, isDbLocked, isGloballyLocked, recordDbFailure, clearDbLockout } from '../middleware/rateLimiter';
+import { authRateLimiter, isLoginLocked, getLoginLockRemaining, recordLoginFailure, recordLoginSuccess, isDbLocked, recordDbFailure, clearDbLockout } from '../middleware/rateLimiter';
+import { checkLoginLock, recordLoginFailureRedis, recordLoginSuccessRedis } from '../redis';
 import { getDeviceInfo } from '../helpers';
 import { validate, loginSchema } from '../validation';
 
@@ -29,6 +30,39 @@ if (process.env.NODE_ENV === 'production') {
 }
 const SESSION_DURATION_MS = 2 * 60 * 60 * 1000;
 const MAX_SESSION_LIFETIME_MS = 24 * 60 * 60 * 1000; // 24 hours absolute cap
+
+// Cookies must be Secure in production (HTTPS) but plain HTTP on
+// http://localhost:4000 would otherwise refuse to store/send them, silently
+// dropping the cookie flow and falling back to Bearer-only (D-07).
+function useSecureCookies(): boolean {
+  return process.env.NODE_ENV === 'production';
+}
+
+// Verify a token's signature without rejecting expired tokens. Used only on
+// logout so an expired access token can still revoke its refresh token and
+// clear the server-side session (C-05). Invalid signatures still throw.
+function verifyForLogout(token: string): TokenPayload {
+  try {
+    return jwt.verify(token, JWT_SECRET, { issuer: 'yemen-telecom', algorithms: ['HS256'] }) as TokenPayload;
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'TokenExpiredError') {
+      return jwt.verify(token, JWT_SECRET, { issuer: 'yemen-telecom', algorithms: ['HS256'], ignoreExpiration: true }) as TokenPayload;
+    }
+    throw err;
+  }
+}
+
+// Native-app signal: the Capacitor WebView (no cookies, credentials:omit)
+// cannot use the httpOnly refresh cookie, so it sends X-Native-App: 1 and
+// receives the refresh token in the JSON body for Keystore-encrypted storage.
+// Web sessions never send this header and keep the cookie-only flow (S4):
+// a web XSS cannot read httpOnly cookies, and a cross-origin attacker cannot
+// attach a custom header without CORS preflight approval (whitelist-only).
+function isNativeRequest(req: Request): boolean {
+  const v = req.headers['x-native-app'];
+  const s = typeof v === 'string' ? v : Array.isArray(v) ? v[0] : '';
+  return s === '1' || s?.toLowerCase() === 'true';
+}
 
 // رسالة خطأ موحدة لا تكشف ما إذا كان اسم المستخدم موجوداً أو كلمة المرور خاطئة
 const GENERIC_LOGIN_ERROR = 'اسم المستخدم أو كلمة المرور غير صحيحة.';
@@ -64,14 +98,25 @@ router.post('/login', authRateLimiter, validate(loginSchema), async (req: Reques
     if (dbLock.locked) {
       return res.status(429).json({ error: lockoutMessage(dbLock.remainingMs) });
     }
-    const globalLock = await isGloballyLocked(username);
-    if (globalLock.locked) {
-      return res.status(429).json({ error: lockoutMessage(globalLock.remainingMs) });
+    // H-04: distributed lock shared across instances via Redis. Fail-open
+    // without REDIS_URL (memory + DB checks above stay authoritative).
+    const redisLock = await checkLoginLock(username, ip);
+    if (redisLock.locked) {
+      return res.status(429).json({ error: lockoutMessage(redisLock.remainingMs) });
     }
+    // NOTE: no per-username global lock across all IPs — it lets one attacker
+    // lock a victim out everywhere (D-06/S-08 DoS). Enforcement is strictly
+    // per username+IP (memory + DB), which survives restarts via login_lockouts.
     const result = await query('SELECT * FROM users WHERE username = $1', [username]);
     if (result.rows.length === 0) {
-      recordLoginFailure(username, ip);
+      const lockedMs = recordLoginFailure(username, ip);
+      void recordLoginFailureRedis(username, ip);
+      const dbLockedMs = await recordDbFailure(username, ip);
+      const effectiveLockMs = Math.max(lockedMs, dbLockedMs);
       await logFailedLogin(username, deviceName, ip, deviceId);
+      if (effectiveLockMs > 0) {
+        return res.status(429).json({ error: lockoutMessage(effectiveLockMs) });
+      }
       return res.status(401).json({ error: GENERIC_LOGIN_ERROR });
     }
     const user = result.rows[0];
@@ -80,14 +125,21 @@ router.post('/login', authRateLimiter, validate(loginSchema), async (req: Reques
       // "Account disabled" leaks the account's existence to an attacker.
       // Treat it exactly like a bad credential (uniform error + failure log).
       await query('UPDATE users SET failed_attempts = COALESCE(failed_attempts, 0) + 1 WHERE id = $1', [user.id]);
-      recordLoginFailure(username, ip);
+      const lockedMs = recordLoginFailure(username, ip);
+      void recordLoginFailureRedis(username, ip);
+      const dbLockedMs = await recordDbFailure(username, ip);
+      const effectiveLockMs = Math.max(lockedMs, dbLockedMs);
       await logFailedLogin(username, deviceName, ip, deviceId);
+      if (effectiveLockMs > 0) {
+        return res.status(429).json({ error: lockoutMessage(effectiveLockMs) });
+      }
       return res.status(401).json({ error: GENERIC_LOGIN_ERROR });
     }
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
       await query('UPDATE users SET failed_attempts = COALESCE(failed_attempts, 0) + 1 WHERE id = $1', [user.id]);
       const lockedMs = recordLoginFailure(username, ip);
+      void recordLoginFailureRedis(username, ip);
       const dbLockedMs = await recordDbFailure(username, ip);
       const effectiveLockMs = Math.max(lockedMs, dbLockedMs);
       await logFailedLogin(username, deviceName, ip, deviceId);
@@ -97,6 +149,7 @@ router.post('/login', authRateLimiter, validate(loginSchema), async (req: Reques
       return res.status(401).json({ error: GENERIC_LOGIN_ERROR });
     }
     recordLoginSuccess(username, ip);
+    void recordLoginSuccessRedis(username, ip);
     await clearDbLockout(username, ip);
     await query('UPDATE users SET last_login = NOW(), failed_attempts = 0, locked_until = NULL WHERE id = $1', [user.id]);
     const sid = crypto.randomUUID();
@@ -116,9 +169,22 @@ router.post('/login', authRateLimiter, validate(loginSchema), async (req: Reques
     const payload = { id: user.id, username: user.username, role: user.role, sid, tv: user.token_version || 1 };
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h', issuer: 'yemen-telecom', algorithm: 'HS256' });
     const refreshToken = jwt.sign(payload, REFRESH_SECRET, { expiresIn: '7d', issuer: 'yemen-telecom', algorithm: 'HS256' });
-    res.cookie('token', token, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 3600 * 1000, path: '/' });
-    res.cookie('refreshToken', refreshToken, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 7 * 24 * 3600 * 1000, path: '/api/auth' });
-    res.json({
+    res.cookie('token', token, { httpOnly: true, secure: useSecureCookies(), sameSite: 'strict', maxAge: 3600 * 1000, path: '/' });
+    res.cookie('refreshToken', refreshToken, { httpOnly: true, secure: useSecureCookies(), sameSite: 'strict', maxAge: 7 * 24 * 3600 * 1000, path: '/api/auth' });
+    // Native apps get the refresh token in the body (encrypted at rest in the
+    // Keystore); web clients rely on the httpOnly cookie above (S4).
+    res.json(isNativeRequest(req) ? {
+      token,
+      refreshToken,
+      user: {
+        id: user.id,
+        username: user.username,
+        displayName: user.display_name,
+        role: user.role,
+        phone: user.phone,
+        region: user.region,
+      },
+    } : {
       token,
       user: {
         id: user.id,
@@ -197,9 +263,10 @@ router.post('/refresh', async (req: Request, res: Response) => {
     const payload = { id: decoded.id, username: decoded.username, role: decoded.role, sid: decoded.sid, tv: decoded.tv };
     const newToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h', issuer: 'yemen-telecom', algorithm: 'HS256' });
     const newRefreshToken = jwt.sign(payload, REFRESH_SECRET, { expiresIn: '7d', issuer: 'yemen-telecom', algorithm: 'HS256' });
-    res.cookie('token', newToken, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 3600 * 1000, path: '/' });
-    res.cookie('refreshToken', newRefreshToken, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 7 * 24 * 3600 * 1000, path: '/api/auth' });
-    res.json({ token: newToken });
+    res.cookie('token', newToken, { httpOnly: true, secure: useSecureCookies(), sameSite: 'strict', maxAge: 3600 * 1000, path: '/' });
+    res.cookie('refreshToken', newRefreshToken, { httpOnly: true, secure: useSecureCookies(), sameSite: 'strict', maxAge: 7 * 24 * 3600 * 1000, path: '/api/auth' });
+    // Rotate the stored refresh token on native apps; web keeps the cookie.
+    res.json(isNativeRequest(req) ? { token: newToken, refreshToken: newRefreshToken } : { token: newToken });
   } catch (err: unknown) {
     if (err instanceof Error && (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError')) {
       return res.status(401).json({ error: 'Invalid or expired refresh token' });
@@ -218,7 +285,11 @@ router.post('/logout', async (req: Request, res: Response) => {
     return res.status(401).json({ error: 'No token provided' });
   }
   try {
-    const decoded = jwt.verify(token, JWT_SECRET, { issuer: 'yemen-telecom', algorithms: ['HS256'] }) as TokenPayload;
+    // Accept expired access tokens here: the signature/issuer are still
+    // verified, so a client holding an expired token can still revoke its
+    // refresh token and clear the server-side session (C-05). Previously a
+    // TokenExpiredError returned 401 before revocation, leaving refresh alive.
+    const decoded = verifyForLogout(token);
     if (decoded.exp) {
       const expiresAt = new Date(decoded.exp * 1000).toISOString();
       await query(
@@ -263,11 +334,11 @@ router.post('/logout', async (req: Request, res: Response) => {
        VALUES ($1, 'logout', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', $4, $5, $6, NOW(), NOW(), 'closed')`,
       [logoutLogId, `تسجيل خروج: ${decoded.username}`, decoded.username, deviceName, ip, deviceId]
     );
-    res.clearCookie('token', { path: '/', httpOnly: true, secure: true, sameSite: 'strict' });
-    res.clearCookie('refreshToken', { path: '/api/auth', httpOnly: true, secure: true, sameSite: 'strict' });
+    res.clearCookie('token', { path: '/', httpOnly: true, secure: useSecureCookies(), sameSite: 'strict' });
+    res.clearCookie('refreshToken', { path: '/api/auth', httpOnly: true, secure: useSecureCookies(), sameSite: 'strict' });
     res.json({ message: 'Logged out successfully' });
   } catch (err: unknown) {
-    if (err instanceof Error && (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError')) {
+    if (err instanceof Error && err.name === 'JsonWebTokenError') {
       return res.status(401).json({ error: 'Invalid token' });
     }
     logger.error('Logout error:', err);
@@ -294,7 +365,7 @@ router.get('/me', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Token has been revoked' });
     }
     const result = await query(
-      'SELECT id, username, display_name, role, phone, region, last_login, status, created_at, active_session_sid, session_expires_at FROM users WHERE id = $1',
+      'SELECT id, username, display_name, role, phone, region, last_login, status, created_at, active_session_sid, session_expires_at, token_version FROM users WHERE id = $1',
       [decoded.id]
     );
     if (result.rows.length === 0) {
@@ -305,6 +376,15 @@ router.get('/me', async (req: Request, res: Response) => {
     // Check if account is disabled
     if (u.status !== 'active') {
       return res.status(403).json({ error: 'Account disabled', code: 'ACCOUNT_DISABLED' });
+    }
+
+    // Global token revocation: reject tokens minted before the latest
+    // password change / session revocation (mirrors authenticateToken and
+    // /auth/refresh). Previously /me omitted this check (C-06), so revoked
+    // tokens still returned 200 until session expiry.
+    const currentTv = u.token_version || 1;
+    if (decoded.tv && decoded.tv !== currentTv) {
+      return res.status(401).json({ error: 'Session revoked. Please log in again.', code: 'SESSION_REVOKED' });
     }
 
     // Check session validity (same checks as /refresh)

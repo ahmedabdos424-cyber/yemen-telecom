@@ -7,7 +7,7 @@ import { requireRole, AuthRequest, resolveScopeAgentId } from '../middleware/aut
 import { getPagination } from '../helpers';
 import { getUniqueViolationKind } from '../helpers/dbErrors';
 import { validate, createSellerSchema, updateSellerSchema, updateSellerBalanceSchema } from '../validation';
-import { broadcastEvent } from '../services/realtime.service';
+import { broadcastScopedEvent } from '../services/realtime.service';
 import { notifyNewMember } from '../services/fcm.service';
 import { cacheInvalidate } from '../cache';
 
@@ -234,7 +234,7 @@ router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), 
       return { seller: mapSeller(finalResult.rows[0]) };
     });
 
-    broadcastEvent({ type: 'seller.created', entity: 'seller', id: createdSeller.id, name: createdSeller.name, agent_id: agentId });
+    broadcastScopedEvent({ type: 'seller.created', entity: 'seller', id: createdSeller.id, name: createdSeller.name, agent_id: agentId, seller_id: createdSeller.id });
     cacheInvalidate('report:');
 
     // Best-effort push: notify managers a new seller was registered. Never
@@ -317,7 +317,7 @@ router.put('/:id', requireRole('manager', 'agent'), validate(updateSellerSchema)
       `SELECT s.*, a.name as agent_name FROM sellers s LEFT JOIN agents a ON s.agent_id = a.id WHERE s.id = $1`,
       [id]
     );
-    broadcastEvent({ type: 'seller.updated', entity: 'seller', id, status, action: 'update' });
+    broadcastScopedEvent({ type: 'seller.updated', entity: 'seller', id, status, action: 'update', agent_id: existing.rows[0].agent_id, seller_id: id });
     res.json(mapSeller(updated.rows[0]));
   } catch (err) {
     logger.error('Error updating seller:', err);
@@ -373,7 +373,7 @@ router.put('/:id/balance', requireRole('manager', 'agent'), validate(updateSelle
       );
       return finalResult.rows[0];
     });
-    broadcastEvent({ type: 'seller.updated', entity: 'seller', id, action: 'balance', amount });
+    broadcastScopedEvent({ type: 'seller.updated', entity: 'seller', id, action: 'balance', amount, agent_id: existing.rows[0].agent_id, seller_id: id });
     cacheInvalidate('report:');
     res.json(mapSeller(result));
   } catch (err) {
@@ -450,12 +450,21 @@ router.delete('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, 
           ['inactive', seller.user_id]
         );
       }
-      await client.query(
+      const moved = await client.query(
         `UPDATE sims SET assigned_to = NULL, owner = $1, owner_role = 'admin' WHERE assigned_to = $2`,
         ['المركز الرئيسي', id]
       );
       await client.query('DELETE FROM distribution_requests WHERE seller_id = $1', [id]);
-      await client.query('UPDATE sellers SET status = $1 WHERE id = $2', ['deleted', id]);
+      // H-02: zero the deleted seller's counters and release its stock from
+      // the parent agency's tally so neither shows phantom inventory.
+      await client.query('UPDATE sellers SET status = $1, current_stock = 0, sims_count = 0 WHERE id = $2', ['deleted', id]);
+      const movedCount = moved.rowCount ?? 0;
+      if (seller.agent_id != null && movedCount > 0) {
+        await client.query(
+          'UPDATE agents SET sims_count = GREATEST(COALESCE(sims_count, 0) - $1, 0) WHERE id = $2',
+          [movedCount, seller.agent_id]
+        );
+      }
       // Audit log for seller deletion
       const deleteLogId = `SELLER-DELETE-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
       await client.query(
@@ -464,7 +473,7 @@ router.delete('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, 
         [deleteLogId, `حذف بائع: ${seller.name}`, req.user?.username || 'unknown']
       );
     });
-    broadcastEvent({ type: 'seller.deleted', entity: 'seller', id });
+    broadcastScopedEvent({ type: 'seller.deleted', entity: 'seller', id, agent_id: seller.agent_id, seller_id: id });
     cacheInvalidate('report:');
     res.json({ message: 'Seller deleted successfully' });
   } catch (err) {

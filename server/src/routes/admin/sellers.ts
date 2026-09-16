@@ -3,7 +3,7 @@ import { query, transaction } from '../../db';
 import { logger } from '../../logger';
 import { requireRole, AuthRequest } from '../../middleware/auth';
 import { getPagination } from '../../helpers';
-import { broadcastEvent } from '../../services/realtime.service';
+import { broadcastScopedEvent } from '../../services/realtime.service';
 import { mapAuditRow } from './shared';
 import { cacheInvalidate } from '../../cache';
 import crypto from 'crypto';
@@ -126,7 +126,7 @@ router.put('/sellers/:id/status', requireRole('manager'), async (req: AuthReques
         [logId, `تغيير حالة البائع ${seller.name}: ${oldStatus} → ${status}`, req.user?.username || 'unknown']
       );
     });
-    broadcastEvent({ type: 'seller.updated', entity: 'seller', id, status, action: 'status-toggle' });
+    broadcastScopedEvent({ type: 'seller.updated', entity: 'seller', id, status, action: 'status-toggle', agent_id: seller.agent_id, seller_id: id });
     cacheInvalidate('report:');
     const updated = await query(`${ADMIN_SELLERS_SELECT} WHERE s.id = $1`, [id]);
     res.json(updated.rows[0] ? mapAdminSeller(updated.rows[0]) : { id: String(id), status });

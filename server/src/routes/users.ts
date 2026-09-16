@@ -125,9 +125,12 @@ router.put('/preferences', validate(updateUserPreferencesSchema), async (req: Au
   }
   const { simNotifications, lowStockNotifications, fontSize, darkMode } = req.body;
   try {
+    // Partial updates must preserve absent fields (C-04): pass NULL for
+    // missing keys so COALESCE keeps the stored value. Column defaults apply
+    // only on first insert (new row), never overwriting existing prefs.
     await query(
       `INSERT INTO user_preferences (user_id, sim_notifications, low_stock_notifications, font_size, dark_mode, updated_at)
-       VALUES ($1, $2, $3, $4, $5, NOW())
+       VALUES ($1, COALESCE($2, TRUE), COALESCE($3, TRUE), COALESCE($4, 'base'), COALESCE($5, FALSE), NOW())
        ON CONFLICT (user_id) DO UPDATE SET
          sim_notifications = COALESCE($2, user_preferences.sim_notifications),
          low_stock_notifications = COALESCE($3, user_preferences.low_stock_notifications),
@@ -136,10 +139,10 @@ router.put('/preferences', validate(updateUserPreferencesSchema), async (req: Au
          updated_at = NOW()`,
       [
         req.user.id,
-        simNotifications ?? true,
-        lowStockNotifications ?? true,
-        fontSize ?? 'base',
-        darkMode ?? false,
+        simNotifications ?? null,
+        lowStockNotifications ?? null,
+        fontSize ?? null,
+        darkMode ?? null,
       ]
     );
     res.json({ message: 'Preferences updated successfully' });

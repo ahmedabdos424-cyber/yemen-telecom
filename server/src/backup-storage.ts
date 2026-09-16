@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { logger } from './logger';
 
 const ENDPOINT = process.env.BACKUP_S3_ENDPOINT || '';
 const REGION = process.env.BACKUP_S3_REGION || 'us-east-1';
@@ -52,9 +53,22 @@ export function decrypt(data: Buffer, password: string): string {
   return decipher.update(encrypted) + decipher.final('utf8');
 }
 
+export function isEncryptionConfigured(): boolean {
+  return ENCRYPTION_KEY.length > 0;
+}
+
 export async function uploadBackup(data: Record<string, unknown[]>): Promise<{ url: string; filename: string; size: number }> {
   if (!configured) {
     throw new Error('S3-compatible backup storage not configured. Set BACKUP_S3_ENDPOINT, BACKUP_S3_ACCESS_KEY_ID, BACKUP_S3_SECRET_ACCESS_KEY, and BACKUP_S3_BUCKET.');
+  }
+  // Backups contain PII (sellers/customers) plus operational data. Never
+  // upload plaintext in production (D-14/S-10); fail fast instead of
+  // silently storing unencrypted JSON.
+  if (!isEncryptionConfigured()) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('BACKUP_ENCRYPTION_KEY is required in production — refusing to upload an unencrypted backup.');
+    }
+    logger.warn('[BACKUP] BACKUP_ENCRYPTION_KEY is not set — uploading unencrypted backup (development only)');
   }
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const filename = `backup-${timestamp}.json.enc`;

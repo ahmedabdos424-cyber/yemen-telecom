@@ -23,9 +23,11 @@ CREATE TABLE IF NOT EXISTS agents (
   email VARCHAR(200) DEFAULT '',
   sellers_count INTEGER DEFAULT 0,
   sims_count INTEGER DEFAULT 0,
-  status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+  status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'deleted')),
   created_at TIMESTAMP DEFAULT NOW()
 );
+
+-- Keep in sync with migration 048 — soft-deleted agents (DELETE route sets 'deleted').
 
 -- Keep schema.sql in sync with migration 004 — unique phone per agent
 -- (partial index allows multiple empty/blank phones).
@@ -354,13 +356,12 @@ CREATE TRIGGER trg_distribution_requests_updated_at
     BEFORE UPDATE ON distribution_requests
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Add UNIQUE constraint on customers.id_number (PostgreSQL has no ADD CONSTRAINT IF NOT EXISTS)
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'customers_id_number_unique') THEN
-    ALTER TABLE customers ADD CONSTRAINT customers_id_number_unique UNIQUE (id_number);
-  END IF;
-END $$;
+-- Partial UNIQUE on customers.id_number (mirrors migration 045): empty
+-- strings skip the index so any number of unidentified customers is allowed,
+-- while every real national id stays unique. A full UNIQUE constraint would
+-- reject the second '' (the column DEFAULT). ON CONFLICT (id_number) in the
+-- app keeps working against this index.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_id_number_unique ON customers(id_number) WHERE id_number <> '';
 
 -- Add created_at to transactions if missing
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
@@ -492,6 +493,173 @@ CREATE TABLE IF NOT EXISTS app_update_installs (
 
 CREATE INDEX IF NOT EXISTS idx_device_tokens_user_id ON device_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_device_tokens_last_used ON device_tokens(last_used_at);
+
+-- ============================================================
+-- P0 convergence (C-01): tables/columns/indexes/triggers/RLS that live in
+-- migrations 025/035/038/040-045/047/049/050. A fresh database built from
+-- this file alone must match a migrated one — keep this section in sync.
+-- ============================================================
+
+-- user_preferences (035)
+CREATE TABLE IF NOT EXISTS user_preferences (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  sim_notifications BOOLEAN DEFAULT TRUE,
+  low_stock_notifications BOOLEAN DEFAULT TRUE,
+  font_size VARCHAR(10) DEFAULT 'base',
+  dark_mode BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- login_lockouts (044)
+CREATE TABLE IF NOT EXISTS login_lockouts (
+  username TEXT NOT NULL,
+  ip TEXT NOT NULL DEFAULT '',
+  failures INT NOT NULL DEFAULT 0,
+  lock_level INT NOT NULL DEFAULT 0,
+  locked_until TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (username, ip)
+);
+CREATE INDEX IF NOT EXISTS idx_login_lockouts_locked_until ON login_lockouts (locked_until);
+
+-- transactions.created_by (042)
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_transactions_created_by ON transactions(created_by);
+
+-- operations.customer_row_id FK (050) — integrity link, backfilled from id_number
+ALTER TABLE operations ADD COLUMN IF NOT EXISTS customer_row_id INTEGER REFERENCES customers(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_operations_customer_row_id ON operations(customer_row_id);
+
+-- sellers.pre_lockdown_status (050) — exact lockdown restore
+ALTER TABLE sellers ADD COLUMN IF NOT EXISTS pre_lockdown_status VARCHAR(20);
+
+-- Missing indexes (001/038/040/047)
+CREATE INDEX IF NOT EXISTS idx_sims_phone ON sims(phone);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_username ON audit_logs(username);
+CREATE INDEX IF NOT EXISTS idx_transactions_provider_id ON transactions(provider_id);
+CREATE INDEX IF NOT EXISTS idx_inventories_provider_id ON inventories(provider_id);
+CREATE INDEX IF NOT EXISTS idx_operations_provider_id ON operations(provider_id);
+CREATE INDEX IF NOT EXISTS idx_distribution_requests_provider_id ON distribution_requests(provider_id);
+CREATE INDEX IF NOT EXISTS idx_app_update_installs_version ON app_update_installs(version);
+CREATE INDEX IF NOT EXISTS idx_app_update_installs_device_id ON app_update_installs(device_id);
+CREATE INDEX IF NOT EXISTS idx_app_update_installs_installed_at ON app_update_installs(installed_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_app_update_installs_device_version
+  ON app_update_installs(device_id, version_code);
+
+-- updated_at on the six late tables + triggers (041)
+ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE duplicate_identities ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE identity_risk_actions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE device_tokens ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE schema_migrations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+DROP TRIGGER IF EXISTS trg_system_settings_updated_at ON system_settings;
+CREATE TRIGGER trg_system_settings_updated_at
+    BEFORE UPDATE ON system_settings
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS trg_duplicate_identities_updated_at ON duplicate_identities;
+CREATE TRIGGER trg_duplicate_identities_updated_at
+    BEFORE UPDATE ON duplicate_identities
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS trg_identity_risk_actions_updated_at ON identity_risk_actions;
+CREATE TRIGGER trg_identity_risk_actions_updated_at
+    BEFORE UPDATE ON identity_risk_actions
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS trg_device_tokens_updated_at ON device_tokens;
+CREATE TRIGGER trg_device_tokens_updated_at
+    BEFORE UPDATE ON device_tokens
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS trg_providers_updated_at ON providers;
+CREATE TRIGGER trg_providers_updated_at
+    BEFORE UPDATE ON providers
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS trg_schema_migrations_updated_at ON schema_migrations;
+CREATE TRIGGER trg_schema_migrations_updated_at
+    BEFORE UPDATE ON schema_migrations
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- app_update_installs retention helper (043)
+CREATE OR REPLACE FUNCTION enforce_app_update_installs_retention()
+RETURNS void AS $$
+BEGIN
+  DELETE FROM app_update_installs
+  WHERE id NOT IN (
+    SELECT id FROM app_update_installs
+    ORDER BY installed_at DESC
+    LIMIT 5000
+  );
+END;
+$$ LANGUAGE plpgsql;
+
+-- Row Level Security (025 + 045): the Express backend connects as postgres
+-- (BYPASSRLS) and Supabase service_role bypasses too, so the app is
+-- unaffected; anon/authenticated Data-API roles stay denied by default.
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN CREATE ROLE service_role NOLOGIN; END IF; END $$;
+
+DROP POLICY IF EXISTS users_backend_full_access ON public.users;
+CREATE POLICY users_backend_full_access ON public.users FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS agents_backend_full_access ON public.agents;
+CREATE POLICY agents_backend_full_access ON public.agents FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+ALTER TABLE public.agents ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS sellers_backend_full_access ON public.sellers;
+CREATE POLICY sellers_backend_full_access ON public.sellers FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+ALTER TABLE public.sellers ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS sims_backend_full_access ON public.sims;
+CREATE POLICY sims_backend_full_access ON public.sims FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+ALTER TABLE public.sims ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS alerts_backend_full_access ON public.alerts;
+CREATE POLICY alerts_backend_full_access ON public.alerts FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+ALTER TABLE public.alerts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS transactions_backend_full_access ON public.transactions;
+CREATE POLICY transactions_backend_full_access ON public.transactions FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS operations_backend_full_access ON public.operations;
+CREATE POLICY operations_backend_full_access ON public.operations FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+ALTER TABLE public.operations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS inventories_backend_full_access ON public.inventories;
+CREATE POLICY inventories_backend_full_access ON public.inventories FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+ALTER TABLE public.inventories ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS audit_logs_backend_full_access ON public.audit_logs;
+CREATE POLICY audit_logs_backend_full_access ON public.audit_logs FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS system_settings_backend_full_access ON public.system_settings;
+CREATE POLICY system_settings_backend_full_access ON public.system_settings FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS token_blacklist_backend_full_access ON public.token_blacklist;
+CREATE POLICY token_blacklist_backend_full_access ON public.token_blacklist FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+ALTER TABLE public.token_blacklist ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS duplicate_identities_backend_full_access ON public.duplicate_identities;
+CREATE POLICY duplicate_identities_backend_full_access ON public.duplicate_identities FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+ALTER TABLE public.duplicate_identities ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS customers_backend_full_access ON public.customers;
+CREATE POLICY customers_backend_full_access ON public.customers FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS distribution_requests_backend_full_access ON public.distribution_requests;
+CREATE POLICY distribution_requests_backend_full_access ON public.distribution_requests FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+ALTER TABLE public.distribution_requests ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS schema_migrations_backend_full_access ON public.schema_migrations;
+CREATE POLICY schema_migrations_backend_full_access ON public.schema_migrations FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+ALTER TABLE public.schema_migrations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS providers_backend_full_access ON public.providers;
+CREATE POLICY providers_backend_full_access ON public.providers FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+ALTER TABLE public.providers ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS device_tokens_backend_full_access ON public.device_tokens;
+CREATE POLICY device_tokens_backend_full_access ON public.device_tokens FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+ALTER TABLE public.device_tokens ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS user_preferences_backend_full_access ON public.user_preferences;
+CREATE POLICY user_preferences_backend_full_access ON public.user_preferences FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+ALTER TABLE public.user_preferences ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS app_update_installs_backend_full_access ON public.app_update_installs;
+CREATE POLICY app_update_installs_backend_full_access ON public.app_update_installs FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+ALTER TABLE public.app_update_installs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS login_lockouts_backend_full_access ON public.login_lockouts;
+CREATE POLICY login_lockouts_backend_full_access ON public.login_lockouts FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+ALTER TABLE public.login_lockouts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS identity_risk_actions_backend_full_access ON public.identity_risk_actions;
+CREATE POLICY identity_risk_actions_backend_full_access ON public.identity_risk_actions FOR ALL TO postgres, service_role USING (true) WITH CHECK (true);
+ALTER TABLE public.identity_risk_actions ENABLE ROW LEVEL SECURITY;
 
 -- SEED DATA
 

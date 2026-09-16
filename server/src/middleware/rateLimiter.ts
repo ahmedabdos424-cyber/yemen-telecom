@@ -24,8 +24,16 @@ export const authRateLimiter = rateLimit({
     });
   },
   skip: (req: Request) => {
-    // تخطي Rate Limiting عبر متغير بيئة مخصص (لا يُستخدم في الإنتاج)
-    if (process.env.RATE_LIMIT_DISABLED === 'true') return true;
+    // Test/CI bypass only — never in production. Previously
+    // `RATE_LIMIT_DISABLED=true` skipped the auth limiter in every env
+    // (S-12); a leaked prod var would have disabled brute-force protection.
+    if (process.env.RATE_LIMIT_DISABLED === 'true') {
+      if (process.env.NODE_ENV === 'production') {
+        logger.warn('[LOCKOUT] RATE_LIMIT_DISABLED is set in production — ignoring it');
+        return false;
+      }
+      return true;
+    }
     // السماح بمسارات-health check دون تحديد
     return req.path === '/health' || req.path === '/api/health';
   }
@@ -192,7 +200,11 @@ export async function isDbLocked(username: string, ip: string): Promise<{ locked
   }
 }
 
-/** هل المستخدم مقفول عالمياً (بجميع الـ IPs)؟ */
+/** هل المستخدم مقفول عالمياً (بجميع الـ IPs)؟
+ * @deprecated Do not enforce: a per-username global lock lets one attacker
+ * lock a victim out from every IP (D-06/S-08 DoS). Kept for backward
+ * compatibility; the login flow now relies on per-username+IP locks only.
+ */
 export async function isGloballyLocked(username: string): Promise<{ locked: boolean; remainingMs: number }> {
   try {
     const result = await query(

@@ -20,7 +20,7 @@ vi.mock('../db', () => {
     }),
   };
 });
-vi.mock('../services/realtime.service', () => ({ broadcastEvent: vi.fn() }));
+vi.mock('../services/realtime.service', () => ({ broadcastEvent: vi.fn(), broadcastScopedEvent: vi.fn(), broadcastToRoles: vi.fn(), broadcastToUserIds: vi.fn() }));
 vi.mock('../services/alerts.service', () => ({ createAlert: vi.fn() }));
 vi.mock('../cache', () => ({ cacheInvalidate: vi.fn() }));
 

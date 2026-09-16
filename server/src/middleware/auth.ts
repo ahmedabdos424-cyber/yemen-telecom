@@ -37,12 +37,14 @@ export interface TokenPayload {
   iss?: string;
 }
 
-// Only demo seed accounts are exempt from single-device session enforcement.
-// Every real production account must pass the active_session_sid check to
-// prevent concurrent-device hijacking.
+// Only demo seed accounts are exempt from single-device session enforcement,
+// and only outside production. Every production account — including accounts
+// that happen to reuse a demo username — must pass the active_session_sid
+// check so a stolen token cannot survive a fresh login (H-01).
 export const DEMO_USERNAMES = new Set<string>(['manager', 'agent', 'seller']);
 
 export function isSessionExempt(username?: string): boolean {
+  if (process.env.NODE_ENV === 'production') return false;
   return !!username && DEMO_USERNAMES.has(username);
 }
 

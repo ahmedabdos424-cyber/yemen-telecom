@@ -76,10 +76,15 @@ async function syncActivationItem(item: OfflineQueueItem): Promise<void> {
   const target = allSims.find(s => s.iccid === q.iccid);
   if (target) {
     await api.updateSim(target.id, { status: 'activated', customerName: q.fullName, customerId: q.idNumber, contractImage: contractImage || undefined });
-  } else {
+  } else if (q.role === 'manager') {
     try {
       await api.createSim({ iccid: q.iccid, phone: q.phoneNumber, provider: q.operator === 'yemen_mobile' ? 'Yemen Mobile' : q.operator === 'sabafon' ? 'Sabafon' : 'YOU', status: 'activated' });
     } catch { /* sim may already exist */ }
+  } else {
+    // Agents/sellers cannot create SIMs (POST /sims is manager-only): the SIM
+    // must arrive via transfer first. Throw so the queue retries later (stock
+    // may arrive meanwhile) instead of looping on a 403 that can never succeed.
+    throw new Error('الشريحة غير موجودة في مخزونك. اطلب تحويلها إليك أولاً ثم أعد المزامنة.');
   }
 }
 
@@ -155,11 +160,17 @@ export function useAgentSellerState(role: string | null, username: string) {
     if (!recipient) {
       throw new Error('لم يتم العثور على البائع المستلم');
     }
+    // The API validates seller_id as a positive integer (C-02): the previous
+    // String(...) coercion failed validation with 400 on every transfer.
+    const sellerId = Number(recipient.id);
+    if (!Number.isInteger(sellerId) || sellerId <= 0) {
+      throw new Error('معرف البائع المستلم غير صالح');
+    }
     try {
       // Server-side strict transfer: ownership moves atomically with the
       // agent's and seller's stock counters.
       const res = await api.transferSims({
-        seller_id: String(recipient.id),
+        seller_id: sellerId,
         from_iccid: startSerial,
         to_iccid: endSerial,
       });
@@ -235,10 +246,13 @@ export function useAgentSellerState(role: string | null, username: string) {
       const target = allSims.find(s => s.iccid === simData.iccid);
       if (target) {
         await api.updateSim(target.id, { status: 'activated', customerName: simData.fullName, customerId: simData.idNumber, contractImage: contractImage || undefined });
-      } else {
+      } else if (role === 'manager') {
         try {
           await api.createSim({ iccid: simData.iccid, phone: simData.phoneNumber, provider: simData.operator === 'yemen_mobile' ? 'Yemen Mobile' : simData.operator === 'sabafon' ? 'Sabafon' : 'YOU', status: 'activated' });
         } catch { /* sim may already exist */ }
+      } else {
+        // Agents/sellers cannot create SIMs (POST /sims is manager-only).
+        throw new Error('الشريحة غير موجودة في مخزونك. اطلب تحويلها إليك أولاً.');
       }
     } catch (err) {
       if (isNetworkError(err)) {
@@ -332,6 +346,20 @@ export function useAgentSellerState(role: string | null, username: string) {
     const prev = sims;
     const prevById = new Map(prev.map(s => [s.id, s]));
     const updatedById = new Map(updated.map(s => [s.id, s]));
+    // Creating and deleting SIMs is manager-only (POST/DELETE /sims return
+    // 403 otherwise). Fail fast with a clear message instead of firing
+    // requests that can never succeed and then rolling back (C-10).
+    const isManager = role === 'manager';
+    if (!isManager) {
+      const added = updated.filter(s => !prevById.has(s.id));
+      if (added.length > 0) {
+        throw new Error('إنشاء الشرائح متاح لمدير النظام فقط.');
+      }
+      const removed = prev.filter(s => !updatedById.has(s.id));
+      if (removed.length > 0) {
+        throw new Error('حذف الشرائح متاح لمدير النظام فقط.');
+      }
+    }
     try {
       for (const sim of updated) {
         const before = prevById.get(sim.id);
@@ -348,6 +376,7 @@ export function useAgentSellerState(role: string | null, username: string) {
       }
       for (const old of prev) {
         if (!updatedById.has(old.id)) {
+          // Guarded above for non-managers; managers may delete.
           await api.deleteSim(Number(old.id));
         }
       }
@@ -361,7 +390,7 @@ export function useAgentSellerState(role: string | null, username: string) {
   };
 
   // Realtime refresh: re-pull the role-scoped lists after a remote change
-  // (activation on another device, distribution approval, inventory edits…).
+  // (activation on another device, distribution approval, inventory edits.).
   const refreshRoleData = useCallback(async () => {
     const results = await Promise.allSettled([
       api.getSellers(),
@@ -376,13 +405,28 @@ export function useAgentSellerState(role: string | null, username: string) {
     if (results[3].status === 'fulfilled') setOperations((results[3].value ?? []) as Operation[]);
   }, [mountedRef]);
 
+  // Initial fetch for agent/seller roles (C-10): without this the hook only
+  // served stale cache until a realtime event or a manual action triggered a
+  // refresh. Mirrors the manager hook's role-gated initial fetch.
+  useEffect(() => {
+    if (role === 'agent' || role === 'seller') {
+      refreshRoleData().catch(err => captureError(err, 'initialRoleData'));
+    }
+  }, [role, refreshRoleData]);
+
   // Self seller data for seller role — memoized to avoid re-creating every render
-  const selfSellerData: Seller = useMemo(() => sellers.find(s => s.username === username || s.name === username) || {
+  const selfSellerData: Seller = useMemo(() => {
+    // Sellers only ever receive their own row, so a single-row list is
+    // unambiguous even when the stored username/displayName does not match
+    // the seller name (C-10 stock-gate fix).
+    if (role === 'seller' && sellers.length === 1) return sellers[0];
+    return sellers.find(s => s.username === username || s.name === username) || {
     id: '', name: username, storeName: '', idNumber: '',
     phone: '', region: '', regionCode: '', status: 'active',
     totalSales: 0, currentStock: 0, efficiency: 0, creationDate: '',
     lastLogin: '', simsCount: 0, sales30Days: 0, salesGrowth: 0, activityRate: 0
-  }, [sellers, username]);
+  };
+  }, [role, sellers, username]);
 
   return {
     sellers, sims, operations, inventories, activeTab, sellerCredentials, selfSellerData,

@@ -1,6 +1,6 @@
 import path from 'path';
 import { Router, Request, Response } from 'express';
-import { query } from '../../db';
+import { query, transaction } from '../../db';
 import { invalidateMaintenanceMode } from '../../maintenance';
 import { logger } from '../../logger';
 import { cacheStats } from '../../cache';
@@ -10,6 +10,7 @@ import { validate, resetDataSchema } from '../../validation';
 import { resetSystemData } from '../../reset-data';
 import { createAlert } from '../../services/alerts.service';
 import { logAudit } from '../../audit-log';
+import { hasColumn } from '../../dbColumns';
 
 const router = Router();
 
@@ -72,9 +73,12 @@ router.post('/system/backup', requireRole('manager'), async (req: AuthRequest, r
       const result = await query(queryText);
       backup[table] = result.rows;
     }
-    const { uploadBackup, isConfigured } = await import('../../backup-storage');
+    const { uploadBackup, isConfigured, isEncryptionConfigured } = await import('../../backup-storage');
     if (!isConfigured()) {
       return res.status(500).json({ error: 'External backup storage not configured. Set BACKUP_S3_* environment variables.' });
+    }
+    if (!isEncryptionConfigured() && process.env.NODE_ENV === 'production') {
+      return res.status(500).json({ error: 'Backup encryption not configured. Set BACKUP_ENCRYPTION_KEY environment variable.' });
     }
     const result = await uploadBackup(backup);
     res.json({
@@ -121,24 +125,53 @@ router.post('/system/lockdown', requireRole('manager'), async (req: AuthRequest,
   try {
     const current = await query('SELECT maintenance_mode FROM system_settings WHERE id = 1');
     const isCurrentlyLocked = current.rows[0]?.maintenance_mode || false;
-    await query(
-      `UPDATE system_settings SET maintenance_mode = $1 WHERE id = 1`,
-      [!isCurrentlyLocked]
-    );
-    await query(
-      `UPDATE sellers SET status = $1 WHERE status NOT IN ('deleted')`,
-      [!isCurrentlyLocked ? 'suspended' : 'active']
-    );
-    if (!isCurrentlyLocked) {
-      // Lockdown: force every non-manager session to re-authenticate. `sellers`
-      // status is a different table, so without this bump seller/agent JWTs
-      // would remain valid even while seller rows are suspended.
-      await query(
-        `UPDATE users SET token_version = token_version + 1,
-                active_session_sid = NULL, session_expires_at = NULL
-         WHERE role <> 'manager' AND status <> 'inactive'`
+    // C-05: remember each seller's pre-lockdown status so deactivation
+    // restores the exact previous state instead of wiping inactive/suspended
+    // to active. The column arrives via migration 050; probe first so a code
+    // deploy ahead of the migration keeps the legacy behavior (with a warn).
+    const stateful = await hasColumn('sellers', 'pre_lockdown_status');
+    await transaction(async (client) => {
+      await client.query(
+        `UPDATE system_settings SET maintenance_mode = $1 WHERE id = 1`,
+        [!isCurrentlyLocked]
       );
-    }
+      if (!isCurrentlyLocked) {
+        if (stateful) {
+          await client.query(
+            `UPDATE sellers SET pre_lockdown_status = status, status = 'suspended'
+              WHERE status NOT IN ('deleted', 'suspended')`
+          );
+          await client.query(
+            `UPDATE sellers SET pre_lockdown_status = status
+              WHERE status = 'suspended' AND pre_lockdown_status IS NULL`
+          );
+        } else {
+          logger.warn('[LOCKDOWN] sellers.pre_lockdown_status missing — falling back to legacy blanket suspend (apply migration 050)');
+          await client.query(
+            `UPDATE sellers SET status = $1 WHERE status NOT IN ('deleted')`,
+            ['suspended']
+          );
+        }
+        // Lockdown: force every non-manager session to re-authenticate. `sellers`
+        // status is a different table, so without this bump seller/agent JWTs
+        // would remain valid even while seller rows are suspended.
+        await client.query(
+          `UPDATE users SET token_version = token_version + 1,
+                  active_session_sid = NULL, session_expires_at = NULL
+           WHERE role <> 'manager' AND status <> 'inactive'`
+        );
+      } else if (stateful) {
+        await client.query(
+          `UPDATE sellers SET status = COALESCE(pre_lockdown_status, 'active'), pre_lockdown_status = NULL
+            WHERE status NOT IN ('deleted')`
+        );
+      } else {
+        await client.query(
+          `UPDATE sellers SET status = $1 WHERE status NOT IN ('deleted')`,
+          ['active']
+        );
+      }
+    });
     const newStatus = !isCurrentlyLocked;
     invalidateMaintenanceMode();
     res.json({

@@ -90,27 +90,59 @@ function validateFileMagic(file: Express.Multer.File): boolean {
   return hasValidMagicBytes(file.buffer, file.mimetype);
 }
 
+// Extract the flat object name from a stored contract-image value. The
+// column may hold either a bare filename ("1718-ab12cd34.jpg") or a full
+// signed URL ("https://.../1718-ab12cd34.jpg?token=...") — in both cases the
+// object name is the last path segment without the query string.
+export function extractDocumentObjectName(stored: string | null | undefined): string {
+  if (!stored) return '';
+  const noQuery = stored.split('?')[0];
+  return noQuery.substring(noQuery.lastIndexOf('/') + 1);
+}
+
 // Contract / identity documents are PII. Managers may rehydrate any signed
 // URL, but agents and sellers may only rehydrate documents linked to records
-// they own (their SIMs and their own operations). `strpos` is used instead of
-// LIKE so characters in the filename can never act as wildcards.
-async function canAccessDocument(user: { id: number; role: string }, filename: string): Promise<boolean> {
+// they own (their SIMs and their own operations). Ownership is resolved first
+// and the stored value is compared by EXACT object name in JS — never with
+// strpos/LIKE — so a short input such as "jpg" can no longer match a
+// document the caller does not own (C-02).
+export async function canAccessDocument(user: { id: number; role: string }, filename: string): Promise<boolean> {
   if (user.role === 'manager') return true;
-  const result = await query(
-    `SELECT 1 FROM sims s
-       WHERE strpos(s.contract_image, $1) > 0
-         AND (
-           s.assigned_to = (SELECT id FROM sellers WHERE user_id = $2)
-           OR s.assigned_to_agent = (SELECT id FROM agents WHERE user_id = $2)
-           OR s.assigned_to IN (SELECT id FROM sellers WHERE agent_id = (SELECT id FROM agents WHERE user_id = $2))
-         )
-     UNION
-     SELECT 1 FROM operations o
-       WHERE strpos(o.contract_image, $1) > 0 AND o.created_by = $2
-     LIMIT 1`,
-    [filename, user.id]
+  if (!filename) return false;
+  const sellerRes = await query('SELECT id FROM sellers WHERE user_id = $1', [user.id]);
+  const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [user.id]);
+  const sellerId = sellerRes.rows[0]?.id ?? null;
+  const agentId = agentRes.rows[0]?.id ?? null;
+
+  const candidates: string[] = [];
+  const simConds: string[] = [];
+  const simParams: unknown[] = [];
+  if (sellerId != null) {
+    simConds.push(`assigned_to = $${simParams.length + 1}`);
+    simParams.push(sellerId);
+  }
+  if (agentId != null) {
+    simConds.push(`assigned_to_agent = $${simParams.length + 1}`);
+    simParams.push(agentId);
+    simConds.push(`assigned_to IN (SELECT id FROM sellers WHERE agent_id = $${simParams.length + 1})`);
+    simParams.push(agentId);
+  }
+  if (simConds.length > 0) {
+    const simRows = await query(
+      `SELECT contract_image FROM sims
+        WHERE contract_image IS NOT NULL AND contract_image <> ''
+          AND (${simConds.join(' OR ')})`,
+      simParams
+    );
+    for (const r of simRows.rows) candidates.push(r.contract_image);
+  }
+  const opRows = await query(
+    `SELECT contract_image FROM operations
+      WHERE created_by = $1 AND contract_image IS NOT NULL AND contract_image <> ''`,
+    [user.id]
   );
-  return result.rows.length > 0;
+  for (const r of opRows.rows) candidates.push(r.contract_image);
+  return candidates.some((stored) => extractDocumentObjectName(stored) === filename);
 }
 
 router.post('/image', requireRole('manager', 'agent', 'seller'), upload.single('image'), async (req: AuthRequest, res: Response) => {

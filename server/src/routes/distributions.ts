@@ -4,10 +4,11 @@ import { logger } from '../logger';
 import { requireRole, AuthRequest, resolveScopeAgentId } from '../middleware/auth';
 import { getPagination } from '../helpers';
 import { validate, createDistributionSchema, approveDistributionSchema, resolveProviderId } from '../validation';
-import { broadcastEvent, broadcastToRoles } from '../services/realtime.service';
+import { broadcastScopedEvent, broadcastToRoles } from '../services/realtime.service';
 import { notifyDistributionApproved } from '../services/fcm.service';
 import crypto from 'crypto';
 import { logAudit } from '../audit-log';
+import { cacheInvalidate } from '../cache';
 
 const router = Router();
 
@@ -134,7 +135,7 @@ router.post('/', requireRole('agent'), validate(createDistributionSchema), async
 router.put('/:id/approve', requireRole('manager'), validate(approveDistributionSchema), async (req: AuthRequest, res: Response) => {
   const { status: decision, notes } = req.body;
   try {
-    await transaction(async (client) => {
+    const approved = await transaction(async (client) => {
       const existing = await client.query('SELECT * FROM distribution_requests WHERE id = $1 FOR UPDATE', [req.params.id]);
       if (existing.rows.length === 0) {
         throw new Error('DISTRIBUTION_NOT_FOUND');
@@ -158,8 +159,12 @@ router.put('/:id/approve', requireRole('manager'), validate(approveDistributionS
           throw new Error('INSUFFICIENT_INVENTORY');
         }
       }
+      return dr;
     });
-    broadcastEvent({ type: 'distribution.updated', entity: 'distribution', id: req.params.id, status: decision, action: 'approve' });
+    // H-03: approving a distribution moves stock — cached reports/stats must refresh.
+    cacheInvalidate('report:');
+    // H-05: the owning agency sees its request outcome; managers see all.
+    broadcastScopedEvent({ type: 'distribution.updated', entity: 'distribution', id: req.params.id, status: decision, action: 'approve', agent_id: approved.agent_id });
     // Best-effort push: notify the buyer (seller) and the submitting agent that
     // their distribution request was approved. Never blocks the HTTP response.
     notifyRecipients(req.params.id).catch((err) => logger.warn('[FCM] distribution approval notify failed:', err));

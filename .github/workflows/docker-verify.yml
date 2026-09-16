@@ -7,6 +7,21 @@ on:
 jobs:
   docker-verify:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: yt_verify
+          POSTGRES_PASSWORD: yt_verify_local_only_pw
+          POSTGRES_DB: yt_verify
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -33,23 +48,26 @@ jobs:
 
       - name: Start container and test
         run: |
-          docker run -d --name yt-test -p 4000:4000 \
+          # --network host lets the container reach the service Postgres via
+          # localhost, which also keeps DB_SSL enforcement local-safe
+          # (db.ts disables SSL only for localhost/127.0.0.1).
+          docker run -d --network host --name yt-test \
             -e NODE_ENV=production \
             -e API_PORT=4000 \
-            -e DB_HOST=dpg-cv5rc8q4d50c73d4krp0-a.oregon-postgres.render.com \
+            -e DB_HOST=localhost \
             -e DB_PORT=5432 \
-            -e DB_USER=dummy \
-            -e DB_PASSWORD=dummy \
-            -e DB_NAME=dummy \
-            -e DB_SSL_REJECT_UNAUTHORIZED=false \
+            -e DB_USER=yt_verify \
+            -e DB_PASSWORD=yt_verify_local_only_pw \
+            -e DB_NAME=yt_verify \
+            -e DB_SSL_REJECT_UNAUTHORIZED=true \
             -e DB_FAMILY=4 \
             -e DB_MAX_CONNECTIONS=5 \
             -e DB_SLOW_QUERY_MS=1000 \
             -e JWT_SECRET=test-jwt-secret-for-verify-at-least-32-chars \
             -e REFRESH_SECRET=test-refresh-secret-for-verify-at-least-32 \
             -e CSRF_SECRET=test-csrf-secret-for-verify-at-least-32-chars \
+            -e BLACKLIST_HMAC_SECRET=test-blacklist-secret-for-verify-32-chars \
             -e CORS_ORIGIN=http://localhost:3000 \
-            -e UPLOAD_DIR=/uploads \
             yemen-telecom:test
           sleep 8
           echo "=== CONTAINER LOGS ==="
