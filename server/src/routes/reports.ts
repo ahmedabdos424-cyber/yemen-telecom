@@ -3,6 +3,8 @@ import { query } from '../db';
 import { logger } from '../logger';
 import { cacheGet, cacheSet } from '../cache';
 import { requireRole, AuthRequest, resolveScopeAgentId } from '../middleware/auth';
+import { getReportPaging, setTotalCount } from '../helpers';
+import { hasColumn } from '../dbColumns';
 import {
   DailySalesRow,
   AgentPerformanceRow,
@@ -18,11 +20,18 @@ router.get('/daily-sales', requireRole('manager'), async (_req: Request, res: Re
   const cached = cacheGet('report:daily-sales');
   if (cached) return res.json(cached);
   try {
+    // J-08: count distinct customers by key, not by bare name. customer_id
+    // carries the national id_number and customer_row_id is the FK (050);
+    // the probe keeps this working on databases predating the migration.
+    const linkable = await hasColumn('operations', 'customer_row_id');
+    const customerKey = linkable
+      ? `COALESCE(customer_row_id::text, NULLIF(customer_id, ''), customer_name)`
+      : `COALESCE(NULLIF(customer_id, ''), customer_name)`;
     const result = await query<DailySalesRow>(`
       SELECT
         DATE(created_at) AS day,
         COUNT(*) AS activations,
-        COUNT(DISTINCT customer_name) AS unique_customers,
+        COUNT(DISTINCT ${customerKey}) AS unique_customers,
         operator
       FROM operations
       WHERE type='activate' AND created_at > NOW() - INTERVAL '30 days'
@@ -37,10 +46,19 @@ router.get('/daily-sales', requireRole('manager'), async (_req: Request, res: Re
   }
 });
 
-router.get('/agent-performance', requireRole('manager'), async (_req: Request, res: Response) => {
-  const cached = cacheGet('report:agent-performance');
-  if (cached) return res.json(cached);
+router.get('/agent-performance', requireRole('manager'), async (req: Request, res: Response) => {
+  // J-05: unified paging contract — array shape preserved, total in header.
+  const { limit, offset } = getReportPaging(req, 500, 500);
+  const cacheKey = `report:agent-performance:${req.query.page || 1}:${limit}`;
+  const cached = cacheGet(cacheKey);
+  if (cached) {
+    const totalRow = await query('SELECT COUNT(*) AS count FROM agents');
+    setTotalCount(res, parseInt(totalRow.rows[0]?.count || '0', 10));
+    return res.json(cached);
+  }
   try {
+    const totalRow = await query('SELECT COUNT(*) AS count FROM agents');
+    setTotalCount(res, parseInt(totalRow.rows[0]?.count || '0', 10));
     const result = await query<AgentPerformanceRow>(`
       SELECT
         a.id, a.name AS agent_name, a.region,
@@ -52,8 +70,9 @@ router.get('/agent-performance', requireRole('manager'), async (_req: Request, r
       LEFT JOIN sellers s ON s.agent_id = a.id
       GROUP BY a.id, a.name, a.region
       ORDER BY sales_30_days DESC
-    `);
-    cacheSet('report:agent-performance', result.rows, 300_000);
+      LIMIT $1 OFFSET $2
+    `, [limit, offset]);
+    cacheSet(cacheKey, result.rows, 300_000);
     res.json(result.rows);
   } catch (err) {
     logger.error('Error fetching agent performance:', err);
@@ -83,20 +102,30 @@ router.get('/operator-distribution', requireRole('manager'), async (_req: Reques
 });
 
 router.get('/seller-performance', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
-  const cacheKey = `report:seller-performance:${req.user?.id || 'anon'}`;
+  // J-05: the old silent LIMIT 100 is now the default page size; the full
+  // count always rides in X-Total-Count and ?page&limit walks the rest.
+  const { limit, offset } = getReportPaging(req, 100, 500);
+  const cacheKey = `report:seller-performance:${req.user?.id || 'anon'}:${req.query.page || 1}:${limit}`;
   const cached = cacheGet(cacheKey);
-  if (cached) return res.json(cached);
+  if (cached) {
+    const totalRow = await query('SELECT COUNT(*) AS count FROM sellers s' + (req.user?.role === 'agent' ? ' WHERE s.agent_id = $1' : ''), req.user?.role === 'agent' ? [(await resolveScopeAgentId(req)) ?? -1] : []);
+    setTotalCount(res, parseInt(totalRow.rows[0]?.count || '0', 10));
+    return res.json(cached);
+  }
   try {
     let whereClause = '';
-    let params: unknown[] | undefined;
+    let params: unknown[] = [];
     if (req.user?.role === 'agent') {
       const agentId = await resolveScopeAgentId(req);
       if (agentId == null) {
+        setTotalCount(res, 0);
         return res.json([]);
       }
       whereClause = ' WHERE s.agent_id = $1';
       params = [agentId];
     }
+    const totalRow = await query(`SELECT COUNT(*) AS count FROM sellers s${whereClause}`, params);
+    setTotalCount(res, parseInt(totalRow.rows[0]?.count || '0', 10));
     const result = await query<SellerPerformanceRow>(`
       SELECT
         s.id, s.name, s.store_name, s.region,
@@ -108,8 +137,8 @@ router.get('/seller-performance', requireRole('manager', 'agent'), async (req: A
       LEFT JOIN agents a ON s.agent_id = a.id
       ${whereClause}
       ORDER BY s.sales_30_days DESC
-      LIMIT 100
-    `, params);
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+    `, [...params, limit, offset]);
     cacheSet(cacheKey, result.rows, 120_000);
     res.json(result.rows);
   } catch (err) {
@@ -122,23 +151,35 @@ router.get('/seller-performance', requireRole('manager', 'agent'), async (req: A
 // and the contract evidence image. This powers the manager's activations
 // table (thumbnail + lightbox) and CSV/Excel export.
 router.get('/activations', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
-  const cacheKey = `report:activations:${req.user?.role === 'agent' ? req.user.id : 'manager'}`;
+  // J-05: default page keeps the old 500-row window; total in header.
+  const { limit, offset } = getReportPaging(req, 500, 500);
+  const cacheKey = `report:activations:${req.user?.role === 'agent' ? req.user.id : 'manager'}:${req.query.page || 1}:${limit}`;
   const cached = cacheGet(cacheKey);
-  if (cached) return res.json(cached);
-  try {
-    let whereClause = 'WHERE o.type = $1';
-    let params: unknown[] = ['activate'];
-    if (req.user?.role === 'agent') {
-      const agentId = await resolveScopeAgentId(req);
-      if (agentId == null) {
-        return res.json([]);
-      }
-      whereClause = `WHERE o.type = $1 AND (
+  const buildScope = async (): Promise<{ where: string; params: unknown[] }> => {
+    if (req.user?.role !== 'agent') return { where: 'WHERE o.type = $1', params: ['activate'] };
+    const agentId = await resolveScopeAgentId(req);
+    if (agentId == null) return { where: '__EMPTY__', params: [] };
+    return {
+      where: `WHERE o.type = $1 AND (
         o.created_by = $2
         OR o.created_by IN (SELECT s.user_id FROM sellers s WHERE s.agent_id = $2)
-      )`;
-      params = ['activate', agentId];
+      )`,
+      params: ['activate', agentId],
+    };
+  };
+  try {
+    const scope = await buildScope();
+    if (scope.where === '__EMPTY__') {
+      setTotalCount(res, 0);
+      return res.json([]);
     }
+    if (cached) {
+      const totalRow = await query(`SELECT COUNT(*) AS count FROM operations o ${scope.where}`, scope.params);
+      setTotalCount(res, parseInt(totalRow.rows[0]?.count || '0', 10));
+      return res.json(cached);
+    }
+    const totalRow = await query(`SELECT COUNT(*) AS count FROM operations o ${scope.where}`, scope.params);
+    setTotalCount(res, parseInt(totalRow.rows[0]?.count || '0', 10));
     const result = await query<ActivationsReportRow>(`
       SELECT
         o.op_id, o.type, o.target, o.operator, o.date, o.time, o.status,
@@ -151,10 +192,10 @@ router.get('/activations', requireRole('manager', 'agent'), async (req: AuthRequ
       LEFT JOIN users u ON o.created_by = u.id
       LEFT JOIN sellers s ON s.user_id = o.created_by
       LEFT JOIN agents a ON a.id = s.agent_id
-      ${whereClause}
+      ${scope.where}
       ORDER BY o.id DESC
-      LIMIT 500
-    `, params);
+      LIMIT $${scope.params.length + 1} OFFSET $${scope.params.length + 2}
+    `, [...scope.params, limit, offset]);
     cacheSet(cacheKey, result.rows, 120_000);
     res.json(result.rows);
   } catch (err) {
@@ -164,18 +205,23 @@ router.get('/activations', requireRole('manager', 'agent'), async (req: AuthRequ
 });
 
 // Sellers registry report — seller profile + avatar/id document image.
+// J-05: bounded pages (default 500) with the total in X-Total-Count.
 router.get('/sellers', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
+  const { limit, offset } = getReportPaging(req, 500, 500);
   try {
     let whereClause = '';
-    let params: unknown[] | undefined;
+    let params: unknown[] = [];
     if (req.user?.role === 'agent') {
       const agentId = await resolveScopeAgentId(req);
       if (agentId == null) {
+        setTotalCount(res, 0);
         return res.json([]);
       }
       whereClause = ' WHERE s.agent_id = $1';
       params = [agentId];
     }
+    const totalRow = await query(`SELECT COUNT(*) AS count FROM sellers s${whereClause}`, params);
+    setTotalCount(res, parseInt(totalRow.rows[0]?.count || '0', 10));
     const result = await query<SellersRegistryRow>(`
       SELECT
         s.id, s.seller_id, s.name, s.store_name, s.id_number, s.phone,
@@ -187,7 +233,8 @@ router.get('/sellers', requireRole('manager', 'agent'), async (req: AuthRequest,
       LEFT JOIN agents a ON s.agent_id = a.id
       ${whereClause}
       ORDER BY s.id DESC
-    `, params);
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+    `, [...params, limit, offset]);
     res.json(result.rows);
   } catch (err) {
     logger.error('Error fetching sellers report:', err);

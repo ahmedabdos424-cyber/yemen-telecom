@@ -32,6 +32,21 @@ export async function rejectIfUnpaginatedTooLarge(
   return false;
 }
 
+// Unified pagination contract for report endpoints (J-05): the array
+// response shape is preserved (the SPA consumes plain arrays), but every
+// endpoint accepts ?page&limit and always reports the full row count via
+// the X-Total-Count header — silent LIMIT truncation is gone.
+export function getReportPaging(req: Request, def = 100, max = 500) {
+  const page = Math.max(1, parseInt(req.query.page as string) || 1);
+  const limit = Math.min(max, Math.max(1, parseInt(req.query.limit as string) || def));
+  const offset = (page - 1) * limit;
+  return { page, limit, offset };
+}
+
+export function setTotalCount(res: Response, total: number) {
+  res.set('X-Total-Count', String(total));
+}
+
 export async function paginatedQuery<T>(
   baseQuery: string,
   countQuery: string,

@@ -252,6 +252,14 @@ const passwordResetLimiter = rateLimit({
   max: 5,
   message: { error: 'Too many password reset attempts, please try again later' },
 });
+// J-06: install telemetry is public by design (unregistered devices report)
+// but must not be floodable into a stats-poisoning channel.
+const installReportLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: { error: 'Too many install reports, please try again later' },
+});
+app.use('/api/app-update-installed', installReportLimiter);
 app.use('/api/sellers', (req, res, next) => {
   if (req.method === 'POST' && req.path.endsWith('/reset-password')) {
     return passwordResetLimiter(req, res, next);

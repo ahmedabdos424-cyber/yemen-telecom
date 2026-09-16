@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { query } from '../../db';
 import { logger } from '../../logger';
 import { requireRole } from '../../middleware/auth';
-import { getPagination } from '../../helpers';
+import { getPagination, getReportPaging, setTotalCount } from '../../helpers';
 
 const router = Router();
 
@@ -10,10 +10,15 @@ router.get('/transactions', requireRole('manager'), async (req: Request, res: Re
   try {
     const { limit, offset } = getPagination(req);
     const paginate = req.query.page || req.query.limit;
+    // J-05: newest-first like every other list; the legacy unpaginated shape
+    // is capped at 500 with the full count in X-Total-Count.
+    const rep = getReportPaging(req, 500, 500);
     const queryText = paginate
-      ? 'SELECT * FROM transactions ORDER BY id LIMIT $1 OFFSET $2'
-      : 'SELECT * FROM transactions ORDER BY id';
+      ? 'SELECT * FROM transactions ORDER BY id DESC LIMIT $1 OFFSET $2'
+      : `SELECT * FROM transactions ORDER BY id DESC LIMIT ${rep.limit} OFFSET ${rep.offset}`;
     const params = paginate ? [limit, offset] : [];
+    const totalRow = await query('SELECT COUNT(*) AS count FROM transactions');
+    setTotalCount(res, parseInt(totalRow.rows[0]?.count || '0', 10));
     const result = await query(queryText, params);
     res.json(result.rows.map((r: { id: string; client_name: string; provider: string; sims_count: number; status: string; relative_time: string }) => ({
       id: r.id,

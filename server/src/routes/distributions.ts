@@ -105,6 +105,11 @@ router.post('/', requireRole('agent'), validate(createDistributionSchema), async
     let sellerId = seller_id || null;
     if (seller_name && !sellerId) {
       const s = await query('SELECT id FROM sellers WHERE name = $1 AND agent_id = $2', [seller_name, agentId]);
+      // J-07: names are not unique — silently picking the first of several
+      // same-named sellers would route stock to the wrong shop.
+      if (s.rows.length > 1) {
+        return res.status(409).json({ error: 'Multiple sellers share this name — provide seller_id' });
+      }
       if (s.rows.length > 0) sellerId = s.rows[0].id;
     }
     // Verify seller belongs to this agent if seller_id was provided directly

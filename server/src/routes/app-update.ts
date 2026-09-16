@@ -74,7 +74,14 @@ router.get('/app-version', async (_req, res: Response) => {
 // POST /api/app-update-installed — record a successful install.
 // deviceId + version + time let the operator know who updated and who didn't.
 router.post('/app-update-installed', async (req: Request, res: Response) => {
-  const deviceId = String(req.body?.deviceId || req.body?.device_id || 'unknown').slice(0, 128);
+  // J-06: junk device rows ('unknown'/empty) collapse into one meaningless
+  // telemetry row and skew per-version stats — require a real device id.
+  // The SPA always sends its generated tele_device_id (typed required).
+  const rawDevice = req.body?.deviceId ?? req.body?.device_id ?? '';
+  const deviceId = String(rawDevice).trim().slice(0, 128);
+  if (!deviceId || deviceId === 'unknown') {
+    return res.status(400).json({ error: 'deviceId required' });
+  }
   const version = String(req.body?.version || '').slice(0, 32);
   const versionCode = parseInt(req.body?.versionCode, 10) || 0;
   if (!version) {

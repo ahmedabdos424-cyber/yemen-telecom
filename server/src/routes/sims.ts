@@ -4,6 +4,7 @@ import { query, transaction } from '../db';
 import { logger } from '../logger';
 import { requireRole, AuthRequest, resolveScopeAgentId, resolveScopeSellerId } from '../middleware/auth';
 import { getPagination, paginatedQuery, rejectIfUnpaginatedTooLarge } from '../helpers';
+import { getUniqueViolationKind, formatUniqueViolationMessage } from '../helpers/dbErrors';
 import { validate, idParamSchema, createSimSchema, updateSimSchema, activateSimSchema, transferSimsSchema } from '../validation';
 import { createAlert } from '../services/alerts.service';
 import { broadcastScopedEvent } from '../services/realtime.service';
@@ -443,6 +444,12 @@ router.put('/:id', requireRole('manager', 'agent', 'seller'), validate(idParamSc
     }
     res.json(result.rows[0]);
   } catch (err) {
+    // J-03: updating the ICCID to an existing one is a client conflict
+    // (409), not a server failure.
+    const kind = getUniqueViolationKind(err);
+    if (kind || (err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === '23505')) {
+      return res.status(409).json({ error: formatUniqueViolationMessage(kind, 'الشريحة') });
+    }
     logger.error('Error updating sim:', err);
     res.status(500).json({ error: 'Internal server error' });
   }

@@ -5,7 +5,7 @@ import { query, transaction } from '../db';
 import { logger } from '../logger';
 import { requireRole, AuthRequest, resolveScopeAgentId } from '../middleware/auth';
 import { getPagination } from '../helpers';
-import { getUniqueViolationKind } from '../helpers/dbErrors';
+import { getUniqueViolationKind, formatUniqueViolationMessage } from '../helpers/dbErrors';
 import { validate, idParamSchema, createSellerSchema, updateSellerSchema, updateSellerBalanceSchema } from '../validation';
 import { broadcastScopedEvent } from '../services/realtime.service';
 import { notifyNewMember } from '../services/fcm.service';
@@ -266,6 +266,11 @@ router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), 
     }
     if (kind === 'phone') {
       return res.status(409).json({ error: 'رقم الهاتف مستخدم بالفعل' });
+    }
+    // J-03: any other unique conflict (e.g. duplicate seller_id) is a client
+    // conflict (409), not a server failure.
+    if (err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === '23505') {
+      return res.status(409).json({ error: formatUniqueViolationMessage(null) });
     }
     logger.error('Error creating seller:', err);
     res.status(500).json({ error: 'Internal server error' });
