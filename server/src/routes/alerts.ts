@@ -3,6 +3,7 @@ import { query } from '../db';
 import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination, rejectIfUnpaginatedTooLarge } from '../helpers';
+import { validate, idParamSchema } from '../validation';
 import { logAudit } from '../audit-log';
 
 const router = Router();
@@ -27,7 +28,7 @@ router.get('/', requireRole('manager'), async (req: Request, res: Response) => {
   }
 });
 
-router.delete('/:id', requireRole('manager'), async (req: AuthRequest, res: Response) => {
+router.delete('/:id', requireRole('manager'), validate(idParamSchema, 'params'), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
     await query('DELETE FROM alerts WHERE id = $1', [id]);

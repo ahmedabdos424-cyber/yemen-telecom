@@ -4,7 +4,7 @@ import { query } from '../db';
 import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination, rejectIfUnpaginatedTooLarge } from '../helpers';
-import { validate, createCustomerSchema, customerSearchSchema } from '../validation';
+import { validate, idParamSchema, createCustomerSchema, customerSearchSchema } from '../validation';
 import { hasColumn } from '../dbColumns';
 
 const router = Router();
@@ -57,7 +57,7 @@ router.get('/search', requireRole('manager', 'agent'), validate(customerSearchSc
   }
 });
 
-router.get('/:id', requireRole('manager', 'agent', 'seller'), async (req: AuthRequest, res: Response) => {
+router.get('/:id', requireRole('manager', 'agent', 'seller'), validate(idParamSchema, 'params'), async (req: AuthRequest, res: Response) => {
   try {
     let sql = 'SELECT * FROM customers WHERE id = $1';
     if (req.user?.role === 'agent' || req.user?.role === 'seller') {

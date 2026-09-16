@@ -4,7 +4,7 @@ import { query, transaction } from '../db';
 import { logger } from '../logger';
 import { requireRole, AuthRequest, resolveScopeAgentId, resolveScopeSellerId } from '../middleware/auth';
 import { getPagination, paginatedQuery, rejectIfUnpaginatedTooLarge } from '../helpers';
-import { validate, createSimSchema, updateSimSchema, activateSimSchema, transferSimsSchema } from '../validation';
+import { validate, idParamSchema, createSimSchema, updateSimSchema, activateSimSchema, transferSimsSchema } from '../validation';
 import { createAlert } from '../services/alerts.service';
 import { broadcastScopedEvent } from '../services/realtime.service';
 import { strictRateLimiter } from '../middleware/rateLimiter';
@@ -287,7 +287,7 @@ router.get('/', requireRole('manager', 'agent', 'seller'), async (req: AuthReque
   }
 });
 
-router.get('/:id', requireRole('manager', 'agent', 'seller'), async (req: AuthRequest, res: Response) => {
+router.get('/:id', requireRole('manager', 'agent', 'seller'), validate(idParamSchema, 'params'), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
     let sql = 'SELECT * FROM sims WHERE id = $1';
@@ -350,7 +350,7 @@ router.post('/', requireRole('manager'), validate(createSimSchema), async (req: 
   }
 });
 
-router.put('/:id', requireRole('manager', 'agent', 'seller'), validate(updateSimSchema), async (req: AuthRequest, res: Response) => {
+router.put('/:id', requireRole('manager', 'agent', 'seller'), validate(idParamSchema, 'params'), validate(updateSimSchema), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
     const existing = await query('SELECT * FROM sims WHERE id = $1', [id]);
@@ -448,7 +448,7 @@ router.put('/:id', requireRole('manager', 'agent', 'seller'), validate(updateSim
   }
 });
 
-router.delete('/:id', requireRole('manager'), async (req: AuthRequest, res: Response) => {
+router.delete('/:id', requireRole('manager'), validate(idParamSchema, 'params'), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
     const existing = await query('SELECT iccid FROM sims WHERE id = $1', [id]);

@@ -3,7 +3,7 @@ import { query, transaction } from '../db';
 import { logger } from '../logger';
 import { requireRole, AuthRequest, resolveScopeAgentId } from '../middleware/auth';
 import { getPagination } from '../helpers';
-import { validate, createDistributionSchema, approveDistributionSchema, resolveProviderId } from '../validation';
+import { validate, idParamSchema, createDistributionSchema, approveDistributionSchema, resolveProviderId } from '../validation';
 import { broadcastScopedEvent, broadcastToRoles } from '../services/realtime.service';
 import { notifyDistributionApproved } from '../services/fcm.service';
 import crypto from 'crypto';
@@ -132,7 +132,7 @@ router.post('/', requireRole('agent'), validate(createDistributionSchema), async
   }
 });
 
-router.put('/:id/approve', requireRole('manager'), validate(approveDistributionSchema), async (req: AuthRequest, res: Response) => {
+router.put('/:id/approve', requireRole('manager'), validate(idParamSchema, 'params'), validate(approveDistributionSchema), async (req: AuthRequest, res: Response) => {
   const { status: decision, notes } = req.body;
   try {
     const approved = await transaction(async (client) => {

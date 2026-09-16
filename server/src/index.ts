@@ -13,6 +13,7 @@ import { query } from './db';
 import { getMaintenanceMode } from './maintenance';
 import { cacheGet, cacheSet, cacheStats } from './cache';
 import { authenticateToken, requireRole } from './middleware/auth';
+import { clientErrorMapper } from './middleware/httpErrors';
 import { clearExpiredLoginLocks, clearExpiredDbLockouts } from './middleware/rateLimiter';
 import { initRedis, closeRedis, clearExpiredLoginLocksRedis } from './redis';
 import { Sentry } from './sentry';
@@ -584,6 +585,10 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
   } as typeof res.json;
   next();
 });
+
+// J-01: map multer/body-parser client errors to 4xx (must precede Sentry
+// and the generic 500 handler so they neither alert nor mislead).
+app.use(clientErrorMapper);
 
 // Sentry error handler (must be before the generic handler)
 if (process.env.SENTRY_DSN) {

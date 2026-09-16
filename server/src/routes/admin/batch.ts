@@ -6,6 +6,7 @@ import { requireRole, AuthRequest } from '../../middleware/auth';
 import { validate, createSimBatchSchema } from '../../validation';
 import { createAlert } from '../../services/alerts.service';
 import { notifyBatchAssigned } from '../../services/fcm.service';
+import { cacheInvalidate } from '../../cache';
 
 const router = Router();
 
@@ -138,6 +139,12 @@ router.post('/sims/batch', requireRole('manager'), validate(createSimBatchSchema
       return inserted;
     });
     const skipped = iccids.length - created;
+
+    // J-04: a batch is the largest stock mutation in the system — cached
+    // reports/stats must refresh instead of serving stale data for 5 minutes.
+    if (created > 0) {
+      cacheInvalidate('report:');
+    }
 
     // Best-effort push: when the batch was assigned to a specific agent/seller,
     // notify that user that new SIMs landed in their stock. Never blocks the

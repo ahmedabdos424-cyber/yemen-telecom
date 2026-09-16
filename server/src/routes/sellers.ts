@@ -6,7 +6,7 @@ import { logger } from '../logger';
 import { requireRole, AuthRequest, resolveScopeAgentId } from '../middleware/auth';
 import { getPagination } from '../helpers';
 import { getUniqueViolationKind } from '../helpers/dbErrors';
-import { validate, createSellerSchema, updateSellerSchema, updateSellerBalanceSchema } from '../validation';
+import { validate, idParamSchema, createSellerSchema, updateSellerSchema, updateSellerBalanceSchema } from '../validation';
 import { broadcastScopedEvent } from '../services/realtime.service';
 import { notifyNewMember } from '../services/fcm.service';
 import { cacheInvalidate } from '../cache';
@@ -136,7 +136,7 @@ router.get('/', requireRole('manager', 'agent', 'seller'), async (req: AuthReque
   }
 });
 
-router.get('/:id', requireRole('manager', 'agent', 'seller'), async (req: AuthRequest, res: Response) => {
+router.get('/:id', requireRole('manager', 'agent', 'seller'), validate(idParamSchema, 'params'), async (req: AuthRequest, res: Response) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
@@ -272,7 +272,7 @@ router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), 
   }
 });
 
-router.put('/:id', requireRole('manager', 'agent'), validate(updateSellerSchema), async (req: AuthRequest, res: Response) => {
+router.put('/:id', requireRole('manager', 'agent'), validate(idParamSchema, 'params'), validate(updateSellerSchema), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
     const existing = await query('SELECT * FROM sellers WHERE id = $1', [id]);
@@ -325,7 +325,7 @@ router.put('/:id', requireRole('manager', 'agent'), validate(updateSellerSchema)
   }
 });
 
-router.put('/:id/balance', requireRole('manager', 'agent'), validate(updateSellerBalanceSchema), async (req: AuthRequest, res: Response) => {
+router.put('/:id/balance', requireRole('manager', 'agent'), validate(idParamSchema, 'params'), validate(updateSellerBalanceSchema), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   const { amount, invoiceImage } = req.body;
   try {
@@ -385,7 +385,7 @@ router.put('/:id/balance', requireRole('manager', 'agent'), validate(updateSelle
   }
 });
 
-router.post('/:id/reset-password', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
+router.post('/:id/reset-password', requireRole('manager', 'agent'), validate(idParamSchema, 'params'), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
     const sellerRes = await query('SELECT * FROM sellers WHERE id = $1', [id]);
@@ -429,7 +429,7 @@ router.post('/:id/reset-password', requireRole('manager', 'agent'), async (req: 
   }
 });
 
-router.delete('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
+router.delete('/:id', requireRole('manager', 'agent'), validate(idParamSchema, 'params'), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
     const existing = await query('SELECT * FROM sellers WHERE id = $1', [id]);

@@ -30,6 +30,13 @@ function so(max = 200) {
   return z.string().max(max).optional().transform(v => v ? stripHtml(v) : v);
 }
 
+// Numeric :id route params — non-numeric ids fail fast with 400 instead of
+// leaking a 500 from Postgres (22P02 invalid_text_representation). Coerces
+// to a number so handlers keep working unchanged.
+export const idParamSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
+
 // Auth
 export const loginSchema = z.object({
   username: s(1, 100),
