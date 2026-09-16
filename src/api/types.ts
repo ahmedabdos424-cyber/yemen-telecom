@@ -45,15 +45,15 @@ export interface SystemHealthResponse {
   db_latency_ms: number | null;
   uptime: number;
   requests: number;
-  memory: {
+  memory?: {
     rssMB: number;
     heapUsedMB: number;
     heapTotalMB: number;
     heapUsedPercent: number;
     osTotalMB: number;
   };
-  node: string;
-  env: string;
+  node?: string;
+  env?: string;
   timestamp: string;
 }
 

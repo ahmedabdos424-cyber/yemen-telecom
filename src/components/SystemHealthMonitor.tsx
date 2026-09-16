@@ -102,8 +102,8 @@ export default function SystemHealthMonitor({ role }: SystemHealthMonitorProps) 
   const status: 'ok' | 'degraded' | 'error' = health ? health.status : error ? 'error' : 'ok';
   const statusMeta = STATUS_META[status] ?? STATUS_META.error;
   const liveUptime = health ? health.uptime + Math.floor((Date.now() - fetchedAtRef.current) / 1000) : 0;
-  const rssPct = health ? Math.min(100, Math.round((health.memory.rssMB / Math.max(health.memory.osTotalMB, 1)) * 100)) : 0;
-  const heapPct = health?.memory.heapUsedPercent ?? 0;
+  const rssPct = health?.memory ? Math.min(100, Math.round((health.memory.rssMB / Math.max(health.memory.osTotalMB, 1)) * 100)) : 0;
+  const heapPct = health?.memory?.heapUsedPercent ?? 0;
 
   return (
     <section className="card p-4 md:p-5">
@@ -188,7 +188,7 @@ export default function SystemHealthMonitor({ role }: SystemHealthMonitorProps) 
             <div>
               <div className="flex items-center justify-between text-[10px] font-bold text-gray-600 mb-1">
                 <span>RSS (الذاكرة الفعلية)</span>
-                <span className="font-mono" dir="ltr">{health ? `${health.memory.rssMB}MB / ${health.memory.osTotalMB}MB` : '—'}</span>
+                <span className="font-mono" dir="ltr">{health?.memory ? `${health.memory.rssMB}MB / ${health.memory.osTotalMB}MB` : '—'}</span>
               </div>
               <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div className={`h-full ${barClass(rssPct)} rounded-full transition-all duration-700`} style={{ width: `${Math.max(rssPct, 2)}%` }} />
@@ -197,7 +197,7 @@ export default function SystemHealthMonitor({ role }: SystemHealthMonitorProps) 
             <div>
               <div className="flex items-center justify-between text-[10px] font-bold text-gray-600 mb-1">
                 <span>Heap (ذاكرة العقدة)</span>
-                <span className="font-mono" dir="ltr">{health ? `${health.memory.heapUsedMB}MB / ${health.memory.heapTotalMB}MB` : '—'}</span>
+                <span className="font-mono" dir="ltr">{health?.memory ? `${health.memory.heapUsedMB}MB / ${health.memory.heapTotalMB}MB` : '—'}</span>
               </div>
               <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div className={`h-full ${barClass(heapPct)} rounded-full transition-all duration-700`} style={{ width: `${Math.max(heapPct, 2)}%` }} />
@@ -209,8 +209,8 @@ export default function SystemHealthMonitor({ role }: SystemHealthMonitorProps) 
 
       {health && (
         <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-gray-400">
-          <span className="font-mono" dir="ltr">Node {health.node}</span>
-          <span>البيئة: {health.env === 'production' ? 'إنتاج' : health.env}</span>
+          <span className="font-mono" dir="ltr">Node {health.node ?? '—'}</span>
+          <span>البيئة: {health.env === 'production' ? 'إنتاج' : health.env ?? '—'}</span>
           <span>آخر فحص: {new Date(health.timestamp).toLocaleTimeString('ar')}</span>
         </div>
       )}

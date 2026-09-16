@@ -344,18 +344,15 @@ app.get('/api/health', async (_req, res) => {
     uptime: Math.floor((Date.now() - START_TIME) / 1000),
     requests: requestCount,
   };
-  // Only expose detailed memory info in non-production
-  if (envMode !== 'production') {
-    healthData.memory = {
-      rssMB,
-      heapUsedMB,
-      heapTotalMB,
-      heapUsedPercent: heapTotalMB > 0 ? Math.min(100, Math.round((heapUsedMB / heapTotalMB) * 100)) : 0,
-      osTotalMB,
-    };
-    healthData.node = process.version;
-    healthData.env = envMode;
-  }
+  healthData.memory = {
+    rssMB,
+    heapUsedMB,
+    heapTotalMB,
+    heapUsedPercent: heapTotalMB > 0 ? Math.min(100, Math.round((heapUsedMB / heapTotalMB) * 100)) : 0,
+    osTotalMB,
+  };
+  healthData.node = process.version;
+  healthData.env = envMode;
   healthData.timestamp = new Date().toISOString();
   res.status(200).json(healthData);
 });
