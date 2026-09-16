@@ -105,7 +105,9 @@ describeLivePostgres('live provider_id ↔ text consistency', () => {
       }
       const res = await query(
         `SELECT tgname FROM pg_trigger
-         WHERE tgname = 'trg_${table}_sync_provider_id' AND NOT tgisinternal`
+         WHERE tgname = 'trg_${table}_sync_provider_id'
+           AND NOT tgisinternal
+           AND tgrelid = '${table}'::regclass`
       );
       expect(res.rows.length).toBe(1);
     }
