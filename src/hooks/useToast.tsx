@@ -26,7 +26,7 @@ const colors: Record<ToastType, { bg: string; border: string; icon: string; text
 export function ToastContainer({ toasts, onDismiss, position = 'top' }: { toasts: Toast[]; onDismiss: (id: string) => void; position?: 'top' | 'bottom' }) {
   if (toasts.length === 0) return null;
   return (
-    <div className={`fixed ${position === 'top' ? 'top-20' : 'bottom-24'} left-4 z-50 w-full max-w-sm flex flex-col gap-2 pointer-events-none`} dir="rtl">
+    <div className={`fixed ${position === 'top' ? 'top-[calc(3.5rem+env(safe-area-inset-top))]' : 'bottom-[calc(5rem+env(safe-area-inset-bottom))]'} inset-x-4 z-50 max-w-[calc(100vw-2rem)] flex flex-col gap-2 pointer-events-none`} dir="rtl">
       {toasts.map(toast => {
         const c = colors[toast.type] ?? colors.info;
         return (

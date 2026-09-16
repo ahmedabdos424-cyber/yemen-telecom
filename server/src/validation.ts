@@ -13,12 +13,26 @@ export function validate(schema: z.ZodSchema, source: 'body' | 'query' | 'params
   };
 }
 
+// L-03: update payloads must carry at least one field — an empty body would
+// otherwise produce a no-op write plus a misleading audit entry.
+export function rejectEmptyBody(req: Request, res: Response, next: NextFunction) {
+  if (!req.body || Object.keys(req.body).length === 0) {
+    return res.status(400).json({
+      error: 'Validation failed',
+      details: [{ field: '', message: 'At least one field is required' }],
+    });
+  }
+  next();
+}
+
 // Helper to strip HTML/script tags from strings (XSS prevention)
 function stripHtml(v: string): string {
   return v
     .replace(/<[^>]*>/g, '')     // Remove HTML tags
     .replace(/[<>]/g, '')        // Remove remaining angle brackets
     .replace(/javascript:/gi, '') // Remove javascript: URIs
+    .replace(/vbscript:/gi, '')   // Remove vbscript: URIs
+    .replace(/data\s*:\s*text\/html/gi, '') // Remove data:text/html URIs
     .replace(/on\w+\s*=/gi, '');  // Remove event handlers (onclick=, onerror=, etc.)
 }
 
@@ -29,6 +43,13 @@ function s(min = 1, max = 200) {
 function so(max = 200) {
   return z.string().max(max).optional().transform(v => v ? stripHtml(v) : v);
 }
+
+// Numeric :id route params — non-numeric ids fail fast with 400 instead of
+// leaking a 500 from Postgres (22P02 invalid_text_representation). Coerces
+// to a number so handlers keep working unchanged.
+export const idParamSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
 
 // Auth
 export const loginSchema = z.object({
@@ -241,8 +262,10 @@ function optionalOperator() {
   ]);
 }
 
-// Helper to resolve operator string to provider_id
-export function resolveProviderId(_db: any, operatorOrId: string | number): number {
+// Helper to resolve operator string to provider_id. Returns null for unknown
+// operators instead of silently attributing them to yemen_mobile (M-03) —
+// callers store NULL (column is nullable) rather than a wrong FK.
+export function resolveProviderId(operatorOrId: string | number): number | null {
   if (typeof operatorOrId === 'number') return operatorOrId;
   const normalized = normalizeOperator(operatorOrId);
   const providers: Record<string, number> = {
@@ -250,11 +273,11 @@ export function resolveProviderId(_db: any, operatorOrId: string | number): numb
     'sabafon': 2,
     'you': 3,
   };
-  return providers[normalized] || 1;
+  return providers[normalized] ?? null;
 }
 
 // Helper to resolve provider_id to display_name
-export function resolveProviderDisplayName(_db: any, providerId: number): string {
+export function resolveProviderDisplayName(providerId: number): string {
   const names: Record<number, string> = {
     1: 'Yemen Mobile',
     2: 'Sabafon',
@@ -264,7 +287,7 @@ export function resolveProviderDisplayName(_db: any, providerId: number): string
 }
 
 // Helper to resolve provider_id to slug
-export function resolveProviderSlug(_db: any, providerId: number): string {
+export function resolveProviderSlug(providerId: number): string {
   const slugs: Record<number, string> = {
     1: 'yemen_mobile',
     2: 'sabafon',
@@ -287,6 +310,9 @@ export const createOperationSchema = z.object({
   contract_image: z.string().max(500).optional(),
   contractImage: z.string().max(500).optional(),
   iccid: z.string().max(30).optional(),
+  // Client-supplied idempotency key (op_id column is VARCHAR(100) UNIQUE).
+  op_id: z.string().max(100).optional(),
+  opId: z.string().max(100).optional(),
 });
 
 // Inventories
@@ -310,10 +336,10 @@ export const updateSettingsSchema = z.object({
   emailAlertsEnabled: z.boolean().optional(),
   smsAlertsEnabled: z.boolean().optional(),
   appNotificationsEnabled: z.boolean().optional(),
-  stockShortageThreshold: z.number().int().optional(),
-  inactiveSimsThreshold: z.number().int().optional(),
-  maxFailedLoginsThreshold: z.number().int().optional(),
-  highRiskDuplicatesThreshold: z.number().int().optional(),
+  stockShortageThreshold: z.number().int().min(0).max(1000000).optional(),
+  inactiveSimsThreshold: z.number().int().min(0).max(1000000).optional(),
+  maxFailedLoginsThreshold: z.number().int().min(1).max(100).optional(),
+  highRiskDuplicatesThreshold: z.number().int().min(0).max(1000000).optional(),
   identityRemindersEnabled: z.boolean().optional(),
   identityRemindersFrequency: z.enum(['daily', 'weekly']).optional(),
 });

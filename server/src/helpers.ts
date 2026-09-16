@@ -32,6 +32,21 @@ export async function rejectIfUnpaginatedTooLarge(
   return false;
 }
 
+// Unified pagination contract for report endpoints (J-05): the array
+// response shape is preserved (the SPA consumes plain arrays), but every
+// endpoint accepts ?page&limit and always reports the full row count via
+// the X-Total-Count header — silent LIMIT truncation is gone.
+export function getReportPaging(req: Request, def = 100, max = 500) {
+  const page = Math.max(1, parseInt(req.query.page as string) || 1);
+  const limit = Math.min(max, Math.max(1, parseInt(req.query.limit as string) || def));
+  const offset = (page - 1) * limit;
+  return { page, limit, offset };
+}
+
+export function setTotalCount(res: Response, total: number) {
+  res.set('X-Total-Count', String(total));
+}
+
 export async function paginatedQuery<T>(
   baseQuery: string,
   countQuery: string,
@@ -60,17 +75,34 @@ export function getDeviceInfo(req: Request): DeviceInfo {
   };
   const ua = (req.headers['user-agent'] as string) || '';
   const uaFirstSegment = ua.split(')')[0];
-  const deviceName =
+  const rawDeviceName =
     header('x-device-name') ||
     (uaFirstSegment ? `${uaFirstSegment})` : '') ||
     ua.slice(0, 100) ||
     'Unknown device';
   const deviceId = header('x-device-id') || '';
+  // Trust req.ip (Express with `trust proxy 1` behind Render) as the source
+  // of truth. The previous code preferred the client-controlled
+  // X-Forwarded-For header, letting an attacker rotate it per request and
+  // bypass the per-username+IP login lockout (D-05/S-07). XFF is now only a
+  // fallback when req.ip is unavailable (e.g. unit tests without proxy).
   const ip =
+    (typeof req.ip === 'string' && req.ip.trim()) ||
     (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
-    req.ip ||
     '';
-  return { deviceName: deviceName.slice(0, 200), deviceId: deviceId.slice(0, 128), ip: ip.slice(0, 64), userAgent: ua };
+  return { deviceName: sanitizeDeviceField(rawDeviceName, 200), deviceId: sanitizeDeviceField(deviceId, 128), ip: ip.slice(0, 64), userAgent: ua };
+}
+
+// Strip markup/event-handler payloads from device fields before they are
+// stored in audit_logs (stored-XSS hardening, S-14). Mirrors validation.ts
+// stripHtml so helpers stay dependency-free.
+function sanitizeDeviceField(v: string, max: number): string {
+  return v
+    .replace(/<[^>]*>/g, '')
+    .replace(/[<>]/g, '')
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+\s*=/gi, '')
+    .slice(0, max);
 }
 
 export function formatDbTimestamp(value: string | Date | null | undefined): string | null {

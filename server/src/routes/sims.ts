@@ -1,14 +1,16 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import crypto from 'crypto';
 import { query, transaction } from '../db';
 import { logger } from '../logger';
-import { requireRole, AuthRequest } from '../middleware/auth';
+import { requireRole, AuthRequest, resolveScopeAgentId, resolveScopeSellerId } from '../middleware/auth';
 import { getPagination, paginatedQuery, rejectIfUnpaginatedTooLarge } from '../helpers';
-import { validate, createSimSchema, updateSimSchema, activateSimSchema, transferSimsSchema } from '../validation';
+import { getUniqueViolationKind, formatUniqueViolationMessage } from '../helpers/dbErrors';
+import { validate, idParamSchema, rejectEmptyBody, createSimSchema, updateSimSchema, activateSimSchema, transferSimsSchema } from '../validation';
 import { createAlert } from '../services/alerts.service';
-import { broadcastEvent } from '../services/realtime.service';
+import { broadcastScopedEvent } from '../services/realtime.service';
 import { strictRateLimiter } from '../middleware/rateLimiter';
 import { cacheInvalidate } from '../cache';
+import { logAudit } from '../audit-log';
 
 interface SimDbRow {
   id: number;
@@ -34,14 +36,21 @@ const router = Router();
 // stock (mirrors the ownership check on PUT). Returns '' for managers and a
 // WHERE clause (with bound params) for agents. Rewrite the route arg as
 // AuthRequest so the role is available on both GET endpoints.
-async function agentOwnershipCondition(userId: number): Promise<{ clause: string; params: number[] }> {
-  const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [userId]);
-  const agentId = agentRes.rows[0]?.id;
+async function agentOwnershipCondition(agentId: number | null): Promise<{ clause: string; params: number[] }> {
   if (agentId == null) {
     // Agent role without an agent profile — there is no stock to read.
     return { clause: ' WHERE 1 = 0', params: [] };
   }
   return { clause: " WHERE owner_role = 'agent' AND assigned_to_agent = $1", params: [Number(agentId)] };
+}
+
+// Seller ownership scoping (C-10): a seller may only read SIMs in their own
+// stock. Managers keep full access; agents use agentOwnershipCondition above.
+async function sellerOwnershipCondition(sellerId: number | null): Promise<{ clause: string; params: number[] }> {
+  if (sellerId == null) {
+    return { clause: ' WHERE 1 = 0', params: [] };
+  }
+  return { clause: " WHERE owner_role = 'seller' AND assigned_to = $1", params: [Number(sellerId)] };
 }
 
 router.post('/activate', requireRole('manager', 'agent', 'seller'), validate(activateSimSchema), async (req: AuthRequest, res: Response) => {
@@ -52,31 +61,40 @@ router.post('/activate', requireRole('manager', 'agent', 'seller'), validate(act
     const contractImage = req.body.contract_image ?? req.body.contractImage ?? null;
     const requester = req.user;
 
+    // Resolve the requester's role-scoped profile id once, before the
+    // transaction, so the ownership checks below reuse it instead of firing
+    // an extra agent/seller lookup per activation.
+    const scopeAgentId = requester?.role === 'agent' ? await resolveScopeAgentId(req) : null;
+    const scopeSellerId = requester?.role === 'seller' ? await resolveScopeSellerId(req) : null;
+
     // Lock the SIM row inside a transaction so concurrent activations
     // serialize on the row lock (FOR UPDATE is a no-op outside a transaction).
     const result = await transaction(async (client) => {
       const existing = await client.query('SELECT * FROM sims WHERE iccid = $1 FOR UPDATE', [iccid]);
       const sim = existing.rows[0];
 
+      // Idempotent replay: the SIM is already activated by the same requester
+      // (an offline-queue or network retry of a succeeded activation). Return
+      // the row untouched instead of a spurious 409 + high-priority alert.
+      if (sim && sim.status === 'activated' && requester?.id != null && Number(sim.activated_by) === Number(requester.id)) {
+        return { ok: true as const, row: sim, simId: sim.id, replay: true as const };
+      }
+
       // Serial validation: the SIM must exist in the requester's available stock.
       let inStock = false;
       if (sim) {
         if (requester?.role === 'agent') {
-          const agentRes = await client.query('SELECT id FROM agents WHERE user_id = $1', [requester.id]);
-          const agentId = agentRes.rows[0]?.id;
           inStock =
             sim.status === 'available' &&
             sim.owner_role === 'agent' &&
-            agentId != null &&
-            Number(sim.assigned_to_agent) === Number(agentId);
+            scopeAgentId != null &&
+            Number(sim.assigned_to_agent) === Number(scopeAgentId);
         } else if (requester?.role === 'seller') {
-          const sellerRes = await client.query('SELECT id FROM sellers WHERE user_id = $1', [requester.id]);
-          const sellerId = sellerRes.rows[0]?.id;
           inStock =
             sim.status === 'available' &&
             sim.owner_role === 'seller' &&
-            sellerId != null &&
-            Number(sim.assigned_to) === Number(sellerId);
+            scopeSellerId != null &&
+            Number(sim.assigned_to) === Number(scopeSellerId);
         } else {
           inStock = sim.status === 'available' && sim.owner_role === 'admin';
         }
@@ -113,7 +131,9 @@ router.post('/activate', requireRole('manager', 'agent', 'seller'), validate(act
       });
       return res.status(400).json({ error: 'الرقم التسلسلي غير متوفر في مخزونك' });
     }
-    broadcastEvent({ type: 'sim.updated', entity: 'sim', id: result.simId, iccid, status: 'activated', action: 'activate' });
+    // H-05: scoped delivery — managers see everything, the owning agency /
+    // seller sees its own SIM, nobody else does.
+    broadcastScopedEvent({ type: 'sim.updated', entity: 'sim', id: result.simId, iccid, status: 'activated', action: 'activate', agent_id: scopeAgentId, seller_id: scopeSellerId });
     cacheInvalidate('report:');
     res.json(result.row);
   } catch (err) {
@@ -148,11 +168,10 @@ router.post('/transfer', requireRole('agent'), strictRateLimiter, validate(trans
       return res.status(400).json({ error: `Transfer limit is ${MAX_TRANSFER_SIMS} SIMs per request` });
     }
 
-    const agentRes = await query('SELECT id, name FROM agents WHERE user_id = $1', [req.user!.id]);
-    if (agentRes.rows.length === 0) {
+    const agentId = await resolveScopeAgentId(req);
+    if (agentId == null) {
       return res.status(400).json({ error: 'Agent profile not found' });
     }
-    const agentId = Number(agentRes.rows[0].id);
 
     // Isolation: the target seller must belong to the requesting agent.
     const sellerRes = await query('SELECT * FROM sellers WHERE id = $1', [seller_id]);
@@ -214,12 +233,13 @@ router.post('/transfer', requireRole('agent'), strictRateLimiter, validate(trans
       userId: req.user?.id ?? null,
     });
 
-    broadcastEvent({
+    broadcastScopedEvent({
       type: 'sim.batch_updated',
       entity: 'sim',
       action: 'transfer',
       count: updated.rows.length,
       seller_id,
+      agent_id: agentId,
       from_iccid,
       to_iccid,
     });
@@ -233,19 +253,22 @@ router.post('/transfer', requireRole('agent'), strictRateLimiter, validate(trans
       seller_id,
       status: 'available',
     });
+    void logAudit({ type: 'sims_transferred', title: `تحويل ${updated.rows.length} شريحة إلى البائع ${seller.name}`, username: req.user?.username || 'unknown' });
   } catch (err) {
     logger.error('Error transferring sims:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
+router.get('/', requireRole('manager', 'agent', 'seller'), async (req: AuthRequest, res: Response) => {
   try {
     const { page, limit, offset } = getPagination(req);
-    // Ownership isolation: agents may only read SIMs in their own stock.
+    // Ownership isolation: agents/sellers may only read SIMs in their own stock.
     const scope = req.user?.role === 'agent'
-      ? await agentOwnershipCondition(req.user.id)
-      : { clause: '', params: [] };
+      ? await agentOwnershipCondition(await resolveScopeAgentId(req))
+      : req.user?.role === 'seller'
+        ? await sellerOwnershipCondition(await resolveScopeSellerId(req))
+        : { clause: '', params: [] as number[] };
     if (req.query.page || req.query.limit) {
       const result = await paginatedQuery<SimDbRow>(
         `SELECT * FROM sims${scope.clause} ORDER BY id DESC`,
@@ -265,19 +288,25 @@ router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: R
   }
 });
 
-router.get('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
+router.get('/:id', requireRole('manager', 'agent', 'seller'), validate(idParamSchema, 'params'), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
     let sql = 'SELECT * FROM sims WHERE id = $1';
     const params: unknown[] = [id];
     if (req.user?.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      const agentId = agentRes.rows[0]?.id;
+      const agentId = await resolveScopeAgentId(req);
       if (agentId == null) {
         return res.status(404).json({ error: 'SIM not found' });
       }
       sql += " AND owner_role = 'agent' AND assigned_to_agent = $2";
       params.push(Number(agentId));
+    } else if (req.user?.role === 'seller') {
+      const sellerId = await resolveScopeSellerId(req);
+      if (sellerId == null) {
+        return res.status(404).json({ error: 'SIM not found' });
+      }
+      sql += " AND owner_role = 'seller' AND assigned_to = $2";
+      params.push(Number(sellerId));
     }
     const result = await query(sql, params);
     if (result.rows.length === 0) {
@@ -290,7 +319,7 @@ router.get('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, res
   }
 });
 
-router.post('/', requireRole('manager'), validate(createSimSchema), async (req: Request, res: Response) => {
+router.post('/', requireRole('manager'), validate(createSimSchema), async (req: AuthRequest, res: Response) => {
   const { phone, iccid, provider, status, owner, package_type } = req.body;
   try {
     const result = await query(
@@ -299,7 +328,7 @@ router.post('/', requireRole('manager'), validate(createSimSchema), async (req: 
        [phone || '', iccid, provider || 'Yemen Mobile', status || 'available', owner || 'المركز الرئيسي',
         new Date().toISOString().split('T')[0].replace(/-/g, '/'), package_type || 'باقة مزايا الشهرية']
     );
-    broadcastEvent({ type: 'sim.created', entity: 'sim', id: result.rows[0].id, iccid, status: result.rows[0].status });
+    broadcastScopedEvent({ type: 'sim.created', entity: 'sim', id: result.rows[0].id, iccid, status: result.rows[0].status });
     cacheInvalidate('report:');
     // Audit log for single SIM creation
     const logId = `SIM-CREATE-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
@@ -307,7 +336,7 @@ router.post('/', requireRole('manager'), validate(createSimSchema), async (req: 
       await query(
         `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
          VALUES ($1, 'sim_created', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', '', '', '', NOW(), 'active')`,
-        [logId, `إنشاء شريحة: ${iccid} (${provider || 'Yemen Mobile'})`, (req as AuthRequest).user?.username || 'unknown']
+        [logId, `إنشاء شريحة: ${iccid} (${provider || 'Yemen Mobile'})`, req.user?.username || 'unknown']
       );
     } catch (err) {
       logger.warn('[AUDIT] Failed to log SIM creation:', err);
@@ -322,7 +351,7 @@ router.post('/', requireRole('manager'), validate(createSimSchema), async (req: 
   }
 });
 
-router.put('/:id', requireRole('manager', 'agent', 'seller'), validate(updateSimSchema), async (req: AuthRequest, res: Response) => {
+router.put('/:id', requireRole('manager', 'agent', 'seller'), validate(idParamSchema, 'params'), rejectEmptyBody, validate(updateSimSchema), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
     const existing = await query('SELECT * FROM sims WHERE id = $1', [id]);
@@ -332,18 +361,20 @@ router.put('/:id', requireRole('manager', 'agent', 'seller'), validate(updateSim
     const cur = existing.rows[0];
 
     // Ownership isolation: agents/sellers may only update SIMs in their own
-    // stock. Managers retain full access.
+    // stock. Managers retain full access. The ownership predicate is also
+    // re-asserted atomically inside the UPDATE below (F3) so a concurrent
+    // transfer cannot let a caller modify a SIM that left their stock mid-flight.
+    let agentId: number | null = null;
+    let sellerId: number | null = null;
     if (req.user?.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      const agentId = agentRes.rows[0]?.id;
-      const owned = cur.owner_role === 'agent' && agentId != null && Number(cur.assigned_to_agent) === Number(agentId);
+      agentId = await resolveScopeAgentId(req);
+      const owned = cur.owner_role === 'agent' && agentId != null && Number(cur.assigned_to_agent) === agentId;
       if (!owned) {
         return res.status(403).json({ error: 'Access denied: this SIM does not belong to your stock' });
       }
     } else if (req.user?.role === 'seller') {
-      const sellerRes = await query('SELECT id FROM sellers WHERE user_id = $1', [req.user.id]);
-      const sellerId = sellerRes.rows[0]?.id;
-      const owned = cur.owner_role === 'seller' && sellerId != null && Number(cur.assigned_to) === Number(sellerId);
+      sellerId = await resolveScopeSellerId(req);
+      const owned = cur.owner_role === 'seller' && sellerId != null && Number(cur.assigned_to) === sellerId;
       if (!owned) {
         return res.status(403).json({ error: 'Access denied: this SIM does not belong to your stock' });
       }
@@ -363,21 +394,42 @@ router.put('/:id', requireRole('manager', 'agent', 'seller'), validate(updateSim
     if (req.user?.role === 'manager' || req.user?.role === 'agent') {
       status = req.body.status ?? cur.status;
     } else if (req.user?.role === 'seller') {
-      const allowedStatuses = ['available', 'requested'];
+      const allowedStatuses = ['available', 'reserved'];
       const requestedStatus = req.body.status ?? cur.status;
       if (allowedStatuses.includes(requestedStatus)) {
         status = requestedStatus;
       } else if (requestedStatus !== cur.status) {
-        return res.status(403).json({ error: 'Access denied: sellers can only set status to available or requested' });
+        return res.status(403).json({ error: 'Access denied: sellers can only set status to available or reserved' });
       }
+    }
+
+    // F3 (TOCTOU): re-assert ownership atomically within the UPDATE so a row
+    // that left the caller's stock between the SELECT and the UPDATE is never
+    // modified. A 0-row update means the SIM vanished or is no longer owned.
+    let ownershipClause = '';
+    let ownershipParam: number | null = null;
+    if (req.user?.role === 'agent' && agentId != null) {
+      ownershipClause = " AND owner_role = 'agent' AND assigned_to_agent = $11";
+      ownershipParam = agentId;
+    } else if (req.user?.role === 'seller' && sellerId != null) {
+      ownershipClause = " AND owner_role = 'seller' AND assigned_to = $11";
+      ownershipParam = sellerId;
     }
 
     const result = await query(
       `UPDATE sims SET phone=$1, iccid=$2, provider=$3, status=$4, owner=$5, package_type=$6,
-         customer_name=$7, customer_id=$8, contract_image=$9 WHERE id=$10 RETURNING *`,
-      [phone, iccid, provider, status, owner, package_type, customerName, customerId, contractImage, id]
+         customer_name=$7, customer_id=$8, contract_image=$9 WHERE id=$10${ownershipClause} RETURNING *`,
+      ownershipParam == null
+        ? [phone, iccid, provider, status, owner, package_type, customerName, customerId, contractImage, id]
+        : [phone, iccid, provider, status, owner, package_type, customerName, customerId, contractImage, id, ownershipParam]
     );
-    broadcastEvent({ type: 'sim.updated', entity: 'sim', id, iccid, status, action: 'update' });
+    if (result.rows.length === 0) {
+      const stillThere = await query('SELECT id FROM sims WHERE id = $1', [id]);
+      return res.status(stillThere.rows.length === 0 ? 404 : 403).json({
+        error: stillThere.rows.length === 0 ? 'SIM not found' : 'Access denied: this SIM does not belong to your stock',
+      });
+    }
+    broadcastScopedEvent({ type: 'sim.updated', entity: 'sim', id, iccid, status, action: 'update', agent_id: agentId, seller_id: sellerId });
     cacheInvalidate('report:');
     // Audit log for SIM update
     const logId = `SIM-UPDATE-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
@@ -392,25 +444,38 @@ router.put('/:id', requireRole('manager', 'agent', 'seller'), validate(updateSim
     }
     res.json(result.rows[0]);
   } catch (err) {
+    // J-03: updating the ICCID to an existing one is a client conflict
+    // (409), not a server failure.
+    const kind = getUniqueViolationKind(err);
+    if (kind || (err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === '23505')) {
+      return res.status(409).json({ error: formatUniqueViolationMessage(kind, 'الشريحة') });
+    }
     logger.error('Error updating sim:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-router.delete('/:id', requireRole('manager'), async (req: AuthRequest, res: Response) => {
+router.delete('/:id', requireRole('manager'), validate(idParamSchema, 'params'), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
     const existing = await query('SELECT iccid FROM sims WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'SIM not found' });
+    }
     const iccid = existing.rows[0]?.iccid || 'unknown';
-    await query('DELETE FROM sims WHERE id = $1', [id]);
-    // Audit log for SIM deletion
-    const deleteLogId = `SIM-DELETE-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
-    await query(
-      `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
-       VALUES ($1, 'sim_deleted', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', '', '', '', NOW(), 'closed')`,
-      [deleteLogId, `حذف شريحة: ${iccid}`, req.user?.username || 'unknown']
-    );
-    broadcastEvent({ type: 'sim.deleted', entity: 'sim', id });
+    // M-02: DELETE + audit commit atomically — a failed audit must roll back
+    // the delete instead of returning a false-failure 500.
+    await transaction(async (client) => {
+      await client.query('DELETE FROM sims WHERE id = $1', [id]);
+      // Audit log for SIM deletion
+      const deleteLogId = `SIM-DELETE-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+      await client.query(
+        `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
+         VALUES ($1, 'sim_deleted', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', '', '', '', NOW(), 'closed')`,
+        [deleteLogId, `حذف شريحة: ${iccid}`, req.user?.username || 'unknown']
+      );
+    });
+    broadcastScopedEvent({ type: 'sim.deleted', entity: 'sim', id });
     cacheInvalidate('report:');
     res.json({ success: true });
   } catch (err) {

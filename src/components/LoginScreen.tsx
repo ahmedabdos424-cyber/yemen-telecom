@@ -289,7 +289,16 @@ export default function LoginScreen({ onLogin, onBiometricLogin, biometricEnable
               </label>
               <div className="relative">
                 <input
-                  ref={usernameRef}
+                  ref={(el) => {
+                    usernameRef.current = el;
+                    // L-05: autofocus the username field on desktop keyboards
+                    // only — forcing focus on touch devices pops the keyboard
+                    // and shifts the layout on load.
+                    if (el && !el.dataset.autofocused && window.matchMedia?.('(pointer: fine)').matches) {
+                      el.dataset.autofocused = '1';
+                      el.focus({ preventScroll: true });
+                    }
+                  }}
                   type="text"
                   value={username}
                   onChange={e => { setUsername(e.target.value); setFieldError(null); setErrorMsg(''); }}
@@ -302,7 +311,6 @@ export default function LoginScreen({ onLogin, onBiometricLogin, biometricEnable
                   autoCorrect="off"
                   spellCheck="false"
                   disabled={isLoading || success}
-                  autoFocus
                   className={focusClasses('username')}
                 />
                 <span className={`absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none ${darkMode ? 'text-white/30' : 'text-gray-400'}`}>

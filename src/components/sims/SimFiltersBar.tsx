@@ -60,6 +60,7 @@ export default function SimFiltersBar({
             <button
               type="button"
               onClick={() => onSearchChange('')}
+              aria-label="مسح البحث"
               className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center"
             >
               <span className="material-symbols-outlined text-sm">close</span>
@@ -76,6 +77,7 @@ export default function SimFiltersBar({
             <button
               type="button"
               onClick={() => onProviderChange('all')}
+              aria-pressed={selectedProvider === 'all'}
               className={`min-h-[44px] px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[10px] md:text-xs font-bold border-2 transition-all duration-200 flex items-center gap-1.5 md:gap-2 active:scale-[0.97] shrink-0 snap-start ${selectedProvider === 'all' ? 'bg-gray-800 text-white border-gray-600 shadow-sm' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100 hover:border-gray-300'}`}
             >
               <span className="material-symbols-outlined text-base md:text-lg">apps</span>
@@ -84,6 +86,7 @@ export default function SimFiltersBar({
             <button
               type="button"
               onClick={() => onProviderChange('Yemen Mobile')}
+              aria-pressed={selectedProvider === 'Yemen Mobile'}
               className={`min-h-[44px] px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[10px] md:text-xs font-bold border-2 transition-all duration-200 flex items-center gap-1.5 md:gap-2 active:scale-[0.97] shrink-0 snap-start ${selectedProvider === 'Yemen Mobile' ? 'bg-op-ym border-op-ym shadow-lg text-white' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-op-ym/60 hover:bg-op-ym-light'}`}
             >
               <OperatorLogo provider="Yemen Mobile" size="md" plain />
@@ -92,6 +95,7 @@ export default function SimFiltersBar({
             <button
               type="button"
               onClick={() => onProviderChange('Sabafon')}
+              aria-pressed={selectedProvider === 'Sabafon'}
               className={`min-h-[44px] px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[10px] md:text-xs font-bold border-2 transition-all duration-200 flex items-center gap-1.5 md:gap-2 active:scale-[0.97] shrink-0 snap-start ${selectedProvider === 'Sabafon' ? 'bg-op-sf border-op-sf shadow-lg text-white' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-op-sf/60 hover:bg-op-sf-light'}`}
             >
               <OperatorLogo provider="Sabafon" size="md" plain />
@@ -100,6 +104,7 @@ export default function SimFiltersBar({
             <button
               type="button"
               onClick={() => onProviderChange('YOU')}
+              aria-pressed={selectedProvider === 'YOU'}
               className={`min-h-[44px] px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[10px] md:text-xs font-bold border-2 transition-all duration-200 flex items-center gap-1.5 md:gap-2 active:scale-[0.97] shrink-0 snap-start ${selectedProvider === 'YOU' ? 'bg-op-you border-op-you shadow-lg text-you-text' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-op-you/60 hover:bg-op-you-light'}`}
             >
               <OperatorLogo provider="YOU" size="md" plain />
@@ -161,8 +166,8 @@ export default function SimFiltersBar({
 
           {searchTerm && (
             <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">
-              نص البحث: "{searchTerm}"
-              <button type="button" onClick={() => onSearchChange('')} className="hover:text-amber-900 font-bold font-mono">✕</button>
+                نص البحث: "{searchTerm}"
+                <button type="button" onClick={() => onSearchChange('')} aria-label="مسح البحث" className="hover:text-amber-900 font-bold font-mono">✕</button>
             </span>
           )}
           {selectedProvider !== 'all' && (
@@ -172,25 +177,25 @@ export default function SimFiltersBar({
               'bg-op-you-light border-op-you'
             }`}>
               الشبكة: {selectedProvider === 'Yemen Mobile' ? 'يمن موبايل' : selectedProvider === 'Sabafon' ? 'سبأفون' : 'يو'}
-              <button type="button" onClick={() => onProviderChange('all')} className="font-bold font-mono">✕</button>
+                <button type="button" onClick={() => onProviderChange('all')} aria-label="مسح فلتر الشبكة" className="font-bold font-mono">✕</button>
             </span>
           )}
           {selectedStatus !== 'all' && (
             <span className="inline-flex items-center gap-1 bg-green-50 text-green-800 border border-green-200 px-2 py-0.5 rounded-full font-semibold">
               الحالة: {statusLabel(selectedStatus)}
-              <button type="button" onClick={() => onStatusChange('all')} className="hover:text-green-950 font-bold font-mono">✕</button>
+                <button type="button" onClick={() => onStatusChange('all')} aria-label="مسح فلتر الحالة" className="hover:text-green-950 font-bold font-mono">✕</button>
             </span>
           )}
           {selectedOwner !== 'all' && (
             <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-850 border border-purple-200 px-2 py-0.5 rounded-full font-semibold">
               المالك: {selectedOwner}
-              <button type="button" onClick={() => onOwnerChange('all')} className="hover:text-purple-900 font-bold font-mono">✕</button>
+                <button type="button" onClick={() => onOwnerChange('all')} aria-label="مسح فلتر المالك" className="hover:text-purple-900 font-bold font-mono">✕</button>
             </span>
           )}
           {selectedPackage !== 'all' && (
             <span className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-850 border border-indigo-200 px-2 py-0.5 rounded-full font-semibold">
               الباقة: {selectedPackage}
-              <button type="button" onClick={() => onPackageChange('all')} className="hover:text-indigo-900 font-bold font-mono">✕</button>
+                <button type="button" onClick={() => onPackageChange('all')} aria-label="مسح فلتر الباقة" className="hover:text-indigo-900 font-bold font-mono">✕</button>
             </span>
           )}
 

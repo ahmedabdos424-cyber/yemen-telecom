@@ -3,10 +3,11 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { query, transaction } from '../db';
 import { logger } from '../logger';
-import { requireRole, AuthRequest } from '../middleware/auth';
+import { requireRole, AuthRequest, resolveScopeAgentId } from '../middleware/auth';
 import { getPagination } from '../helpers';
-import { validate, createSellerSchema, updateSellerSchema, updateSellerBalanceSchema } from '../validation';
-import { broadcastEvent } from '../services/realtime.service';
+import { getUniqueViolationKind, formatUniqueViolationMessage } from '../helpers/dbErrors';
+import { validate, idParamSchema, rejectEmptyBody, createSellerSchema, updateSellerSchema, updateSellerBalanceSchema } from '../validation';
+import { broadcastScopedEvent } from '../services/realtime.service';
 import { notifyNewMember } from '../services/fcm.service';
 import { cacheInvalidate } from '../cache';
 
@@ -84,11 +85,10 @@ router.get('/', requireRole('manager', 'agent', 'seller'), async (req: AuthReque
         );
       }
     } else if (req.user.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      if (agentRes.rows.length === 0) {
+      const agentId = await resolveScopeAgentId(req);
+      if (agentId == null) {
         return res.json([]);
       }
-      const agentId = agentRes.rows[0].id;
       if (paginate) {
         result = await query(
           `SELECT s.*, a.name as agent_name 
@@ -136,7 +136,7 @@ router.get('/', requireRole('manager', 'agent', 'seller'), async (req: AuthReque
   }
 });
 
-router.get('/:id', requireRole('manager', 'agent', 'seller'), async (req: AuthRequest, res: Response) => {
+router.get('/:id', requireRole('manager', 'agent', 'seller'), validate(idParamSchema, 'params'), async (req: AuthRequest, res: Response) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
@@ -150,8 +150,8 @@ router.get('/:id', requireRole('manager', 'agent', 'seller'), async (req: AuthRe
       return res.status(404).json({ error: 'Seller not found' });
     }
     if (req.user.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      if (agentRes.rows.length === 0 || agentRes.rows[0].id !== result.rows[0].agent_id) {
+      const agentId = await resolveScopeAgentId(req);
+      if (agentId == null || Number(agentId) !== Number(result.rows[0].agent_id)) {
         return res.status(403).json({ error: 'Access denied: this seller does not belong to your agency' });
       }
     } else if (req.user.role === 'seller') {
@@ -188,11 +188,10 @@ router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), 
     // prevent cross-tenant (IDOR) assignment of sellers to another agency.
     let agentId: number | null = null;
     if (req.user?.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      if (agentRes.rows.length === 0) {
+      agentId = await resolveScopeAgentId(req);
+      if (agentId == null) {
         return res.status(403).json({ error: 'Access denied: no agency is associated with your account' });
       }
-      agentId = agentRes.rows[0].id;
     } else if (agent_name) {
       const agentRes = await query('SELECT id FROM agents WHERE name = $1', [agent_name]);
       if (agentRes.rows.length > 0) {
@@ -235,7 +234,7 @@ router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), 
       return { seller: mapSeller(finalResult.rows[0]) };
     });
 
-    broadcastEvent({ type: 'seller.created', entity: 'seller', id: createdSeller.id, name: createdSeller.name, agent_id: agentId });
+    broadcastScopedEvent({ type: 'seller.created', entity: 'seller', id: createdSeller.id, name: createdSeller.name, agent_id: agentId, seller_id: createdSeller.id });
     cacheInvalidate('report:');
 
     // Best-effort push: notify managers a new seller was registered. Never
@@ -250,17 +249,35 @@ router.post('/', requireRole('manager', 'agent'), validate(createSellerSchema), 
     res.status(201).json({
       seller: createdSeller,
       message: 'تم إنشاء البائع بنجاح. اسم المستخدم: ' + sellerUsername,
+      credentials: {
+        username: sellerUsername,
+        password: sellerPassword
+      }
     });
   } catch (err: unknown) {
     if (err && typeof err === 'object' && 'statusCode' in err && (err as { statusCode?: number }).statusCode === 409) {
       return res.status(409).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+    // The pre-check above guards the common case, but the unique index can still
+    // reject a concurrent duplicate (TOCTOU) — surface it as 409, never 500.
+    const kind = getUniqueViolationKind(err);
+    if (kind === 'username') {
+      return res.status(409).json({ error: 'اسم المستخدم غير متاح؛ يرجى إعادة المحاولة أو اختيار اسم مستخدم آخر' });
+    }
+    if (kind === 'phone') {
+      return res.status(409).json({ error: 'رقم الهاتف مستخدم بالفعل' });
+    }
+    // J-03: any other unique conflict (e.g. duplicate seller_id) is a client
+    // conflict (409), not a server failure.
+    if (err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === '23505') {
+      return res.status(409).json({ error: formatUniqueViolationMessage(null) });
     }
     logger.error('Error creating seller:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-router.put('/:id', requireRole('manager', 'agent'), validate(updateSellerSchema), async (req: AuthRequest, res: Response) => {
+router.put('/:id', requireRole('manager', 'agent'), validate(idParamSchema, 'params'), rejectEmptyBody, validate(updateSellerSchema), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
     const existing = await query('SELECT * FROM sellers WHERE id = $1', [id]);
@@ -268,8 +285,8 @@ router.put('/:id', requireRole('manager', 'agent'), validate(updateSellerSchema)
       return res.status(404).json({ error: 'Seller not found' });
     }
     if (req.user?.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      if (agentRes.rows.length === 0 || agentRes.rows[0].id !== existing.rows[0].agent_id) {
+      const agentId = await resolveScopeAgentId(req);
+      if (agentId == null || Number(agentId) !== Number(existing.rows[0].agent_id)) {
         return res.status(403).json({ error: 'Access denied: this seller does not belong to your agency' });
       }
     }
@@ -290,22 +307,26 @@ router.put('/:id', requireRole('manager', 'agent'), validate(updateSellerSchema)
       return res.status(403).json({ error: 'Access denied: agents cannot change seller status' });
     }
 
-    await query(
-      `UPDATE sellers SET name=$1, store_name=$2, id_number=$3, phone=$4, region=$5, region_code=$6, status=$7, avatar=$8 WHERE id=$9 RETURNING *`,
-      [name, store_name, id_number, phone, region, region_code, status, avatar, id]
-    );
-    // Audit log for seller update
-    const updateLogId = `SELLER-UPDATE-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
-    await query(
-      `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
-       VALUES ($1, 'seller_updated', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', '', '', '', NOW(), 'active')`,
-      [updateLogId, `تحديث بيانات البائع: ${name}`, req.user?.username || 'unknown']
-    );
-    const updated = await query(
-      `SELECT s.*, a.name as agent_name FROM sellers s LEFT JOIN agents a ON s.agent_id = a.id WHERE s.id = $1`,
-      [id]
-    );
-    broadcastEvent({ type: 'seller.updated', entity: 'seller', id, status, action: 'update' });
+    // M-02: UPDATE + audit + re-read run atomically — a failed audit must
+    // roll back the update instead of returning a false-failure 500.
+    const updated = await transaction(async (client) => {
+      await client.query(
+        `UPDATE sellers SET name=$1, store_name=$2, id_number=$3, phone=$4, region=$5, region_code=$6, status=$7, avatar=$8 WHERE id=$9 RETURNING *`,
+        [name, store_name, id_number, phone, region, region_code, status, avatar, id]
+      );
+      // Audit log for seller update
+      const updateLogId = `SELLER-UPDATE-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+      await client.query(
+        `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
+         VALUES ($1, 'seller_updated', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', '', '', '', NOW(), 'active')`,
+        [updateLogId, `تحديث بيانات البائع: ${name}`, req.user?.username || 'unknown']
+      );
+      return client.query(
+        `SELECT s.*, a.name as agent_name FROM sellers s LEFT JOIN agents a ON s.agent_id = a.id WHERE s.id = $1`,
+        [id]
+      );
+    });
+    broadcastScopedEvent({ type: 'seller.updated', entity: 'seller', id, status, action: 'update', agent_id: existing.rows[0].agent_id, seller_id: id });
     res.json(mapSeller(updated.rows[0]));
   } catch (err) {
     logger.error('Error updating seller:', err);
@@ -313,7 +334,7 @@ router.put('/:id', requireRole('manager', 'agent'), validate(updateSellerSchema)
   }
 });
 
-router.put('/:id/balance', requireRole('manager', 'agent'), validate(updateSellerBalanceSchema), async (req: AuthRequest, res: Response) => {
+router.put('/:id/balance', requireRole('manager', 'agent'), validate(idParamSchema, 'params'), validate(updateSellerBalanceSchema), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   const { amount, invoiceImage } = req.body;
   try {
@@ -322,8 +343,8 @@ router.put('/:id/balance', requireRole('manager', 'agent'), validate(updateSelle
       return res.status(404).json({ error: 'Seller not found' });
     }
     if (req.user?.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      if (agentRes.rows.length === 0 || agentRes.rows[0].id !== existing.rows[0].agent_id) {
+      const agentId = await resolveScopeAgentId(req);
+      if (agentId == null || Number(agentId) !== Number(existing.rows[0].agent_id)) {
         return res.status(403).json({ error: 'Access denied: this seller does not belong to your agency' });
       }
     }
@@ -361,7 +382,7 @@ router.put('/:id/balance', requireRole('manager', 'agent'), validate(updateSelle
       );
       return finalResult.rows[0];
     });
-    broadcastEvent({ type: 'seller.updated', entity: 'seller', id, action: 'balance', amount });
+    broadcastScopedEvent({ type: 'seller.updated', entity: 'seller', id, action: 'balance', amount, agent_id: existing.rows[0].agent_id, seller_id: id });
     cacheInvalidate('report:');
     res.json(mapSeller(result));
   } catch (err) {
@@ -373,7 +394,7 @@ router.put('/:id/balance', requireRole('manager', 'agent'), validate(updateSelle
   }
 });
 
-router.post('/:id/reset-password', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
+router.post('/:id/reset-password', requireRole('manager', 'agent'), validate(idParamSchema, 'params'), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
     const sellerRes = await query('SELECT * FROM sellers WHERE id = $1', [id]);
@@ -381,8 +402,8 @@ router.post('/:id/reset-password', requireRole('manager', 'agent'), async (req: 
       return res.status(404).json({ error: 'Seller not found' });
     }
     if (req.user?.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      if (agentRes.rows.length === 0 || agentRes.rows[0].id !== sellerRes.rows[0].agent_id) {
+      const agentId = await resolveScopeAgentId(req);
+      if (agentId == null || Number(agentId) !== Number(sellerRes.rows[0].agent_id)) {
         return res.status(403).json({ error: 'Access denied: this seller does not belong to your agency' });
       }
     }
@@ -392,20 +413,28 @@ router.post('/:id/reset-password', requireRole('manager', 'agent'), async (req: 
     }
     const newPassword = crypto.randomBytes(16).toString('hex');
     const passwordHash = await bcrypt.hash(newPassword, 12);
-    await query(
-      'UPDATE users SET password_hash = $1, active_session_sid = NULL, session_expires_at = NULL WHERE id = $2',
-      [passwordHash, seller.user_id]
-    );
-    // Audit log for password reset
-    const resetLogId = `PWD-RESET-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
-    await query(
-      `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
-       VALUES ($1, 'seller_password_reset', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', '', '', '', NOW(), 'closed')`,
-      [resetLogId, `إعادة تعيين كلمة مرور البائع: ${seller.name}`, req.user?.username || 'unknown']
-    );
+    // M-02: password rotation + audit commit atomically — a failed audit
+    // must not leave the password changed with a 500 returned.
+    await transaction(async (client) => {
+      await client.query(
+        'UPDATE users SET password_hash = $1, active_session_sid = NULL, session_expires_at = NULL WHERE id = $2',
+        [passwordHash, seller.user_id]
+      );
+      // Audit log for password reset
+      const resetLogId = `PWD-RESET-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+      await client.query(
+        `INSERT INTO audit_logs (log_id, type, title, username, time, status, device_name, ip_address, mac_address, login_at, session_status)
+         VALUES ($1, 'seller_password_reset', $2, $3, TO_CHAR(NOW(), 'YYYY/MM/DD HH24:MI:SS'), 'success', '', '', '', NOW(), 'closed')`,
+        [resetLogId, `إعادة تعيين كلمة مرور البائع: ${seller.name}`, req.user?.username || 'unknown']
+      );
+    });
     const userRes = await query('SELECT username FROM users WHERE id = $1', [seller.user_id]);
     res.json({
       message: `تم إعادة تعيين كلمة المرور بنجاح لـ ${seller.name}. اسم المستخدم: ${userRes.rows[0].username}`,
+      credentials: {
+        username: userRes.rows[0].username,
+        password: newPassword
+      }
     });
   } catch (err) {
     logger.error('Error resetting seller password:', err);
@@ -413,7 +442,7 @@ router.post('/:id/reset-password', requireRole('manager', 'agent'), async (req: 
   }
 });
 
-router.delete('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, res: Response) => {
+router.delete('/:id', requireRole('manager', 'agent'), validate(idParamSchema, 'params'), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
     const existing = await query('SELECT * FROM sellers WHERE id = $1', [id]);
@@ -421,8 +450,8 @@ router.delete('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, 
       return res.status(404).json({ error: 'Seller not found' });
     }
     if (req.user?.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      if (agentRes.rows.length === 0 || agentRes.rows[0].id !== existing.rows[0].agent_id) {
+      const agentId = await resolveScopeAgentId(req);
+      if (agentId == null || Number(agentId) !== Number(existing.rows[0].agent_id)) {
         return res.status(403).json({ error: 'Access denied: this seller does not belong to your agency' });
       }
     }
@@ -434,12 +463,21 @@ router.delete('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, 
           ['inactive', seller.user_id]
         );
       }
-      await client.query(
+      const moved = await client.query(
         `UPDATE sims SET assigned_to = NULL, owner = $1, owner_role = 'admin' WHERE assigned_to = $2`,
         ['المركز الرئيسي', id]
       );
       await client.query('DELETE FROM distribution_requests WHERE seller_id = $1', [id]);
-      await client.query('UPDATE sellers SET status = $1 WHERE id = $2', ['deleted', id]);
+      // H-02: zero the deleted seller's counters and release its stock from
+      // the parent agency's tally so neither shows phantom inventory.
+      await client.query('UPDATE sellers SET status = $1, current_stock = 0, sims_count = 0 WHERE id = $2', ['deleted', id]);
+      const movedCount = moved.rowCount ?? 0;
+      if (seller.agent_id != null && movedCount > 0) {
+        await client.query(
+          'UPDATE agents SET sims_count = GREATEST(COALESCE(sims_count, 0) - $1, 0) WHERE id = $2',
+          [movedCount, seller.agent_id]
+        );
+      }
       // Audit log for seller deletion
       const deleteLogId = `SELLER-DELETE-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
       await client.query(
@@ -448,7 +486,7 @@ router.delete('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, 
         [deleteLogId, `حذف بائع: ${seller.name}`, req.user?.username || 'unknown']
       );
     });
-    broadcastEvent({ type: 'seller.deleted', entity: 'seller', id });
+    broadcastScopedEvent({ type: 'seller.deleted', entity: 'seller', id, agent_id: seller.agent_id, seller_id: id });
     cacheInvalidate('report:');
     res.json({ message: 'Seller deleted successfully' });
   } catch (err) {

@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { AsyncLocalStorage } from 'async_hooks';
 
 const SENSITIVE_PATTERNS = [
   /bearer\s+[a-zA-Z0-9._-]+/gi,
@@ -39,14 +40,27 @@ export type LogContext = {
   method?: string;
 };
 
-let currentContext: LogContext = {};
+// Per-request isolated context. The previous module-level `let currentContext`
+// was shared across concurrent requests: one request's `clearLogContext()` on
+// `finish` wiped another in-flight request's correlationId/path (C-08 race).
+// AsyncLocalStorage keeps each request's context isolated without manual clear.
+const logContextStorage = new AsyncLocalStorage<LogContext>();
+
+function getCurrentContext(): LogContext {
+  return logContextStorage.getStore() ?? {};
+}
 
 export function setLogContext(ctx: LogContext) {
-  currentContext = { ...currentContext, ...ctx };
+  const prev = getCurrentContext();
+  logContextStorage.enterWith({ ...prev, ...ctx });
 }
 
 export function clearLogContext() {
-  currentContext = {};
+  logContextStorage.enterWith({});
+}
+
+export function runWithLogContext<T>(ctx: LogContext, fn: () => T): T {
+  return logContextStorage.run({ ...getCurrentContext(), ...ctx }, fn);
 }
 
 function buildMeta(args: unknown[]): { data?: unknown[]; errorId?: string } {
@@ -72,7 +86,7 @@ function log(level: string, message: string, ...args: unknown[]) {
     level,
     ts: formatTimestamp(),
     msg: safe,
-    ...currentContext,
+    ...getCurrentContext(),
   };
 
   if (meta.data) entry.data = meta.data;

@@ -69,6 +69,8 @@ export default function TopBar({
         <div className="relative">
           <button
             onClick={() => setShowNotifications(!showNotifications)}
+            aria-label={showNotifications ? 'إغلاق الإشعارات' : `فتح الإشعارات${unresolvedAlertsCount > 0 ? ` (${unresolvedAlertsCount} تنبيه نشط)` : ''}`}
+            aria-expanded={showNotifications}
             className="p-1.5 md:p-2 text-gray-600 hover:bg-gray-100 rounded-full transition-all flex items-center justify-center relative active:scale-95 cursor-pointer touch-target"
           >
             <span className="material-symbols-outlined text-xl md:text-2xl">notifications</span>
@@ -146,6 +148,8 @@ export default function TopBar({
         <div className="relative flex items-center gap-2">
           <button
             onClick={() => setShowProfileMenu(!showProfileMenu)}
+            aria-label={`قائمة المستخدم (${displayName || 'المستخدم'})`}
+            aria-expanded={showProfileMenu}
             className="flex items-center gap-2 cursor-pointer"
           >
             <div className="text-right hidden sm:block">

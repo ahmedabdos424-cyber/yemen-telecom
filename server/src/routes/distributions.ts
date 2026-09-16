@@ -1,12 +1,14 @@
 import { Router, Response } from 'express';
 import { query, transaction } from '../db';
 import { logger } from '../logger';
-import { requireRole, AuthRequest } from '../middleware/auth';
+import { requireRole, AuthRequest, resolveScopeAgentId } from '../middleware/auth';
 import { getPagination } from '../helpers';
-import { validate, createDistributionSchema, approveDistributionSchema, resolveProviderId } from '../validation';
-import { broadcastEvent, broadcastToRoles } from '../services/realtime.service';
+import { validate, idParamSchema, createDistributionSchema, approveDistributionSchema, resolveProviderId } from '../validation';
+import { broadcastScopedEvent, broadcastToRoles } from '../services/realtime.service';
 import { notifyDistributionApproved } from '../services/fcm.service';
 import crypto from 'crypto';
+import { logAudit } from '../audit-log';
+import { cacheInvalidate } from '../cache';
 
 const router = Router();
 
@@ -62,8 +64,8 @@ router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: R
         );
       }
     } else {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user!.id]);
-      if (agentRes.rows.length === 0) return res.json([]);
+      const agentId = await resolveScopeAgentId(req);
+      if (agentId == null) return res.json([]);
       if (paginate) {
         result = await query(
           `SELECT dr.*, a.name AS agent_name, s.name AS seller_name
@@ -72,7 +74,7 @@ router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: R
            LEFT JOIN sellers s ON dr.seller_id = s.id
            WHERE dr.agent_id = $1
            ORDER BY dr.id DESC LIMIT $2 OFFSET $3`,
-          [agentRes.rows[0].id, limit, offset]
+          [agentId, limit, offset]
         );
       } else {
         result = await query(
@@ -82,7 +84,7 @@ router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: R
            LEFT JOIN sellers s ON dr.seller_id = s.id
            WHERE dr.agent_id = $1
            ORDER BY dr.id DESC`,
-          [agentRes.rows[0].id]
+          [agentId]
         );
       }
     }
@@ -96,14 +98,18 @@ router.get('/', requireRole('manager', 'agent'), async (req: AuthRequest, res: R
 router.post('/', requireRole('agent'), validate(createDistributionSchema), async (req: AuthRequest, res: Response) => {
   const { seller_id, seller_name, operator, count, notes } = req.body;
   try {
-    const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user!.id]);
-    if (agentRes.rows.length === 0) {
+    const agentId = await resolveScopeAgentId(req);
+    if (agentId == null) {
       return res.status(400).json({ error: 'Agent profile not found' });
     }
-    const agentId = agentRes.rows[0].id;
     let sellerId = seller_id || null;
     if (seller_name && !sellerId) {
       const s = await query('SELECT id FROM sellers WHERE name = $1 AND agent_id = $2', [seller_name, agentId]);
+      // J-07: names are not unique — silently picking the first of several
+      // same-named sellers would route stock to the wrong shop.
+      if (s.rows.length > 1) {
+        return res.status(409).json({ error: 'Multiple sellers share this name — provide seller_id' });
+      }
       if (s.rows.length > 0) sellerId = s.rows[0].id;
     }
     // Verify seller belongs to this agent if seller_id was provided directly
@@ -114,7 +120,7 @@ router.post('/', requireRole('agent'), validate(createDistributionSchema), async
       }
     }
     const requestId = `DIST-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
-    const providerId = await resolveProviderId(null, operator);
+    const providerId = resolveProviderId(operator);
     const result = await query(
       `INSERT INTO distribution_requests (request_id, agent_id, seller_id, operator, provider_id, count, notes)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
@@ -131,10 +137,10 @@ router.post('/', requireRole('agent'), validate(createDistributionSchema), async
   }
 });
 
-router.put('/:id/approve', requireRole('manager'), validate(approveDistributionSchema), async (req: AuthRequest, res: Response) => {
+router.put('/:id/approve', requireRole('manager'), validate(idParamSchema, 'params'), validate(approveDistributionSchema), async (req: AuthRequest, res: Response) => {
   const { status: decision, notes } = req.body;
   try {
-    await transaction(async (client) => {
+    const approved = await transaction(async (client) => {
       const existing = await client.query('SELECT * FROM distribution_requests WHERE id = $1 FOR UPDATE', [req.params.id]);
       if (existing.rows.length === 0) {
         throw new Error('DISTRIBUTION_NOT_FOUND');
@@ -158,12 +164,17 @@ router.put('/:id/approve', requireRole('manager'), validate(approveDistributionS
           throw new Error('INSUFFICIENT_INVENTORY');
         }
       }
+      return dr;
     });
-    broadcastEvent({ type: 'distribution.updated', entity: 'distribution', id: req.params.id, status: decision, action: 'approve' });
+    // H-03: approving a distribution moves stock — cached reports/stats must refresh.
+    cacheInvalidate('report:');
+    // H-05: the owning agency sees its request outcome; managers see all.
+    broadcastScopedEvent({ type: 'distribution.updated', entity: 'distribution', id: req.params.id, status: decision, action: 'approve', agent_id: approved.agent_id });
     // Best-effort push: notify the buyer (seller) and the submitting agent that
     // their distribution request was approved. Never blocks the HTTP response.
     notifyRecipients(req.params.id).catch((err) => logger.warn('[FCM] distribution approval notify failed:', err));
     res.json({ message: `Request ${decision} successfully` });
+    void logAudit({ type: `distribution_${decision}`, title: `${decision === 'approved' ? 'اعتماد' : 'رفض'} طلب توزيع ${req.params.id}`, username: req.user?.username || 'unknown' });
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
     if (errMsg === 'DISTRIBUTION_NOT_FOUND') {

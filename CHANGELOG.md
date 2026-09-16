@@ -2,6 +2,31 @@
 
 All notable changes to the Yemen Telecom SIM Management System are documented in this file.
 
+## [1.1.0] — 2026-09-16
+
+### Security & integrity audit remediation (P0/P1)
+
+### Fixed
+- Database drift: `schema.sql` synced with all migrations (049 drift-repair + 050 integrity-links); partition rebuild preserves `occurred_at`
+- Document authorization: exact object-name ownership check instead of partial match
+- Operations integrity: `customer_row_id` FK + atomic SIM scope verification with advisory-lock idempotency
+- Lockdown restores exact pre-lockdown seller states (transactional); identity block/unblock transactional with session revocation
+- Demo session exemption is now dev-only; agent delete returns SIMs to the admin pool; seller delete zeroes counters
+- Stats cache key moved under the `report:` prefix; missing invalidations added (distributions, inventories, batch)
+- WebSocket broadcasts scoped to managers + owning agent/seller; alerts to managers only
+- Redis wired for distributed login lockout (memory + DB fallback intact)
+
+### Added
+- Unified report pagination: `?page&limit` with `X-Total-Count` on all reports and admin transactions
+- Numeric `:id` validation (400) on every parameterized route; unique conflicts return 409
+- Client error mapping: oversized uploads → 413, malformed JSON → 400
+- P0/J/P2/P3 hermetic regression suites (`p0-fixes`, `j-robustness`, `j-p3` test files)
+
+### Infrastructure
+- Node 24 (`.nvmrc`, engines, Docker, CI); PostgreSQL 17 with 37 migrations (latest: `050_integrity_links.sql`)
+- 75 route registrations; 6 CI workflows (android, ci, codeql-analysis, deploy, docker-verify, opencode)
+- Version 1.1.0 / versionCode 24 (package.json, `build.gradle`, `render.yaml` `APP_*` in sync)
+
 ## [1.0.0] — 2026-06-29
 
 ### Production Release — Certified

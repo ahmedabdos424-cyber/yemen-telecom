@@ -3,7 +3,8 @@ import { query, transaction } from '../../db';
 import { logger } from '../../logger';
 import { requireRole, AuthRequest } from '../../middleware/auth';
 import { getPagination } from '../../helpers';
-import { broadcastEvent } from '../../services/realtime.service';
+import { validate, idParamSchema } from '../../validation';
+import { broadcastScopedEvent } from '../../services/realtime.service';
 import { mapAuditRow } from './shared';
 import { cacheInvalidate } from '../../cache';
 import crypto from 'crypto';
@@ -92,7 +93,7 @@ router.get('/sellers', requireRole('manager'), async (_req: Request, res: Respon
 });
 
 // تفعيل/تعطيل بائع — يزامن حالة حساب المستخدم المرتبط به
-router.put('/sellers/:id/status', requireRole('manager'), async (req: AuthRequest, res: Response) => {
+router.put('/sellers/:id/status', requireRole('manager'), validate(idParamSchema, 'params'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const status = req.body?.status;
@@ -126,7 +127,7 @@ router.put('/sellers/:id/status', requireRole('manager'), async (req: AuthReques
         [logId, `تغيير حالة البائع ${seller.name}: ${oldStatus} → ${status}`, req.user?.username || 'unknown']
       );
     });
-    broadcastEvent({ type: 'seller.updated', entity: 'seller', id, status, action: 'status-toggle' });
+    broadcastScopedEvent({ type: 'seller.updated', entity: 'seller', id, status, action: 'status-toggle', agent_id: seller.agent_id, seller_id: id });
     cacheInvalidate('report:');
     const updated = await query(`${ADMIN_SELLERS_SELECT} WHERE s.id = $1`, [id]);
     res.json(updated.rows[0] ? mapAdminSeller(updated.rows[0]) : { id: String(id), status });
@@ -137,7 +138,7 @@ router.put('/sellers/:id/status', requireRole('manager'), async (req: AuthReques
 });
 
 // سجل جلسات دخول بائع معين (دخول ناجح/فاشل/خروج) من audit_logs
-router.get('/sellers/:id/sessions', requireRole('manager'), async (req: Request, res: Response) => {
+router.get('/sellers/:id/sessions', requireRole('manager'), validate(idParamSchema, 'params'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { page, limit, offset } = getPagination(req);
@@ -172,7 +173,7 @@ router.get('/sellers/:id/sessions', requireRole('manager'), async (req: Request,
 });
 
 // إلغاء جميع جلسات مستخدم معين (يرفع token_version)
-router.post('/users/:id/revoke-sessions', requireRole('manager'), async (req: AuthRequest, res: Response) => {
+router.post('/users/:id/revoke-sessions', requireRole('manager'), validate(idParamSchema, 'params'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const userRes = await query('SELECT id, username, token_version FROM users WHERE id = $1', [id]);

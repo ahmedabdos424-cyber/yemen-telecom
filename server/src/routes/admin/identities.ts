@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { Router, Request, Response } from 'express';
-import { query } from '../../db';
+import { query, transaction } from '../../db';
 import { logger } from '../../logger';
 import { requireRole, AuthRequest } from '../../middleware/auth';
 import { getPagination } from '../../helpers';
@@ -149,23 +149,35 @@ router.post('/duplicate-identities/:idNo/block', requireRole('manager'), async (
     const reason = (req.body && typeof req.body.reason === 'string') ? req.body.reason : '';
     const performedBy = req.user?.username || 'manager';
 
-    await query(
-      `INSERT INTO identity_risk_actions (id_no, name, action, reason, performed_by)
-       VALUES ($1, $2, 'block', $3, $4)`,
-      [idNo, name, reason, performedBy]
-    );
-    // Block all sellers sharing this id_number.
-    await query(
-      `UPDATE sellers SET status = 'suspended' WHERE id_number = $1 AND status NOT IN ('deleted')`,
-      [idNo]
-    );
-    // Upsert into duplicate_identities so the list reflects the block.
-    await query(
-      `INSERT INTO duplicate_identities (id_no, name, review_status, flagged, blocked)
-       VALUES ($1, $2, 'blocked', TRUE, TRUE)
-       ON CONFLICT (id_no) DO UPDATE SET blocked = TRUE, flagged = TRUE, review_status = 'blocked'`,
-      [idNo, name]
-    );
+    // C-05: all four writes succeed or none do — a mid-path failure must not
+    // leave sellers suspended while the risk record says otherwise. Frozen
+    // sellers also get their sessions revoked (token_version bump +
+    // sid clear), mirroring the sellers/status toggle.
+    await transaction(async (client) => {
+      await client.query(
+        `INSERT INTO identity_risk_actions (id_no, name, action, reason, performed_by)
+         VALUES ($1, $2, 'block', $3, $4)`,
+        [idNo, name, reason, performedBy]
+      );
+      // Block all sellers sharing this id_number.
+      await client.query(
+        `UPDATE sellers SET status = 'suspended' WHERE id_number = $1 AND status NOT IN ('deleted')`,
+        [idNo]
+      );
+      await client.query(
+        `UPDATE users SET token_version = token_version + 1,
+                active_session_sid = NULL, session_expires_at = NULL
+         WHERE id IN (SELECT user_id FROM sellers WHERE id_number = $1 AND user_id IS NOT NULL)`,
+        [idNo]
+      );
+      // Upsert into duplicate_identities so the list reflects the block.
+      await client.query(
+        `INSERT INTO duplicate_identities (id_no, name, review_status, flagged, blocked)
+         VALUES ($1, $2, 'blocked', TRUE, TRUE)
+         ON CONFLICT (id_no) DO UPDATE SET blocked = TRUE, flagged = TRUE, review_status = 'blocked'`,
+        [idNo, name]
+      );
+    });
     await logIdentityAction(idNo, name, 'block', performedBy);
     res.json({ success: true, idNo, blocked: true, reviewStatus: 'blocked' });
   } catch (err) {
@@ -183,19 +195,21 @@ router.post('/duplicate-identities/:idNo/unblock', requireRole('manager'), async
     if (!reason) return res.status(400).json({ error: 'سبب الحظر مطلوب', message: 'يجب توفير سبب عملية رفع الحظر لتوثيق السجل.' });
     const performedBy = req.user?.username || 'manager';
 
-    await query(
-      `INSERT INTO identity_risk_actions (id_no, name, action, reason, performed_by)
-       VALUES ($1, $2, 'unblock', $3, $4)`,
-      [idNo, name, reason, performedBy]
-    );
-    await query(
-      `UPDATE sellers SET status = 'active' WHERE id_number = $1 AND status = 'suspended'`,
-      [idNo]
-    );
-    await query(
-      `UPDATE duplicate_identities SET blocked = FALSE, review_status = 'resolved' WHERE id_no = $1`,
-      [idNo]
-    );
+    await transaction(async (client) => {
+      await client.query(
+        `INSERT INTO identity_risk_actions (id_no, name, action, reason, performed_by)
+         VALUES ($1, $2, 'unblock', $3, $4)`,
+        [idNo, name, reason, performedBy]
+      );
+      await client.query(
+        `UPDATE sellers SET status = 'active' WHERE id_number = $1 AND status = 'suspended'`,
+        [idNo]
+      );
+      await client.query(
+        `UPDATE duplicate_identities SET blocked = FALSE, review_status = 'resolved' WHERE id_no = $1`,
+        [idNo]
+      );
+    });
     await logIdentityAction(idNo, name, 'unblock', performedBy);
     res.json({ success: true, idNo, blocked: false, reviewStatus: 'resolved' });
   } catch (err) {

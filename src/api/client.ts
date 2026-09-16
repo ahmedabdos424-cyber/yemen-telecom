@@ -10,6 +10,7 @@ import type {
   MappedOperation, CreateOperationRequest,
   MappedInventory, UpdateInventoryItem,
   AlertRow,
+  CustomerRow, CustomerDetailRow,
   AdminSettingsResponse, UpdateSettingsRequest, MappedTransaction, DuplicateIdentityRow, AuditLogEntry, AuditLogPageResponse,
   UpdateProfileRequest,
   StatsResponse,
@@ -48,9 +49,6 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, retries 
   throw lastErr instanceof Error ? lastErr : new Error('Network request failed');
 }
 
-const hostname = window.location.hostname;
-const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('10.') || hostname.startsWith('192.168.');
-
 function detectCapacitor(): boolean {
   try {
     return !!(window as unknown as { Capacitor?: { isNative?: boolean } }).Capacitor?.isNative;
@@ -67,18 +65,17 @@ function detectCapacitor(): boolean {
 // keeps the relative '/api' path.
 const PROD_API = 'https://yemen-telecom.onrender.com/api';
 function resolveApiBase(): string {
+  // Vite dev server handles /api proxying via vite.config.ts → always relative.
   if (import.meta.env.DEV) return '/api';
-  // E2E/CI builds run `vite preview` against a local API; when the build was
-  // produced with VITE_PROXY_TARGET set (ci.yml e2e job) the relative path is
-  // safe because the preview proxy forwards /api to the local server. The APK
-  // and production builds never set this var, so they keep the absolute URL.
+  // E2E/CI builds run `vite preview` with VITE_PROXY_TARGET set; the preview
+  // proxy forwards /api to the local server, so relative path is safe.
   if (import.meta.env.VITE_PROXY_TARGET) return '/api';
+  // Native Capacitor app — always target the production API.
   if (detectCapacitor()) return PROD_API;
-  if (isLocal) {
-    // Inside the native WebView (androidScheme https) the origin is localhost but
-    // there is no local server, so always use the production API.
-    return PROD_API;
-  }
+  // Fallback: inside the native WebView, window.Capacitor may not yet be
+  // injected (timing), so any localhost origin must still target production.
+  // For normal browser access on localhost, prefer running `npm run dev`
+  // (Vite proxy) or set VITE_PROXY_TARGET for `npm run preview`.
   return PROD_API;
 }
 
@@ -270,6 +267,9 @@ async function refreshAccessToken(): Promise<string | null> {
           'X-CSRF-Hash': tokens.csrfHash,
           'X-Device-Id': getDeviceId(),
           'X-Device-Name': getDeviceName(),
+          // Native apps (no cookies) get the rotated refresh token in the
+          // JSON body for Keystore storage; web keeps the httpOnly cookie.
+          ...(isCapacitor ? { 'X-Native-App': '1' } : {}),
         },
         credentials: CREDENTIALS_MODE,
       });
@@ -279,7 +279,9 @@ async function refreshAccessToken(): Promise<string | null> {
       }
       const data = await res.json();
       setToken(data.token);
-      setRefreshToken(data.refreshToken);
+      // The server omits refreshToken for web sessions (httpOnly cookie only,
+      // S4) — never wipe the securely stored token on an absent field (C-01).
+      if (data.refreshToken) setRefreshToken(data.refreshToken);
       return data.token;
     } catch {
       clearTokens();
@@ -378,15 +380,38 @@ async function uploadFile(file: File | Blob, fieldName = 'image'): Promise<{ url
   await loadTokens();
   const form = new FormData();
   form.append(fieldName, file);
-  const headers: Record<string, string> = {};
-  if (tokens.auth) {
-    headers['Authorization'] = `Bearer ${tokens.auth}`;
+  // M-05: mirror request()'s recovery — a 401 refreshes the access token and
+  // a 403-CSRF refetches the token pair, then the upload is retried once.
+  // (FormData bodies are reusable across retries.)
+  const buildHeaders = (): Record<string, string> => {
+    const headers: Record<string, string> = {};
+    if (tokens.auth) {
+      headers['Authorization'] = `Bearer ${tokens.auth}`;
+    }
+    if (tokens.csrf && tokens.csrfHash) {
+      headers['X-CSRF-Token'] = tokens.csrf;
+      headers['X-CSRF-Hash'] = tokens.csrfHash;
+    }
+    return headers;
+  };
+  const doUpload = () =>
+    fetchWithTimeout(`${API_BASE}/upload/image`, { method: 'POST', headers: buildHeaders(), body: form, credentials: CREDENTIALS_MODE });
+  let res = await doUpload();
+  if (res.status === 401 && tokens.refresh) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      res = await doUpload();
+    }
   }
-  if (tokens.csrf && tokens.csrfHash) {
-    headers['X-CSRF-Token'] = tokens.csrf;
-    headers['X-CSRF-Hash'] = tokens.csrfHash;
+  if (res.status === 403) {
+    const errBody = await res.clone().json().catch(() => ({} as Record<string, unknown>));
+    if (typeof errBody.error === 'string' && errBody.error.includes('CSRF')) {
+      await fetchCsrfToken();
+      if (tokens.csrf && tokens.csrfHash) {
+        res = await doUpload();
+      }
+    }
   }
-  const res = await fetchWithTimeout(`${API_BASE}/upload/image`, { method: 'POST', headers, body: form, credentials: CREDENTIALS_MODE });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || `HTTP ${res.status}`);
@@ -396,13 +421,44 @@ async function uploadFile(file: File | Blob, fieldName = 'image'): Promise<{ url
 
 export type { ApiLoginResponse, ApiMeResponse, ApiBackupResponse, ApiLockdownResponse, ApiResetPasswordResponse, SystemHealthResponse } from './types';
 
+// M-04: preferences are fetched on every shell mount (App + 3 account
+// screens). Share in-flight requests and cache briefly instead of hitting
+// /users/preferences 4x per session start.
+type UserPrefs = { simNotifications: boolean; lowStockNotifications: boolean; fontSize: string; darkMode: boolean };
+const PREFS_TTL_MS = 60_000;
+let prefsCache: { data: UserPrefs; ts: number } | null = null;
+let prefsInflight: Promise<UserPrefs> | null = null;
+async function getCachedUserPreferences(): Promise<UserPrefs> {
+  if (prefsCache && Date.now() - prefsCache.ts < PREFS_TTL_MS) return prefsCache.data;
+  if (!prefsInflight) {
+    prefsInflight = request<UserPrefs>('/users/preferences')
+      .then((data) => {
+        prefsCache = { data, ts: Date.now() };
+        return data;
+      })
+      .finally(() => {
+        prefsInflight = null;
+      });
+  }
+  return prefsInflight;
+}
+
 export const api = {
   // Auth
-  login: (username: string, password: string) =>
-    request<ApiLoginResponse>('/auth/login', {
+  login: async (username: string, password: string) => {
+    // Native apps identify themselves so the server returns the refresh token
+    // in the body (Keystore-encrypted at rest); web uses the httpOnly cookie.
+    const res = await request<ApiLoginResponse>('/auth/login', {
       method: 'POST',
+      headers: isCapacitor ? { 'X-Native-App': '1' } : {},
       body: JSON.stringify({ username, password }),
-    }),
+    });
+    // Rotate the CSRF token after a successful login so any token fetched
+    // before authentication (shared kiosk, stale session) is not reused for
+    // the new session (audit: CSRF token not rotated on login).
+    await fetchCsrfToken();
+    return res;
+  },
 
   getMe: () => request<ApiMeResponse>('/auth/me'),
   logout: () => request<Record<string, unknown>>('/auth/logout', { method: 'POST' }),
@@ -441,6 +497,8 @@ export const api = {
 
   // Sellers
   getSellers: () => request<MappedSeller[]>('/sellers'),
+  getSellersPaged: (page: number, limit = 20) =>
+    request<MappedSeller[]>(`/sellers?page=${page}&limit=${limit}`),
   createSeller: (data: CreateSellerRequest) =>
     request<CreateSellerResponse>('/sellers', { method: 'POST', body: JSON.stringify(data) }),
   updateSeller: (id: number, data: UpdateSellerRequest) =>
@@ -468,6 +526,12 @@ export const api = {
     request<MappedInventory[]>('/inventories', { method: 'PUT', body: JSON.stringify(data) }),
 
   // Customers
+  getCustomers: (page?: number, limit = 20) =>
+    request<CustomerRow[]>(page != null ? `/customers?page=${page}&limit=${limit}` : '/customers'),
+  searchCustomers: (q: string) =>
+    request<CustomerRow[]>(`/customers/search?q=${encodeURIComponent(q)}`),
+  getCustomer: (id: number | string) =>
+    request<CustomerDetailRow>(`/customers/${id}`),
   createCustomer: (data: { fullName: string; idNumber: string; idType?: string; idIssueDate?: string; phone?: string; region?: string }) =>
     request<Record<string, unknown>>('/customers', { method: 'POST', body: JSON.stringify(data) }),
 
@@ -570,8 +634,10 @@ export const api = {
     request<{ url: string; filename: string }>(`/upload/signed/${encodeURIComponent(filename)}`),
 
   // User Preferences
-  getUserPreferences: () =>
-    request<{ simNotifications: boolean; lowStockNotifications: boolean; fontSize: string; darkMode: boolean }>('/users/preferences'),
-  updateUserPreferences: (data: { simNotifications?: boolean; lowStockNotifications?: boolean; fontSize?: string; darkMode?: boolean }) =>
-    request<{ message: string }>('/users/preferences', { method: 'PUT', body: JSON.stringify(data) }),
+  getUserPreferences: () => getCachedUserPreferences(),
+  updateUserPreferences: (data: { simNotifications?: boolean; lowStockNotifications?: boolean; fontSize?: string; darkMode?: boolean }) => {
+    // Drop the read cache so the next fetch observes the write.
+    prefsCache = null;
+    return request<{ message: string }>('/users/preferences', { method: 'PUT', body: JSON.stringify(data) });
+  },
 };

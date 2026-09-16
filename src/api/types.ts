@@ -14,7 +14,9 @@ export interface LoginRequest {
 
 export interface ApiLoginResponse {
   token: string;
-  refreshToken: string;
+  // Present only for native app logins (X-Native-App: 1), where httpOnly
+  // cookies are unavailable. Web sessions rely on the httpOnly cookie (S4).
+  refreshToken?: string;
   user: {
     id: number;
     username: string;
@@ -61,7 +63,8 @@ export interface RefreshTokenRequest {
 
 export interface RenewTokenResponse {
   token: string;
-  refreshToken: string;
+  // Present only for native app refreshes (X-Native-App: 1) for rotation.
+  refreshToken?: string;
 }
 
 // ==================== SIMs ====================
@@ -128,7 +131,7 @@ export interface SimBatchResult {
 }
 
 export interface TransferSimsRequest {
-  seller_id: string;
+  seller_id: number;
   from_iccid: string;
   to_iccid: string;
 }
@@ -138,7 +141,7 @@ export interface TransferSimsResult {
   total: number;
   from_iccid: string;
   to_iccid: string;
-  seller_id: string;
+  seller_id: number;
   status: string;
 }
 
@@ -305,6 +308,7 @@ export interface CreateOperationRequest {
   contract_image?: string;
   contractImage?: string;
   iccid?: string;
+  opId?: string;
 }
 
 export interface QueryOperationsRequest {
@@ -495,6 +499,10 @@ export interface CustomerRow {
   created_at: string;
   activated_by: number | null;
   created_by: number | null;
+}
+
+export interface CustomerDetailRow extends CustomerRow {
+  operations: MappedOperation[];
 }
 
 // ==================== Distributions ====================

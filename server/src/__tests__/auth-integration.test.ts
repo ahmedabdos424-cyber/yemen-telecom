@@ -198,6 +198,47 @@ describe('P1-20 Auth Integration Tests', () => {
       expect(insertCount).toBe(1);
     });
 
+    it('F1 regression: should blacklist the X-Refresh-Token header on logout (Capacitor flow)', async () => {
+      const blacklisted = new Set<string>();
+      (query as any).mockImplementation((sql: string, params: any[]) => {
+        if (sql.includes('INSERT INTO token_blacklist')) {
+          blacklisted.add(params[0]);
+          return Promise.resolve({ rows: [] });
+        }
+        if (sql.includes('SELECT 1 FROM token_blacklist')) {
+          const hash = params[0];
+          return Promise.resolve({ rows: blacklisted.has(hash) ? [{ token_hash: hash }] : [] });
+        }
+        if (sql.includes('SELECT status, token_version FROM users WHERE id')) {
+          return Promise.resolve({ rows: [{ status: 'active', token_version: 1 }] });
+        }
+        if (sql.includes('SELECT * FROM users WHERE username')) {
+          return Promise.resolve({ rows: [testUser] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const accessToken = makeToken({ id: 1, username: 'testuser', role: 'agent' });
+      const refreshToken = makeToken(
+        { id: 1, username: 'testuser', role: 'agent', type: 'refresh' },
+        REFRESH_SECRET, '7d'
+      );
+
+      // Logout sends the refresh token via X-Refresh-Token header (Capacitor has no cookies).
+      const logoutRes = await req('POST', '/api/auth/logout', undefined, {
+        'Authorization': `Bearer ${accessToken}`,
+        'X-Refresh-Token': refreshToken,
+      });
+      expect(logoutRes.status).toBe(200);
+      // Access token + header refresh token both blacklisted.
+      expect(blacklisted.size).toBe(2);
+
+      // The same refresh token must no longer be usable afterwards.
+      const refreshRes = await req('POST', '/api/auth/refresh', undefined, { 'X-Refresh-Token': refreshToken });
+      expect(refreshRes.status).toBe(401);
+      expect(refreshRes.data.error).toBe('Refresh token has been revoked');
+    });
+
     it('should blacklist old refresh token on refresh', async () => {
       mockUser();
       let blacklisted = false;

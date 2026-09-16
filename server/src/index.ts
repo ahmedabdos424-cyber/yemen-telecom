@@ -13,7 +13,9 @@ import { query } from './db';
 import { getMaintenanceMode } from './maintenance';
 import { cacheGet, cacheSet, cacheStats } from './cache';
 import { authenticateToken, requireRole } from './middleware/auth';
+import { clientErrorMapper } from './middleware/httpErrors';
 import { clearExpiredLoginLocks, clearExpiredDbLockouts } from './middleware/rateLimiter';
+import { initRedis, closeRedis, clearExpiredLoginLocksRedis } from './redis';
 import { Sentry } from './sentry';
 import authRoutes from './routes/auth';
 import simsRoutes from './routes/sims';
@@ -32,7 +34,7 @@ import notificationsRoutes from './routes/notifications';
 import appUpdateRoutes from './routes/app-update';
 import { attachRealtimeServer, realtimeStats } from './services/realtime.service';
 
-import { logger, setLogContext, clearLogContext } from './logger';
+import { logger, runWithLogContext } from './logger';
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 // Environment validation — fail fast on missing secrets
@@ -56,7 +58,7 @@ if (missingUpdateEnv.length > 0) {
 
 const envMode = process.env.NODE_ENV || 'development';
 if (envMode === 'development') {
-  logger.warn('[ENV] NODE_ENV=development — CORS allows all origins, query logging enabled');
+  logger.warn('[ENV] NODE_ENV=development — CORS is restricted to whitelist + localhost/127.0.0.1 dev origins, query logging enabled');
 }
 logger.info(`[ENV] NODE_ENV=${envMode}`);
 
@@ -71,16 +73,13 @@ let requestCount = 0;
 app.set('trust proxy', 1);
 app.use(cookieParser());
 
-// Request counter and correlation middleware
-app.use((req, res, next) => {
+// Request counter and correlation middleware (AsyncLocalStorage-isolated per
+// request so concurrent requests never share or clear each other's context).
+app.use((req, _res, next) => {
   requestCount++;
   const correlationId = (req.headers['x-correlation-id'] as string) || crypto.randomUUID();
   req.headers['x-correlation-id'] = correlationId;
-  setLogContext({ correlationId, path: req.path, method: req.method });
-  res.on('finish', () => {
-    clearLogContext();
-  });
-  next();
+  runWithLogContext({ correlationId, path: req.path, method: req.method }, () => next());
 });
 
 if (!process.env.CSRF_SECRET) {
@@ -127,15 +126,33 @@ const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,https://y
   .split(',')
   .map((o) => o.trim())
   .filter(Boolean);
-const isCapacitorOrigin = (origin: string) =>
-  origin === 'https://localhost' ||
-  origin === 'capacitor://localhost' ||
-  origin.startsWith('https://localhost:') ||
-  origin.startsWith('http://localhost:') ||
-  origin.startsWith('capacitor://');
+// Capacitor WebView origin is https://localhost (androidScheme: https, no local
+// server). In production only allow the exact native origins; in development
+// additionally allow local dev servers (Vite :3000, preview :4173, backend
+// :4000) so `npm run dev` keeps working without opening CORS to any origin.
+const isCapacitorOrigin = (origin: string) => {
+  if (
+    origin === 'https://localhost' ||
+    origin === 'capacitor://localhost' ||
+    origin.startsWith('capacitor://')
+  ) {
+    return true;
+  }
+  if (isDev) {
+    return (
+      origin.startsWith('https://localhost:') ||
+      origin.startsWith('http://localhost:') ||
+      origin.startsWith('http://127.0.0.1:')
+    );
+  }
+  return false;
+};
 app.use(cors({
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    if (!origin || isDev || corsOrigins.includes(origin) || (origin && isCapacitorOrigin(origin))) {
+    // Non-browser clients (curl, health checks, mobile) send no Origin — allow
+    // them; browsers must match the whitelist or a native origin. The previous
+    // `isDev` blanket-allow reflected any Origin with credentials:true (S-01).
+    if (!origin || corsOrigins.includes(origin) || (origin && isCapacitorOrigin(origin))) {
       callback(null, true);
     } else {
       logger.warn(`CORS blocked origin: ${origin}`);
@@ -144,7 +161,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-CSRF-Hash', 'X-Refresh-Token', 'X-Device-Id', 'X-Device-Name'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-CSRF-Hash', 'X-Refresh-Token', 'X-Device-Id', 'X-Device-Name', 'X-Native-App'],
 }));
 app.use(compression());
 app.use(express.json({ limit: '1mb' }));
@@ -190,8 +207,14 @@ app.get('/', (_req, res) => {
 // Serve remaining static files (manifest, icons, etc.) — GET / is already handled above
 app.use(express.static('dist', { maxAge: '1y', immutable: true, etag: true }));
 
-// CSRF token generation endpoint (must be after CORS middleware)
-app.get('/api/csrf-token', (_req, res) => {
+// CSRF token generation endpoint (must be after CORS middleware). A light
+// per-IP limiter prevents abuse of this public, unauthenticated endpoint.
+const csrfLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: { error: 'Too many requests, please slow down' },
+});
+app.get('/api/csrf-token', csrfLimiter, (_req, res) => {
   const token = crypto.randomBytes(32).toString('hex');
   const hash = crypto.createHmac('sha256', CSRF_SECRET).update(token).digest('hex');
   res.json({ token, hash });
@@ -229,6 +252,14 @@ const passwordResetLimiter = rateLimit({
   max: 5,
   message: { error: 'Too many password reset attempts, please try again later' },
 });
+// J-06: install telemetry is public by design (unregistered devices report)
+// but must not be floodable into a stats-poisoning channel.
+const installReportLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: { error: 'Too many install reports, please try again later' },
+});
+app.use('/api/app-update-installed', installReportLimiter);
 app.use('/api/sellers', (req, res, next) => {
   if (req.method === 'POST' && req.path.endsWith('/reset-password')) {
     return passwordResetLimiter(req, res, next);
@@ -443,7 +474,10 @@ app.use('/api/notifications', notificationsRoutes);
 
 // Stats endpoint (manager only) — cached 5 minutes
 app.get('/api/stats', requireRole('manager'), async (_req, res) => {
-  const cached = cacheGet<Record<string, unknown>>('stats:overview');
+  // H-03: the key lives under the 'report:' prefix so every report mutation
+  // (sims/sellers/operations/distributions/inventories) invalidates it via
+  // the existing cacheInvalidate('report:') calls.
+  const cached = cacheGet<Record<string, unknown>>('report:stats-overview');
   if (cached) return res.json(cached);
   try {
     const result = await query(`
@@ -522,7 +556,7 @@ app.get('/api/stats', requireRole('manager'), async (_req, res) => {
       agents_added_30d: agentsAdded30d,
       sellers_added_30d: sellersAdded30d,
     };
-    cacheSet('stats:overview', data, 300_000);
+    cacheSet('report:stats-overview', data, 300_000);
     res.json(data);
   } catch (err) {
     logger.error('Error fetching stats:', err);
@@ -560,6 +594,10 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
   next();
 });
 
+// J-01: map multer/body-parser client errors to 4xx (must precede Sentry
+// and the generic 500 handler so they neither alert nor mislead).
+app.use(clientErrorMapper);
+
 // Sentry error handler (must be before the generic handler)
 if (process.env.SENTRY_DSN) {
   Sentry.setupExpressErrorHandler(app);
@@ -590,6 +628,11 @@ async function prewarmDb(): Promise<void> {
 }
 prewarmDb().catch(err => logger.warn('[INIT] Database not ready (will retry on first request):', err.message));
 
+// H-04: connect the distributed rate-limit/login-lockout layer. initRedis is
+// non-fatal without REDIS_URL (in-memory + DB fallbacks stay authoritative),
+// so single-instance and CI environments keep working unchanged.
+initRedis().catch((err) => logger.warn('[INIT] Redis unavailable — using in-memory + DB fallbacks:', err?.message || err));
+
 const server = app.listen(PORT, '0.0.0.0', () => {
   logger.info(`[INIT] Server running on http://0.0.0.0:${PORT}`);
   logger.info(`[INIT] Routes (${listRoutes().length} total):`);
@@ -613,6 +656,7 @@ setInterval(async () => {
   }
   clearExpiredLoginLocks();
   clearExpiredDbLockouts().catch((err) => logger.warn('[CLEANUP] DB lockout cleanup failed:', err));
+  clearExpiredLoginLocksRedis().catch((err) => logger.warn('[CLEANUP] Redis lockout cleanup failed:', err));
 }, 60 * 60 * 1000);
 
 // Graceful shutdown
@@ -620,7 +664,7 @@ function shutdown(signal: string) {
   logger.info(`[SHUTDOWN] Received ${signal}. Closing server...`);
   server.close(() => {
     logger.info('[SHUTDOWN] Server closed.');
-    process.exit(0);
+    closeRedis().catch((err) => logger.warn('[SHUTDOWN] Redis close failed:', err)).finally(() => process.exit(0));
   });
   setTimeout(() => {
     logger.error('[SHUTDOWN] Forced exit after timeout.');

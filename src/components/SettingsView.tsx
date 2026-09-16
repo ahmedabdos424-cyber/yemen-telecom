@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { SystemSettings } from '../types';
 import ConfirmModal from './shared/ConfirmModal';
 import { captureError } from '../lib/monitor.ts';
+import { getErrorMessage } from '../lib/getErrorMessage';
 import { api } from '../api/client';
 import { Fingerprint } from 'lucide-react';
 import { useToast, ToastContainer } from '../hooks/useToast';
@@ -52,8 +53,8 @@ export default function SettingsView({
       downloadAnchor.click();
       downloadAnchor.remove();
       toastSuccess('نجاح', 'تم تنزيل تقرير التدقيق الأمني بنجاح');
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.error || error.message || 'حدث خطأ غير متوقع';
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error, 'حدث خطأ غير متوقع');
       toastError('فشل', `تعذر تنزيل التقرير: ${errorMessage}`);
       captureError(error, 'downloadAuditReport');
     }
@@ -70,8 +71,8 @@ export default function SettingsView({
       document.body.appendChild(link);
       link.click();
       link.remove();
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.error || error.message || 'تعذر التواصل مع الخدمة';
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error, 'تعذر التواصل مع الخدمة');
       toastError('فشل', `تعذر إنشاء النسخة الاحتياطية: ${errorMessage}`);
       captureError(error, 'handleBackup');
     } finally {
@@ -89,8 +90,8 @@ export default function SettingsView({
       } catch {
         setLockdownConfirm(false);
       }
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.error || error.message || 'تعذر الوصول لخدمة الصيانة';
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error, 'تعذر الوصول لخدمة الصيانة');
       toastError('فشل', `تعذر تغيير حالة الصيانة: ${errorMessage}`);
       setLockdownConfirm(false);
       captureError(error, 'handleLockdown');
@@ -102,8 +103,8 @@ const updateSetting = async (patch: Partial<SystemSettings>, silent = false) => 
     try {
       await onUpdateSettings(updated);
       if (!silent) toastSuccess('نجاح', 'تم حفظ الإعدادات بنجاح');
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.error || err.message || 'تعذر حفظ الإعدادات';
+    } catch (err: unknown) {
+      const errorMessage = getErrorMessage(err, 'تعذر حفظ الإعدادات');
       toastError('فشل', `تعذر حفظ الإعدادات: ${errorMessage}`);
       captureError(err, 'updateSetting');
     }

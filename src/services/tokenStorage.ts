@@ -1,4 +1,5 @@
 import { captureError } from '../lib/monitor';
+import BiometricAuth from '../plugins/BiometricAuth';
 
 const STORAGE_KEYS = {
   AUTH_TOKEN: 'auth_token',
@@ -75,8 +76,7 @@ function looksEncrypted(raw: string): boolean {
 
 async function encryptNative(plaintext: string): Promise<string | null> {
   try {
-    const mod = await import('../plugins/BiometricAuth');
-    const out = await mod.default.encrypt(plaintext);
+    const out = await BiometricAuth.encrypt(plaintext);
     if (!out || typeof out.iv !== 'string' || typeof out.ciphertext !== 'string') {
       return null;
     }
@@ -91,8 +91,7 @@ async function encryptNative(plaintext: string): Promise<string | null> {
 async function decryptNative(raw: string): Promise<string | null> {
   try {
     const parsed = JSON.parse(raw) as KeystoreEnvelope;
-    const mod = await import('../plugins/BiometricAuth');
-    const out = await mod.default.decrypt(parsed.iv, parsed.ciphertext);
+    const out = await BiometricAuth.decrypt(parsed.iv, parsed.ciphertext);
     return out?.data ?? null;
   } catch {
     return null;

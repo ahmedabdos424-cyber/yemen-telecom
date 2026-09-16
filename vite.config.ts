@@ -51,7 +51,7 @@ export default defineConfig({
              if (req.method === 'OPTIONS') {
                proxyRes.headers['access-control-allow-origin'] = req.headers.origin || '*';
                proxyRes.headers['access-control-allow-methods'] = 'GET,POST,PUT,DELETE,OPTIONS';
-               proxyRes.headers['access-control-allow-headers'] = 'Content-Type,Authorization,X-CSRF-Token,X-CSRF-Hash,X-Refresh-Token';
+               proxyRes.headers['access-control-allow-headers'] = 'Content-Type,Authorization,X-CSRF-Token,X-CSRF-Hash,X-Refresh-Token,X-Native-App,X-Device-Id,X-Device-Name';
                proxyRes.headers['access-control-allow-credentials'] = 'true';
              }
            });

@@ -46,7 +46,11 @@ BEGIN
     -- NOTE: occurred_at is not present in every environment, so default to NOW().
     UPDATE operations SET created_at = NOW() WHERE created_at IS NULL;
 
-    -- New partitioned parent table (same columns as the legacy table)
+    -- New partitioned parent table (same columns as the legacy table,
+    -- including occurred_at from migration 010 — an earlier revision of this
+    -- rebuild omitted it and silently dropped the column (C-01). Guarded by
+    -- the is_partitioned check above, so databases rebuilt by the old
+    -- revision are repaired by migration 049 instead of re-running this).
     CREATE TABLE operations_new (
       id INTEGER NOT NULL DEFAULT nextval('operations_id_seq'),
       op_id VARCHAR(100) NOT NULL,
@@ -61,6 +65,7 @@ BEGIN
       contract_image VARCHAR(500),
       iccid VARCHAR(30),
       created_at TIMESTAMP DEFAULT NOW(),
+      occurred_at TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       provider_id INTEGER,
       created_by INTEGER,
@@ -81,11 +86,11 @@ BEGIN
     INSERT INTO operations_new
       (id, op_id, type, target, operator, date, time, status,
        customer_name, customer_id, contract_image, iccid,
-       created_at, updated_at, provider_id, created_by)
+       created_at, occurred_at, updated_at, provider_id, created_by)
     SELECT
       id, op_id, type, target, operator, date, time, status,
       customer_name, customer_id, contract_image, iccid,
-      created_at, updated_at, provider_id, created_by
+      created_at, occurred_at, updated_at, provider_id, created_by
     FROM operations;
 
     -- Swap: drop legacy table (sequence survives via OWNED BY NONE), rename new

@@ -1,13 +1,14 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { query, transaction } from '../db';
 import { logger } from '../logger';
-import { requireRole, AuthRequest } from '../middleware/auth';
+import { requireRole, AuthRequest, resolveScopeAgentId } from '../middleware/auth';
 import { getPagination, paginatedQuery, rejectIfUnpaginatedTooLarge } from '../helpers';
-import { validate, createAgentSchema, updateAgentSchema } from '../validation';
+import { validate, rejectEmptyBody, createAgentSchema, updateAgentSchema } from '../validation';
 import { notifyNewMember } from '../services/fcm.service';
 import { getUniqueViolationKind } from '../helpers/dbErrors';
+import { logAudit } from '../audit-log';
 
 const router = Router();
 
@@ -80,6 +81,7 @@ router.post('/', requireRole('manager'), validate(createAgentSchema), async (req
         password: agentPassword
       }
     });
+    void logAudit({ type: 'agent_created', title: `إنشاء وكيل: ${name}`, username: req.user?.username || 'unknown' });
    } catch (err) {
     const kind = getUniqueViolationKind(err);
     if (kind === 'phone') {
@@ -107,8 +109,8 @@ router.get('/:id', requireRole('manager', 'agent'), async (req: AuthRequest, res
   if (agentId === null) return;
   try {
     if (req.user?.role === 'agent') {
-      const agentRes = await query('SELECT id FROM agents WHERE user_id = $1', [req.user.id]);
-      if (agentRes.rows.length === 0 || agentRes.rows[0].id !== agentId) {
+      const scopedAgentId = await resolveScopeAgentId(req);
+      if (scopedAgentId == null || Number(scopedAgentId) !== Number(agentId)) {
         return res.status(403).json({ error: 'Access denied: this agent does not belong to your account' });
       }
     }
@@ -145,16 +147,25 @@ router.delete('/:id', requireRole('manager'), async (req: AuthRequest, res: Resp
       }
       // Unlink sellers from this agent (set agent_id to NULL)
       await client.query('UPDATE sellers SET agent_id = NULL WHERE agent_id = $1', [agentId]);
-      await client.query('UPDATE agents SET status = $1, sellers_count = 0 WHERE id = $2', ['deleted', agentId]);
+      // H-02: return the agent's SIM stock to the admin pool instead of
+      // orphaning it. Activated SIMs keep their status/history — only the
+      // ownership moves back to the head office.
+      await client.query(
+        `UPDATE sims SET assigned_to_agent = NULL, owner_role = 'admin', owner = $1
+          WHERE assigned_to_agent = $2`,
+        ['المركز الرئيسي', agentId]
+      );
+      await client.query('UPDATE agents SET status = $1, sellers_count = 0, sims_count = 0 WHERE id = $2', ['deleted', agentId]);
     });
     res.json({ message: 'Agent deleted successfully' });
+    void logAudit({ type: 'agent_deleted', title: `حذف وكيل: ${agent.name}`, username: req.user?.username || 'unknown' });
   } catch (err) {
     logger.error('Error deleting agent:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-router.put('/:id', requireRole('manager'), validate(updateAgentSchema), async (req: Request, res: Response) => {
+router.put('/:id', requireRole('manager'), rejectEmptyBody, validate(updateAgentSchema), async (req: AuthRequest, res: Response) => {
   const agentId = parseId(req.params.id, res);
   if (agentId === null) return;
   try {
@@ -170,22 +181,28 @@ router.put('/:id', requireRole('manager'), validate(updateAgentSchema), async (r
     const sims_count = req.body.sims_count ?? cur.sims_count;
     const status = req.body.status ?? cur.status;
     const statusChanged = status !== cur.status;
-    const result = await query(
-      `UPDATE agents SET name=$1, region=$2, phone=$3, sellers_count=$4, sims_count=$5, status=$6 WHERE id=$7 RETURNING *`,
-      [name, region, phone, sellers_count, sims_count, status, agentId]
-    );
-    // Sync user status + force-logout active session when disabling
-    if (statusChanged && cur.user_id) {
-      if (status === 'inactive') {
-        await query(
-          `UPDATE users SET status = $1, active_session_sid = NULL, session_expires_at = NOW() WHERE id = $2`,
-          [status, cur.user_id]
-        );
-      } else {
-        await query('UPDATE users SET status = $1 WHERE id = $2', [status, cur.user_id]);
+    // M-02: agent row + linked user row commit atomically so a failed user
+    // sync can never leave agents.status and users.status contradicting.
+    const result = await transaction(async (client) => {
+      const updated = await client.query(
+        `UPDATE agents SET name=$1, region=$2, phone=$3, sellers_count=$4, sims_count=$5, status=$6 WHERE id=$7 RETURNING *`,
+        [name, region, phone, sellers_count, sims_count, status, agentId]
+      );
+      // Sync user status + force-logout active session when disabling
+      if (statusChanged && cur.user_id) {
+        if (status === 'inactive') {
+          await client.query(
+            `UPDATE users SET status = $1, active_session_sid = NULL, session_expires_at = NOW() WHERE id = $2`,
+            [status, cur.user_id]
+          );
+        } else {
+          await client.query('UPDATE users SET status = $1 WHERE id = $2', [status, cur.user_id]);
+        }
       }
-    }
+      return updated;
+    });
     res.json(result.rows[0]);
+    void logAudit({ type: 'agent_updated', title: `تحديث وكيل: ${name}`, username: req.user?.username || 'unknown' });
    } catch (err) {
     const kind = getUniqueViolationKind(err);
     if (kind === 'phone') {

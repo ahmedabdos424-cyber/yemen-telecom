@@ -23,7 +23,7 @@ if (!process.env.BLACKLIST_HMAC_SECRET) {
 const BLACKLIST_HMAC_SECRET = process.env.BLACKLIST_HMAC_SECRET;
 
 export interface AuthRequest extends Request {
-  user?: { id: number; username: string; role: string };
+  user?: { id: number; username: string; role: string; agentId?: number; sellerId?: number };
 }
 
 export interface TokenPayload {
@@ -37,12 +37,14 @@ export interface TokenPayload {
   iss?: string;
 }
 
-// Only demo seed accounts are exempt from single-device session enforcement.
-// Every real production account must pass the active_session_sid check to
-// prevent concurrent-device hijacking.
+// Only demo seed accounts are exempt from single-device session enforcement,
+// and only outside production. Every production account — including accounts
+// that happen to reuse a demo username — must pass the active_session_sid
+// check so a stolen token cannot survive a fresh login (H-01).
 export const DEMO_USERNAMES = new Set<string>(['manager', 'agent', 'seller']);
 
 export function isSessionExempt(username?: string): boolean {
+  if (process.env.NODE_ENV === 'production') return false;
   return !!username && DEMO_USERNAMES.has(username);
 }
 
@@ -65,7 +67,7 @@ export function requireRole(...roles: string[]) {
   };
 }
 
-export type ResolvedUser = { id: number; username: string; role: string };
+export type ResolvedUser = { id: number; username: string; role: string; agentId?: number; sellerId?: number };
 
 // Shared token resolution used by both the Express middleware and the
 // realtime WebSocket gateway. Returns the authenticated user or null.
@@ -102,11 +104,40 @@ export async function resolveTokenUser(token: string): Promise<ResolvedUser | nu
         }
       }
     }
-    return { id: decoded.id, username: decoded.username, role: decoded.role };
+    // Resolve the role-scoped foreign key once so authenticated handlers never
+    // re-query it (removes the per-endpoint N+1 agent/seller lookups). Read
+    // fresh per request — never trust a stale value baked into a token.
+    let agentId: number | undefined;
+    let sellerId: number | undefined;
+    if (decoded.role === 'agent') {
+      const agentResult = await query('SELECT id FROM agents WHERE user_id = $1', [decoded.id]);
+      agentId = agentResult.rows[0]?.id;
+    } else if (decoded.role === 'seller') {
+      const sellerResult = await query('SELECT id FROM sellers WHERE user_id = $1', [decoded.id]);
+      sellerId = sellerResult.rows[0]?.id;
+    }
+    return { id: decoded.id, username: decoded.username, role: decoded.role, agentId, sellerId };
   } catch (err) {
     logger.warn('[AUTH] Token resolution failed:', err instanceof Error ? err.message : err);
     return null;
   }
+}
+
+// Helpers that hand a handler its role-scoped foreign key. In production the
+// value is already resolved by resolveTokenUser (agentId/sellerId on the
+// request). The query fallback keeps direct-auth test suites working, where
+// req.user is stubbed without the scoped ids and the select is intercepted by
+// a mocked db query.
+export async function resolveScopeAgentId(req: AuthRequest): Promise<number | null> {
+  if (req.user?.agentId != null) return req.user.agentId;
+  const agentResult = await query('SELECT id FROM agents WHERE user_id = $1', [req.user!.id]);
+  return (agentResult.rows[0]?.id as number | undefined) ?? null;
+}
+
+export async function resolveScopeSellerId(req: AuthRequest): Promise<number | null> {
+  if (req.user?.sellerId != null) return req.user.sellerId;
+  const sellerResult = await query('SELECT id FROM sellers WHERE user_id = $1', [req.user!.id]);
+  return (sellerResult.rows[0]?.id as number | undefined) ?? null;
 }
 
 export async function authenticateToken(req: AuthRequest, res: Response, next: NextFunction) {

@@ -4,7 +4,8 @@ import { query } from '../db';
 import { logger } from '../logger';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { getPagination, rejectIfUnpaginatedTooLarge } from '../helpers';
-import { validate, createCustomerSchema, customerSearchSchema } from '../validation';
+import { validate, idParamSchema, createCustomerSchema, customerSearchSchema } from '../validation';
+import { hasColumn } from '../dbColumns';
 
 const router = Router();
 
@@ -56,7 +57,7 @@ router.get('/search', requireRole('manager', 'agent'), validate(customerSearchSc
   }
 });
 
-router.get('/:id', requireRole('manager', 'agent', 'seller'), async (req: AuthRequest, res: Response) => {
+router.get('/:id', requireRole('manager', 'agent', 'seller'), validate(idParamSchema, 'params'), async (req: AuthRequest, res: Response) => {
   try {
     let sql = 'SELECT * FROM customers WHERE id = $1';
     if (req.user?.role === 'agent' || req.user?.role === 'seller') {
@@ -70,11 +71,47 @@ router.get('/:id', requireRole('manager', 'agent', 'seller'), async (req: AuthRe
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Customer not found' });
     }
-    const ops = await query(
-      `SELECT * FROM operations WHERE customer_name = $1 ORDER BY id DESC LIMIT 50`,
-      [result.rows[0].full_name]
-    );
-    res.json({ ...result.rows[0], operations: ops.rows });
+    const customer = result.rows[0];
+    // C-03: link operations by key, never by bare name. New rows carry
+    // customer_row_id (FK) and/or customer_id (= national id_number); legacy
+    // rows carry only customer_name. Name matching is kept ONLY for legacy
+    // rows of unidentified customers (empty id_number) and is additionally
+    // scoped to the customer's creator so identical names cannot leak across
+    // tenants.
+    let ops;
+    const linkable = await hasColumn('operations', 'customer_row_id');
+    if (linkable && customer.id_number && String(customer.id_number) !== '') {
+      ops = await query(
+        `SELECT * FROM operations
+          WHERE customer_row_id = $1
+             OR (customer_row_id IS NULL AND customer_id = $2)
+          ORDER BY id DESC LIMIT 50`,
+        [customer.id, String(customer.id_number)]
+      );
+    } else if (linkable) {
+      // Identified-customer column exists but this customer has no id_number:
+      // keyed lookup plus creator-scoped legacy fallback.
+      ops = await query(
+        `SELECT * FROM operations
+          WHERE customer_row_id = $1
+             OR (customer_row_id IS NULL AND (customer_id IS NULL OR customer_id = '')
+                 AND customer_name = $2 AND created_by = $3)
+          ORDER BY id DESC LIMIT 50`,
+        [customer.id, customer.full_name, customer.created_by]
+      );
+    } else {
+      // Pre-migration fallback (no customer_row_id column yet): match the
+      // national id when present, else creator-scoped name matching. Still
+      // strictly narrower than the old bare-name query.
+      ops = await query(
+        `SELECT * FROM operations
+          WHERE (customer_id = $1 AND $1 <> '')
+             OR (customer_name = $2 AND created_by = $3)
+          ORDER BY id DESC LIMIT 50`,
+        [String(customer.id_number || ''), customer.full_name, customer.created_by]
+      );
+    }
+    res.json({ ...customer, operations: ops.rows });
   } catch (err) {
     logger.error('Error fetching customer:', err);
     res.status(500).json({ error: 'Internal server error' });

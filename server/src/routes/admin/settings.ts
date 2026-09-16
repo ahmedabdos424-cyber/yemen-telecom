@@ -2,8 +2,9 @@ import { Router, Request, Response } from 'express';
 import { query } from '../../db';
 import { invalidateMaintenanceMode } from '../../maintenance';
 import { logger } from '../../logger';
-import { requireRole } from '../../middleware/auth';
+import { requireRole, AuthRequest } from '../../middleware/auth';
 import { validate, updateSettingsSchema } from '../../validation';
+import { logAudit } from '../../audit-log';
 
 const router = Router();
 
@@ -64,7 +65,7 @@ router.get('/settings', requireRole('manager'), async (_req: Request, res: Respo
   }
 });
 
-router.put('/settings', requireRole('manager'), validate(updateSettingsSchema), async (req: Request, res: Response) => {
+router.put('/settings', requireRole('manager'), validate(updateSettingsSchema), async (req: AuthRequest, res: Response) => {
   const settings = req.body;
   try {
     const result = await query(
@@ -92,6 +93,7 @@ router.put('/settings', requireRole('manager'), validate(updateSettingsSchema), 
     );
     invalidateMaintenanceMode();
     res.json(mapAdminSettingsToCamelCase(result.rows[0]));
+    void logAudit({ type: 'settings_updated', title: 'تحديث إعدادات النظام', username: req.user?.username || 'unknown' });
   } catch (err) {
     logger.error('Error updating settings:', err);
     res.status(500).json({ error: 'Internal server error' });

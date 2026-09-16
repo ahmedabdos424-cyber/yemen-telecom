@@ -38,7 +38,8 @@ Full-stack SIM card distribution management system with offline Arabic OCR for i
 ```bash
 git clone https://github.com/ahmedabdos424-cyber/yemen-telecom.git
 cd yemen-telecom
-npm install
+npm install          # root — frontend deps
+cd server && npm install  # server — backend deps (separate package.json)
 ```
 
 ## Environment Variables
@@ -52,10 +53,19 @@ Copy `.env.example` to `server/.env` and configure:
 | `DB_USER` | Database user |
 | `DB_PASSWORD` | Database password |
 | `DB_NAME` | Database name |
-| `JWT_SECRET` | JWT signing secret |
-| `REFRESH_SECRET` | Refresh token secret |
-| `CSRF_SECRET` | CSRF token secret |
+| `JWT_SECRET` | JWT signing secret (≥32 chars in production) |
+| `REFRESH_SECRET` | Refresh token secret (≥32 chars in production) |
+| `CSRF_SECRET` | CSRF token secret (≥32 chars in production) |
+| `BLACKLIST_HMAC_SECRET` | Token-blacklist HMAC key — **required, server refuses to start without it** |
+| `RESET_CONFIRM_TOKEN` | Confirmation token for `POST /api/admin/reset` |
 | `CORS_ORIGIN` | Allowed CORS origins (comma-separated) |
+| `REDIS_URL` | Redis URL for distributed login lockout (optional — memory + DB fallback) |
+| `APP_VERSION` / `APP_VERSION_CODE` | Must match `android/app/build.gradle` versionName/versionCode |
+| `APP_APK_SHA256` / `APP_APK_SIZE` | APK integrity values verified client-side |
+| `APP_APK_BUCKET` / `APP_APK_OBJECT` | Private bucket/object for per-request signed APK URLs (`APP_APK_URL` is fallback) |
+| `BACKUP_S3_ENDPOINT` / `BACKUP_S3_REGION` / `BACKUP_S3_ACCESS_KEY_ID` / `BACKUP_S3_SECRET_ACCESS_KEY` / `BACKUP_S3_BUCKET` | S3-compatible backup storage |
+| `BACKUP_ENCRYPTION_KEY` | Backup encryption key (required in production) |
+| `FIREBASE_PROJECT_ID` / `FIREBASE_CLIENT_EMAIL` / `FIREBASE_PRIVATE_KEY` | FCM push notifications (optional) |
 | `SUPABASE_URL` | Supabase project URL (image uploads) |
 | `SUPABASE_ANON_KEY` | Supabase anon/publishable key (image uploads) |
 | `UPLOAD_BUCKET` | Supabase Storage bucket for uploads |
@@ -64,10 +74,9 @@ Frontend env vars (prefix with `VITE_`):
 
 | Variable | Description |
 |----------|-------------|
-| `VITE_SUPABASE_URL` | Supabase project URL |
-| `VITE_SUPABASE_ANON_KEY` | Supabase anon/publishable key |
-| `VITE_FIREBASE_MESSAGING_SENDER_ID` | Firebase sender ID |
-| `VITE_FIREBASE_APP_ID` | Firebase app ID |
+| `VITE_PROXY_TARGET` | Dev/preview API proxy target (default: production) |
+| `VITE_SENTRY_DSN` | Frontend Sentry DSN (optional) |
+| `VITE_SENTRY_RELEASE` | Frontend release tag for Sentry (optional) |
 
 ## Development
 
@@ -151,21 +160,36 @@ Key tables: `users`, `sellers`, `sims`, `agents`, `operations`, `inventories`, `
 
 | Endpoint | Auth | Description |
 |----------|------|-------------|
-| `POST /api/auth/login` | No | Login (rate-limited) |
-| `POST /api/auth/refresh` | No | Refresh token |
-| `GET /api/csrf-token` | No | CSRF token |
-| `GET /api/health` | No | Health check |
-| `GET /api/stats` | Manager | Dashboard stats |
-| `CRUD /api/sellers` | JWT | Seller management |
-| `CRUD /api/agents` | JWT | Agent management |
-| `CRUD /api/sims` | JWT | SIM inventory |
-| `CRUD /api/admin/*` | Admin | Admin functions |
+| `POST /api/auth/login` | No | Login (5 attempts/15min + escalating lockout) |
+| `POST /api/auth/refresh` | No (+CSRF) | Refresh token rotation (20/15min) |
+| `POST /api/auth/logout` | JWT | Logout, revokes tokens + session |
+| `GET /api/auth/me` | JWT | Current user profile + session checks |
+| `GET /api/csrf-token` | No | CSRF token pair (30/min) |
+| `GET /api/health` | No | Health check (always 200, `ok`/`degraded`) |
+| `GET /api/stats` | Manager | Dashboard stats (cached 5 min) |
+| `CRUD /api/sellers` | JWT (scoped) | Seller management + balance + password reset |
+| `CRUD /api/agents` | Manager (+self-read) | Agent management |
+| `CRUD /api/sims` | JWT (scoped) | SIM inventory + activate + agent→seller transfer |
+| `GET/POST /api/operations` | JWT (scoped) | Activation/recharge log (idempotent) |
+| `GET/PUT /api/inventories` | JWT / Manager | Stock overview + updates |
+| `GET/POST /api/customers` | JWT (scoped) | Customer registry + search |
+| `GET/POST/PUT /api/distributions` | Agent/Manager | Stock requests + approval |
+| `GET /api/reports/*` | Manager/Agent (scoped) | daily-sales, performance, activations (paged, `X-Total-Count`) |
+| `GET/DELETE /api/alerts` | Manager | Alerts (delete returns 404 when missing) |
+| `POST/DELETE /api/notifications/device-token` | JWT (self) | FCM token register/unregister |
+| `POST /api/upload/image(s)` | JWT | Image upload (magic bytes, 5MB, 413 on overflow) |
+| `GET /api/upload/signed/:filename` | JWT (owner) | Fresh signed URL for owned documents |
+| `PUT /api/users/*` | JWT (self) | Password, profile, preferences |
+| `GET /api/app-version` | No | Public updater metadata (no-store, https-only APK) |
+| `POST /api/app-update-installed` | No (+CSRF, 30/15min) | Install telemetry (deviceId required) |
+| `CRUD /api/admin/*` | Manager | Batch SIMs, audit logs, settings, lockdown, identities |
 
 ## Security
 
 - JWT access + refresh token rotation
-- CSRF protection (double-submit cookie pattern)
-- Rate limiting (login: 10/15min, API: 100/min)
+- CSRF protection (HMAC-bound token pair, rotated on login)
+- Rate limiting (login 5/15min + escalating username+IP lockout in memory, DB and Redis; refresh 20/15min; writes 30/min; API 100/min; transfers 10/min)
+- Numeric `:id` params validated (400, never 500); unique conflicts return 409
 - Helmet security headers + CSP
 - Input validation on all routes
 - ProGuard rules for Android release

@@ -1,11 +1,11 @@
 import type { QueryResult } from 'pg';
 import { query } from '../db';
 import { sendPushToTokens, getManagerTokens, getAgentAndManagerTokens, isFcmEnabled } from './fcm.service';
-import { broadcastEvent } from './realtime.service';
+import { broadcastToRoles } from './realtime.service';
 import { logger } from '../logger';
 
 export interface Queryable {
-  query(text: string, params?: unknown[]): Promise<QueryResult<any>>;
+  query(text: string, params?: unknown[]): Promise<QueryResult<Record<string, unknown>>>;
 }
 
 export type AlertPriority = 'high' | 'medium' | 'low';
@@ -65,12 +65,13 @@ export async function createAlert(input: CreateAlertInput, db: Queryable = { que
   // never slows down or breaks the request that created the alert).
   void broadcastPush(input);
   // Live realtime update so open dashboards show the alert instantly.
-  broadcastEvent({
+  // H-05: alerts are a manager-only view — never broadcast them to field roles.
+  broadcastToRoles({
     type: 'alert.created',
     entity: 'alert',
     title: input.title,
     description: input.description,
     priority: input.priority ?? 'low',
     category: input.category ?? 'مخزون',
-  });
+  }, ['manager']);
 }

@@ -159,7 +159,14 @@ export default function AddSellerForm({ onSellerAdded, agentName }: AddSellerFor
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="اسم البائع"
                 className="input-field pl-12 bg-slate-950 border-slate-850 text-sm text-right placeholder:text-slate-700"
-                autoFocus
+                ref={(el) => {
+                  // L-05: desktop-only initial focus (see LoginScreen) —
+                  // mobile keyboards must not pop on form open.
+                  if (el && !el.dataset.autofocused && window.matchMedia?.('(pointer: fine)').matches) {
+                    el.dataset.autofocused = '1';
+                    el.focus({ preventScroll: true });
+                  }
+                }}
               />
             <CameraCapture onCapture={handleNameCapture} />
           </div>
